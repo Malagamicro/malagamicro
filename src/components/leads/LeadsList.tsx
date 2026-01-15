@@ -10,7 +10,8 @@ import {
   Building2, 
   Grid3X3,
   List,
-  Upload
+  Upload,
+  Download
 } from 'lucide-react';
 import {
   Select,
@@ -19,6 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { exportToCSV, exportToExcel } from '@/lib/exportLeads';
+import { toast } from 'sonner';
 
 interface LeadsListProps {
   leads: Lead[];
@@ -56,6 +65,28 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
           </p>
         </div>
         <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2" disabled={leads.length === 0}>
+                <Download className="w-4 h-4" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => {
+                exportToCSV(filteredLeads);
+                toast.success(`${filteredLeads.length} leads exportados a CSV`);
+              }}>
+                Exportar a CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                exportToExcel(filteredLeads);
+                toast.success(`${filteredLeads.length} leads exportados a Excel`);
+              }}>
+                Exportar a Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" onClick={onImportLeads} className="gap-2">
             <Upload className="w-4 h-4" />
             Importar
