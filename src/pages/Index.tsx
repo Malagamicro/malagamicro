@@ -28,9 +28,11 @@ const Index = () => {
     updateLead, 
     deleteLead,
     importLeads,
+    geocodeLead,
     isAddingLead,
     isUpdatingLead,
     isImportingLeads,
+    isGeocodingLead,
   } = useLeads();
 
   const handleViewLead = (id: string) => {
@@ -101,6 +103,8 @@ const Index = () => {
           onUpdateStatus={handleUpdateLeadStatus}
           onEdit={() => handleEditLead(selectedLead)}
           onDelete={() => handleDeleteLead(selectedLead.id)}
+          onGeocode={(id, address, city) => geocodeLead({ id, address, city })}
+          isGeocoding={isGeocodingLead}
         />
       );
     }

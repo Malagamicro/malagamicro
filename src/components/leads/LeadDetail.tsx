@@ -20,6 +20,8 @@ import {
   Bell,
   Edit,
   Trash2,
+  MapPinned,
+  Loader2,
 } from 'lucide-react';
 import {
   Select,
@@ -46,9 +48,11 @@ interface LeadDetailProps {
   onUpdateStatus: (id: string, status: LeadStatus, previousStatus?: LeadStatus) => void;
   onEdit: () => void;
   onDelete: () => void;
+  onGeocode: (id: string, address?: string, city?: string) => void;
+  isGeocoding?: boolean;
 }
 
-export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: LeadDetailProps) {
+export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete, onGeocode, isGeocoding = false }: LeadDetailProps) {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
@@ -234,6 +238,27 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
                 <Bell className="w-4 h-4" />
                 Programar Recordatorio
               </Button>
+              {!lead.latitude && !lead.longitude && (lead.address || lead.city) && (
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2"
+                  onClick={() => onGeocode(lead.id, lead.address, lead.city)}
+                  disabled={isGeocoding}
+                >
+                  {isGeocoding ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <MapPinned className="w-4 h-4" />
+                  )}
+                  {isGeocoding ? 'Obteniendo ubicación...' : 'Obtener Coordenadas'}
+                </Button>
+              )}
+              {lead.latitude && lead.longitude && (
+                <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                  <MapPinned className="w-4 h-4 text-green-500" />
+                  <span>Ubicación disponible</span>
+                </div>
+              )}
             </div>
           </div>
 
