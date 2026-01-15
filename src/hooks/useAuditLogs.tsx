@@ -19,11 +19,11 @@ export interface DateRange {
   to: Date | undefined;
 }
 
-export function useAuditLogs(limit: number = 50, dateRange?: DateRange) {
+export function useAuditLogs(limit: number = 50, dateRange?: DateRange, actionTypes?: string[]) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['audit-logs', limit, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
+    queryKey: ['audit-logs', limit, dateRange?.from?.toISOString(), dateRange?.to?.toISOString(), actionTypes],
     queryFn: async (): Promise<AuditLogEntry[]> => {
       let query = supabase
         .from('audit_logs')
@@ -38,6 +38,9 @@ export function useAuditLogs(limit: number = 50, dateRange?: DateRange) {
         const endDate = new Date(dateRange.to);
         endDate.setDate(endDate.getDate() + 1);
         query = query.lt('created_at', endDate.toISOString());
+      }
+      if (actionTypes && actionTypes.length > 0) {
+        query = query.in('action', actionTypes);
       }
 
       const { data, error } = await query.limit(limit) as { data: AuditLogEntry[] | null; error: any };

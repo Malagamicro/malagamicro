@@ -13,8 +13,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send, Download, FileSpreadsheet, File, CalendarIcon, X } from 'lucide-react';
+import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send, Download, FileSpreadsheet, File, CalendarIcon, X, Filter } from 'lucide-react';
 import { exportAuditLogsToCSV, exportAuditLogsToPDF } from '@/lib/exportAuditLogs';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -37,6 +40,13 @@ const actionLabels: Record<string, string> = {
   campaign_created: 'Campaña creada',
   campaign_sent: 'Campaña enviada',
   whatsapp_sent: 'WhatsApp enviado',
+};
+
+const actionGroups: Record<string, string[]> = {
+  'Autenticación': ['login', 'logout', 'password_reset_request', 'password_updated'],
+  'Leads': ['lead_created', 'lead_updated', 'lead_deleted', 'lead_status_changed', 'leads_imported', 'lead_geocoded'],
+  'Recordatorios': ['reminder_created', 'reminder_completed', 'reminder_deleted'],
+  'Comunicación': ['email_sent', 'campaign_created', 'campaign_sent', 'whatsapp_sent'],
 };
 
 const entityIcons: Record<string, React.ElementType> = {
@@ -62,8 +72,32 @@ const actionColors: Record<string, string> = {
 
 export function AuditLogViewer() {
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
-  const { data: logs, isLoading, error } = useAuditLogs(100, dateRange);
+  const [selectedActions, setSelectedActions] = useState<string[]>([]);
+  const { data: logs, isLoading, error } = useAuditLogs(100, dateRange, selectedActions.length > 0 ? selectedActions : undefined);
   const { toast } = useToast();
+
+  const toggleAction = (action: string) => {
+    setSelectedActions(prev => 
+      prev.includes(action) 
+        ? prev.filter(a => a !== action)
+        : [...prev, action]
+    );
+  };
+
+  const toggleGroup = (group: string) => {
+    const groupActions = actionGroups[group];
+    const allSelected = groupActions.every(a => selectedActions.includes(a));
+    
+    if (allSelected) {
+      setSelectedActions(prev => prev.filter(a => !groupActions.includes(a)));
+    } else {
+      setSelectedActions(prev => [...new Set([...prev, ...groupActions])]);
+    }
+  };
+
+  const clearActionFilter = () => {
+    setSelectedActions([]);
+  };
 
   const handleExportCSV = () => {
     if (!logs || logs.length === 0) {
@@ -122,6 +156,8 @@ export function AuditLogViewer() {
   };
 
   const hasDateFilter = dateRange.from || dateRange.to;
+  const hasActionFilter = selectedActions.length > 0;
+  const hasAnyFilter = hasDateFilter || hasActionFilter;
 
   return (
     <Card>
@@ -136,7 +172,52 @@ export function AuditLogViewer() {
               Historial de acciones realizadas en tu cuenta para auditoría y seguridad
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Action Type Filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(hasActionFilter && "text-primary")}
+                >
+                  <Filter className="w-4 h-4 mr-2" />
+                  {hasActionFilter ? `${selectedActions.length} filtros` : "Tipo de acción"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 max-h-80 overflow-y-auto">
+                {Object.entries(actionGroups).map(([group, actions]) => (
+                  <div key={group}>
+                    <DropdownMenuLabel className="flex items-center justify-between">
+                      <span>{group}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          toggleGroup(group);
+                        }}
+                      >
+                        {actions.every(a => selectedActions.includes(a)) ? 'Quitar' : 'Todos'}
+                      </Button>
+                    </DropdownMenuLabel>
+                    {actions.map(action => (
+                      <DropdownMenuCheckboxItem
+                        key={action}
+                        checked={selectedActions.includes(action)}
+                        onCheckedChange={() => toggleAction(action)}
+                      >
+                        {actionLabels[action] || action}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                  </div>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Date Range Filter */}
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -173,12 +254,18 @@ export function AuditLogViewer() {
                 />
               </PopoverContent>
             </Popover>
-            {hasDateFilter && (
+
+            {/* Clear Filters */}
+            {hasAnyFilter && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={clearDateFilter}
+                onClick={() => {
+                  clearDateFilter();
+                  clearActionFilter();
+                }}
                 className="h-9 px-2"
+                title="Limpiar filtros"
               >
                 <X className="w-4 h-4" />
               </Button>
