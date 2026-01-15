@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Lead, LeadStatus } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
+import { LeadScoreBadge } from './LeadScoreBadge';
 import { ActivityTimeline } from './ActivityTimeline';
 import { EmailComposeModal } from './EmailComposeModal';
 import { WhatsAppComposeModal } from './WhatsAppComposeModal';
@@ -75,6 +76,7 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-foreground">{lead.companyName}</h1>
+            <LeadScoreBadge score={lead.score ?? 0} size="md" showLabel />
             <LeadStatusBadge status={lead.status} size="md" />
           </div>
           <p className="text-muted-foreground mt-1 flex items-center gap-2">

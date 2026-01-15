@@ -188,6 +188,7 @@ export type Database = {
           longitude: number | null
           notes: string | null
           phone: string | null
+          score: number | null
           segment: string
           source: string
           status: string
@@ -210,6 +211,7 @@ export type Database = {
           longitude?: number | null
           notes?: string | null
           phone?: string | null
+          score?: number | null
           segment?: string
           source?: string
           status?: string
@@ -232,6 +234,7 @@ export type Database = {
           longitude?: number | null
           notes?: string | null
           phone?: string | null
+          score?: number | null
           segment?: string
           source?: string
           status?: string
@@ -277,7 +280,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_lead_score: { Args: { p_lead_id: string }; Returns: number }
     }
     Enums: {
       [_ in never]: never

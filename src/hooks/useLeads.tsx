@@ -31,6 +31,7 @@ function mapRowToLead(row: any): Lead {
     updatedAt: new Date(row.updated_at),
     lastContactedAt: row.last_contacted_at ? new Date(row.last_contacted_at) : undefined,
     tags: row.tags,
+    score: row.score ?? 0,
   };
 }
 

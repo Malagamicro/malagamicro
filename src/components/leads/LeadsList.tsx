@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Lead, LeadStatus, LeadSegment } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
+import { LeadScoreBadge } from './LeadScoreBadge';
 import { LeadCard } from './LeadCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,8 @@ import {
   Grid3X3,
   List,
   Upload,
-  Download
+  Download,
+  ArrowUpDown
 } from 'lucide-react';
 import {
   Select,
@@ -29,6 +31,8 @@ import {
 import { exportToCSV, exportToExcel } from '@/lib/exportLeads';
 import { toast } from 'sonner';
 
+type SortOption = 'recent' | 'score' | 'name';
+
 interface LeadsListProps {
   leads: Lead[];
   onViewLead: (id: string) => void;
@@ -41,18 +45,34 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [segmentFilter, setSegmentFilter] = useState<LeadSegment | 'all'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortBy, setSortBy] = useState<SortOption>('score');
 
-  const filteredLeads = leads.filter((lead) => {
-    const matchesSearch = 
-      lead.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.contactName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.city.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
-    const matchesSegment = segmentFilter === 'all' || lead.segment === segmentFilter;
-    
-    return matchesSearch && matchesStatus && matchesSegment;
-  });
+  const filteredAndSortedLeads = useMemo(() => {
+    const filtered = leads.filter((lead) => {
+      const matchesSearch = 
+        lead.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        lead.contactName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        lead.city.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
+      const matchesSegment = segmentFilter === 'all' || lead.segment === segmentFilter;
+      
+      return matchesSearch && matchesStatus && matchesSegment;
+    });
+
+    // Sort the filtered leads
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'score':
+          return (b.score ?? 0) - (a.score ?? 0);
+        case 'name':
+          return a.companyName.localeCompare(b.companyName);
+        case 'recent':
+        default:
+          return b.createdAt.getTime() - a.createdAt.getTime();
+      }
+    });
+  }, [leads, searchTerm, statusFilter, segmentFilter, sortBy]);
 
   return (
     <div className="p-8 space-y-6 animate-fade-in">
@@ -61,7 +81,7 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
         <div>
           <h1 className="text-3xl font-bold text-foreground">Leads</h1>
           <p className="text-muted-foreground mt-1">
-            {filteredLeads.length} de {leads.length} leads
+            {filteredAndSortedLeads.length} de {leads.length} leads
           </p>
         </div>
         <div className="flex gap-2">
@@ -74,14 +94,14 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => {
-                exportToCSV(filteredLeads);
-                toast.success(`${filteredLeads.length} leads exportados a CSV`);
+                exportToCSV(filteredAndSortedLeads);
+                toast.success(`${filteredAndSortedLeads.length} leads exportados a CSV`);
               }}>
                 Exportar a CSV
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => {
-                exportToExcel(filteredLeads);
-                toast.success(`${filteredLeads.length} leads exportados a Excel`);
+                exportToExcel(filteredAndSortedLeads);
+                toast.success(`${filteredAndSortedLeads.length} leads exportados a Excel`);
               }}>
                 Exportar a Excel
               </DropdownMenuItem>
@@ -134,6 +154,18 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
           </SelectContent>
         </Select>
 
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+          <SelectTrigger className="w-36">
+            <ArrowUpDown className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Ordenar" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="score">Por Score</SelectItem>
+            <SelectItem value="recent">Más recientes</SelectItem>
+            <SelectItem value="name">Por nombre</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="flex border rounded-lg overflow-hidden">
           <Button
             variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
@@ -153,7 +185,7 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
       </div>
 
       {/* Leads Grid/List */}
-      {filteredLeads.length === 0 ? (
+      {filteredAndSortedLeads.length === 0 ? (
         <div className="text-center py-12">
           <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium text-foreground">No hay leads</h3>
@@ -165,7 +197,7 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredLeads.map((lead) => (
+          {filteredAndSortedLeads.map((lead) => (
             <LeadCard key={lead.id} lead={lead} onClick={() => onViewLead(lead.id)} />
           ))}
         </div>
@@ -175,6 +207,7 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
             <thead className="bg-muted/50">
               <tr>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Empresa</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Score</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Contacto</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Ciudad</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Estado</th>
@@ -182,7 +215,7 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
               </tr>
             </thead>
             <tbody>
-              {filteredLeads.map((lead) => (
+              {filteredAndSortedLeads.map((lead) => (
                 <tr
                   key={lead.id}
                   onClick={() => onViewLead(lead.id)}
@@ -190,6 +223,9 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
                 >
                   <td className="px-4 py-3">
                     <span className="font-medium text-foreground">{lead.companyName}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <LeadScoreBadge score={lead.score ?? 0} />
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{lead.contactName || '-'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{lead.city}</td>

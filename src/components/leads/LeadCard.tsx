@@ -1,5 +1,6 @@
 import { Lead } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
+import { LeadScoreBadge } from './LeadScoreBadge';
 import { Building2, MapPin, Phone, Mail, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -33,7 +34,10 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
             </p>
           </div>
         </div>
-        <LeadStatusBadge status={lead.status} />
+        <div className="flex items-center gap-2">
+          <LeadScoreBadge score={lead.score ?? 0} />
+          <LeadStatusBadge status={lead.status} />
+        </div>
       </div>
 
       {lead.contactName && (

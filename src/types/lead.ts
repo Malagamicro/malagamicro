@@ -20,6 +20,7 @@ export interface Lead {
   updatedAt: Date;
   lastContactedAt?: Date;
   tags?: string[];
+  score?: number;
 }
 
 export interface LeadActivity {
