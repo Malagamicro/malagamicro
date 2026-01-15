@@ -93,6 +93,7 @@ interface EmailComposeModalProps {
   onOpenChange: (open: boolean) => void;
   lead: Lead;
   onEmailSent?: () => void;
+  onActivityLogged?: () => void;
 }
 
 export function EmailComposeModal({ 
