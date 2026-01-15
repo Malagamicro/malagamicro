@@ -3,8 +3,17 @@ import { es } from 'date-fns/locale';
 import { useAuditLogs } from '@/hooks/useAuditLogs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send, Download, FileSpreadsheet, File } from 'lucide-react';
+import { exportAuditLogsToCSV, exportAuditLogsToPDF } from '@/lib/exportAuditLogs';
+import { useToast } from '@/hooks/use-toast';
 
 const actionLabels: Record<string, string> = {
   login: 'Inicio de sesión',
@@ -49,6 +58,39 @@ const actionColors: Record<string, string> = {
 
 export function AuditLogViewer() {
   const { data: logs, isLoading, error } = useAuditLogs(100);
+  const { toast } = useToast();
+
+  const handleExportCSV = () => {
+    if (!logs || logs.length === 0) {
+      toast({
+        title: 'Sin datos',
+        description: 'No hay registros para exportar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    exportAuditLogsToCSV(logs);
+    toast({
+      title: 'Exportación completada',
+      description: 'El archivo CSV se ha descargado.',
+    });
+  };
+
+  const handleExportPDF = () => {
+    if (!logs || logs.length === 0) {
+      toast({
+        title: 'Sin datos',
+        description: 'No hay registros para exportar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    exportAuditLogsToPDF(logs);
+    toast({
+      title: 'Exportación completada',
+      description: 'El archivo PDF se ha descargado.',
+    });
+  };
 
   if (isLoading) {
     return (
@@ -73,13 +115,37 @@ export function AuditLogViewer() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="w-5 h-5" />
-          Registro de Actividad
-        </CardTitle>
-        <CardDescription>
-          Historial de acciones realizadas en tu cuenta para auditoría y seguridad
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              Registro de Actividad
+            </CardTitle>
+            <CardDescription>
+              Historial de acciones realizadas en tu cuenta para auditoría y seguridad
+            </CardDescription>
+          </div>
+          {logs && logs.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportCSV}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Exportar como CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF}>
+                  <File className="w-4 h-4 mr-2" />
+                  Exportar como PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {logs && logs.length > 0 ? (
