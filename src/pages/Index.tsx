@@ -14,6 +14,7 @@ import { ReportsDashboard } from '@/components/reports/ReportsDashboard';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 import { SessionTimeoutWarning } from '@/components/auth/SessionTimeoutWarning';
 import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
+import { ProfileSettings } from '@/components/settings/ProfileSettings';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -185,6 +186,7 @@ const Index = () => {
                 Configuración y registro de actividad
               </p>
             </div>
+            <ProfileSettings />
             <AuditLogViewer />
           </div>
         );
