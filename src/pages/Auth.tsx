@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Building2 } from 'lucide-react';
 import { z } from 'zod';
+import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 
 const authSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -159,6 +160,7 @@ export default function Auth() {
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
               )}
+              {isSignUp && <PasswordStrengthIndicator password={password} />}
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
