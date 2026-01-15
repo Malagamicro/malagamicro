@@ -3,6 +3,7 @@ import { Lead, LeadStatus } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
 import { ActivityTimeline } from './ActivityTimeline';
 import { EmailComposeModal } from './EmailComposeModal';
+import { WhatsAppComposeModal } from './WhatsAppComposeModal';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, 
@@ -45,6 +46,7 @@ interface LeadDetailProps {
 
 export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: LeadDetailProps) {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('es-ES', {
@@ -198,7 +200,7 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
               <Button 
                 variant="outline" 
                 className="w-full justify-start gap-2"
-                onClick={() => lead.phone && window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}
+                onClick={() => setIsWhatsAppModalOpen(true)}
                 disabled={!lead.phone}
               >
                 <MessageSquare className="w-4 h-4" />
@@ -297,6 +299,13 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
       <EmailComposeModal
         open={isEmailModalOpen}
         onOpenChange={setIsEmailModalOpen}
+        lead={lead}
+      />
+
+      {/* WhatsApp Modal */}
+      <WhatsAppComposeModal
+        open={isWhatsAppModalOpen}
+        onOpenChange={setIsWhatsAppModalOpen}
         lead={lead}
       />
     </div>
