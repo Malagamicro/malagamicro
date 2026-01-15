@@ -322,6 +322,59 @@ export function useLeads() {
     },
   });
 
+  const bulkGeocode = useMutation({
+    mutationFn: async (leadsToGeocode: { id: string; address?: string; city?: string }[]) => {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const lead of leadsToGeocode) {
+        try {
+          const coords = await geocodeAddress(lead.address, lead.city);
+          
+          if (coords) {
+            const { error } = await supabase
+              .from('leads')
+              .update({
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', lead.id);
+            
+            if (!error) {
+              successCount++;
+            } else {
+              failCount++;
+            }
+          } else {
+            failCount++;
+          }
+          
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error) {
+          failCount++;
+        }
+      }
+
+      return { successCount, failCount, total: leadsToGeocode.length };
+    },
+    onSuccess: ({ successCount, failCount, total }) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      toast({
+        title: 'Geocodificación completada',
+        description: `${successCount} de ${total} leads actualizados${failCount > 0 ? `. ${failCount} fallidos.` : '.'}`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Ocurrió un error durante la geocodificación masiva.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     leads,
     isLoading,
@@ -332,11 +385,13 @@ export function useLeads() {
     deleteLead: deleteLead.mutate,
     importLeads: importLeads.mutate,
     geocodeLead: geocodeLead.mutate,
+    bulkGeocode: bulkGeocode.mutate,
     isAddingLead: addLead.isPending,
     isUpdatingLead: updateLead.isPending,
     isDeletingLead: deleteLead.isPending,
     isImportingLeads: importLeads.isPending,
     isGeocodingLead: geocodeLead.isPending,
+    isBulkGeocoding: bulkGeocode.isPending,
   };
 }
 

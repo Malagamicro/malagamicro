@@ -29,10 +29,12 @@ const Index = () => {
     deleteLead,
     importLeads,
     geocodeLead,
+    bulkGeocode,
     isAddingLead,
     isUpdatingLead,
     isImportingLeads,
     isGeocodingLead,
+    isBulkGeocoding,
   } = useLeads();
 
   const handleViewLead = (id: string) => {
@@ -150,7 +152,12 @@ const Index = () => {
                 Visualiza tus leads en el mapa según su ubicación
               </p>
             </div>
-            <LeadMap leads={leads} onViewLead={handleViewLead} />
+            <LeadMap 
+              leads={leads} 
+              onViewLead={handleViewLead} 
+              onBulkGeocode={bulkGeocode}
+              isBulkGeocoding={isBulkGeocoding}
+            />
           </div>
         );
       case 'settings':
