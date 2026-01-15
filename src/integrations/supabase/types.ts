@@ -97,6 +97,47 @@ export type Database = {
         }
         Relationships: []
       }
+      follow_up_reminders: {
+        Row: {
+          created_at: string
+          id: string
+          is_completed: boolean
+          lead_id: string
+          message: string | null
+          reminder_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          lead_id: string
+          message?: string | null
+          reminder_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          lead_id?: string
+          message?: string | null
+          reminder_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_reminders_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_activities: {
         Row: {
           created_at: string

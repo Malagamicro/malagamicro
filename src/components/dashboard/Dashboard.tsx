@@ -1,9 +1,9 @@
 import { StatCard } from './StatCard';
 import { LeadsByStatusChart } from './LeadsByStatusChart';
 import { RecentLeads } from './RecentLeads';
+import { UpcomingReminders } from './UpcomingReminders';
 import { useLeads, useDashboardStats } from '@/hooks/useLeads';
-import { Users, UserPlus, TrendingUp, Target } from 'lucide-react';
-import { Loader2 } from 'lucide-react';
+import { Users, UserPlus, TrendingUp, Target, Loader2 } from 'lucide-react';
 
 interface DashboardProps {
   onViewLead: (id: string) => void;
@@ -73,9 +73,10 @@ export function Dashboard({ onViewLead }: DashboardProps) {
       </div>
 
       {/* Charts & Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <LeadsByStatusChart stats={dashboardStats} />
         <RecentLeads leads={leads} onViewLead={onViewLead} />
+        <UpcomingReminders onLeadClick={onViewLead} />
       </div>
     </div>
   );
