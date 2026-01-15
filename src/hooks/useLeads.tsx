@@ -94,6 +94,7 @@ export function useLeads() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       toast({
         title: 'Lead añadido',
         description: 'El lead ha sido añadido correctamente.',
@@ -108,12 +109,84 @@ export function useLeads() {
     },
   });
 
+  const updateLead = useMutation({
+    mutationFn: async ({ id, ...lead }: Partial<Lead> & { id: string }) => {
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          company_name: lead.companyName,
+          contact_name: lead.contactName,
+          email: lead.email,
+          phone: lead.phone,
+          website: lead.website,
+          address: lead.address,
+          city: lead.city,
+          status: lead.status,
+          segment: lead.segment,
+          source: lead.source,
+          equipment_count: lead.equipmentCount,
+          notes: lead.notes,
+          tags: lead.tags,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({
+        title: 'Lead actualizado',
+        description: 'El lead ha sido actualizado correctamente.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el lead.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteLead = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({
+        title: 'Lead eliminado',
+        description: 'El lead ha sido eliminado correctamente.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el lead.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     leads,
     isLoading,
     error,
     updateLeadStatus: updateLeadStatus.mutate,
     addLead: addLead.mutate,
+    updateLead: updateLead.mutate,
+    deleteLead: deleteLead.mutate,
+    isAddingLead: addLead.isPending,
+    isUpdatingLead: updateLead.isPending,
+    isDeletingLead: deleteLead.isPending,
   };
 }
 
