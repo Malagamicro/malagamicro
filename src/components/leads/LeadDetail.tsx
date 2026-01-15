@@ -5,6 +5,8 @@ import { LeadStatusBadge } from './LeadStatusBadge';
 import { ActivityTimeline } from './ActivityTimeline';
 import { EmailComposeModal } from './EmailComposeModal';
 import { WhatsAppComposeModal } from './WhatsAppComposeModal';
+import { ReminderModal } from './ReminderModal';
+import { RemindersList } from './RemindersList';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, 
@@ -14,7 +16,7 @@ import {
   Mail, 
   Globe, 
   MessageSquare,
-  Calendar,
+  Bell,
   Edit,
   Trash2,
 } from 'lucide-react';
@@ -48,6 +50,7 @@ interface LeadDetailProps {
 export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: LeadDetailProps) {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const refreshActivities = () => {
@@ -221,12 +224,19 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
                 <Phone className="w-4 h-4" />
                 Llamar
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-2" disabled>
-                <Calendar className="w-4 h-4" />
-                Programar Reunión
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2"
+                onClick={() => setIsReminderModalOpen(true)}
+              >
+                <Bell className="w-4 h-4" />
+                Programar Recordatorio
               </Button>
             </div>
           </div>
+
+          {/* Reminders List */}
+          <RemindersList leadId={lead.id} />
 
           {/* Status */}
           <div className="bg-card rounded-xl p-6 border border-border shadow-card">
@@ -315,6 +325,13 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
         onOpenChange={setIsWhatsAppModalOpen}
         lead={lead}
         onMessageSent={refreshActivities}
+      />
+
+      {/* Reminder Modal */}
+      <ReminderModal
+        open={isReminderModalOpen}
+        onOpenChange={setIsReminderModalOpen}
+        lead={lead}
       />
     </div>
   );
