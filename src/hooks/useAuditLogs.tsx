@@ -14,17 +14,33 @@ export interface AuditLogEntry {
   created_at: string;
 }
 
-export function useAuditLogs(limit: number = 50) {
+export interface DateRange {
+  from: Date | undefined;
+  to: Date | undefined;
+}
+
+export function useAuditLogs(limit: number = 50, dateRange?: DateRange) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['audit-logs', limit],
+    queryKey: ['audit-logs', limit, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async (): Promise<AuditLogEntry[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('audit_logs')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(limit) as { data: AuditLogEntry[] | null; error: any };
+        .order('created_at', { ascending: false });
+
+      if (dateRange?.from) {
+        query = query.gte('created_at', dateRange.from.toISOString());
+      }
+      if (dateRange?.to) {
+        // Add 1 day to include the entire end date
+        const endDate = new Date(dateRange.to);
+        endDate.setDate(endDate.getDate() + 1);
+        query = query.lt('created_at', endDate.toISOString());
+      }
+
+      const { data, error } = await query.limit(limit) as { data: AuditLogEntry[] | null; error: any };
       
       if (error) throw error;
       return data || [];
