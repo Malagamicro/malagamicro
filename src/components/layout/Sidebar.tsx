@@ -11,7 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
-  LogOut
+  LogOut,
+  Kanban
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,6 +25,7 @@ interface SidebarProps {
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'leads', label: 'Leads', icon: Users },
+  { id: 'pipeline', label: 'Pipeline', icon: Kanban },
   { id: 'prospeccion', label: 'Prospección', icon: Search },
   { id: 'campaigns', label: 'Campañas', icon: Mail },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, disabled: true },
