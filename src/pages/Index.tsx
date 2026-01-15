@@ -9,6 +9,7 @@ import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadImportModal } from '@/components/leads/LeadImportModal';
 import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
 import { EmailCampaigns } from '@/components/campaigns/EmailCampaigns';
+import { ReportsDashboard } from '@/components/reports/ReportsDashboard';
 import { useLeads } from '@/hooks/useLeads';
 import { Lead, LeadStatus } from '@/types/lead';
 import { Loader2 } from 'lucide-react';
@@ -160,6 +161,8 @@ const Index = () => {
             />
           </div>
         );
+      case 'reports':
+        return <ReportsDashboard />;
       case 'settings':
         return (
           <div className="p-8">
