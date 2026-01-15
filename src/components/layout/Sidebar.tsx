@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Building2,
   LogOut,
-  Kanban
+  Kanban,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,6 +30,7 @@ const menuItems = [
   { id: 'prospeccion', label: 'Prospección', icon: Search },
   { id: 'campaigns', label: 'Campañas', icon: Mail },
   { id: 'mapa', label: 'Mapa', icon: MapPin },
+  { id: 'reports', label: 'Reportes', icon: BarChart3 },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, disabled: true },
 ];
 
