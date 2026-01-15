@@ -3,6 +3,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadsList } from '@/components/leads/LeadsList';
 import { LeadDetail } from '@/components/leads/LeadDetail';
+import { LeadKanban } from '@/components/leads/LeadKanban';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadImportModal } from '@/components/leads/LeadImportModal';
 import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
@@ -117,6 +118,22 @@ const Index = () => {
         );
       case 'prospeccion':
         return <ProspectingPanel />;
+      case 'pipeline':
+        return (
+          <div className="p-8 space-y-6 animate-fade-in">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Pipeline</h1>
+              <p className="text-muted-foreground mt-1">
+                Arrastra los leads entre columnas para cambiar su estado
+              </p>
+            </div>
+            <LeadKanban 
+              leads={leads} 
+              onViewLead={handleViewLead} 
+              onUpdateStatus={handleUpdateLeadStatus}
+            />
+          </div>
+        );
       case 'campaigns':
         return <EmailCampaigns />;
       case 'settings':
