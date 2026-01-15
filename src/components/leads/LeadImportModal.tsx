@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -71,6 +71,96 @@ const fieldLabels: Record<keyof ColumnMapping, string> = {
   tags: 'Etiquetas',
 };
 
+// Parse CSV content manually with proper handling of quoted fields
+const parseCSV = (content: string): string[][] => {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentCell = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
+    const nextChar = content[i + 1];
+    
+    if (inQuotes) {
+      if (char === '"' && nextChar === '"') {
+        currentCell += '"';
+        i++; // Skip next quote
+      } else if (char === '"') {
+        inQuotes = false;
+      } else {
+        currentCell += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ',') {
+        currentRow.push(currentCell.trim());
+        currentCell = '';
+      } else if (char === '\n' || (char === '\r' && nextChar === '\n')) {
+        currentRow.push(currentCell.trim());
+        if (currentRow.some(cell => cell !== '')) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        currentCell = '';
+        if (char === '\r') i++; // Skip \n after \r
+      } else if (char !== '\r') {
+        currentCell += char;
+      }
+    }
+  }
+  
+  // Handle last cell/row
+  if (currentCell || currentRow.length > 0) {
+    currentRow.push(currentCell.trim());
+    if (currentRow.some(cell => cell !== '')) {
+      rows.push(currentRow);
+    }
+  }
+  
+  return rows;
+};
+
+// Parse Excel file using exceljs
+const parseExcel = async (buffer: ArrayBuffer): Promise<string[][]> => {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) return [];
+  
+  const rows: string[][] = [];
+  
+  worksheet.eachRow((row, rowNumber) => {
+    const rowData: string[] = [];
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      // Ensure we fill gaps with empty strings
+      while (rowData.length < colNumber - 1) {
+        rowData.push('');
+      }
+      
+      let value = '';
+      if (cell.value !== null && cell.value !== undefined) {
+        if (typeof cell.value === 'object' && 'text' in cell.value) {
+          value = String(cell.value.text || '');
+        } else if (typeof cell.value === 'object' && 'result' in cell.value) {
+          value = String(cell.value.result || '');
+        } else {
+          value = String(cell.value);
+        }
+      }
+      rowData.push(value.trim());
+    });
+    
+    if (rowData.some(cell => cell !== '')) {
+      rows.push(rowData);
+    }
+  });
+  
+  return rows;
+};
+
 export function LeadImportModal({ 
   open, 
   onOpenChange, 
@@ -104,22 +194,30 @@ export function LeadImportModal({
     setFileName(file.name);
 
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json<ParsedRow>(worksheet, { header: 1 });
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      let rows: string[][] = [];
+      
+      if (extension === 'csv') {
+        const text = await file.text();
+        rows = parseCSV(text);
+      } else if (extension === 'xlsx' || extension === 'xls') {
+        const buffer = await file.arrayBuffer();
+        rows = await parseExcel(buffer);
+      } else {
+        setError('Formato de archivo no soportado. Usa CSV o Excel.');
+        return;
+      }
 
-      if (jsonData.length < 2) {
+      if (rows.length < 2) {
         setError('El archivo debe tener al menos una fila de cabecera y una fila de datos.');
         return;
       }
 
-      const headerRow = jsonData[0] as unknown as string[];
-      const dataRows = jsonData.slice(1).map((row: any) => {
+      const headerRow = rows[0].filter(h => h);
+      const dataRows = rows.slice(1).map((row) => {
         const obj: ParsedRow = {};
         headerRow.forEach((header, index) => {
-          obj[header] = row[index]?.toString() || '';
+          obj[header] = row[index] || '';
         });
         return obj;
       }).filter(row => Object.values(row).some(v => v.trim() !== ''));
@@ -129,7 +227,7 @@ export function LeadImportModal({
         return;
       }
 
-      setHeaders(headerRow.filter(h => h));
+      setHeaders(headerRow);
       setParsedData(dataRows);
       
       // Auto-map columns based on common names
