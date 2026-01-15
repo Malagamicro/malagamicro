@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeSyncProvider } from "@/components/ThemeSyncProvider";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -28,7 +29,9 @@ const App = () => (
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <Index />
+                    <ThemeSyncProvider>
+                      <Index />
+                    </ThemeSyncProvider>
                   </ProtectedRoute>
                 }
               />

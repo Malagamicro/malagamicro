@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Moon, Sun, Monitor } from 'lucide-react';
+import { Moon, Sun, Monitor, Cloud } from 'lucide-react';
 
 export function ThemeToggleCard() {
   const { theme, setTheme } = useTheme();
@@ -46,8 +46,9 @@ export function ThemeToggleCard() {
           )}
           Tema de la Aplicación
         </CardTitle>
-        <CardDescription>
-          Selecciona tu preferencia de apariencia visual
+        <CardDescription className="flex items-center gap-2">
+          <Cloud className="w-4 h-4" />
+          Tu preferencia se sincroniza automáticamente entre dispositivos
         </CardDescription>
       </CardHeader>
       <CardContent>
