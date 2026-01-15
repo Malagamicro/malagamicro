@@ -10,7 +10,6 @@ import {
   Phone, 
   Mail, 
   Globe, 
-  Monitor,
   MessageSquare,
   Calendar,
   Send,
@@ -26,17 +25,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { mockActivities } from '@/data/mockLeads';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface LeadDetailProps {
   lead: Lead;
   onBack: () => void;
   onUpdateStatus: (id: string, status: LeadStatus) => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
-export function LeadDetail({ lead, onBack, onUpdateStatus }: LeadDetailProps) {
+export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: LeadDetailProps) {
   const [newNote, setNewNote] = useState('');
-  const activities = mockActivities.filter(a => a.leadId === lead.id);
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('es-ES', {
@@ -75,12 +85,30 @@ export function LeadDetail({ lead, onBack, onUpdateStatus }: LeadDetailProps) {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" onClick={onEdit}>
             <Edit className="w-4 h-4" />
           </Button>
-          <Button variant="outline" size="icon" className="text-destructive hover:text-destructive">
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="icon" className="text-destructive hover:text-destructive">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Eliminar lead?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. Se eliminará permanentemente el lead "{lead.companyName}" y toda su información.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -176,31 +204,10 @@ export function LeadDetail({ lead, onBack, onUpdateStatus }: LeadDetailProps) {
               </Button>
             </div>
 
-            {/* Timeline */}
-            <div className="space-y-4">
-              {activities.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">
-                  No hay actividad registrada aún
-                </p>
-              ) : (
-                activities.map((activity) => {
-                  const Icon = getActivityIcon(activity.type);
-                  return (
-                    <div key={activity.id} className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-foreground">{activity.description}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatDate(activity.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            {/* Timeline - empty state for now */}
+            <p className="text-center text-muted-foreground py-4">
+              No hay actividad registrada aún
+            </p>
           </div>
         </div>
 

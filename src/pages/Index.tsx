@@ -3,15 +3,28 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadsList } from '@/components/leads/LeadsList';
 import { LeadDetail } from '@/components/leads/LeadDetail';
+import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
 import { useLeads } from '@/hooks/useLeads';
-import { LeadStatus } from '@/types/lead';
+import { Lead, LeadStatus } from '@/types/lead';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const { leads, isLoading, updateLeadStatus } = useLeads();
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  
+  const { 
+    leads, 
+    isLoading, 
+    updateLeadStatus, 
+    addLead, 
+    updateLead, 
+    deleteLead,
+    isAddingLead,
+    isUpdatingLead,
+  } = useLeads();
 
   const handleViewLead = (id: string) => {
     setSelectedLeadId(id);
@@ -28,8 +41,30 @@ const Index = () => {
   };
 
   const handleAddLead = () => {
-    // TODO: Open add lead modal
-    console.log('Add lead clicked');
+    setEditingLead(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditLead = (lead: Lead) => {
+    setEditingLead(lead);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteLead = (id: string) => {
+    deleteLead(id);
+    if (selectedLeadId === id) {
+      handleBackFromDetail();
+    }
+  };
+
+  const handleFormSubmit = (data: any) => {
+    if (editingLead) {
+      updateLead({ id: editingLead.id, ...data });
+    } else {
+      addLead(data);
+    }
+    setIsFormOpen(false);
+    setEditingLead(null);
   };
 
   const selectedLead = leads.find(l => l.id === selectedLeadId);
@@ -49,6 +84,8 @@ const Index = () => {
           lead={selectedLead} 
           onBack={handleBackFromDetail}
           onUpdateStatus={handleUpdateLeadStatus}
+          onEdit={() => handleEditLead(selectedLead)}
+          onDelete={() => handleDeleteLead(selectedLead.id)}
         />
       );
     }
@@ -89,6 +126,14 @@ const Index = () => {
       <main className="flex-1 overflow-auto">
         {renderContent()}
       </main>
+
+      <LeadFormModal
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        lead={editingLead}
+        onSubmit={handleFormSubmit}
+        isLoading={isAddingLead || isUpdatingLead}
+      />
     </div>
   );
 };
