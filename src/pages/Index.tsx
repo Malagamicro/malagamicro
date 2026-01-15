@@ -19,6 +19,7 @@ import { PasswordChangeCard } from '@/components/settings/PasswordChangeCard';
 import { NotificationPreferencesCard } from '@/components/settings/NotificationPreferencesCard';
 import { TwoFactorAuthCard } from '@/components/settings/TwoFactorAuthCard';
 import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
+import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -191,6 +192,7 @@ const Index = () => {
               </p>
             </div>
             <ProfileSettings />
+            <ThemeToggleCard />
             <PasswordChangeCard />
             <TwoFactorAuthCard />
             <NotificationPreferencesCard />
