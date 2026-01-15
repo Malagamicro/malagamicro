@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign_emails: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          lead_id: string
+          opened_at: string | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_id: string
+          opened_at?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_id?: string
+          opened_at?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_emails_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_emails_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_campaigns: {
         Row: {
           created_at: string
@@ -181,6 +229,7 @@ export type Database = {
           contact_name: string | null
           created_at: string
           email: string | null
+          email_unsubscribed: boolean | null
           equipment_count: number | null
           id: string
           last_contacted_at: string | null
@@ -204,6 +253,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           email?: string | null
+          email_unsubscribed?: boolean | null
           equipment_count?: number | null
           id?: string
           last_contacted_at?: string | null
@@ -227,6 +277,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string
           email?: string | null
+          email_unsubscribed?: boolean | null
           equipment_count?: number | null
           id?: string
           last_contacted_at?: string | null

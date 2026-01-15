@@ -21,6 +21,7 @@ export interface Lead {
   lastContactedAt?: Date;
   tags?: string[];
   score?: number;
+  emailUnsubscribed?: boolean;
 }
 
 export interface LeadActivity {
