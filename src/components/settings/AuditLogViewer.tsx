@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useAuditLogs, DateRange } from '@/hooks/useAuditLogs';
+import { useAuditLogs, DateRange, AuditLogEntry } from '@/hooks/useAuditLogs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -17,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send, Download, FileSpreadsheet, File, CalendarIcon, X, Filter } from 'lucide-react';
+import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send, Download, FileSpreadsheet, File, CalendarIcon, X, Filter, Search } from 'lucide-react';
 import { exportAuditLogsToCSV, exportAuditLogsToPDF } from '@/lib/exportAuditLogs';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -73,8 +74,52 @@ const actionColors: Record<string, string> = {
 export function AuditLogViewer() {
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const { data: logs, isLoading, error } = useAuditLogs(100, dateRange, selectedActions.length > 0 ? selectedActions : undefined);
   const { toast } = useToast();
+
+  // Search through log details
+  const searchInDetails = (details: Record<string, unknown> | null, query: string): boolean => {
+    if (!details) return false;
+    const searchLower = query.toLowerCase();
+    
+    const searchValue = (value: unknown): boolean => {
+      if (typeof value === 'string') {
+        return value.toLowerCase().includes(searchLower);
+      }
+      if (typeof value === 'number') {
+        return value.toString().includes(searchLower);
+      }
+      if (Array.isArray(value)) {
+        return value.some(v => searchValue(v));
+      }
+      if (typeof value === 'object' && value !== null) {
+        return Object.values(value).some(v => searchValue(v));
+      }
+      return false;
+    };
+    
+    return Object.values(details).some(v => searchValue(v));
+  };
+
+  const filteredLogs = useMemo(() => {
+    if (!logs || !searchQuery.trim()) return logs;
+    
+    const query = searchQuery.toLowerCase();
+    return logs.filter(log => {
+      // Search in action label
+      const actionLabel = actionLabels[log.action] || log.action;
+      if (actionLabel.toLowerCase().includes(query)) return true;
+      
+      // Search in entity type
+      if (log.entity_type.toLowerCase().includes(query)) return true;
+      
+      // Search in details
+      if (searchInDetails(log.details, query)) return true;
+      
+      return false;
+    });
+  }, [logs, searchQuery]);
 
   const toggleAction = (action: string) => {
     setSelectedActions(prev => 
@@ -99,8 +144,12 @@ export function AuditLogViewer() {
     setSelectedActions([]);
   };
 
+  const clearSearch = () => {
+    setSearchQuery('');
+  };
+
   const handleExportCSV = () => {
-    if (!logs || logs.length === 0) {
+    if (!filteredLogs || filteredLogs.length === 0) {
       toast({
         title: 'Sin datos',
         description: 'No hay registros para exportar.',
@@ -108,7 +157,7 @@ export function AuditLogViewer() {
       });
       return;
     }
-    exportAuditLogsToCSV(logs);
+    exportAuditLogsToCSV(filteredLogs);
     toast({
       title: 'Exportación completada',
       description: 'El archivo CSV se ha descargado.',
@@ -116,7 +165,7 @@ export function AuditLogViewer() {
   };
 
   const handleExportPDF = () => {
-    if (!logs || logs.length === 0) {
+    if (!filteredLogs || filteredLogs.length === 0) {
       toast({
         title: 'Sin datos',
         description: 'No hay registros para exportar.',
@@ -124,7 +173,7 @@ export function AuditLogViewer() {
       });
       return;
     }
-    exportAuditLogsToPDF(logs);
+    exportAuditLogsToPDF(filteredLogs);
     toast({
       title: 'Exportación completada',
       description: 'El archivo PDF se ha descargado.',
@@ -157,11 +206,12 @@ export function AuditLogViewer() {
 
   const hasDateFilter = dateRange.from || dateRange.to;
   const hasActionFilter = selectedActions.length > 0;
-  const hasAnyFilter = hasDateFilter || hasActionFilter;
+  const hasSearchFilter = searchQuery.trim().length > 0;
+  const hasAnyFilter = hasDateFilter || hasActionFilter || hasSearchFilter;
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -173,6 +223,27 @@ export function AuditLogViewer() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar en registros..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 w-48"
+              />
+              {hasSearchFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSearch}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
+
             {/* Action Type Filter */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -263,6 +334,7 @@ export function AuditLogViewer() {
                 onClick={() => {
                   clearDateFilter();
                   clearActionFilter();
+                  clearSearch();
                 }}
                 className="h-9 px-2"
                 title="Limpiar filtros"
@@ -270,7 +342,7 @@ export function AuditLogViewer() {
                 <X className="w-4 h-4" />
               </Button>
             )}
-            {logs && logs.length > 0 && (
+            {filteredLogs && filteredLogs.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -294,10 +366,10 @@ export function AuditLogViewer() {
         </div>
       </CardHeader>
       <CardContent>
-        {logs && logs.length > 0 ? (
+        {filteredLogs && filteredLogs.length > 0 ? (
           <ScrollArea className="h-[500px] pr-4">
             <div className="space-y-3">
-              {logs.map((log) => {
+              {filteredLogs.map((log) => {
                 const Icon = entityIcons[log.entity_type] || Activity;
                 const colorClass = actionColors[log.action] || 'bg-muted text-muted-foreground';
                 
@@ -329,6 +401,11 @@ export function AuditLogViewer() {
               })}
             </div>
           </ScrollArea>
+        ) : logs && logs.length > 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p>No se encontraron resultados para "{searchQuery}"</p>
+          </div>
         ) : (
           <div className="py-12 text-center text-muted-foreground">
             <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
