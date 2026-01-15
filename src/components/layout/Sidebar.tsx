@@ -25,7 +25,7 @@ const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'leads', label: 'Leads', icon: Users },
   { id: 'prospeccion', label: 'Prospección', icon: Search },
-  { id: 'email', label: 'Email', icon: Mail, disabled: true },
+  { id: 'campaigns', label: 'Campañas', icon: Mail },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, disabled: true },
   { id: 'mapa', label: 'Mapa', icon: MapPin, disabled: true },
 ];

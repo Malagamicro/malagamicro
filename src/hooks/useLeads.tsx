@@ -32,6 +32,7 @@ function mapRowToLead(row: any): Lead {
     lastContactedAt: row.last_contacted_at ? new Date(row.last_contacted_at) : undefined,
     tags: row.tags,
     score: row.score ?? 0,
+    emailUnsubscribed: row.email_unsubscribed ?? false,
   };
 }
 

@@ -6,6 +6,7 @@ import { LeadDetail } from '@/components/leads/LeadDetail';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadImportModal } from '@/components/leads/LeadImportModal';
 import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
+import { EmailCampaigns } from '@/components/campaigns/EmailCampaigns';
 import { useLeads } from '@/hooks/useLeads';
 import { Lead, LeadStatus } from '@/types/lead';
 import { Loader2 } from 'lucide-react';
@@ -116,6 +117,8 @@ const Index = () => {
         );
       case 'prospeccion':
         return <ProspectingPanel />;
+      case 'campaigns':
+        return <EmailCampaigns />;
       case 'settings':
         return (
           <div className="p-8">
