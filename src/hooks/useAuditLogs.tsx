@@ -19,34 +19,72 @@ export interface DateRange {
   to: Date | undefined;
 }
 
-export function useAuditLogs(limit: number = 50, dateRange?: DateRange, actionTypes?: string[]) {
+export interface PaginatedAuditLogs {
+  data: AuditLogEntry[];
+  totalCount: number;
+  pageCount: number;
+}
+
+export function useAuditLogs(
+  page: number = 1,
+  pageSize: number = 20,
+  dateRange?: DateRange,
+  actionTypes?: string[]
+) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['audit-logs', limit, dateRange?.from?.toISOString(), dateRange?.to?.toISOString(), actionTypes],
-    queryFn: async (): Promise<AuditLogEntry[]> => {
-      let query = supabase
+    queryKey: ['audit-logs', page, pageSize, dateRange?.from?.toISOString(), dateRange?.to?.toISOString(), actionTypes],
+    queryFn: async (): Promise<PaginatedAuditLogs> => {
+      // Build base query for count
+      let countQuery = supabase
+        .from('audit_logs')
+        .select('*', { count: 'exact', head: true });
+
+      // Build data query
+      let dataQuery = supabase
         .from('audit_logs')
         .select('*')
         .order('created_at', { ascending: false });
 
+      // Apply filters to both queries
       if (dateRange?.from) {
-        query = query.gte('created_at', dateRange.from.toISOString());
+        const fromIso = dateRange.from.toISOString();
+        countQuery = countQuery.gte('created_at', fromIso);
+        dataQuery = dataQuery.gte('created_at', fromIso);
       }
       if (dateRange?.to) {
-        // Add 1 day to include the entire end date
         const endDate = new Date(dateRange.to);
         endDate.setDate(endDate.getDate() + 1);
-        query = query.lt('created_at', endDate.toISOString());
+        const toIso = endDate.toISOString();
+        countQuery = countQuery.lt('created_at', toIso);
+        dataQuery = dataQuery.lt('created_at', toIso);
       }
       if (actionTypes && actionTypes.length > 0) {
-        query = query.in('action', actionTypes);
+        countQuery = countQuery.in('action', actionTypes);
+        dataQuery = dataQuery.in('action', actionTypes);
       }
 
-      const { data, error } = await query.limit(limit) as { data: AuditLogEntry[] | null; error: any };
-      
+      // Get total count
+      const { count, error: countError } = await countQuery;
+      if (countError) throw countError;
+
+      // Apply pagination
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      dataQuery = dataQuery.range(from, to);
+
+      const { data, error } = await dataQuery as { data: AuditLogEntry[] | null; error: any };
       if (error) throw error;
-      return data || [];
+
+      const totalCount = count || 0;
+      const pageCount = Math.ceil(totalCount / pageSize);
+
+      return {
+        data: data || [],
+        totalCount,
+        pageCount,
+      };
     },
     enabled: !!user,
   });

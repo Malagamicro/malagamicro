@@ -18,10 +18,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send, Download, FileSpreadsheet, File, CalendarIcon, X, Filter, Search } from 'lucide-react';
+import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send, Download, FileSpreadsheet, File, CalendarIcon, X, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { exportAuditLogsToCSV, exportAuditLogsToPDF } from '@/lib/exportAuditLogs';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const actionLabels: Record<string, string> = {
   login: 'Inicio de sesión',
@@ -71,11 +72,26 @@ const actionColors: Record<string, string> = {
   reminder_created: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
 };
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
 export function AuditLogViewer() {
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: logs, isLoading, error } = useAuditLogs(100, dateRange, selectedActions.length > 0 ? selectedActions : undefined);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  
+  const { data: paginatedData, isLoading, error } = useAuditLogs(
+    currentPage,
+    pageSize,
+    dateRange,
+    selectedActions.length > 0 ? selectedActions : undefined
+  );
+  
+  const logs = paginatedData?.data;
+  const totalCount = paginatedData?.totalCount || 0;
+  const pageCount = paginatedData?.pageCount || 0;
+  
   const { toast } = useToast();
 
   // Search through log details
@@ -127,6 +143,7 @@ export function AuditLogViewer() {
         ? prev.filter(a => a !== action)
         : [...prev, action]
     );
+    setCurrentPage(1); // Reset to first page on filter change
   };
 
   const toggleGroup = (group: string) => {
@@ -138,14 +155,25 @@ export function AuditLogViewer() {
     } else {
       setSelectedActions(prev => [...new Set([...prev, ...groupActions])]);
     }
+    setCurrentPage(1); // Reset to first page on filter change
   };
 
   const clearActionFilter = () => {
     setSelectedActions([]);
+    setCurrentPage(1);
   };
 
   const clearSearch = () => {
     setSearchQuery('');
+  };
+
+  const handlePageSizeChange = (value: string) => {
+    setPageSize(Number(value));
+    setCurrentPage(1);
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, pageCount)));
   };
 
   const handleExportCSV = () => {
@@ -367,40 +395,84 @@ export function AuditLogViewer() {
       </CardHeader>
       <CardContent>
         {filteredLogs && filteredLogs.length > 0 ? (
-          <ScrollArea className="h-[500px] pr-4">
-            <div className="space-y-3">
-              {filteredLogs.map((log) => {
-                const Icon = entityIcons[log.entity_type] || Activity;
-                const colorClass = actionColors[log.action] || 'bg-muted text-muted-foreground';
-                
-                return (
-                  <div
-                    key={log.id}
-                    className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="secondary" className={colorClass}>
-                          {actionLabels[log.action] || log.action}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(log.created_at), "d MMM yyyy, HH:mm", { locale: es })}
-                        </span>
+          <>
+            <ScrollArea className="h-[500px] pr-4">
+              <div className="space-y-3">
+                {filteredLogs.map((log) => {
+                  const Icon = entityIcons[log.entity_type] || Activity;
+                  const colorClass = actionColors[log.action] || 'bg-muted text-muted-foreground';
+                  
+                  return (
+                    <div
+                      key={log.id}
+                      className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-4 h-4 text-muted-foreground" />
                       </div>
-                      {log.details && (
-                        <p className="text-sm text-muted-foreground mt-1 truncate">
-                          {formatDetails(log.action, log.details)}
-                        </p>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary" className={colorClass}>
+                            {actionLabels[log.action] || log.action}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(log.created_at), "d MMM yyyy, HH:mm", { locale: es })}
+                          </span>
+                        </div>
+                        {log.details && (
+                          <p className="text-sm text-muted-foreground mt-1 truncate">
+                            {formatDetails(log.action, log.details)}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </ScrollArea>
+            
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Mostrar</span>
+                <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                  <SelectTrigger className="w-20 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZE_OPTIONS.map(size => (
+                      <SelectItem key={size} value={size.toString()}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span>de {totalCount} registros</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage <= 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  Página {currentPage} de {pageCount || 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage >= pageCount}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-          </ScrollArea>
+          </>
         ) : logs && logs.length > 0 ? (
           <div className="py-12 text-center text-muted-foreground">
             <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
