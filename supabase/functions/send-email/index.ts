@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -18,17 +18,18 @@ interface SendEmailRequest {
   leadName?: string;
 }
 
-const handler = async (req: Request): Promise<Response> => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { to, subject, html, text }: SendEmailRequest = await req.json();
+    const { to, subject, html, text, leadId, leadName }: SendEmailRequest = await req.json();
 
     // Validate required fields
     if (!to || !subject || !html) {
+      console.error('Missing required fields:', { to: !!to, subject: !!subject, html: !!html });
       return new Response(
         JSON.stringify({ error: "Missing required fields: to, subject, html" }),
         {
@@ -41,6 +42,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(to)) {
+      console.error('Invalid email format:', to);
       return new Response(
         JSON.stringify({ error: "Invalid email address" }),
         {
@@ -49,6 +51,8 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
+
+    console.log(`Sending email to ${to} for lead: ${leadName || 'unknown'}`);
 
     const emailResponse = await resend.emails.send({
       from: "MalagaMicro CRM <onboarding@resend.dev>",
@@ -59,6 +63,27 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     console.log("Email sent successfully:", emailResponse);
+
+    // Log activity if leadId is provided
+    if (leadId) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      await supabase.from('lead_activities').insert({
+        lead_id: leadId,
+        type: 'email',
+        description: `Email enviado: "${subject}"`,
+      });
+
+      // Update last_contacted_at
+      await supabase
+        .from('leads')
+        .update({ last_contacted_at: new Date().toISOString() })
+        .eq('id', leadId);
+
+      console.log('Activity logged for lead:', leadId);
+    }
 
     return new Response(JSON.stringify(emailResponse), {
       status: 200,
@@ -77,6 +102,4 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
   }
-};
-
-serve(handler);
+});

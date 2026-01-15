@@ -4,6 +4,13 @@ import { Lead, LeadStatus, DashboardStats } from '@/types/lead';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 
+const statusLabels: Record<LeadStatus, string> = {
+  nuevo: 'Nuevo',
+  contactado: 'Contactado',
+  interesado: 'Interesado',
+  cliente: 'Cliente',
+};
+
 // Map database row to Lead type
 function mapRowToLead(row: any): Lead {
   return {
@@ -47,16 +54,27 @@ export function useLeads() {
   });
 
   const updateLeadStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: LeadStatus }) => {
+    mutationFn: async ({ id, status, previousStatus }: { id: string; status: LeadStatus; previousStatus?: LeadStatus }) => {
       const { error } = await supabase
         .from('leads')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', id);
       
       if (error) throw error;
+
+      // Log the status change activity
+      if (previousStatus && previousStatus !== status) {
+        await supabase.from('lead_activities').insert({
+          lead_id: id,
+          type: 'estado',
+          description: `Estado cambiado de "${statusLabels[previousStatus]}" a "${statusLabels[status]}"`,
+          user_id: user?.id,
+        });
+      }
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead-activities', variables.id] });
       toast({
         title: 'Estado actualizado',
         description: 'El estado del lead ha sido actualizado correctamente.',
@@ -73,7 +91,7 @@ export function useLeads() {
 
   const addLead = useMutation({
     mutationFn: async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => {
-      const { error } = await supabase.from('leads').insert({
+      const { data, error } = await supabase.from('leads').insert({
         company_name: lead.companyName,
         contact_name: lead.contactName,
         email: lead.email,
@@ -88,9 +106,21 @@ export function useLeads() {
         notes: lead.notes,
         tags: lead.tags,
         user_id: user?.id,
-      });
+      }).select('id').single();
       
       if (error) throw error;
+
+      // Log the lead creation activity
+      if (data) {
+        await supabase.from('lead_activities').insert({
+          lead_id: data.id,
+          type: 'creado',
+          description: `Lead "${lead.companyName}" creado`,
+          user_id: user?.id,
+        });
+      }
+
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });

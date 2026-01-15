@@ -25,7 +25,7 @@ export interface Lead {
 export interface LeadActivity {
   id: string;
   leadId: string;
-  type: 'nota' | 'email' | 'llamada' | 'whatsapp' | 'reunion' | 'visita';
+  type: 'nota' | 'email' | 'llamada' | 'whatsapp' | 'reunion' | 'visita' | 'estado' | 'creado';
   description: string;
   createdAt: Date;
   createdBy?: string;

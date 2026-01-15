@@ -75,6 +75,7 @@ interface WhatsAppComposeModalProps {
   onOpenChange: (open: boolean) => void;
   lead: Lead;
   onMessageSent?: () => void;
+  onActivityLogged?: () => void;
 }
 
 export function WhatsAppComposeModal({ 

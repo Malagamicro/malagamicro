@@ -18,7 +18,9 @@ import {
   MapPin,
   FileText,
   Loader2,
-  Trash2
+  Trash2,
+  ArrowRightLeft,
+  PlusCircle
 } from 'lucide-react';
 import { useLeadActivities } from '@/hooks/useLeadActivities';
 
@@ -26,14 +28,18 @@ interface ActivityTimelineProps {
   leadId: string;
 }
 
-const activityTypes: { value: LeadActivity['type']; label: string; icon: React.ElementType }[] = [
-  { value: 'nota', label: 'Nota', icon: FileText },
-  { value: 'llamada', label: 'Llamada', icon: PhoneCall },
-  { value: 'email', label: 'Email', icon: Mail },
-  { value: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
-  { value: 'reunion', label: 'Reunión', icon: Video },
-  { value: 'visita', label: 'Visita', icon: MapPin },
+const activityTypes: { value: LeadActivity['type']; label: string; icon: React.ElementType; userSelectable?: boolean }[] = [
+  { value: 'nota', label: 'Nota', icon: FileText, userSelectable: true },
+  { value: 'llamada', label: 'Llamada', icon: PhoneCall, userSelectable: true },
+  { value: 'email', label: 'Email', icon: Mail, userSelectable: true },
+  { value: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, userSelectable: true },
+  { value: 'reunion', label: 'Reunión', icon: Video, userSelectable: true },
+  { value: 'visita', label: 'Visita', icon: MapPin, userSelectable: true },
+  { value: 'estado', label: 'Cambio de estado', icon: ArrowRightLeft },
+  { value: 'creado', label: 'Lead creado', icon: PlusCircle },
 ];
+
+const userSelectableTypes = activityTypes.filter(t => t.userSelectable);
 
 export function ActivityTimeline({ leadId }: ActivityTimelineProps) {
   const [newNote, setNewNote] = useState('');
@@ -96,7 +102,7 @@ export function ActivityTimeline({ leadId }: ActivityTimelineProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {activityTypes.map((type) => (
+              {userSelectableTypes.map((type) => (
                 <SelectItem key={type.value} value={type.value}>
                   <div className="flex items-center gap-2">
                     <type.icon className="w-4 h-4" />

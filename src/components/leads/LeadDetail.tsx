@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Lead, LeadStatus } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
 import { ActivityTimeline } from './ActivityTimeline';
@@ -39,7 +40,7 @@ import {
 interface LeadDetailProps {
   lead: Lead;
   onBack: () => void;
-  onUpdateStatus: (id: string, status: LeadStatus) => void;
+  onUpdateStatus: (id: string, status: LeadStatus, previousStatus?: LeadStatus) => void;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -47,6 +48,11 @@ interface LeadDetailProps {
 export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: LeadDetailProps) {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const refreshActivities = () => {
+    queryClient.invalidateQueries({ queryKey: ['lead-activities', lead.id] });
+  };
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('es-ES', {
@@ -227,7 +233,7 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
             <h2 className="text-lg font-semibold text-foreground mb-4">Estado</h2>
             <Select 
               value={lead.status} 
-              onValueChange={(v) => onUpdateStatus(lead.id, v as LeadStatus)}
+              onValueChange={(v) => onUpdateStatus(lead.id, v as LeadStatus, lead.status)}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -300,6 +306,7 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
         open={isEmailModalOpen}
         onOpenChange={setIsEmailModalOpen}
         lead={lead}
+        onEmailSent={refreshActivities}
       />
 
       {/* WhatsApp Modal */}
@@ -307,6 +314,7 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
         open={isWhatsAppModalOpen}
         onOpenChange={setIsWhatsAppModalOpen}
         lead={lead}
+        onMessageSent={refreshActivities}
       />
     </div>
   );

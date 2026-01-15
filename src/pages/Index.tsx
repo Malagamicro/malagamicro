@@ -40,8 +40,8 @@ const Index = () => {
     setActiveTab('leads');
   };
 
-  const handleUpdateLeadStatus = (id: string, status: LeadStatus) => {
-    updateLeadStatus({ id, status });
+  const handleUpdateLeadStatus = (id: string, status: LeadStatus, previousStatus?: LeadStatus) => {
+    updateLeadStatus({ id, status, previousStatus });
   };
 
   const handleAddLead = () => {
