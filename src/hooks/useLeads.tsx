@@ -286,6 +286,42 @@ export function useLeads() {
     },
   });
 
+  const geocodeLead = useMutation({
+    mutationFn: async ({ id, address, city }: { id: string; address?: string; city?: string }) => {
+      const coords = await geocodeAddress(address, city);
+      
+      if (!coords) {
+        throw new Error('No se pudo obtener las coordenadas para esta dirección');
+      }
+
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+      
+      if (error) throw error;
+      return coords;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      toast({
+        title: 'Ubicación actualizada',
+        description: 'Las coordenadas del lead han sido actualizadas correctamente.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error de geocodificación',
+        description: error instanceof Error ? error.message : 'No se pudieron obtener las coordenadas.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     leads,
     isLoading,
@@ -295,10 +331,12 @@ export function useLeads() {
     updateLead: updateLead.mutate,
     deleteLead: deleteLead.mutate,
     importLeads: importLeads.mutate,
+    geocodeLead: geocodeLead.mutate,
     isAddingLead: addLead.isPending,
     isUpdatingLead: updateLead.isPending,
     isDeletingLead: deleteLead.isPending,
     isImportingLeads: importLeads.isPending,
+    isGeocodingLead: geocodeLead.isPending,
   };
 }
 
