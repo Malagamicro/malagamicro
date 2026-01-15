@@ -15,6 +15,7 @@ import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBann
 import { SessionTimeoutWarning } from '@/components/auth/SessionTimeoutWarning';
 import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
 import { ProfileSettings } from '@/components/settings/ProfileSettings';
+import { PasswordChangeCard } from '@/components/settings/PasswordChangeCard';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -187,6 +188,7 @@ const Index = () => {
               </p>
             </div>
             <ProfileSettings />
+            <PasswordChangeCard />
             <AuditLogViewer />
           </div>
         );
