@@ -4,6 +4,7 @@ import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadsList } from '@/components/leads/LeadsList';
 import { LeadDetail } from '@/components/leads/LeadDetail';
 import { LeadKanban } from '@/components/leads/LeadKanban';
+import { LeadMap } from '@/components/leads/LeadMap';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadImportModal } from '@/components/leads/LeadImportModal';
 import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
@@ -136,6 +137,18 @@ const Index = () => {
         );
       case 'campaigns':
         return <EmailCampaigns />;
+      case 'mapa':
+        return (
+          <div className="p-8 h-full flex flex-col space-y-6 animate-fade-in">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Mapa de Leads</h1>
+              <p className="text-muted-foreground mt-1">
+                Visualiza tus leads en el mapa según su ubicación
+              </p>
+            </div>
+            <LeadMap leads={leads} onViewLead={handleViewLead} />
+          </div>
+        );
       case 'settings':
         return (
           <div className="p-8">

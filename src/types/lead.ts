@@ -22,6 +22,8 @@ export interface Lead {
   tags?: string[];
   score?: number;
   emailUnsubscribed?: boolean;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface LeadActivity {
