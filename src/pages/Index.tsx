@@ -16,6 +16,7 @@ import { SessionTimeoutWarning } from '@/components/auth/SessionTimeoutWarning';
 import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
 import { ProfileSettings } from '@/components/settings/ProfileSettings';
 import { PasswordChangeCard } from '@/components/settings/PasswordChangeCard';
+import { NotificationPreferencesCard } from '@/components/settings/NotificationPreferencesCard';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -189,6 +190,7 @@ const Index = () => {
             </div>
             <ProfileSettings />
             <PasswordChangeCard />
+            <NotificationPreferencesCard />
             <AuditLogViewer />
           </div>
         );

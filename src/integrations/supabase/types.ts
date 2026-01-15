@@ -332,6 +332,42 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          email_campaign_reports: boolean
+          email_lead_updates: boolean
+          email_reminder_notifications: boolean
+          email_security_alerts: boolean
+          email_weekly_summary: boolean
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_campaign_reports?: boolean
+          email_lead_updates?: boolean
+          email_reminder_notifications?: boolean
+          email_security_alerts?: boolean
+          email_weekly_summary?: boolean
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_campaign_reports?: boolean
+          email_lead_updates?: boolean
+          email_reminder_notifications?: boolean
+          email_security_alerts?: boolean
+          email_weekly_summary?: boolean
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
