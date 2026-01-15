@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Lead, LeadStatus, DashboardStats } from '@/types/lead';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
+import { geocodeAddress } from './useGeocoding';
 
 const statusLabels: Record<LeadStatus, string> = {
   nuevo: 'Nuevo',
@@ -95,6 +96,18 @@ export function useLeads() {
 
   const addLead = useMutation({
     mutationFn: async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => {
+      // Geocode the address
+      let latitude: number | undefined;
+      let longitude: number | undefined;
+      
+      if (lead.address || lead.city) {
+        const coords = await geocodeAddress(lead.address, lead.city);
+        if (coords) {
+          latitude = coords.latitude;
+          longitude = coords.longitude;
+        }
+      }
+
       const { data, error } = await supabase.from('leads').insert({
         company_name: lead.companyName,
         contact_name: lead.contactName,
@@ -110,6 +123,8 @@ export function useLeads() {
         notes: lead.notes,
         tags: lead.tags,
         user_id: user?.id,
+        latitude,
+        longitude,
       }).select('id').single();
       
       if (error) throw error;
@@ -145,24 +160,44 @@ export function useLeads() {
 
   const updateLead = useMutation({
     mutationFn: async ({ id, ...lead }: Partial<Lead> & { id: string }) => {
+      // Geocode the address if address or city changed
+      let latitude: number | undefined;
+      let longitude: number | undefined;
+      
+      if (lead.address !== undefined || lead.city !== undefined) {
+        const coords = await geocodeAddress(lead.address, lead.city);
+        if (coords) {
+          latitude = coords.latitude;
+          longitude = coords.longitude;
+        }
+      }
+
+      const updateData: Record<string, unknown> = {
+        company_name: lead.companyName,
+        contact_name: lead.contactName,
+        email: lead.email,
+        phone: lead.phone,
+        website: lead.website,
+        address: lead.address,
+        city: lead.city,
+        status: lead.status,
+        segment: lead.segment,
+        source: lead.source,
+        equipment_count: lead.equipmentCount,
+        notes: lead.notes,
+        tags: lead.tags,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Only update coordinates if we got new ones
+      if (latitude !== undefined && longitude !== undefined) {
+        updateData.latitude = latitude;
+        updateData.longitude = longitude;
+      }
+
       const { error } = await supabase
         .from('leads')
-        .update({
-          company_name: lead.companyName,
-          contact_name: lead.contactName,
-          email: lead.email,
-          phone: lead.phone,
-          website: lead.website,
-          address: lead.address,
-          city: lead.city,
-          status: lead.status,
-          segment: lead.segment,
-          source: lead.source,
-          equipment_count: lead.equipmentCount,
-          notes: lead.notes,
-          tags: lead.tags,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', id);
       
       if (error) throw error;
