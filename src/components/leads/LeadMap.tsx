@@ -32,44 +32,22 @@ const statusColors: Record<string, string> = {
   cliente: '#10b981',    // green
 };
 
-export function LeadMap({ leads, onViewLead, onBulkGeocode, isBulkGeocoding = false }: LeadMapProps) {
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [isLoadingKey, setIsLoadingKey] = useState(true);
-  const [keyError, setKeyError] = useState<string | null>(null);
+// Inner component that uses useJsApiLoader - only rendered when apiKey is available
+interface GoogleMapWrapperProps {
+  apiKey: string;
+  leads: Lead[];
+  onViewLead: (id: string) => void;
+  onBulkGeocode?: (leads: { id: string; address?: string; city?: string }[]) => void;
+  isBulkGeocoding?: boolean;
+}
+
+function GoogleMapWrapper({ apiKey, leads, onViewLead, onBulkGeocode, isBulkGeocoding = false }: GoogleMapWrapperProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
-  // Fetch API key from edge function
-  useEffect(() => {
-    const fetchApiKey = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('get-maps-key');
-        
-        if (error) {
-          console.error('Error fetching API key:', error);
-          setKeyError('No se pudo cargar el mapa');
-          return;
-        }
-        
-        if (data?.apiKey) {
-          setApiKey(data.apiKey);
-        } else {
-          setKeyError('API key no configurada');
-        }
-      } catch (err) {
-        console.error('Error:', err);
-        setKeyError('Error al conectar con el servidor');
-      } finally {
-        setIsLoadingKey(false);
-      }
-    };
-
-    fetchApiKey();
-  }, []);
-
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: apiKey || '',
+    googleMapsApiKey: apiKey,
   });
 
   const onLoad = useCallback((map: google.maps.Map) => {
@@ -114,23 +92,12 @@ export function LeadMap({ leads, onViewLead, onBulkGeocode, isBulkGeocoding = fa
     }
   };
 
-  if (isLoadingKey) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-muted/30 rounded-lg">
-        <div className="text-center space-y-3">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">Cargando mapa...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (keyError || loadError) {
+  if (loadError) {
     return (
       <div className="flex-1 flex items-center justify-center bg-muted/30 rounded-lg">
         <div className="text-center space-y-3">
           <AlertCircle className="w-8 h-8 text-destructive mx-auto" />
-          <p className="text-destructive font-medium">{keyError || 'Error al cargar el mapa'}</p>
+          <p className="text-destructive font-medium">Error al cargar el mapa</p>
           <p className="text-sm text-muted-foreground">
             Verifica que la API key de Google Maps esté configurada correctamente
           </p>
@@ -287,5 +254,76 @@ export function LeadMap({ leads, onViewLead, onBulkGeocode, isBulkGeocoding = fa
         )}
       </GoogleMap>
     </div>
+  );
+}
+
+// Main component that handles API key fetching
+export function LeadMap({ leads, onViewLead, onBulkGeocode, isBulkGeocoding = false }: LeadMapProps) {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isLoadingKey, setIsLoadingKey] = useState(true);
+  const [keyError, setKeyError] = useState<string | null>(null);
+
+  // Fetch API key from edge function
+  useEffect(() => {
+    const fetchApiKey = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-maps-key');
+        
+        if (error) {
+          console.error('Error fetching API key:', error);
+          setKeyError('No se pudo cargar el mapa');
+          return;
+        }
+        
+        if (data?.apiKey) {
+          setApiKey(data.apiKey);
+        } else {
+          setKeyError('API key no configurada');
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        setKeyError('Error al conectar con el servidor');
+      } finally {
+        setIsLoadingKey(false);
+      }
+    };
+
+    fetchApiKey();
+  }, []);
+
+  if (isLoadingKey) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-muted/30 rounded-lg">
+        <div className="text-center space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Cargando mapa...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (keyError || !apiKey) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-muted/30 rounded-lg">
+        <div className="text-center space-y-3">
+          <AlertCircle className="w-8 h-8 text-destructive mx-auto" />
+          <p className="text-destructive font-medium">{keyError || 'Error al cargar el mapa'}</p>
+          <p className="text-sm text-muted-foreground">
+            Verifica que la API key de Google Maps esté configurada correctamente
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only render GoogleMapWrapper when we have a valid API key
+  return (
+    <GoogleMapWrapper
+      apiKey={apiKey}
+      leads={leads}
+      onViewLead={onViewLead}
+      onBulkGeocode={onBulkGeocode}
+      isBulkGeocoding={isBulkGeocoding}
+    />
   );
 }
