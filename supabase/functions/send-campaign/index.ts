@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { encode as hexEncode } from "https://deno.land/std@0.208.0/encoding/hex.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -41,6 +42,33 @@ function sanitizeHtmlContent(html: string): string {
   sanitized = sanitized.replace(/behavior\s*:/gi, '');
   
   return sanitized;
+}
+
+// Generate HMAC-SHA256 signature
+async function generateHmacSignature(payload: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secret);
+  const messageData = encoder.encode(payload);
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+  return new TextDecoder().decode(hexEncode(new Uint8Array(signature)));
+}
+
+// Generate secure unsubscribe token with HMAC signature and expiration
+async function generateUnsubscribeToken(leadId: string, email: string, secret: string): Promise<string> {
+  // Token expires in 90 days
+  const expiresAt = Date.now() + (90 * 24 * 60 * 60 * 1000);
+  const payload = `${leadId}:${email}:${expiresAt}`;
+  const signature = await generateHmacSignature(payload, secret);
+  return btoa(`${payload}:${signature}`);
 }
 
 // Anti-spam settings
@@ -88,6 +116,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const unsubscribeSecret = Deno.env.get('UNSUBSCRIBE_SECRET') || supabaseServiceKey;
     
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
@@ -180,7 +209,7 @@ Deno.serve(async (req) => {
 
     const template = campaign.email_templates;
     const results = { sent: 0, failed: 0, errors: [] as string[] };
-    const unsubscribeUrl = `${supabaseUrl}/functions/v1/unsubscribe`;
+    const unsubscribeBaseUrl = `${supabaseUrl}/functions/v1/unsubscribe`;
 
     // Send emails with rate limiting
     for (const emailRecord of pendingEmails) {
@@ -206,6 +235,10 @@ Deno.serve(async (req) => {
         // Sanitize the template body to remove any malicious HTML
         const sanitizedBody = sanitizeHtmlContent(personalizedBody);
         
+        // Generate secure unsubscribe token with HMAC signature
+        const secureToken = await generateUnsubscribeToken(lead.id, lead.email, unsubscribeSecret);
+        const unsubscribeUrl = `${unsubscribeBaseUrl}?lead=${lead.id}&token=${encodeURIComponent(secureToken)}`;
+        
         // Add unsubscribe footer
         const htmlWithUnsubscribe = `
           ${sanitizedBody}
@@ -213,7 +246,7 @@ Deno.serve(async (req) => {
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;"/>
           <p style="font-size: 12px; color: #666; text-align: center;">
             Si no deseas recibir más emails, 
-            <a href="${unsubscribeUrl}?lead=${lead.id}&token=${btoa(lead.id + ':' + lead.email)}" style="color: #666;">
+            <a href="${unsubscribeUrl}" style="color: #666;">
               haz clic aquí para desuscribirte
             </a>
           </p>
