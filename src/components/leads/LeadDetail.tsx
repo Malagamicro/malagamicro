@@ -1,22 +1,18 @@
-import { useState } from 'react';
-import { Lead, LeadActivity, LeadStatus } from '@/types/lead';
+import { Lead, LeadStatus } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
+import { ActivityTimeline } from './ActivityTimeline';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { 
   ArrowLeft, 
   Building2, 
   MapPin, 
-  Phone, 
+  Phone,
   Mail, 
   Globe, 
   MessageSquare,
   Calendar,
-  Send,
   Edit,
   Trash2,
-  PhoneCall,
-  Video
 } from 'lucide-react';
 import {
   Select,
@@ -46,25 +42,12 @@ interface LeadDetailProps {
 }
 
 export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: LeadDetailProps) {
-  const [newNote, setNewNote] = useState('');
-
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('es-ES', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
     }).format(date);
-  };
-
-  const getActivityIcon = (type: LeadActivity['type']) => {
-    switch (type) {
-      case 'llamada': return PhoneCall;
-      case 'email': return Mail;
-      case 'whatsapp': return MessageSquare;
-      case 'reunion': return Video;
-      case 'visita': return MapPin;
-      default: return MessageSquare;
-    }
   };
 
   return (
@@ -188,27 +171,7 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
           )}
 
           {/* Activity Timeline */}
-          <div className="bg-card rounded-xl p-6 border border-border shadow-card">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Actividad</h2>
-            
-            {/* Add Note */}
-            <div className="flex gap-3 mb-6">
-              <Textarea
-                placeholder="Añade una nota o registro de actividad..."
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                className="min-h-[80px]"
-              />
-              <Button size="icon" className="h-auto">
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {/* Timeline - empty state for now */}
-            <p className="text-center text-muted-foreground py-4">
-              No hay actividad registrada aún
-            </p>
-          </div>
+          <ActivityTimeline leadId={lead.id} />
         </div>
 
         {/* Sidebar */}
