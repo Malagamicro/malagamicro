@@ -10,6 +10,7 @@ import { LeadImportModal } from '@/components/leads/LeadImportModal';
 import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
 import { EmailCampaigns } from '@/components/campaigns/EmailCampaigns';
 import { ReportsDashboard } from '@/components/reports/ReportsDashboard';
+import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 import { useLeads } from '@/hooks/useLeads';
 import { Lead, LeadStatus } from '@/types/lead';
 import { Loader2 } from 'lucide-react';
@@ -183,9 +184,12 @@ const Index = () => {
         activeTab={activeTab === 'lead-detail' ? 'leads' : activeTab} 
         onTabChange={setActiveTab} 
       />
-      <main className="flex-1 overflow-auto">
-        {renderContent()}
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <EmailVerificationBanner />
+        <main className="flex-1 overflow-auto">
+          {renderContent()}
+        </main>
+      </div>
 
       <LeadFormModal
         open={isFormOpen}
