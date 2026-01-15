@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Lead, LeadStatus } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
 import { ActivityTimeline } from './ActivityTimeline';
+import { EmailComposeModal } from './EmailComposeModal';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, 
@@ -42,6 +44,8 @@ interface LeadDetailProps {
 }
 
 export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: LeadDetailProps) {
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('es-ES', {
       day: 'numeric',
@@ -182,19 +186,34 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
               Acciones Rápidas
             </h2>
             <div className="space-y-2">
-              <Button variant="outline" className="w-full justify-start gap-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2"
+                onClick={() => setIsEmailModalOpen(true)}
+                disabled={!lead.email}
+              >
                 <Mail className="w-4 h-4" />
                 Enviar Email
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2"
+                onClick={() => lead.phone && window.open(`https://wa.me/${lead.phone.replace(/\D/g, '')}`, '_blank')}
+                disabled={!lead.phone}
+              >
                 <MessageSquare className="w-4 h-4" />
                 WhatsApp
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2"
+                onClick={() => lead.phone && window.open(`tel:${lead.phone}`, '_self')}
+                disabled={!lead.phone}
+              >
                 <Phone className="w-4 h-4" />
                 Llamar
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-2">
+              <Button variant="outline" className="w-full justify-start gap-2" disabled>
                 <Calendar className="w-4 h-4" />
                 Programar Reunión
               </Button>
@@ -273,6 +292,13 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete }: L
           )}
         </div>
       </div>
+
+      {/* Email Modal */}
+      <EmailComposeModal
+        open={isEmailModalOpen}
+        onOpenChange={setIsEmailModalOpen}
+        lead={lead}
+      />
     </div>
   );
 }
