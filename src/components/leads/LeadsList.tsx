@@ -99,8 +99,8 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
               }}>
                 Exportar a CSV
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => {
-                exportToExcel(filteredAndSortedLeads);
+              <DropdownMenuItem onClick={async () => {
+                await exportToExcel(filteredAndSortedLeads);
                 toast.success(`${filteredAndSortedLeads.length} leads exportados a Excel`);
               }}>
                 Exportar a Excel
