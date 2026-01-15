@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Lead, LeadStatus, DashboardStats } from '@/types/lead';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
+import { useAuditLog } from './useAuditLog';
 import { geocodeAddress } from './useGeocoding';
 
 const statusLabels: Record<LeadStatus, string> = {
@@ -43,6 +44,7 @@ export function useLeads() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { logLeadCreated, logLeadUpdated, logLeadDeleted, logLeadStatusChanged, logLeadsImported } = useAuditLog();
 
   const { data: leads = [], isLoading, error } = useQuery({
     queryKey: ['leads'],
@@ -80,6 +82,10 @@ export function useLeads() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['lead-activities', variables.id] });
+      // Audit log
+      if (variables.previousStatus) {
+        logLeadStatusChanged(variables.id, variables.previousStatus, variables.status);
+      }
       toast({
         title: 'Estado actualizado',
         description: 'El estado del lead ha sido actualizado correctamente.',
@@ -141,9 +147,13 @@ export function useLeads() {
 
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      // Audit log
+      if (data?.id) {
+        logLeadCreated(data.id, variables.companyName);
+      }
       toast({
         title: 'Lead añadido',
         description: 'El lead ha sido añadido correctamente.',
@@ -202,9 +212,11 @@ export function useLeads() {
       
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      // Audit log
+      logLeadUpdated(variables.id, variables);
       toast({
         title: 'Lead actualizado',
         description: 'El lead ha sido actualizado correctamente.',
@@ -220,17 +232,20 @@ export function useLeads() {
   });
 
   const deleteLead = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, companyName }: { id: string; companyName: string }) => {
       const { error } = await supabase
         .from('leads')
         .delete()
         .eq('id', id);
       
       if (error) throw error;
+      return { id, companyName };
     },
-    onSuccess: () => {
+    onSuccess: ({ id, companyName }) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      // Audit log
+      logLeadDeleted(id, companyName);
       toast({
         title: 'Lead eliminado',
         description: 'El lead ha sido eliminado correctamente.',
@@ -272,6 +287,8 @@ export function useLeads() {
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      // Audit log
+      logLeadsImported(count);
       toast({
         title: 'Importación completada',
         description: `Se han importado ${count} leads correctamente.`,

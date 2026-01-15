@@ -13,6 +13,7 @@ import { EmailCampaigns } from '@/components/campaigns/EmailCampaigns';
 import { ReportsDashboard } from '@/components/reports/ReportsDashboard';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 import { SessionTimeoutWarning } from '@/components/auth/SessionTimeoutWarning';
+import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -74,8 +75,8 @@ const Index = () => {
     setIsFormOpen(true);
   };
 
-  const handleDeleteLead = (id: string) => {
-    deleteLead(id);
+  const handleDeleteLead = (id: string, companyName?: string) => {
+    deleteLead({ id, companyName: companyName || 'Unknown' });
     if (selectedLeadId === id) {
       handleBackFromDetail();
     }
@@ -117,7 +118,7 @@ const Index = () => {
           onBack={handleBackFromDetail}
           onUpdateStatus={handleUpdateLeadStatus}
           onEdit={() => handleEditLead(selectedLead)}
-          onDelete={() => handleDeleteLead(selectedLead.id)}
+          onDelete={() => handleDeleteLead(selectedLead.id, selectedLead.companyName)}
           onGeocode={(id, address, city) => geocodeLead({ id, address, city })}
           isGeocoding={isGeocodingLead}
         />
@@ -177,11 +178,14 @@ const Index = () => {
         return <ReportsDashboard />;
       case 'settings':
         return (
-          <div className="p-8">
-            <h1 className="text-3xl font-bold text-foreground">Ajustes</h1>
-            <p className="text-muted-foreground mt-1">
-              Configuración de la aplicación (próximamente)
-            </p>
+          <div className="p-8 space-y-6 animate-fade-in">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Ajustes</h1>
+              <p className="text-muted-foreground mt-1">
+                Configuración y registro de actividad
+              </p>
+            </div>
+            <AuditLogViewer />
           </div>
         );
       default:
