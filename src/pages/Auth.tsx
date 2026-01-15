@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Building2 } from 'lucide-react';
 import { z } from 'zod';
 import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
+import { RateLimitWarning } from '@/components/auth/RateLimitWarning';
+import { useLoginRateLimit } from '@/hooks/useLoginRateLimit';
 
 const authSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -25,6 +27,15 @@ export default function Auth() {
   const { signIn, signUp, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  const {
+    isLocked,
+    attemptsRemaining,
+    formatRemainingTime,
+    recordFailedAttempt,
+    resetAttempts,
+    maxAttempts,
+  } = useLoginRateLimit(email);
 
   useEffect(() => {
     if (!loading && user) {
@@ -55,6 +66,16 @@ export default function Auth() {
     
     if (!validateForm()) return;
     
+    // Check rate limit for login attempts
+    if (!isSignUp && isLocked) {
+      toast({
+        title: 'Cuenta bloqueada',
+        description: 'Demasiados intentos fallidos. Espera antes de intentar de nuevo.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -83,6 +104,9 @@ export default function Auth() {
       } else {
         const { error } = await signIn(email, password);
         if (error) {
+          // Record failed attempt for rate limiting
+          recordFailedAttempt();
+          
           if (error.message.includes('Invalid login credentials')) {
             toast({
               title: 'Error',
@@ -96,6 +120,9 @@ export default function Auth() {
               variant: 'destructive',
             });
           }
+        } else {
+          // Successful login, reset attempts
+          resetAttempts();
         }
       }
     } finally {
@@ -131,6 +158,16 @@ export default function Auth() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
+            {/* Rate limit warning for login */}
+            {!isSignUp && (
+              <RateLimitWarning
+                isLocked={isLocked}
+                attemptsRemaining={attemptsRemaining}
+                formattedTime={formatRemainingTime()}
+                maxAttempts={maxAttempts}
+              />
+            )}
+            
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -139,7 +176,7 @@ export default function Auth() {
                 placeholder="tu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || isLocked}
                 autoComplete="email"
               />
               {errors.email && (
@@ -154,7 +191,7 @@ export default function Auth() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || isLocked}
                 autoComplete={isSignUp ? 'new-password' : 'current-password'}
               />
               {errors.password && (
@@ -164,7 +201,11 @@ export default function Auth() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isLoading || (!isSignUp && isLocked)}
+            >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}
             </Button>
