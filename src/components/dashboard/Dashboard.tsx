@@ -1,14 +1,38 @@
 import { StatCard } from './StatCard';
 import { LeadsByStatusChart } from './LeadsByStatusChart';
 import { RecentLeads } from './RecentLeads';
-import { mockStats, mockLeads } from '@/data/mockLeads';
-import { Users, UserPlus, MessageSquare, TrendingUp, Target, Calendar } from 'lucide-react';
+import { useLeads, useDashboardStats } from '@/hooks/useLeads';
+import { Users, UserPlus, TrendingUp, Target } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface DashboardProps {
   onViewLead: (id: string) => void;
 }
 
 export function Dashboard({ onViewLead }: DashboardProps) {
+  const { leads, isLoading: leadsLoading } = useLeads();
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
+
+  const isLoading = leadsLoading || statsLoading;
+
+  if (isLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const dashboardStats = stats || {
+    totalLeads: 0,
+    newLeads: 0,
+    contactedLeads: 0,
+    interestedLeads: 0,
+    clients: 0,
+    thisWeekLeads: 0,
+    conversionRate: 0,
+  };
+
   return (
     <div className="p-8 space-y-8 animate-fade-in">
       {/* Header */}
@@ -23,35 +47,35 @@ export function Dashboard({ onViewLead }: DashboardProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Leads"
-          value={mockStats.totalLeads}
+          value={dashboardStats.totalLeads}
           subtitle="En tu base de datos"
           icon={Users}
           variant="primary"
         />
         <StatCard
           title="Nuevos esta semana"
-          value={mockStats.thisWeekLeads}
+          value={dashboardStats.thisWeekLeads}
           icon={UserPlus}
           trend={{ value: 15, isPositive: true }}
         />
         <StatCard
           title="Tasa de conversión"
-          value={`${mockStats.conversionRate}%`}
+          value={`${dashboardStats.conversionRate}%`}
           subtitle="Leads → Clientes"
           icon={TrendingUp}
           variant="accent"
         />
         <StatCard
           title="Clientes activos"
-          value={mockStats.clients}
+          value={dashboardStats.clients}
           icon={Target}
         />
       </div>
 
       {/* Charts & Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <LeadsByStatusChart stats={mockStats} />
-        <RecentLeads leads={mockLeads} onViewLead={onViewLead} />
+        <LeadsByStatusChart stats={dashboardStats} />
+        <RecentLeads leads={leads} onViewLead={onViewLead} />
       </div>
     </div>
   );

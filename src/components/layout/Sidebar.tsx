@@ -10,9 +10,11 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Building2
+  Building2,
+  LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SidebarProps {
   activeTab: string;
@@ -30,6 +32,11 @@ const menuItems = [
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const { signOut, user } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
 
   return (
     <aside 
@@ -80,8 +87,15 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Settings & Collapse */}
+      {/* User info & Settings & Logout & Collapse */}
       <div className="p-3 border-t border-sidebar-border space-y-1">
+        {/* User email */}
+        {!collapsed && user && (
+          <div className="px-3 py-2 text-xs text-sidebar-foreground/70 truncate">
+            {user.email}
+          </div>
+        )}
+        
         <button
           onClick={() => onTabChange('settings')}
           className={cn(
@@ -92,6 +106,17 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         >
           <Settings className="w-5 h-5 flex-shrink-0" />
           {!collapsed && <span className="text-sm font-medium">Ajustes</span>}
+        </button>
+
+        <button
+          onClick={handleSignOut}
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
+            "hover:bg-sidebar-accent text-red-400 hover:text-red-300"
+          )}
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          {!collapsed && <span className="text-sm font-medium">Cerrar sesión</span>}
         </button>
         
         <Button

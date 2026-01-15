@@ -4,13 +4,14 @@ import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadsList } from '@/components/leads/LeadsList';
 import { LeadDetail } from '@/components/leads/LeadDetail';
 import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
-import { mockLeads } from '@/data/mockLeads';
-import { Lead, LeadStatus } from '@/types/lead';
+import { useLeads } from '@/hooks/useLeads';
+import { LeadStatus } from '@/types/lead';
+import { Loader2 } from 'lucide-react';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [leads, setLeads] = useState<Lead[]>(mockLeads);
+  const { leads, isLoading, updateLeadStatus } = useLeads();
 
   const handleViewLead = (id: string) => {
     setSelectedLeadId(id);
@@ -23,11 +24,7 @@ const Index = () => {
   };
 
   const handleUpdateLeadStatus = (id: string, status: LeadStatus) => {
-    setLeads(prev => 
-      prev.map(lead => 
-        lead.id === id ? { ...lead, status, updatedAt: new Date() } : lead
-      )
-    );
+    updateLeadStatus({ id, status });
   };
 
   const handleAddLead = () => {
@@ -38,6 +35,14 @@ const Index = () => {
   const selectedLead = leads.find(l => l.id === selectedLeadId);
 
   const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+
     if (activeTab === 'lead-detail' && selectedLead) {
       return (
         <LeadDetail 
