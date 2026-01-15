@@ -1,19 +1,23 @@
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useAuditLogs } from '@/hooks/useAuditLogs';
+import { useAuditLogs, DateRange } from '@/hooks/useAuditLogs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send, Download, FileSpreadsheet, File } from 'lucide-react';
+import { Loader2, Activity, User, FileText, Mail, Bell, MessageSquare, Send, Download, FileSpreadsheet, File, CalendarIcon, X } from 'lucide-react';
 import { exportAuditLogsToCSV, exportAuditLogsToPDF } from '@/lib/exportAuditLogs';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 const actionLabels: Record<string, string> = {
   login: 'Inicio de sesión',
@@ -57,7 +61,8 @@ const actionColors: Record<string, string> = {
 };
 
 export function AuditLogViewer() {
-  const { data: logs, isLoading, error } = useAuditLogs(100);
+  const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
+  const { data: logs, isLoading, error } = useAuditLogs(100, dateRange);
   const { toast } = useToast();
 
   const handleExportCSV = () => {
@@ -112,10 +117,16 @@ export function AuditLogViewer() {
     );
   }
 
+  const clearDateFilter = () => {
+    setDateRange({ from: undefined, to: undefined });
+  };
+
+  const hasDateFilter = dateRange.from || dateRange.to;
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
@@ -125,26 +136,74 @@ export function AuditLogViewer() {
               Historial de acciones realizadas en tu cuenta para auditoría y seguridad
             </CardDescription>
           </div>
-          {logs && logs.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "justify-start text-left font-normal",
+                    hasDateFilter && "text-primary"
+                  )}
+                >
+                  <CalendarIcon className="w-4 h-4 mr-2" />
+                  {dateRange.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "d MMM", { locale: es })} - {format(dateRange.to, "d MMM yyyy", { locale: es })}
+                      </>
+                    ) : (
+                      format(dateRange.from, "d MMM yyyy", { locale: es })
+                    )
+                  ) : (
+                    "Filtrar por fecha"
+                  )}
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportCSV}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Exportar como CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPDF}>
-                  <File className="w-4 h-4 mr-2" />
-                  Exportar como PDF
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange.from}
+                  selected={{ from: dateRange.from, to: dateRange.to }}
+                  onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                  numberOfMonths={2}
+                  locale={es}
+                />
+              </PopoverContent>
+            </Popover>
+            {hasDateFilter && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearDateFilter}
+                className="h-9 px-2"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+            {logs && logs.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="w-4 h-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Exportar como CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <File className="w-4 h-4 mr-2" />
+                    Exportar como PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
