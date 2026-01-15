@@ -10,6 +10,7 @@ import { Loader2, Building2 } from 'lucide-react';
 import { z } from 'zod';
 import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 import { RateLimitWarning } from '@/components/auth/RateLimitWarning';
+import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
 import { useLoginRateLimit } from '@/hooks/useLoginRateLimit';
 
 const authSchema = z.object({
@@ -22,6 +23,7 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
   const { signIn, signUp, user, loading } = useAuth();
@@ -199,6 +201,17 @@ export default function Auth() {
               )}
               {isSignUp && <PasswordStrengthIndicator password={password} />}
             </div>
+            
+            {/* Forgot password link */}
+            {!isSignUp && (
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-primary hover:underline self-start"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button 
@@ -221,6 +234,13 @@ export default function Auth() {
           </CardFooter>
         </form>
       </Card>
+      
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        open={showForgotPassword}
+        onOpenChange={setShowForgotPassword}
+        initialEmail={email}
+      />
     </div>
   );
 }
