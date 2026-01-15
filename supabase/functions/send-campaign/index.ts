@@ -8,6 +8,41 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// HTML sanitization to prevent XSS attacks
+function escapeHtml(unsafe: string): string {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Sanitize HTML content - escape dangerous patterns while preserving safe HTML
+function sanitizeHtmlContent(html: string): string {
+  if (!html) return '';
+  
+  // Remove script tags and their content
+  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  
+  // Remove event handlers (onclick, onerror, onload, etc.)
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]+/gi, '');
+  
+  // Remove javascript: and data: URLs from href and src attributes
+  sanitized = sanitized.replace(/href\s*=\s*["']?\s*javascript:[^"'>]*/gi, 'href="#"');
+  sanitized = sanitized.replace(/src\s*=\s*["']?\s*javascript:[^"'>]*/gi, 'src=""');
+  sanitized = sanitized.replace(/href\s*=\s*["']?\s*data:[^"'>]*/gi, 'href="#"');
+  sanitized = sanitized.replace(/src\s*=\s*["']?\s*data:[^"'>]*/gi, 'src=""');
+  
+  // Remove style expressions and behavior
+  sanitized = sanitized.replace(/expression\s*\([^)]*\)/gi, '');
+  sanitized = sanitized.replace(/behavior\s*:/gi, '');
+  
+  return sanitized;
+}
+
 // Anti-spam settings
 const MAX_EMAILS_PER_BATCH = 10;
 const DELAY_BETWEEN_EMAILS_MS = 6000; // 6 seconds between emails (10 per minute max)
@@ -17,13 +52,19 @@ interface CampaignRequest {
   campaignId: string;
 }
 
-// Helper to replace template variables
+// Helper to replace template variables with sanitized values
 function personalizeEmail(template: string, lead: any): string {
+  // Escape lead data to prevent XSS when inserting into HTML
+  const safeName = escapeHtml(lead.contact_name || 'Estimado/a');
+  const safeCompany = escapeHtml(lead.company_name || '');
+  const safeCity = escapeHtml(lead.city || '');
+  const safeEmail = escapeHtml(lead.email || '');
+  
   return template
-    .replace(/\{\{nombre\}\}/gi, lead.contact_name || 'Estimado/a')
-    .replace(/\{\{empresa\}\}/gi, lead.company_name || '')
-    .replace(/\{\{ciudad\}\}/gi, lead.city || '')
-    .replace(/\{\{email\}\}/gi, lead.email || '');
+    .replace(/\{\{nombre\}\}/gi, safeName)
+    .replace(/\{\{empresa\}\}/gi, safeCompany)
+    .replace(/\{\{ciudad\}\}/gi, safeCity)
+    .replace(/\{\{email\}\}/gi, safeEmail);
 }
 
 // Sleep helper for rate limiting
@@ -158,13 +199,16 @@ Deno.serve(async (req) => {
       }
 
       try {
-        // Personalize email content
+        // Personalize email content (personalizeEmail already escapes lead data)
         const personalizedSubject = personalizeEmail(template.subject, lead);
         const personalizedBody = personalizeEmail(template.body, lead);
         
+        // Sanitize the template body to remove any malicious HTML
+        const sanitizedBody = sanitizeHtmlContent(personalizedBody);
+        
         // Add unsubscribe footer
         const htmlWithUnsubscribe = `
-          ${personalizedBody}
+          ${sanitizedBody}
           <br/><br/>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;"/>
           <p style="font-size: 12px; color: #666; text-align: center;">

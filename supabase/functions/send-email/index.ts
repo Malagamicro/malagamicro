@@ -9,6 +9,41 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// HTML sanitization to prevent XSS attacks
+function escapeHtml(unsafe: string): string {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Sanitize HTML content - escape dangerous patterns while preserving safe HTML
+function sanitizeHtmlContent(html: string): string {
+  if (!html) return '';
+  
+  // Remove script tags and their content
+  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  
+  // Remove event handlers (onclick, onerror, onload, etc.)
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]+/gi, '');
+  
+  // Remove javascript: and data: URLs from href and src attributes
+  sanitized = sanitized.replace(/href\s*=\s*["']?\s*javascript:[^"'>]*/gi, 'href="#"');
+  sanitized = sanitized.replace(/src\s*=\s*["']?\s*javascript:[^"'>]*/gi, 'src=""');
+  sanitized = sanitized.replace(/href\s*=\s*["']?\s*data:[^"'>]*/gi, 'href="#"');
+  sanitized = sanitized.replace(/src\s*=\s*["']?\s*data:[^"'>]*/gi, 'src=""');
+  
+  // Remove style expressions and behavior
+  sanitized = sanitized.replace(/expression\s*\([^)]*\)/gi, '');
+  sanitized = sanitized.replace(/behavior\s*:/gi, '');
+  
+  return sanitized;
+}
+
 interface SendEmailRequest {
   to: string;
   subject: string;
@@ -84,11 +119,15 @@ Deno.serve(async (req) => {
 
     console.log(`Sending email to ${to} for lead: ${leadName || 'unknown'}`);
 
+    // Sanitize HTML content to prevent XSS attacks
+    const sanitizedHtml = sanitizeHtmlContent(html);
+    const sanitizedSubject = escapeHtml(subject);
+
     const emailResponse = await resend.emails.send({
       from: "MalagaMicro CRM <onboarding@resend.dev>",
       to: [to],
-      subject: subject,
-      html: html,
+      subject: sanitizedSubject,
+      html: sanitizedHtml,
       text: text,
     });
 
