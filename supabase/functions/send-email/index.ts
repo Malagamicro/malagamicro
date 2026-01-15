@@ -25,6 +25,36 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('Missing authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    // Create client with user's auth token to verify authentication
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - please log in' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Authenticated user: ${user.id}`);
+
     const { to, subject, html, text, leadId, leadName }: SendEmailRequest = await req.json();
 
     // Validate required fields
@@ -66,7 +96,6 @@ Deno.serve(async (req) => {
 
     // Log activity if leadId is provided
     if (leadId) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -74,6 +103,7 @@ Deno.serve(async (req) => {
         lead_id: leadId,
         type: 'email',
         description: `Email enviado: "${subject}"`,
+        user_id: user.id,
       });
 
       // Update last_contacted_at
