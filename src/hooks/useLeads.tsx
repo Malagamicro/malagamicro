@@ -176,6 +176,47 @@ export function useLeads() {
     },
   });
 
+  const importLeads = useMutation({
+    mutationFn: async (leads: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+      const leadsToInsert = leads.map(lead => ({
+        company_name: lead.companyName,
+        contact_name: lead.contactName || null,
+        email: lead.email || null,
+        phone: lead.phone || null,
+        website: lead.website || null,
+        address: lead.address || null,
+        city: lead.city,
+        status: lead.status || 'nuevo',
+        segment: lead.segment || 'pyme',
+        source: lead.source || 'manual',
+        equipment_count: lead.equipmentCount || null,
+        notes: lead.notes || null,
+        tags: lead.tags || null,
+        user_id: user?.id,
+      }));
+      
+      const { error } = await supabase.from('leads').insert(leadsToInsert);
+      
+      if (error) throw error;
+      return leadsToInsert.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({
+        title: 'Importación completada',
+        description: `Se han importado ${count} leads correctamente.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error en la importación',
+        description: 'No se pudieron importar los leads. Verifica el formato de los datos.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     leads,
     isLoading,
@@ -184,9 +225,11 @@ export function useLeads() {
     addLead: addLead.mutate,
     updateLead: updateLead.mutate,
     deleteLead: deleteLead.mutate,
+    importLeads: importLeads.mutate,
     isAddingLead: addLead.isPending,
     isUpdatingLead: updateLead.isPending,
     isDeletingLead: deleteLead.isPending,
+    isImportingLeads: importLeads.isPending,
   };
 }
 

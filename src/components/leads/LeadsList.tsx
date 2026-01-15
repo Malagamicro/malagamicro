@@ -6,13 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { 
   Search, 
-  Filter, 
   Plus, 
   Building2, 
-  Mail, 
-  Phone,
   Grid3X3,
-  List
+  List,
+  Upload
 } from 'lucide-react';
 import {
   Select,
@@ -26,9 +24,10 @@ interface LeadsListProps {
   leads: Lead[];
   onViewLead: (id: string) => void;
   onAddLead: () => void;
+  onImportLeads: () => void;
 }
 
-export function LeadsList({ leads, onViewLead, onAddLead }: LeadsListProps) {
+export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: LeadsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [segmentFilter, setSegmentFilter] = useState<LeadSegment | 'all'>('all');
@@ -56,10 +55,16 @@ export function LeadsList({ leads, onViewLead, onAddLead }: LeadsListProps) {
             {filteredLeads.length} de {leads.length} leads
           </p>
         </div>
-        <Button onClick={onAddLead} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nuevo Lead
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onImportLeads} className="gap-2">
+            <Upload className="w-4 h-4" />
+            Importar
+          </Button>
+          <Button onClick={onAddLead} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nuevo Lead
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
