@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.geocode-address]
 verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false
