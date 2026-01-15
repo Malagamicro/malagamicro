@@ -13,10 +13,13 @@ import {
   Building2,
   LogOut,
   Kanban,
-  BarChart3
+  BarChart3,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from 'next-themes';
 
 interface SidebarProps {
   activeTab: string;
@@ -37,9 +40,14 @@ const menuItems = [
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { signOut, user } = useAuth();
+  const { theme, setTheme } = useTheme();
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   return (
@@ -51,15 +59,31 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     >
       {/* Logo */}
       <div className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-sidebar-accent flex items-center justify-center">
-            <Building2 className="w-6 h-6" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-sidebar-accent flex items-center justify-center">
+              <Building2 className="w-6 h-6" />
+            </div>
+            {!collapsed && (
+              <div className="animate-fade-in">
+                <h1 className="font-bold text-lg leading-tight">MalagaMicro</h1>
+                <p className="text-xs opacity-70">CRM</p>
+              </div>
+            )}
           </div>
           {!collapsed && (
-            <div className="animate-fade-in">
-              <h1 className="font-bold text-lg leading-tight">MalagaMicro</h1>
-              <p className="text-xs opacity-70">CRM</p>
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </Button>
           )}
         </div>
       </div>
