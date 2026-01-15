@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadsList } from '@/components/leads/LeadsList';
@@ -11,11 +12,14 @@ import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
 import { EmailCampaigns } from '@/components/campaigns/EmailCampaigns';
 import { ReportsDashboard } from '@/components/reports/ReportsDashboard';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
+import { SessionTimeoutWarning } from '@/components/auth/SessionTimeoutWarning';
 import { useLeads } from '@/hooks/useLeads';
+import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -38,6 +42,13 @@ const Index = () => {
     isGeocodingLead,
     isBulkGeocoding,
   } = useLeads();
+
+  // Session timeout - 30 minutes of inactivity
+  const { showWarning, formattedTime, extendSession, logout } = useSessionTimeout({
+    onTimeout: () => {
+      navigate('/auth', { replace: true });
+    },
+  });
 
   const handleViewLead = (id: string) => {
     setSelectedLeadId(id);
@@ -204,6 +215,14 @@ const Index = () => {
         onOpenChange={setIsImportOpen}
         onImport={handleImportLeads}
         isImporting={isImportingLeads}
+      />
+
+      {/* Session timeout warning */}
+      <SessionTimeoutWarning
+        open={showWarning}
+        formattedTime={formattedTime}
+        onExtend={extendSession}
+        onLogout={logout}
       />
     </div>
   );
