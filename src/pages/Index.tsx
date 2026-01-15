@@ -4,6 +4,7 @@ import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadsList } from '@/components/leads/LeadsList';
 import { LeadDetail } from '@/components/leads/LeadDetail';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
+import { LeadImportModal } from '@/components/leads/LeadImportModal';
 import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
 import { useLeads } from '@/hooks/useLeads';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -13,6 +14,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   
   const { 
@@ -22,8 +24,10 @@ const Index = () => {
     addLead, 
     updateLead, 
     deleteLead,
+    importLeads,
     isAddingLead,
     isUpdatingLead,
+    isImportingLeads,
   } = useLeads();
 
   const handleViewLead = (id: string) => {
@@ -67,6 +71,14 @@ const Index = () => {
     setEditingLead(null);
   };
 
+  const handleImportLeads = (leadsData: any[]) => {
+    importLeads(leadsData, {
+      onSuccess: () => {
+        setIsImportOpen(false);
+      },
+    });
+  };
+
   const selectedLead = leads.find(l => l.id === selectedLeadId);
 
   const renderContent = () => {
@@ -99,6 +111,7 @@ const Index = () => {
             leads={leads} 
             onViewLead={handleViewLead}
             onAddLead={handleAddLead}
+            onImportLeads={() => setIsImportOpen(true)}
           />
         );
       case 'prospeccion':
@@ -133,6 +146,13 @@ const Index = () => {
         lead={editingLead}
         onSubmit={handleFormSubmit}
         isLoading={isAddingLead || isUpdatingLead}
+      />
+
+      <LeadImportModal
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        onImport={handleImportLeads}
+        isImporting={isImportingLeads}
       />
     </div>
   );
