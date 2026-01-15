@@ -28,8 +28,8 @@ const menuItems = [
   { id: 'pipeline', label: 'Pipeline', icon: Kanban },
   { id: 'prospeccion', label: 'Prospección', icon: Search },
   { id: 'campaigns', label: 'Campañas', icon: Mail },
+  { id: 'mapa', label: 'Mapa', icon: MapPin },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, disabled: true },
-  { id: 'mapa', label: 'Mapa', icon: MapPin, disabled: true },
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {

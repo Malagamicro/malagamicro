@@ -33,6 +33,8 @@ function mapRowToLead(row: any): Lead {
     tags: row.tags,
     score: row.score ?? 0,
     emailUnsubscribed: row.email_unsubscribed ?? false,
+    latitude: row.latitude ?? undefined,
+    longitude: row.longitude ?? undefined,
   };
 }
 
