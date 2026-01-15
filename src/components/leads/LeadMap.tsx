@@ -3,7 +3,7 @@ import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-map
 import { Lead } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
 import { LeadScoreBadge } from './LeadScoreBadge';
-import { Building2, Phone, Mail, MapPin, Loader2, AlertCircle } from 'lucide-react';
+import { Building2, Phone, Mail, MapPin, Loader2, AlertCircle, MapPinned } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 interface LeadMapProps {
   leads: Lead[];
   onViewLead: (id: string) => void;
+  onBulkGeocode?: (leads: { id: string; address?: string; city?: string }[]) => void;
+  isBulkGeocoding?: boolean;
 }
 
 const containerStyle = {
@@ -30,7 +32,7 @@ const statusColors: Record<string, string> = {
   cliente: '#10b981',    // green
 };
 
-export function LeadMap({ leads, onViewLead }: LeadMapProps) {
+export function LeadMap({ leads, onViewLead, onBulkGeocode, isBulkGeocoding = false }: LeadMapProps) {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isLoadingKey, setIsLoadingKey] = useState(true);
   const [keyError, setKeyError] = useState<string | null>(null);
@@ -100,6 +102,17 @@ export function LeadMap({ leads, onViewLead }: LeadMapProps) {
   }, []);
 
   const leadsWithLocation = leads.filter(l => l.latitude && l.longitude);
+  const leadsWithoutLocation = leads.filter(l => (!l.latitude || !l.longitude) && (l.address || l.city));
+
+  const handleBulkGeocode = () => {
+    if (onBulkGeocode && leadsWithoutLocation.length > 0) {
+      onBulkGeocode(leadsWithoutLocation.map(l => ({
+        id: l.id,
+        address: l.address,
+        city: l.city,
+      })));
+    }
+  };
 
   if (isLoadingKey) {
     return (
@@ -156,6 +169,27 @@ export function LeadMap({ leads, onViewLead }: LeadMapProps) {
         <p className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border">
           {leadsWithLocation.length} de {leads.length} leads con ubicación
         </p>
+        {leadsWithoutLocation.length > 0 && onBulkGeocode && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full mt-3 gap-2 text-xs"
+            onClick={handleBulkGeocode}
+            disabled={isBulkGeocoding}
+          >
+            {isBulkGeocoding ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Geocodificando...
+              </>
+            ) : (
+              <>
+                <MapPinned className="w-3 h-3" />
+                Geocodificar {leadsWithoutLocation.length} leads
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       <GoogleMap
