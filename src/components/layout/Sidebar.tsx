@@ -34,7 +34,7 @@ const menuItems = [
   { id: 'campaigns', label: 'Campañas', icon: Mail },
   { id: 'mapa', label: 'Mapa', icon: MapPin },
   { id: 'reports', label: 'Reportes', icon: BarChart3 },
-  { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, disabled: true },
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
@@ -93,23 +93,16 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         {menuItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => !item.disabled && onTabChange(item.id)}
-            disabled={item.disabled}
+            onClick={() => onTabChange(item.id)}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
               "hover:bg-sidebar-accent",
-              activeTab === item.id && "bg-sidebar-accent",
-              item.disabled && "opacity-40 cursor-not-allowed hover:bg-transparent"
+              activeTab === item.id && "bg-sidebar-accent"
             )}
           >
             <item.icon className="w-5 h-5 flex-shrink-0" />
             {!collapsed && (
               <span className="text-sm font-medium animate-fade-in">{item.label}</span>
-            )}
-            {!collapsed && item.disabled && (
-              <span className="ml-auto text-[10px] bg-sidebar-accent px-2 py-0.5 rounded-full">
-                Pronto
-              </span>
             )}
           </button>
         ))}
