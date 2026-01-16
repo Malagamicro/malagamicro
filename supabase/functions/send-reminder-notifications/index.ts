@@ -19,10 +19,12 @@ interface ReminderWithDetails {
     company_name: string;
     contact_name: string | null;
   };
-  profiles: {
-    email: string | null;
-    full_name: string | null;
-  } | null;
+}
+
+interface UserProfile {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -95,28 +97,47 @@ Deno.serve(async (req) => {
 
     console.log(`Grouped into ${remindersByUser.size} user(s)`);
 
-    // Fetch user profiles for email addresses
+    // Fetch user emails from auth.users using admin API and profiles for full_name
     const userIds = Array.from(remindersByUser.keys());
+    
+    // Get profiles for full names
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('user_id, email, full_name')
+      .select('user_id, full_name')
       .in('user_id', userIds);
 
     if (profilesError) {
       console.error('Error fetching profiles:', profilesError);
-      throw profilesError;
     }
 
     const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+
+    // Get user emails from auth.users
+    const userEmails = new Map<string, UserProfile>();
+    for (const userId of userIds) {
+      try {
+        const { data: { user }, error } = await supabase.auth.admin.getUserById(userId);
+        if (!error && user?.email) {
+          const profile = profileMap.get(userId);
+          userEmails.set(userId, {
+            user_id: userId,
+            email: user.email,
+            full_name: profile?.full_name || null,
+          });
+        }
+      } catch (err) {
+        console.error(`Error fetching user ${userId}:`, err);
+      }
+    }
 
     let emailsSent = 0;
     const errors: string[] = [];
 
     // Send email to each user with their reminders
     for (const [userId, userReminders] of remindersByUser) {
-      const profile = profileMap.get(userId);
+      const userProfile = userEmails.get(userId);
       
-      if (!profile?.email) {
+      if (!userProfile?.email) {
         console.log(`No email found for user ${userId}, skipping...`);
         continue;
       }
@@ -128,7 +149,7 @@ Deno.serve(async (req) => {
         return date >= startOfDay && date <= endOfDay;
       });
 
-      const userName = profile.full_name || 'Usuario';
+      const userName = userProfile.full_name || 'Usuario';
       
       let html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -200,20 +221,20 @@ Deno.serve(async (req) => {
         : `🔔 Tienes ${todayReminders.length} recordatorio(s) para hoy`;
 
       try {
-        console.log(`Sending email to ${profile.email} with ${totalReminders} reminders`);
+        console.log(`Sending email to ${userProfile.email} with ${totalReminders} reminders`);
         
         const emailResponse = await resend.emails.send({
           from: "MalagaMicro CRM <onboarding@resend.dev>",
-          to: [profile.email],
+          to: [userProfile.email],
           subject: subject,
           html: html,
         });
 
-        console.log(`Email sent successfully to ${profile.email}:`, emailResponse);
+        console.log(`Email sent successfully to ${userProfile.email}:`, emailResponse);
         emailsSent++;
       } catch (emailError: any) {
-        console.error(`Failed to send email to ${profile.email}:`, emailError);
-        errors.push(`Failed to send to ${profile.email}: ${emailError.message}`);
+        console.error(`Failed to send email to ${userProfile.email}:`, emailError);
+        errors.push(`Failed to send to ${userProfile.email}: ${emailError.message}`);
       }
     }
 

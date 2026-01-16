@@ -229,7 +229,7 @@ export type Database = {
           id: string
           lead_id: string
           type: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string
@@ -237,7 +237,7 @@ export type Database = {
           id?: string
           lead_id: string
           type: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string
@@ -245,7 +245,7 @@ export type Database = {
           id?: string
           lead_id?: string
           type?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -279,7 +279,7 @@ export type Database = {
           status: string
           tags: string[] | null
           updated_at: string
-          user_id: string | null
+          user_id: string
           website: string | null
         }
         Insert: {
@@ -303,7 +303,7 @@ export type Database = {
           status?: string
           tags?: string[] | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
           website?: string | null
         }
         Update: {
@@ -327,7 +327,7 @@ export type Database = {
           status?: string
           tags?: string[] | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
           website?: string | null
         }
         Relationships: []
@@ -372,7 +372,6 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
-          email: string | null
           full_name: string | null
           id: string
           role: string | null
@@ -383,7 +382,6 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
-          email?: string | null
           full_name?: string | null
           id?: string
           role?: string | null
@@ -394,7 +392,6 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
-          email?: string | null
           full_name?: string | null
           id?: string
           role?: string | null
