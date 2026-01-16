@@ -102,6 +102,10 @@ export function useLeads() {
 
   const addLead = useMutation({
     mutationFn: async (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => {
+      if (!user?.id) {
+        throw new Error('Usuario no autenticado');
+      }
+
       // Geocode the address
       let latitude: number | undefined;
       let longitude: number | undefined;
@@ -128,7 +132,7 @@ export function useLeads() {
         equipment_count: lead.equipmentCount,
         notes: lead.notes,
         tags: lead.tags,
-        user_id: user?.id,
+        user_id: user.id,
         latitude,
         longitude,
       }).select('id').single();
@@ -262,6 +266,10 @@ export function useLeads() {
 
   const importLeads = useMutation({
     mutationFn: async (leads: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+      if (!user?.id) {
+        throw new Error('Usuario no autenticado');
+      }
+
       const leadsToInsert = leads.map(lead => ({
         company_name: lead.companyName,
         contact_name: lead.contactName || null,
@@ -276,7 +284,7 @@ export function useLeads() {
         equipment_count: lead.equipmentCount || null,
         notes: lead.notes || null,
         tags: lead.tags || null,
-        user_id: user?.id,
+        user_id: user.id,
       }));
       
       const { error } = await supabase.from('leads').insert(leadsToInsert);
