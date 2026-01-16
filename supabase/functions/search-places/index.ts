@@ -28,9 +28,9 @@ serve(async (req) => {
   }
 
   try {
-    const { query, location, category } = await req.json();
+    const { query, location, category, pageToken } = await req.json();
     
-    console.log('Search request:', { query, location, category });
+    console.log('Search request:', { query, location, category, pageToken: pageToken ? 'yes' : 'no' });
     
     const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
     if (!apiKey) {
@@ -62,18 +62,24 @@ serve(async (req) => {
     
     console.log('Searching for:', fullQuery);
 
-    // First, use Text Search to find places
+    // Build Text Search URL
     const textSearchUrl = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
     textSearchUrl.searchParams.set('query', fullQuery);
     textSearchUrl.searchParams.set('key', apiKey);
     textSearchUrl.searchParams.set('language', 'es');
     textSearchUrl.searchParams.set('region', 'es');
+    
+    // If we have a page token, use it to get next page
+    if (pageToken) {
+      textSearchUrl.searchParams.set('pagetoken', pageToken);
+    }
 
     const textSearchResponse = await fetch(textSearchUrl.toString());
     const textSearchData = await textSearchResponse.json();
     
     console.log('Text search status:', textSearchData.status);
     console.log('Results count:', textSearchData.results?.length || 0);
+    console.log('Has next page:', !!textSearchData.next_page_token);
 
     if (textSearchData.status !== 'OK' && textSearchData.status !== 'ZERO_RESULTS') {
       console.error('Google Places API error:', textSearchData.status, textSearchData.error_message);
@@ -88,8 +94,8 @@ serve(async (req) => {
 
     const places: PlaceResult[] = [];
     
-    // Get details for each place (limited to first 10 for performance)
-    const placesToProcess = (textSearchData.results || []).slice(0, 10);
+    // Get details for each place (up to 20 results)
+    const placesToProcess = (textSearchData.results || []).slice(0, 20);
     
     for (const place of placesToProcess) {
       // Get place details for phone and website
@@ -137,7 +143,10 @@ serve(async (req) => {
     console.log('Returning', places.length, 'places with details');
     
     return new Response(
-      JSON.stringify({ places }),
+      JSON.stringify({ 
+        places,
+        nextPageToken: textSearchData.next_page_token || null,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

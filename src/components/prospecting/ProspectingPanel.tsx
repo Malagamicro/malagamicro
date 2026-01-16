@@ -58,24 +58,31 @@ export function ProspectingPanel() {
   const [location, setLocation] = useState('Málaga');
   const [category, setCategory] = useState('all');
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addingLeadId, setAddingLeadId] = useState<string | null>(null);
   const [isAddingAll, setIsAddingAll] = useState(false);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   
   const { addLead, isAddingLead } = useLeads();
 
-  const handleSearch = async () => {
+  const handleSearch = async (isLoadMore = false) => {
     if (!location.trim()) {
       toast.error('Por favor, introduce una ubicación');
       return;
     }
 
-    setIsSearching(true);
-    setHasSearched(true);
-    setError(null);
-    setResults([]);
+    if (isLoadMore) {
+      setIsLoadingMore(true);
+    } else {
+      setIsSearching(true);
+      setHasSearched(true);
+      setError(null);
+      setResults([]);
+      setNextPageToken(null);
+    }
     
     try {
       const { data, error: fnError } = await supabase.functions.invoke('search-places', {
@@ -83,6 +90,7 @@ export function ProspectingPanel() {
           query: searchQuery,
           location: location,
           category: category,
+          pageToken: isLoadMore ? nextPageToken : undefined,
         },
       });
 
@@ -98,18 +106,27 @@ export function ProspectingPanel() {
         return;
       }
 
-      setResults(data.places || []);
+      const newPlaces = data.places || [];
       
-      if (data.places?.length === 0) {
-        toast.info('No se encontraron resultados para esta búsqueda');
+      if (isLoadMore) {
+        setResults(prev => [...prev, ...newPlaces]);
+        toast.success(`Se cargaron ${newPlaces.length} empresas más`);
       } else {
-        toast.success(`Se encontraron ${data.places.length} empresas`);
+        setResults(newPlaces);
+        if (newPlaces.length === 0) {
+          toast.info('No se encontraron resultados para esta búsqueda');
+        } else {
+          toast.success(`Se encontraron ${newPlaces.length} empresas`);
+        }
       }
+      
+      setNextPageToken(data.nextPageToken || null);
     } catch (err) {
       console.error('Search error:', err);
       setError('Error de conexión. Inténtalo de nuevo.');
     } finally {
       setIsSearching(false);
+      setIsLoadingMore(false);
     }
   };
 
@@ -197,8 +214,12 @@ export function ProspectingPanel() {
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSearch();
+      handleSearch(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    handleSearch(true);
   };
 
   return (
@@ -274,7 +295,7 @@ export function ProspectingPanel() {
 
         <div className="flex justify-end mt-6">
           <Button 
-            onClick={handleSearch} 
+            onClick={() => handleSearch(false)} 
             disabled={isSearching}
             className="gap-2"
           >
@@ -424,6 +445,30 @@ export function ProspectingPanel() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          
+          {/* Load More Button */}
+          {results.length > 0 && nextPageToken && (
+            <div className="flex justify-center mt-6">
+              <Button 
+                variant="outline" 
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="gap-2"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Cargando más empresas...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Cargar más resultados
+                  </>
+                )}
+              </Button>
             </div>
           )}
         </div>
