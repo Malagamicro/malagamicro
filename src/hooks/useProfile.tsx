@@ -8,7 +8,6 @@ interface Profile {
   id: string;
   user_id: string;
   full_name: string | null;
-  email: string | null;
   avatar_url: string | null;
   role: string | null;
   theme_preference: string | null;
@@ -40,7 +39,6 @@ export function useProfile() {
           .from('profiles')
           .insert({
             user_id: user.id,
-            email: user.email,
           })
           .select()
           .single();
