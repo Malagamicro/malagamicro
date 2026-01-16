@@ -9,7 +9,10 @@ import {
   Loader2,
   ExternalLink,
   Plus,
-  Sparkles
+  Sparkles,
+  Phone,
+  Star,
+  AlertCircle
 } from 'lucide-react';
 import {
   Select,
@@ -18,6 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useLeads } from '@/hooks/useLeads';
 
 const businessCategories = [
   { value: 'all', label: 'Todas las categorías' },
@@ -26,9 +32,12 @@ const businessCategories = [
   { value: 'health', label: 'Salud (clínicas, farmacias)' },
   { value: 'professional', label: 'Servicios profesionales' },
   { value: 'franchise', label: 'Franquicias' },
+  { value: 'gym', label: 'Gimnasios' },
+  { value: 'beauty', label: 'Peluquerías y estética' },
+  { value: 'automotive', label: 'Automoción' },
 ];
 
-interface MockResult {
+interface PlaceResult {
   id: string;
   name: string;
   address: string;
@@ -36,61 +45,160 @@ interface MockResult {
   phone?: string;
   category: string;
   rating?: number;
+  userRatingsTotal?: number;
+  placeId: string;
+  location?: {
+    lat: number;
+    lng: number;
+  };
 }
-
-const mockResults: MockResult[] = [
-  {
-    id: '1',
-    name: 'Óptica Visually',
-    address: 'Calle Larios 15, Málaga',
-    website: 'opticavisually.es',
-    phone: '+34 952 123 456',
-    category: 'retail',
-    rating: 4.5,
-  },
-  {
-    id: '2',
-    name: 'Clínica Dental Plus',
-    address: 'Av. de Andalucía 78, Málaga',
-    website: 'clinicadentalplus.com',
-    category: 'health',
-    rating: 4.8,
-  },
-  {
-    id: '3',
-    name: 'Bufete Abogados Málaga',
-    address: 'Plaza de la Marina 5, Málaga',
-    website: 'bufetemalaga.es',
-    phone: '+34 951 234 567',
-    category: 'professional',
-    rating: 4.2,
-  },
-  {
-    id: '4',
-    name: 'Telepizza Teatinos',
-    address: 'C/ Louis Pasteur 12, Málaga',
-    category: 'franchise',
-    rating: 3.9,
-  },
-];
 
 export function ProspectingPanel() {
   const [searchQuery, setSearchQuery] = useState('');
   const [location, setLocation] = useState('Málaga');
   const [category, setCategory] = useState('all');
   const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<MockResult[]>([]);
+  const [results, setResults] = useState<PlaceResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [addingLeadId, setAddingLeadId] = useState<string | null>(null);
+  const [isAddingAll, setIsAddingAll] = useState(false);
+  
+  const { addLead, isAddingLead } = useLeads();
 
   const handleSearch = async () => {
+    if (!location.trim()) {
+      toast.error('Por favor, introduce una ubicación');
+      return;
+    }
+
     setIsSearching(true);
     setHasSearched(true);
+    setError(null);
+    setResults([]);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('search-places', {
+        body: {
+          query: searchQuery,
+          location: location,
+          category: category,
+        },
+      });
+
+      if (fnError) {
+        console.error('Edge function error:', fnError);
+        setError('Error al buscar empresas. Inténtalo de nuevo.');
+        return;
+      }
+
+      if (data.error) {
+        console.error('API error:', data.error, data.details);
+        setError(data.details || data.error);
+        return;
+      }
+
+      setResults(data.places || []);
+      
+      if (data.places?.length === 0) {
+        toast.info('No se encontraron resultados para esta búsqueda');
+      } else {
+        toast.success(`Se encontraron ${data.places.length} empresas`);
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Error de conexión. Inténtalo de nuevo.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleAddToLeads = (place: PlaceResult) => {
+    setAddingLeadId(place.id);
     
-    setResults(mockResults);
-    setIsSearching(false);
+    // Extract city from address (usually after last comma)
+    const addressParts = place.address.split(',');
+    const city = addressParts.length > 1 
+      ? addressParts[addressParts.length - 2]?.trim() || 'Málaga'
+      : 'Málaga';
+
+    addLead({
+      companyName: place.name,
+      address: place.address,
+      city: city,
+      phone: place.phone || undefined,
+      website: place.website ? `https://${place.website}` : undefined,
+      source: 'google_maps',
+      status: 'nuevo',
+      segment: 'pyme',
+      latitude: place.location?.lat,
+      longitude: place.location?.lng,
+      notes: place.rating ? `Rating: ${place.rating}/5 (${place.userRatingsTotal || 0} reseñas)` : undefined,
+    }, {
+      onSuccess: () => {
+        toast.success(`${place.name} añadido a leads`);
+        setResults(prev => prev.filter(p => p.id !== place.id));
+        setAddingLeadId(null);
+      },
+      onError: () => {
+        toast.error('Error al añadir el lead');
+        setAddingLeadId(null);
+      },
+    });
+  };
+
+  const handleAddAllToLeads = () => {
+    const toAdd = results.slice(0, 10); // Limit to 10 at a time
+    setIsAddingAll(true);
+    let added = 0;
+    let processed = 0;
+    
+    toAdd.forEach((place) => {
+      const addressParts = place.address.split(',');
+      const city = addressParts.length > 1 
+        ? addressParts[addressParts.length - 2]?.trim() || 'Málaga'
+        : 'Málaga';
+
+      addLead({
+        companyName: place.name,
+        address: place.address,
+        city: city,
+        phone: place.phone || undefined,
+        website: place.website ? `https://${place.website}` : undefined,
+        source: 'google_maps',
+        status: 'nuevo',
+        segment: 'pyme',
+        latitude: place.location?.lat,
+        longitude: place.location?.lng,
+        notes: place.rating ? `Rating: ${place.rating}/5 (${place.userRatingsTotal || 0} reseñas)` : undefined,
+      }, {
+        onSuccess: () => {
+          added++;
+          processed++;
+          if (processed === toAdd.length) {
+            toast.success(`${added} empresas añadidas a leads`);
+            setResults(prev => prev.filter(p => !toAdd.some(t => t.id === p.id)));
+            setIsAddingAll(false);
+          }
+        },
+        onError: () => {
+          processed++;
+          if (processed === toAdd.length) {
+            if (added > 0) {
+              toast.success(`${added} empresas añadidas a leads`);
+              setResults(prev => prev.filter(p => !toAdd.some(t => t.id === p.id)));
+            }
+            setIsAddingAll(false);
+          }
+        },
+      });
+    });
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   return (
@@ -99,7 +207,7 @@ export function ProspectingPanel() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Prospección</h1>
         <p className="text-muted-foreground mt-1">
-          Busca empresas y extrae contactos automáticamente
+          Busca empresas reales en Google Maps y añádelas a tu lista de leads
         </p>
       </div>
 
@@ -123,6 +231,7 @@ export function ProspectingPanel() {
                 placeholder="ej: tiendas de ropa, restaurantes, clínicas..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={handleKeyPress}
                 className="pl-10"
               />
             </div>
@@ -130,14 +239,15 @@ export function ProspectingPanel() {
 
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-              Ubicación
+              Ubicación / Código Postal
             </label>
             <div className="relative">
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Ciudad o zona"
+                placeholder="Ciudad, zona o CP"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
+                onKeyPress={handleKeyPress}
                 className="pl-10"
               />
             </div>
@@ -171,7 +281,7 @@ export function ProspectingPanel() {
             {isSearching ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Buscando...
+                Buscando en Google Maps...
               </>
             ) : (
               <>
@@ -183,15 +293,32 @@ export function ProspectingPanel() {
         </div>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-destructive">Error en la búsqueda</p>
+            <p className="text-sm text-muted-foreground mt-1">{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Results */}
-      {hasSearched && (
+      {hasSearched && !error && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">
               Resultados {results.length > 0 && `(${results.length})`}
             </h2>
             {results.length > 0 && (
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2"
+                onClick={handleAddAllToLeads}
+                disabled={isAddingAll || isAddingLead}
+              >
                 <Plus className="w-4 h-4" />
                 Añadir todos a Leads
               </Button>
@@ -218,18 +345,24 @@ export function ProspectingPanel() {
                       <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center">
                         <Building2 className="w-6 h-6 text-primary" />
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground">{result.name}</h3>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-foreground truncate">{result.name}</h3>
                         <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {result.address}
+                          <MapPin className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{result.address}</span>
                         </p>
                       </div>
                     </div>
                     {result.rating && (
-                      <span className="text-sm font-medium text-amber-500">
-                        ★ {result.rating}
-                      </span>
+                      <div className="flex items-center gap-1 text-sm font-medium text-amber-500 flex-shrink-0">
+                        <Star className="w-4 h-4 fill-current" />
+                        {result.rating}
+                        {result.userRatingsTotal && (
+                          <span className="text-muted-foreground font-normal">
+                            ({result.userRatingsTotal})
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -242,25 +375,52 @@ export function ProspectingPanel() {
                         className="flex items-center gap-2 text-primary hover:underline"
                       >
                         <Globe className="w-4 h-4" />
-                        {result.website}
-                        <ExternalLink className="w-3 h-3" />
+                        <span className="truncate">{result.website}</span>
+                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
                       </a>
                     )}
                     {result.phone && (
                       <p className="flex items-center gap-2">
-                        📞 {result.phone}
+                        <Phone className="w-4 h-4" />
+                        {result.phone}
+                      </p>
+                    )}
+                    {!result.website && !result.phone && (
+                      <p className="text-muted-foreground/60 italic">
+                        Sin datos de contacto disponibles
                       </p>
                     )}
                   </div>
 
                   <div className="flex gap-2">
-                    <Button size="sm" className="flex-1 gap-1">
-                      <Plus className="w-3 h-3" />
+                    <Button 
+                      size="sm" 
+                      className="flex-1 gap-1"
+                      onClick={() => handleAddToLeads(result)}
+                      disabled={addingLeadId === result.id}
+                    >
+                      {addingLeadId === result.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Plus className="w-3 h-3" />
+                      )}
                       Añadir a Leads
                     </Button>
-                    <Button variant="outline" size="sm">
-                      <Globe className="w-4 h-4" />
-                    </Button>
+                    {result.website && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        asChild
+                      >
+                        <a 
+                          href={`https://${result.website}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Globe className="w-4 h-4" />
+                        </a>
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -278,11 +438,12 @@ export function ProspectingPanel() {
             </div>
             <div>
               <h3 className="font-semibold text-foreground">
-                Próximamente: Búsqueda avanzada con Google Maps
+                Búsqueda con Google Maps
               </h3>
               <p className="text-muted-foreground mt-1 text-sm">
-                Conectaremos con Google Maps y Firecrawl para buscar empresas automáticamente, 
-                extraer datos de contacto de sus webs y añadirlos directamente a tu lista de leads.
+                Busca empresas reales por nombre, categoría, ciudad o código postal. 
+                Los resultados incluyen dirección, teléfono, web y valoraciones. 
+                Añade las que te interesen directamente a tu lista de leads.
               </p>
             </div>
           </div>
