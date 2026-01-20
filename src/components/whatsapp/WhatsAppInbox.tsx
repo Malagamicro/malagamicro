@@ -47,17 +47,28 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
       const data = await response.json();
       console.log('Chats recibidos:', data);
       
+      // Handle different WAHA response formats
+      const chatsArray = Array.isArray(data) ? data : (data.chats || data.data || []);
+      
       // Transform WAHA response to our format
-      const transformedChats: Chat[] = data
-        .filter((chat: any) => chat.id?.includes('@c.us')) // Only individual chats, not groups
-        .map((chat: any) => ({
-          id: chat.id,
-          name: chat.name || chat.id?.replace('@c.us', '') || 'Desconocido',
-          lastMessage: chat.lastMessage?.body || 'Sin mensajes',
-          timestamp: chat.lastMessage?.timestamp || Date.now() / 1000,
-          unreadCount: chat.unreadCount || 0,
-          phone: chat.id?.replace('@c.us', '') || '',
-        }))
+      const transformedChats: Chat[] = chatsArray
+        .filter((chat: any) => {
+          // Get chat id - could be string or object with _serialized
+          const chatId = typeof chat.id === 'string' ? chat.id : chat.id?._serialized || '';
+          return chatId.includes('@c.us'); // Only individual chats, not groups
+        })
+        .map((chat: any) => {
+          const chatId = typeof chat.id === 'string' ? chat.id : chat.id?._serialized || '';
+          const phone = chatId.replace('@c.us', '');
+          return {
+            id: chatId,
+            name: chat.name || chat.contact?.name || chat.contact?.pushname || phone || 'Desconocido',
+            lastMessage: chat.lastMessage?.body || chat.lastMessage?.text || 'Sin mensajes',
+            timestamp: chat.lastMessage?.timestamp || chat.timestamp || Date.now() / 1000,
+            unreadCount: chat.unreadCount || 0,
+            phone,
+          };
+        })
         .sort((a: Chat, b: Chat) => b.timestamp - a.timestamp);
       
       setChats(transformedChats);
