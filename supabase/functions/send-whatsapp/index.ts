@@ -62,11 +62,12 @@ Deno.serve(async (req) => {
     console.log(`Sending WhatsApp message via WAHA to ${cleanPhone} for lead: ${leadName || 'unknown'}`);
 
     // Send message via WAHA local API
+    // Using host.docker.internal for Docker-to-host networking
     const response = await fetch('http://host.docker.internal:3000/api/sendText', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': '123456',
+        'X-Api-Key': '12345678',
       },
       body: JSON.stringify({
         chatId: `${cleanPhone}@c.us`,
