@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 interface WhatsAppRequest {
-  to: string;
+  phone: string;
   message: string;
   leadId?: string;
   leadName?: string;
@@ -49,56 +49,40 @@ Deno.serve(async (req) => {
 
     console.log(`Authenticated user: ${user.id}`);
 
-    const WHATSAPP_ACCESS_TOKEN = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
-    const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
+    const { phone, message, leadId, leadName } = await req.json() as WhatsAppRequest;
 
-    if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
-      console.error('Missing WhatsApp API credentials');
-      throw new Error('WhatsApp API credentials not configured');
-    }
-
-    const { to, message, leadId, leadName } = await req.json() as WhatsAppRequest;
-
-    if (!to || !message) {
-      console.error('Missing required fields:', { to: !!to, message: !!message });
-      throw new Error('Phone number (to) and message are required');
+    if (!phone || !message) {
+      console.error('Missing required fields:', { phone: !!phone, message: !!message });
+      throw new Error('Phone number and message are required');
     }
 
     // Clean phone number - remove any non-digit characters
-    const cleanPhone = to.replace(/\D/g, '');
+    const cleanPhone = phone.replace(/\D/g, '');
     
-    console.log(`Sending WhatsApp message to ${cleanPhone} for lead: ${leadName || 'unknown'}`);
+    console.log(`Sending WhatsApp message via WAHA to ${cleanPhone} for lead: ${leadName || 'unknown'}`);
 
-    // Send message via WhatsApp Business API
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: cleanPhone,
-          type: 'text',
-          text: {
-            preview_url: false,
-            body: message,
-          },
-        }),
-      }
-    );
+    // Send message via WAHA local API
+    const response = await fetch('http://host.docker.internal:3000/api/sendText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': '123456',
+      },
+      body: JSON.stringify({
+        chatId: `${cleanPhone}@c.us`,
+        text: message,
+        session: 'default',
+      }),
+    });
 
     const responseData = await response.json();
 
     if (!response.ok) {
-      console.error('WhatsApp API error:', responseData);
-      throw new Error(responseData.error?.message || 'Failed to send WhatsApp message');
+      console.error('WAHA API error:', responseData);
+      throw new Error(responseData.message || 'Failed to send WhatsApp message');
     }
 
-    console.log('WhatsApp message sent successfully:', responseData);
+    console.log('WhatsApp message sent successfully via WAHA:', responseData);
 
     // Log activity if leadId is provided
     if (leadId) {
@@ -124,7 +108,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        messageId: responseData.messages?.[0]?.id 
+        messageId: responseData.id || 'sent'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
