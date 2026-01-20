@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WhatsAppInbox } from './WhatsAppInbox';
 import { WhatsAppChat } from './WhatsAppChat';
 import { WhatsAppSimpleForm } from './WhatsAppSimpleForm';
+import { WahaSessionManager } from './WahaSessionManager';
 import { MessageSquare, Send, Inbox } from 'lucide-react';
 
 export function WhatsAppPanel() {
@@ -22,6 +23,7 @@ export function WhatsAppPanel() {
 
   return (
     <div className="h-[calc(100vh-180px)]">
+      <WahaSessionManager />
       <Tabs defaultValue="inbox" className="h-full">
         <TabsList className="mb-4">
           <TabsTrigger value="inbox" className="flex items-center gap-2">
