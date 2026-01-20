@@ -5,7 +5,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageCircle, Send, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export function WhatsAppSimpleForm() {
@@ -24,22 +23,37 @@ export function WhatsAppSimpleForm() {
     setIsSending(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("send-whatsapp", {
-        body: { phone, message },
+      const cleanPhone = phone.replace(/\D/g, "");
+      
+      const response = await fetch("http://localhost:3000/api/sendText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": "123456",
+        },
+        body: JSON.stringify({
+          chatId: `${cleanPhone}@c.us`,
+          text: message,
+          session: "default",
+        }),
       });
 
-      if (error) throw error;
-
-      if (data?.success) {
-        toast.success("Mensaje de WhatsApp enviado correctamente");
-        setPhone("");
-        setMessage("");
-      } else {
-        throw new Error(data?.error || "Error al enviar mensaje");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Error HTTP: ${response.status}`);
       }
+
+      toast.success("Mensaje de WhatsApp enviado correctamente");
+      setPhone("");
+      setMessage("");
     } catch (error: any) {
       console.error("Error sending WhatsApp:", error);
-      toast.error(error.message || "Error al enviar el mensaje de WhatsApp");
+      
+      if (error.name === "TypeError" && error.message.includes("fetch")) {
+        toast.error("No se pudo conectar con el servidor WAHA. Verifica que esté corriendo en localhost:3000");
+      } else {
+        toast.error(error.message || "Error al enviar el mensaje de WhatsApp");
+      }
     } finally {
       setIsSending(false);
     }
