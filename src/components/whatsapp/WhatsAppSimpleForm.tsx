@@ -23,7 +23,21 @@ export function WhatsAppSimpleForm() {
     setIsSending(true);
 
     try {
-      const cleanPhone = phone.replace(/\D/g, "");
+      let cleanPhone = phone.replace(/\D/g, "");
+      
+      // Si el número no empieza con código de país (34 para España), lo añadimos
+      if (!cleanPhone.startsWith("34") && cleanPhone.length === 9) {
+        cleanPhone = "34" + cleanPhone;
+      }
+      
+      const chatId = `${cleanPhone}@c.us`;
+      const payload = {
+        chatId,
+        text: message,
+        session: "default",
+      };
+      
+      console.log("📤 Enviando WhatsApp:", payload);
       
       const response = await fetch("http://localhost:3000/api/sendText", {
         method: "POST",
@@ -31,11 +45,7 @@ export function WhatsAppSimpleForm() {
           "Content-Type": "application/json",
           "X-Api-Key": "123456",
         },
-        body: JSON.stringify({
-          chatId: `${cleanPhone}@c.us`,
-          text: message,
-          session: "default",
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -74,13 +84,13 @@ export function WhatsAppSimpleForm() {
             <Input
               id="phone"
               type="tel"
-              placeholder="Ej: 34612345678"
+              placeholder="Ej: 651857079"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               disabled={isSending}
             />
             <p className="text-xs text-muted-foreground">
-              Incluye el código de país sin el símbolo +
+              Si escribes 9 dígitos, se añadirá automáticamente el prefijo 34
             </p>
           </div>
 
