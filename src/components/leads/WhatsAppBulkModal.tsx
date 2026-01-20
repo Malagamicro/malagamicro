@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, MessageSquare, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, MessageSquare, CheckCircle, XCircle, ImagePlus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Lead } from '@/types/lead';
 import { Progress } from '@/components/ui/progress';
@@ -83,6 +84,9 @@ export function WhatsAppBulkModal({
   const [isSending, setIsSending] = useState(false);
   const [sendProgress, setSendProgress] = useState(0);
   const [results, setResults] = useState<SendResult[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Leads con teléfono válido
@@ -115,27 +119,111 @@ export function WhatsAppBulkModal({
     return cleanPhone;
   };
 
-  const sendWhatsApp = async (lead: Lead, personalizedMessage: string): Promise<SendResult> => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validar tipo de archivo
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Error',
+          description: 'Solo se permiten archivos de imagen.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Validar tamaño (máx 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'Error',
+          description: 'La imagen no puede superar 5MB.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setImageFile(file);
+      
+      // Crear preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remover el prefijo "data:image/xxx;base64," para obtener solo el base64
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const sendWhatsApp = async (lead: Lead, personalizedMessage: string, imageBase64?: string): Promise<SendResult> => {
     try {
       const cleanPhone = formatPhoneNumber(lead.phone || '');
       const chatId = `${cleanPhone}@c.us`;
       
-      const payload = {
-        chatId,
-        text: personalizedMessage,
-        session: "default",
-      };
-      
-      console.log(`📤 Enviando WhatsApp a ${lead.companyName}:`, payload);
-      
-      const response = await fetch("http://localhost:3000/api/sendText", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": "123456",
-        },
-        body: JSON.stringify(payload),
-      });
+      let response: Response;
+
+      if (imageBase64 && imageFile) {
+        // Enviar imagen con caption
+        const payload = {
+          chatId,
+          file: {
+            mimetype: imageFile.type,
+            filename: imageFile.name,
+            data: imageBase64,
+          },
+          caption: personalizedMessage,
+          session: "default",
+        };
+        
+        console.log(`📤 Enviando imagen WhatsApp a ${lead.companyName}:`, { chatId, caption: personalizedMessage, filename: imageFile.name });
+        
+        response = await fetch("http://localhost:3000/api/sendImage", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Api-Key": "123456",
+          },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // Enviar solo texto
+        const payload = {
+          chatId,
+          text: personalizedMessage,
+          session: "default",
+        };
+        
+        console.log(`📤 Enviando WhatsApp a ${lead.companyName}:`, payload);
+        
+        response = await fetch("http://localhost:3000/api/sendText", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Api-Key": "123456",
+          },
+          body: JSON.stringify(payload),
+        });
+      }
 
       if (!response.ok) {
         const errorData = await response.text();
@@ -159,10 +247,10 @@ export function WhatsAppBulkModal({
   };
 
   const handleSend = async () => {
-    if (!message) {
+    if (!message && !imageFile) {
       toast({
         title: 'Error',
-        description: 'Por favor, escribe un mensaje.',
+        description: 'Por favor, escribe un mensaje o adjunta una imagen.',
         variant: 'destructive',
       });
       return;
@@ -181,20 +269,36 @@ export function WhatsAppBulkModal({
     setResults([]);
     setSendProgress(0);
 
+    // Convertir imagen a base64 una sola vez
+    let imageBase64: string | undefined;
+    if (imageFile) {
+      try {
+        imageBase64 = await fileToBase64(imageFile);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'No se pudo procesar la imagen.',
+          variant: 'destructive',
+        });
+        setIsSending(false);
+        return;
+      }
+    }
+
     const newResults: SendResult[] = [];
 
     for (let i = 0; i < leadsWithPhone.length; i++) {
       const lead = leadsWithPhone[i];
       const personalizedMessage = replaceVariables(message, lead);
       
-      const result = await sendWhatsApp(lead, personalizedMessage);
+      const result = await sendWhatsApp(lead, personalizedMessage, imageBase64);
       newResults.push(result);
       setResults([...newResults]);
       setSendProgress(((i + 1) / leadsWithPhone.length) * 100);
 
       // Pequeña pausa entre mensajes para no saturar la API
       if (i < leadsWithPhone.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
     }
 
@@ -220,6 +324,7 @@ export function WhatsAppBulkModal({
       setSelectedTemplate('');
       setResults([]);
       setSendProgress(0);
+      removeImage();
       onOpenChange(false);
     }
   };
@@ -279,10 +384,67 @@ export function WhatsAppBulkModal({
             </p>
           </div>
 
+          {/* Image Attachment */}
+          <div className="space-y-2">
+            <Label>Imagen (opcional)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                disabled={isSending}
+                className="hidden"
+                id="image-upload"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSending}
+                className="gap-2"
+              >
+                <ImagePlus className="w-4 h-4" />
+                Adjuntar imagen
+              </Button>
+              {imageFile && (
+                <span className="text-sm text-muted-foreground truncate max-w-[200px]">
+                  {imageFile.name}
+                </span>
+              )}
+            </div>
+            
+            {/* Image Preview */}
+            {imagePreview && (
+              <div className="relative inline-block">
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="max-h-32 rounded-lg border"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6"
+                  onClick={removeImage}
+                  disabled={isSending}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Formatos: JPG, PNG, GIF. Máximo 5MB.
+            </p>
+          </div>
+
           {/* Message */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <Label htmlFor="message">Mensaje *</Label>
+              <Label htmlFor="message">
+                {imageFile ? 'Texto (caption)' : 'Mensaje *'}
+              </Label>
               <span className={`text-xs ${isOverLimit ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {characterCount}/4096
               </span>
@@ -291,8 +453,8 @@ export function WhatsAppBulkModal({
               id="message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Escribe tu mensaje... Usa {{contactName}} para personalizar."
-              rows={6}
+              placeholder={imageFile ? "Escribe un texto para acompañar la imagen..." : "Escribe tu mensaje... Usa {{contactName}} para personalizar."}
+              rows={4}
               disabled={isSending}
               className="resize-none"
             />
@@ -347,7 +509,7 @@ export function WhatsAppBulkModal({
           {results.length === 0 && (
             <Button 
               onClick={handleSend} 
-              disabled={isSending || isOverLimit || leadsWithPhone.length === 0}
+              disabled={isSending || isOverLimit || leadsWithPhone.length === 0 || (!message && !imageFile)}
               className="bg-green-600 hover:bg-green-700"
             >
               {isSending ? (
