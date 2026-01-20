@@ -36,7 +36,7 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
     try {
       const response = await fetch('http://localhost:3000/api/default/chats', {
         headers: {
-          'X-Api-Key': '123456',
+          'X-Api-Key': '12345678',
         },
       });
       
