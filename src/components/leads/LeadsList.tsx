@@ -5,6 +5,7 @@ import { LeadScoreBadge } from './LeadScoreBadge';
 import { LeadCard } from './LeadCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Search, 
   Plus, 
@@ -13,7 +14,8 @@ import {
   List,
   Upload,
   Download,
-  ArrowUpDown
+  ArrowUpDown,
+  MessageSquare
 } from 'lucide-react';
 import {
   Select,
@@ -30,6 +32,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { exportToCSV, exportToExcel } from '@/lib/exportLeads';
 import { toast } from 'sonner';
+import { WhatsAppBulkModal } from './WhatsAppBulkModal';
 
 type SortOption = 'recent' | 'score' | 'name';
 
@@ -46,6 +49,8 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
   const [segmentFilter, setSegmentFilter] = useState<LeadSegment | 'all'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<SortOption>('score');
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
 
   const filteredAndSortedLeads = useMemo(() => {
     const filtered = leads.filter((lead) => {
@@ -74,6 +79,25 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
     });
   }, [leads, searchTerm, statusFilter, segmentFilter, sortBy]);
 
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds(prev => 
+      prev.includes(leadId) 
+        ? prev.filter(id => id !== leadId)
+        : [...prev, leadId]
+    );
+  };
+
+  const selectAllLeads = () => {
+    if (selectedLeadIds.length === filteredAndSortedLeads.length) {
+      setSelectedLeadIds([]);
+    } else {
+      setSelectedLeadIds(filteredAndSortedLeads.map(lead => lead.id));
+    }
+  };
+
+  const selectedLeads = leads.filter(lead => selectedLeadIds.includes(lead.id));
+  const allSelected = selectedLeadIds.length === filteredAndSortedLeads.length && filteredAndSortedLeads.length > 0;
+
   return (
     <div className="p-8 space-y-6 animate-fade-in">
       {/* Header */}
@@ -82,9 +106,23 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
           <h1 className="text-3xl font-bold text-foreground">Leads</h1>
           <p className="text-muted-foreground mt-1">
             {filteredAndSortedLeads.length} de {leads.length} leads
+            {selectedLeadIds.length > 0 && (
+              <span className="text-primary ml-2">
+                ({selectedLeadIds.length} seleccionados)
+              </span>
+            )}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {selectedLeadIds.length > 0 && (
+            <Button 
+              onClick={() => setShowWhatsAppModal(true)} 
+              className="gap-2 bg-green-600 hover:bg-green-700"
+            >
+              <MessageSquare className="w-4 h-4" />
+              WhatsApp ({selectedLeadIds.length})
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2" disabled={leads.length === 0}>
@@ -196,20 +234,47 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
           </p>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAndSortedLeads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} onClick={() => onViewLead(lead.id)} />
-          ))}
+        <div className="space-y-4">
+          {/* Select all for grid */}
+          <div className="flex items-center gap-2 px-2">
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={selectAllLeads}
+            />
+            <span className="text-sm text-muted-foreground">
+              Seleccionar todos
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredAndSortedLeads.map((lead) => (
+              <div key={lead.id} className="relative">
+                <div className="absolute top-3 left-3 z-10">
+                  <Checkbox
+                    checked={selectedLeadIds.includes(lead.id)}
+                    onCheckedChange={() => toggleLeadSelection(lead.id)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+                <LeadCard lead={lead} onClick={() => onViewLead(lead.id)} />
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <table className="w-full">
             <thead className="bg-muted/50">
               <tr>
+                <th className="w-12 px-4 py-3">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={selectAllLeads}
+                  />
+                </th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Empresa</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Score</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Contacto</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Ciudad</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Teléfono</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Estado</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Segmento</th>
               </tr>
@@ -218,21 +283,30 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
               {filteredAndSortedLeads.map((lead) => (
                 <tr
                   key={lead.id}
-                  onClick={() => onViewLead(lead.id)}
                   className="border-t border-border hover:bg-muted/30 cursor-pointer transition-colors"
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedLeadIds.includes(lead.id)}
+                      onCheckedChange={() => toggleLeadSelection(lead.id)}
+                    />
+                  </td>
+                  <td className="px-4 py-3" onClick={() => onViewLead(lead.id)}>
                     <span className="font-medium text-foreground">{lead.companyName}</span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={() => onViewLead(lead.id)}>
                     <LeadScoreBadge score={lead.score ?? 0} />
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{lead.contactName || '-'}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{lead.city}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-muted-foreground" onClick={() => onViewLead(lead.id)}>
+                    {lead.contactName || '-'}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground" onClick={() => onViewLead(lead.id)}>
+                    {lead.phone || '-'}
+                  </td>
+                  <td className="px-4 py-3" onClick={() => onViewLead(lead.id)}>
                     <LeadStatusBadge status={lead.status} />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={() => onViewLead(lead.id)}>
                     <span className="text-xs font-medium uppercase text-muted-foreground">
                       {lead.segment}
                     </span>
@@ -243,6 +317,17 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
           </table>
         </div>
       )}
+
+      {/* WhatsApp Bulk Modal */}
+      <WhatsAppBulkModal
+        open={showWhatsAppModal}
+        onOpenChange={setShowWhatsAppModal}
+        selectedLeads={selectedLeads}
+        onComplete={() => {
+          setSelectedLeadIds([]);
+          setShowWhatsAppModal(false);
+        }}
+      />
     </div>
   );
 }
