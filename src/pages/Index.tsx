@@ -20,6 +20,7 @@ import { NotificationPreferencesCard } from '@/components/settings/NotificationP
 import { TwoFactorAuthCard } from '@/components/settings/TwoFactorAuthCard';
 import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
 import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
+import { WhatsAppSimpleForm } from '@/components/whatsapp/WhatsAppSimpleForm';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -182,6 +183,20 @@ const Index = () => {
         );
       case 'reports':
         return <ReportsDashboard />;
+      case 'whatsapp':
+        return (
+          <div className="p-8 space-y-6 animate-fade-in">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">WhatsApp</h1>
+              <p className="text-muted-foreground mt-1">
+                Envía mensajes de prueba para verificar la conexión con WAHA
+              </p>
+            </div>
+            <div className="max-w-md">
+              <WhatsAppSimpleForm />
+            </div>
+          </div>
+        );
       case 'settings':
         return (
           <div className="p-8 space-y-6 animate-fade-in">
