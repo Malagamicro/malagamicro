@@ -43,7 +43,7 @@ export function WhatsAppSimpleForm() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Api-Key": "123456",
+          "X-Api-Key": "12345678",
         },
         body: JSON.stringify(payload),
       });
