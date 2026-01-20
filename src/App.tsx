@@ -10,6 +10,7 @@ import { ThemeSyncProvider } from "@/components/ThemeSyncProvider";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
+import WhatsAppTest from "./pages/WhatsAppTest";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/whatsapp-test" element={<WhatsAppTest />} />
               <Route
                 path="/"
                 element={
