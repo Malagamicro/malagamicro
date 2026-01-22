@@ -51,12 +51,13 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
             {lead.email}
           </p>
         )}
-        {lead.phone && (
+        {/* Phone icon hidden per TAREA 1.2 */}
+        {/* {lead.phone && (
           <p className="flex items-center gap-2">
             <Phone className="w-4 h-4 flex-shrink-0" />
             {lead.phone}
           </p>
-        )}
+        )} */}
         {lead.equipmentCount && (
           <p className="flex items-center gap-2">
             <Monitor className="w-4 h-4 flex-shrink-0" />

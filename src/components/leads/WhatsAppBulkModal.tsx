@@ -22,7 +22,7 @@ import { Loader2, MessageSquare, CheckCircle, XCircle, ImagePlus, X } from 'luci
 import { useToast } from '@/hooks/use-toast';
 import { Lead } from '@/types/lead';
 import { Progress } from '@/components/ui/progress';
-
+import { sendText, sendImage } from '@/services/wahaService';
 interface MessageTemplate {
   id: string;
   name: string;
@@ -108,16 +108,7 @@ export function WhatsAppBulkModal({
     }
   };
 
-  const formatPhoneNumber = (phone: string): string => {
-    let cleanPhone = phone.replace(/\D/g, "");
-    
-    // Si el número no empieza con código de país (34 para España), lo añadimos
-    if (!cleanPhone.startsWith("34") && cleanPhone.length === 9) {
-      cleanPhone = "34" + cleanPhone;
-    }
-    
-    return cleanPhone;
-  };
+  
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -175,59 +166,23 @@ export function WhatsAppBulkModal({
     });
   };
 
-  const sendWhatsApp = async (lead: Lead, personalizedMessage: string, imageBase64?: string): Promise<SendResult> => {
+  const sendWhatsAppMessage = async (lead: Lead, personalizedMessage: string, imageBase64?: string): Promise<SendResult> => {
     try {
-      const cleanPhone = formatPhoneNumber(lead.phone || '');
-      const chatId = `${cleanPhone}@c.us`;
-      
-      let response: Response;
-
       if (imageBase64 && imageFile) {
-        // Enviar imagen con caption
-        const payload = {
-          chatId,
-          file: {
-            mimetype: imageFile.type,
-            filename: imageFile.name,
-            data: imageBase64,
-          },
+        // Send image with caption using centralized service
+        await sendImage({
+          phone: lead.phone || '',
           caption: personalizedMessage,
-          session: "default",
-        };
-        
-        console.log(`📤 Enviando imagen WhatsApp a ${lead.companyName}:`, { chatId, caption: personalizedMessage, filename: imageFile.name });
-        
-        response = await fetch("http://localhost:3000/api/sendImage", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Api-Key": "12345678",
-          },
-          body: JSON.stringify(payload),
+          imageBase64,
+          imageMimeType: imageFile.type,
+          imageFilename: imageFile.name,
         });
       } else {
-        // Enviar solo texto
-        const payload = {
-          chatId,
-          text: personalizedMessage,
-          session: "default",
-        };
-        
-        console.log(`📤 Enviando WhatsApp a ${lead.companyName}:`, payload);
-        
-        response = await fetch("http://localhost:3000/api/sendText", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Api-Key": "12345678",
-          },
-          body: JSON.stringify(payload),
+        // Send text only using centralized service
+        await sendText({
+          phone: lead.phone || '',
+          message: personalizedMessage,
         });
-      }
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`Error ${response.status}: ${errorData}`);
       }
 
       return {
@@ -291,7 +246,7 @@ export function WhatsAppBulkModal({
       const lead = leadsWithPhone[i];
       const personalizedMessage = replaceVariables(message, lead);
       
-      const result = await sendWhatsApp(lead, personalizedMessage, imageBase64);
+      const result = await sendWhatsAppMessage(lead, personalizedMessage, imageBase64);
       newResults.push(result);
       setResults([...newResults]);
       setSendProgress(((i + 1) / leadsWithPhone.length) * 100);
