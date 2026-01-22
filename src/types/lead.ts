@@ -24,6 +24,7 @@ export interface Lead {
   emailUnsubscribed?: boolean;
   latitude?: number;
   longitude?: number;
+  folderId?: string;
 }
 
 export interface LeadActivity {

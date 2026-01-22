@@ -35,7 +35,8 @@ const Index = () => {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   
   const { 
-    leads, 
+    leads,
+    totalCount,
     isLoading, 
     updateLeadStatus, 
     addLead, 
@@ -44,6 +45,11 @@ const Index = () => {
     importLeads,
     geocodeLead,
     bulkGeocode,
+    // Pagination
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    // Loading states
     isAddingLead,
     isUpdatingLead,
     isImportingLeads,
@@ -138,10 +144,14 @@ const Index = () => {
       case 'leads':
         return (
           <LeadsList 
-            leads={leads} 
+            leads={leads}
+            totalCount={totalCount}
             onViewLead={handleViewLead}
             onAddLead={handleAddLead}
             onImportLeads={() => setIsImportOpen(true)}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={() => fetchNextPage()}
           />
         );
       case 'prospeccion':

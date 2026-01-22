@@ -1,10 +1,12 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Lead, LeadStatus, DashboardStats } from '@/types/lead';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 import { useAuditLog } from './useAuditLog';
 import { geocodeAddress } from './useGeocoding';
+
+const PAGE_SIZE = 20;
 
 const statusLabels: Record<LeadStatus, string> = {
   nuevo: 'Nuevo',
@@ -37,7 +39,14 @@ function mapRowToLead(row: any): Lead {
     emailUnsubscribed: row.email_unsubscribed ?? false,
     latitude: row.latitude ?? undefined,
     longitude: row.longitude ?? undefined,
+    folderId: row.folder_id ?? undefined,
   };
+}
+
+interface LeadsPage {
+  leads: Lead[];
+  nextCursor: number | null;
+  totalCount: number;
 }
 
 export function useLeads() {
@@ -46,19 +55,46 @@ export function useLeads() {
   const queryClient = useQueryClient();
   const { logLeadCreated, logLeadUpdated, logLeadDeleted, logLeadStatusChanged, logLeadsImported } = useAuditLog();
 
-  const { data: leads = [], isLoading, error } = useQuery({
+  // Paginated query with useInfiniteQuery
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['leads'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async ({ pageParam = 0 }): Promise<LeadsPage> => {
+      const from = pageParam;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, error, count } = await supabase
         .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
       
       if (error) throw error;
-      return data.map(mapRowToLead);
+      
+      const leads = data.map(mapRowToLead);
+      const totalCount = count ?? 0;
+      const nextCursor = to < totalCount - 1 ? to + 1 : null;
+
+      return {
+        leads,
+        nextCursor,
+        totalCount,
+      };
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    initialPageParam: 0,
     enabled: !!user,
   });
+
+  // Flatten all pages into a single leads array
+  const leads = data?.pages.flatMap(page => page.leads) ?? [];
+  const totalCount = data?.pages[0]?.totalCount ?? 0;
 
   const updateLeadStatus = useMutation({
     mutationFn: async ({ id, status, previousStatus }: { id: string; status: LeadStatus; previousStatus?: LeadStatus }) => {
@@ -135,6 +171,7 @@ export function useLeads() {
         user_id: user.id,
         latitude,
         longitude,
+        folder_id: lead.folderId || null,
       }).select('id').single();
       
       if (error) throw error;
@@ -202,6 +239,11 @@ export function useLeads() {
         tags: lead.tags,
         updated_at: new Date().toISOString(),
       };
+
+      // Only update folder if explicitly provided
+      if (lead.folderId !== undefined) {
+        updateData.folder_id = lead.folderId || null;
+      }
 
       // Only update coordinates if we got new ones
       if (latitude !== undefined && longitude !== undefined) {
@@ -285,6 +327,7 @@ export function useLeads() {
         notes: lead.notes || null,
         tags: lead.tags || null,
         user_id: user.id,
+        folder_id: lead.folderId || null,
       }));
       
       const { error } = await supabase.from('leads').insert(leadsToInsert);
@@ -402,8 +445,14 @@ export function useLeads() {
 
   return {
     leads,
+    totalCount,
     isLoading,
     error,
+    // Pagination
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    // Mutations
     updateLeadStatus: updateLeadStatus.mutate,
     addLead: addLead.mutate,
     updateLead: updateLead.mutate,
@@ -411,6 +460,7 @@ export function useLeads() {
     importLeads: importLeads.mutate,
     geocodeLead: geocodeLead.mutate,
     bulkGeocode: bulkGeocode.mutate,
+    // Loading states
     isAddingLead: addLead.isPending,
     isUpdatingLead: updateLead.isPending,
     isDeletingLead: deleteLead.isPending,
