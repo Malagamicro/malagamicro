@@ -23,41 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Lead } from '@/types/lead';
 import { Progress } from '@/components/ui/progress';
 import { sendText, sendImage } from '@/services/wahaService';
-interface MessageTemplate {
-  id: string;
-  name: string;
-  message: string;
-}
-
-const defaultTemplates: MessageTemplate[] = [
-  {
-    id: 'intro',
-    name: 'Presentación inicial',
-    message: `Hola {{contactName}}, soy del equipo de MalagaMicro. 
-
-Nos gustaría presentarle nuestros servicios de mantenimiento informático para {{companyName}}.
-
-¿Tendría unos minutos para hablar sobre cómo podemos ayudarle?`,
-  },
-  {
-    id: 'followup',
-    name: 'Seguimiento',
-    message: `Hola {{contactName}}, espero que esté bien.
-
-Le escribo para dar seguimiento a nuestra conversación anterior sobre los servicios de mantenimiento informático para {{companyName}}.
-
-¿Ha tenido oportunidad de revisar nuestra propuesta?`,
-  },
-  {
-    id: 'promo',
-    name: 'Promoción',
-    message: `Hola {{contactName}}, 
-
-¡Tenemos una oferta especial para {{companyName}}!
-
-Contáctenos para más detalles sobre nuestros servicios de mantenimiento informático.`,
-  },
-];
+import { useMessageTemplates } from '@/hooks/useMessageTemplates';
 
 interface SendResult {
   leadId: string;
@@ -88,6 +54,9 @@ export function WhatsAppBulkModal({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  // Obtener plantillas de la BD
+  const { templates, isLoading: isLoadingTemplates } = useMessageTemplates();
 
   // Leads con teléfono válido
   const leadsWithPhone = selectedLeads.filter(lead => lead.phone && lead.phone.trim() !== '');
@@ -97,14 +66,15 @@ export function WhatsAppBulkModal({
       .replace(/\{\{companyName\}\}/g, lead.companyName)
       .replace(/\{\{contactName\}\}/g, lead.contactName || 'Cliente')
       .replace(/\{\{city\}\}/g, lead.city)
-      .replace(/\{\{email\}\}/g, lead.email || '');
+      .replace(/\{\{email\}\}/g, lead.email || '')
+      .replace(/\{\{phone\}\}/g, lead.phone || '');
   };
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplate(templateId);
-    const template = defaultTemplates.find(t => t.id === templateId);
+    const template = templates.find(t => t.id === templateId);
     if (template) {
-      setMessage(template.message);
+      setMessage(template.content);
     }
   };
 
@@ -322,20 +292,30 @@ export function WhatsAppBulkModal({
           {/* Template Selector */}
           <div className="space-y-2">
             <Label>Plantilla</Label>
-            <Select value={selectedTemplate} onValueChange={handleTemplateChange} disabled={isSending}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar plantilla (opcional)" />
+            <Select 
+              value={selectedTemplate} 
+              onValueChange={handleTemplateChange} 
+              disabled={isSending || isLoadingTemplates}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder={isLoadingTemplates ? "Cargando..." : "Seleccionar plantilla (opcional)"} />
               </SelectTrigger>
-              <SelectContent>
-                {defaultTemplates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name}
+              <SelectContent className="bg-popover z-50">
+                {templates.length === 0 ? (
+                  <SelectItem value="__empty__" disabled>
+                    No hay plantillas - Créalas en Plantillas
                   </SelectItem>
-                ))}
+                ) : (
+                  templates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Variables disponibles: {'{{contactName}}'}, {'{{companyName}}'}, {'{{city}}'}
+              Variables disponibles: {'{{contactName}}'}, {'{{companyName}}'}, {'{{city}}'}, {'{{phone}}'}
             </p>
           </div>
 
