@@ -21,6 +21,7 @@ import { TwoFactorAuthCard } from '@/components/settings/TwoFactorAuthCard';
 import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
 import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
 import { WhatsAppPanel } from '@/components/whatsapp/WhatsAppPanel';
+import Inbox from '@/pages/Inbox';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -206,6 +207,8 @@ const Index = () => {
         );
       case 'reports':
         return <ReportsDashboard />;
+      case 'inbox':
+        return <Inbox />;
       case 'whatsapp':
         return (
           <div className="p-8 space-y-6 animate-fade-in">

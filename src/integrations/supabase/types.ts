@@ -370,6 +370,36 @@ export type Database = {
           },
         ]
       }
+      message_templates: {
+        Row: {
+          category: string | null
+          content: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
@@ -438,6 +468,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      waha_messages: {
+        Row: {
+          chat_id: string
+          content: string
+          created_at: string
+          from_me: boolean
+          id: string
+          lead_id: string | null
+          media_url: string | null
+          message_id: string | null
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          content: string
+          created_at?: string
+          from_me?: boolean
+          id?: string
+          lead_id?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          content?: string
+          created_at?: string
+          from_me?: boolean
+          id?: string
+          lead_id?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waha_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
