@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import WhatsAppTest from "./pages/WhatsAppTest";
+import Scraper from "./pages/Scraper";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,14 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/whatsapp-test" element={<WhatsAppTest />} />
+              <Route
+                path="/tools/scraper"
+                element={
+                  <ProtectedRoute>
+                    <Scraper />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/"
                 element={
