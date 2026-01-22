@@ -185,8 +185,34 @@ export async function deleteSession(): Promise<void> {
 // MESSAGING
 // ============================================
 
+// Anti-spam: track last message timestamp per chat
+const lastMessageTimestamps = new Map<string, number>();
+const ANTI_SPAM_DELAY_MS = 5000; // 5 seconds minimum between messages
+
+export function canSendMessage(phone: string): { allowed: boolean; waitMs: number } {
+  const chatId = buildChatId(phone);
+  const lastSent = lastMessageTimestamps.get(chatId);
+  
+  if (!lastSent) {
+    return { allowed: true, waitMs: 0 };
+  }
+  
+  const elapsed = Date.now() - lastSent;
+  if (elapsed >= ANTI_SPAM_DELAY_MS) {
+    return { allowed: true, waitMs: 0 };
+  }
+  
+  return { allowed: false, waitMs: ANTI_SPAM_DELAY_MS - elapsed };
+}
+
 export async function sendText({ phone, message }: SendTextPayload): Promise<void> {
   const chatId = buildChatId(phone);
+  
+  // Anti-spam check
+  const { allowed, waitMs } = canSendMessage(phone);
+  if (!allowed) {
+    throw new Error(`Espera ${Math.ceil(waitMs / 1000)} segundos antes de enviar otro mensaje`);
+  }
   
   console.log('📤 Enviando WhatsApp:', { chatId, message: message.substring(0, 50) + '...' });
   
@@ -198,6 +224,9 @@ export async function sendText({ phone, message }: SendTextPayload): Promise<voi
       session: SESSION_NAME,
     }),
   });
+  
+  // Record timestamp after successful send
+  lastMessageTimestamps.set(chatId, Date.now());
 }
 
 export async function sendImage({ 

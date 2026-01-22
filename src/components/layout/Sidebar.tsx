@@ -26,6 +26,8 @@ interface SidebarProps {
   onTabChange: (tab: string) => void;
 }
 
+import { Inbox } from 'lucide-react';
+
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'leads', label: 'Leads', icon: Users },
@@ -34,6 +36,7 @@ const menuItems = [
   { id: 'campaigns', label: 'Campañas', icon: Mail },
   { id: 'mapa', label: 'Mapa', icon: MapPin },
   { id: 'reports', label: 'Reportes', icon: BarChart3 },
+  { id: 'inbox', label: 'Inbox', icon: Inbox },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
 ];
 
