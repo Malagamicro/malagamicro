@@ -3,6 +3,8 @@
  * Centralized service for all WhatsApp API interactions
  */
 
+import { supabase } from "@/integrations/supabase/client";
+
 // Configuration from environment variables with fallbacks for local development
 const WAHA_API_URL = import.meta.env.VITE_WAHA_API_URL || 'http://localhost:3000';
 const WAHA_API_KEY = import.meta.env.VITE_WAHA_API_KEY || '12345678';
@@ -23,6 +25,10 @@ export interface SessionInfo {
 export interface SendTextPayload {
   phone: string;
   message: string;
+  /** Optional: associate the outbound message with an existing lead */
+  leadId?: string | null;
+  /** Optional: avoid writing to DB when caller handles it (e.g., Inbox) */
+  logToDb?: boolean;
 }
 
 export interface SendImagePayload {
@@ -31,6 +37,10 @@ export interface SendImagePayload {
   imageBase64: string;
   imageMimeType: string;
   imageFilename: string;
+  /** Optional: associate the outbound message with an existing lead */
+  leadId?: string | null;
+  /** Optional: avoid writing to DB when caller handles it */
+  logToDb?: boolean;
 }
 
 interface WahaError {
@@ -78,6 +88,34 @@ async function wahaFetch<T>(
   }
 
   return response.json();
+}
+
+async function tryLogOutboundMessage(params: {
+  chatId: string;
+  content: string;
+  leadId?: string | null;
+}) {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id;
+    if (!userId) return;
+
+    const { error } = await (supabase as any).from("waha_messages").insert({
+      chat_id: params.chatId,
+      content: params.content,
+      from_me: true,
+      timestamp: new Date().toISOString(),
+      lead_id: params.leadId ?? null,
+      user_id: userId,
+    });
+
+    if (error) {
+      // Do not fail the WhatsApp send if logging fails
+      console.warn("Failed to log outbound WhatsApp message:", error);
+    }
+  } catch (e) {
+    console.warn("Failed to log outbound WhatsApp message:", e);
+  }
 }
 
 // ============================================
@@ -205,7 +243,8 @@ export function canSendMessage(phone: string): { allowed: boolean; waitMs: numbe
   return { allowed: false, waitMs: ANTI_SPAM_DELAY_MS - elapsed };
 }
 
-export async function sendText({ phone, message }: SendTextPayload): Promise<void> {
+export async function sendText(payload: SendTextPayload): Promise<void> {
+  const { phone, message, leadId, logToDb } = payload;
   const chatId = buildChatId(phone);
   
   // Anti-spam check
@@ -227,16 +266,37 @@ export async function sendText({ phone, message }: SendTextPayload): Promise<voi
   
   // Record timestamp after successful send
   lastMessageTimestamps.set(chatId, Date.now());
+
+  // Log to DB (so Inbox can show new chats even when sent from other screens)
+  // NOTE: Inbox can disable this and do its own insert to include leadId, etc.
+  // (kept best-effort: never throws)
+  if (logToDb !== false) {
+    await tryLogOutboundMessage({
+      chatId,
+      content: message,
+      leadId,
+    });
+  }
 }
 
-export async function sendImage({ 
-  phone, 
-  caption, 
-  imageBase64, 
-  imageMimeType, 
-  imageFilename 
-}: SendImagePayload): Promise<void> {
+export async function sendImage(payload: SendImagePayload): Promise<void> {
+  const {
+    phone,
+    caption,
+    imageBase64,
+    imageMimeType,
+    imageFilename,
+    leadId,
+    logToDb,
+  } = payload;
+
   const chatId = buildChatId(phone);
+
+  // Anti-spam check (same policy as sendText)
+  const { allowed, waitMs } = canSendMessage(phone);
+  if (!allowed) {
+    throw new Error(`Espera ${Math.ceil(waitMs / 1000)} segundos antes de enviar otro mensaje`);
+  }
   
   console.log('📤 Enviando imagen WhatsApp:', { chatId, caption: caption.substring(0, 50) + '...', filename: imageFilename });
   
@@ -253,6 +313,16 @@ export async function sendImage({
       session: SESSION_NAME,
     }),
   });
+
+  lastMessageTimestamps.set(chatId, Date.now());
+
+  if (logToDb !== false) {
+    await tryLogOutboundMessage({
+      chatId,
+      content: caption?.trim() || "[Imagen]",
+      leadId,
+    });
+  }
 }
 
 // Export config for components that need to check connection
