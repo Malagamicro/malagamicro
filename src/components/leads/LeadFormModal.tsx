@@ -37,7 +37,7 @@ const leadSchema = z.object({
   equipmentCount: z.number().optional(),
   notes: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  folderId: z.string().optional(),
+  folderId: z.string().nullable().optional(),
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
@@ -153,7 +153,8 @@ export function LeadFormModal({
       ...formData,
       tags,
       email: formData.email || undefined,
-      folderId: formData.folderId || undefined,
+      // CRITICAL: folderId must be null (not undefined) when no folder is selected
+      folderId: formData.folderId === 'none' || !formData.folderId ? null : formData.folderId,
     };
 
     try {

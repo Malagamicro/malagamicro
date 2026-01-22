@@ -240,9 +240,9 @@ export function useLeads() {
         updated_at: new Date().toISOString(),
       };
 
-      // Only update folder if explicitly provided
-      if (lead.folderId !== undefined) {
-        updateData.folder_id = lead.folderId || null;
+      // CRITICAL: Always update folder_id if the key exists in the object (even if null)
+      if ('folderId' in lead) {
+        updateData.folder_id = lead.folderId;
       }
 
       // Only update coordinates if we got new ones
