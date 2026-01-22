@@ -7,7 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Search, Download, Mail, Phone, MessageCircle, Loader2, FolderOpen, Globe, AlertCircle, ArrowLeft } from "lucide-react";
+import { Search, Download, Mail, Phone, MessageCircle, Loader2, FolderOpen, Globe, AlertCircle, ArrowLeft, Save, Plus } from "lucide-react";
+import { useFileManager } from "@/hooks/useFileManager";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 interface ScrapeResult {
   emails: string[];
@@ -23,17 +33,9 @@ interface SelectedItems {
   whatsapp: Set<string>;
 }
 
-const VIRTUAL_FOLDERS = [
-  { value: "none", label: "Sin carpeta" },
-  { value: "proveedores", label: "Proveedores" },
-  { value: "clientes", label: "Clientes" },
-  { value: "partners", label: "Partners" },
-  { value: "competencia", label: "Competencia" },
-  { value: "otros", label: "Otros" },
-];
-
 export default function Scraper() {
   const navigate = useNavigate();
+  const { folders, addFile, addFolder } = useFileManager();
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ScrapeResult | null>(null);
@@ -44,6 +46,8 @@ export default function Scraper() {
     whatsapp: new Set(),
   });
   const [folder, setFolder] = useState("none");
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false);
 
   const handleScan = async () => {
     if (!url.trim()) {
@@ -113,7 +117,7 @@ export default function Scraper() {
     });
   };
 
-  const handleDownload = () => {
+  const handleSaveToFileManager = () => {
     const lines: string[] = [];
     const date = new Date().toISOString().split("T")[0];
     
@@ -140,24 +144,43 @@ export default function Scraper() {
     }
 
     const content = lines.join("\n");
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    
-    // Build filename
-    let filename = `contactos_${date}.txt`;
-    if (folder !== "none") {
-      filename = `[${folder}]_${filename}`;
+    const filename = `contactos_${date}_${Date.now()}.txt`;
+    const folderName = folder === "none" ? "" : folder;
+
+    addFile({
+      name: filename,
+      folder: folderName,
+      content,
+      itemCount: totalSelected,
+    });
+
+    toast.success(
+      folderName 
+        ? `Guardado en carpeta "${folderName}"` 
+        : "Guardado en Administrador de Archivos",
+      {
+        action: {
+          label: "Ver archivos",
+          onClick: () => navigate("/tools/files"),
+        },
+      }
+    );
+  };
+
+  const handleCreateFolder = () => {
+    if (!newFolderName.trim()) {
+      toast.error("Introduce un nombre para la carpeta");
+      return;
     }
-
-    // Download
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-
-    toast.success(`Archivo ${filename} descargado`);
+    const created = addFolder(newFolderName.trim());
+    if (created) {
+      setFolder(created.name);
+      setNewFolderName("");
+      setIsNewFolderDialogOpen(false);
+      toast.success(`Carpeta "${created.name}" creada`);
+    } else {
+      toast.error("Ya existe una carpeta con ese nombre");
+    }
   };
 
   const totalSelected = selectedItems.emails.size + selectedItems.phones.size + selectedItems.whatsapp.size;
@@ -352,38 +375,69 @@ export default function Scraper() {
               </Card>
             </div>
 
-            {/* Download Section */}
+            {/* Save Section */}
             {(result.emails.length > 0 || result.phones.length > 0 || result.whatsapp.length > 0) && (
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-wrap">
                       <div className="flex items-center gap-2">
                         <FolderOpen className="h-4 w-4 text-muted-foreground" />
                         <Select value={folder} onValueChange={setFolder}>
                           <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Carpeta virtual" />
+                            <SelectValue placeholder="Sin carpeta" />
                           </SelectTrigger>
                           <SelectContent>
-                            {VIRTUAL_FOLDERS.map((f) => (
-                              <SelectItem key={f.value} value={f.value}>
-                                {f.label}
+                            <SelectItem value="none">Sin carpeta</SelectItem>
+                            {folders.map((f) => (
+                              <SelectItem key={f.id} value={f.name}>
+                                {f.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        <Dialog open={isNewFolderDialogOpen} onOpenChange={setIsNewFolderDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-9 w-9">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Nueva Carpeta</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="newFolderName">Nombre</Label>
+                                <Input
+                                  id="newFolderName"
+                                  value={newFolderName}
+                                  onChange={(e) => setNewFolderName(e.target.value)}
+                                  placeholder="Ej: Proveedores 2024"
+                                  onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setIsNewFolderDialogOpen(false)}>
+                                Cancelar
+                              </Button>
+                              <Button onClick={handleCreateFolder}>Crear</Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                       <span className="text-sm text-muted-foreground">
                         {totalSelected} items seleccionados
                       </span>
                     </div>
                     <Button
-                      onClick={handleDownload}
+                      onClick={handleSaveToFileManager}
                       disabled={totalSelected === 0}
                       className="w-full sm:w-auto"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Guardar selección en .txt
+                      <Save className="h-4 w-4 mr-2" />
+                      Guardar en Archivos
                     </Button>
                   </div>
                 </CardContent>

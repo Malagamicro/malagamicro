@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,8 @@ import {
   Plus,
   Search,
   FileText,
-  Clock
+  Clock,
+  Globe
 } from "lucide-react";
 import {
   Dialog,
@@ -24,40 +25,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-
-interface SavedFile {
-  id: string;
-  name: string;
-  folder: string;
-  content: string;
-  createdAt: string;
-  itemCount: number;
-}
-
-const STORAGE_KEY = "crm_saved_files";
+import { useFileManager } from "@/hooks/useFileManager";
 
 export default function FileManager() {
   const navigate = useNavigate();
-  const [files, setFiles] = useState<SavedFile[]>([]);
+  const { files, folders, addFolder, deleteFile, deleteFolder } = useFileManager();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  // Load files from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setFiles(JSON.parse(saved));
-      } catch {
-        setFiles([]);
-      }
-    }
-  }, []);
-
-  // Get unique folders
-  const folders = [...new Set(files.map((f) => f.folder).filter(Boolean))];
 
   // Filter files
   const filteredFiles = files.filter((file) => {
@@ -66,7 +42,7 @@ export default function FileManager() {
     return matchesSearch && matchesFolder;
   });
 
-  const handleDownload = (file: SavedFile) => {
+  const handleDownload = (file: { name: string; content: string }) => {
     const blob = new Blob([file.content], { type: "text/plain;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -79,10 +55,16 @@ export default function FileManager() {
   };
 
   const handleDelete = (fileId: string) => {
-    const updated = files.filter((f) => f.id !== fileId);
-    setFiles(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    deleteFile(fileId);
     toast.success("Archivo eliminado");
+  };
+
+  const handleDeleteFolder = (folderId: string) => {
+    deleteFolder(folderId, true);
+    if (selectedFolder === folders.find(f => f.id === folderId)?.name) {
+      setSelectedFolder(null);
+    }
+    toast.success("Carpeta eliminada");
   };
 
   const handleCreateFolder = () => {
@@ -90,25 +72,14 @@ export default function FileManager() {
       toast.error("Introduce un nombre para la carpeta");
       return;
     }
-    if (folders.includes(newFolderName.trim())) {
+    const created = addFolder(newFolderName.trim());
+    if (created) {
+      setNewFolderName("");
+      setIsDialogOpen(false);
+      toast.success(`Carpeta "${created.name}" creada`);
+    } else {
       toast.error("Ya existe una carpeta con ese nombre");
-      return;
     }
-    // Create a placeholder file to create the folder
-    const placeholder: SavedFile = {
-      id: crypto.randomUUID(),
-      name: `.${newFolderName.trim()}_placeholder`,
-      folder: newFolderName.trim(),
-      content: "",
-      createdAt: new Date().toISOString(),
-      itemCount: 0,
-    };
-    const updated = [...files, placeholder];
-    setFiles(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    setNewFolderName("");
-    setIsDialogOpen(false);
-    toast.success(`Carpeta "${newFolderName.trim()}" creada`);
   };
 
   const formatDate = (dateStr: string) => {
@@ -205,23 +176,35 @@ export default function FileManager() {
                 <FolderOpen className="h-4 w-4 text-primary" />
                 <span className="text-sm">Todos los archivos</span>
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {files.filter((f) => !f.name.startsWith(".")).length}
+                  {files.length}
                 </span>
               </button>
-                {folders.map((folder) => (
+              {folders.map((folder) => (
+                <div
+                  key={folder.id}
+                  className={`group flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                    selectedFolder === folder.name ? "bg-accent" : "hover:bg-accent/50"
+                  }`}
+                >
                   <button
-                    key={folder}
-                    onClick={() => setSelectedFolder(folder)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-left ${
-                      selectedFolder === folder ? "bg-accent" : "hover:bg-accent/50"
-                    }`}
+                    onClick={() => setSelectedFolder(folder.name)}
+                    className="flex-1 flex items-center gap-2 text-left"
                   >
                     <FolderOpen className="h-4 w-4 text-primary" />
-                  <span className="text-sm truncate">{folder}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {files.filter((f) => f.folder === folder && !f.name.startsWith(".")).length}
-                  </span>
-                </button>
+                    <span className="text-sm truncate">{folder.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {files.filter((f) => f.folder === folder.name).length}
+                    </span>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteFolder(folder.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               ))}
               {folders.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
@@ -233,7 +216,7 @@ export default function FileManager() {
 
           {/* Files Grid */}
           <div className="lg:col-span-3">
-            {filteredFiles.filter((f) => !f.name.startsWith(".")).length === 0 ? (
+            {filteredFiles.length === 0 ? (
               <Card>
                 <CardContent className="py-12">
                   <div className="text-center text-muted-foreground">
@@ -244,9 +227,10 @@ export default function FileManager() {
                     </p>
                     <Button
                       variant="outline"
-                      className="mt-4"
+                      className="mt-4 gap-2"
                       onClick={() => navigate("/tools/scraper")}
                     >
+                      <Globe className="h-4 w-4" />
                       Ir al Scraper
                     </Button>
                   </div>
@@ -254,55 +238,56 @@ export default function FileManager() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {filteredFiles
-                  .filter((f) => !f.name.startsWith("."))
-                  .map((file) => (
-                    <Card key={file.id} className="group hover:shadow-md transition-shadow">
-                      <CardContent className="pt-4">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 bg-primary/10 rounded-lg">
-                            <File className="h-6 w-6 text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-sm truncate" title={file.name}>
-                              {file.name}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              <span>{formatDate(file.createdAt)}</span>
-                            </div>
-                            {file.folder && (
-                              <div className="mt-1">
-                                <span className="inline-flex items-center gap-1 text-xs bg-accent px-2 py-0.5 rounded">
-                                  <FolderOpen className="h-3 w-3" />
-                                  {file.folder}
-                                </span>
-                              </div>
+                {filteredFiles.map((file) => (
+                  <Card key={file.id} className="group hover:shadow-md transition-shadow">
+                    <CardContent className="pt-4">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <File className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-sm truncate" title={file.name}>
+                            {file.name}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatDate(file.createdAt)}</span>
+                            {file.itemCount > 0 && (
+                              <span className="ml-2">{file.itemCount} contactos</span>
                             )}
                           </div>
+                          {file.folder && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 text-xs bg-accent px-2 py-0.5 rounded">
+                                <FolderOpen className="h-3 w-3" />
+                                {file.folder}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-2 mt-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => handleDownload(file)}
-                          >
-                            <Download className="h-4 w-4 mr-1" />
-                            Descargar
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(file.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleDownload(file)}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Descargar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(file.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </div>
