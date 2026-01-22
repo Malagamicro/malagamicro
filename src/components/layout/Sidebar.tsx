@@ -18,10 +18,13 @@ import {
   Moon,
   Inbox,
   FileText,
+  Globe,
+  FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
+import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   activeTab: string;
@@ -41,10 +44,15 @@ const menuItems = [
   { id: 'templates', label: 'Plantillas', icon: FileText },
 ];
 
+const toolsItems = [
+  { id: 'scraper', label: 'Scraper', icon: Globe, route: '/tools/scraper' },
+];
+
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { signOut, user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
 
   const handleSignOut = async () => {
     await signOut();
@@ -93,7 +101,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -102,6 +110,33 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
               "hover:bg-sidebar-accent",
               activeTab === item.id && "bg-sidebar-accent"
+            )}
+          >
+            <item.icon className="w-5 h-5 flex-shrink-0" />
+            {!collapsed && (
+              <span className="text-sm font-medium animate-fade-in">{item.label}</span>
+            )}
+          </button>
+        ))}
+
+        {/* Separator */}
+        {!collapsed && (
+          <div className="pt-3 pb-1">
+            <span className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
+              Herramientas
+            </span>
+          </div>
+        )}
+        {collapsed && <div className="h-3" />}
+
+        {/* Tools */}
+        {toolsItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => navigate(item.route)}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+              "hover:bg-sidebar-accent"
             )}
           >
             <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -137,7 +172,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           onClick={handleSignOut}
           className={cn(
             "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all",
-            "hover:bg-sidebar-accent text-red-400 hover:text-red-300"
+            "hover:bg-sidebar-accent text-destructive hover:text-destructive/80"
           )}
         >
           <LogOut className="w-5 h-5 flex-shrink-0" />
