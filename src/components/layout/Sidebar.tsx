@@ -46,6 +46,7 @@ const menuItems = [
 
 const toolsItems = [
   { id: 'scraper', label: 'Scraper', icon: Globe, route: '/tools/scraper' },
+  { id: 'files', label: 'Archivos', icon: FolderOpen, route: '/tools/files' },
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {

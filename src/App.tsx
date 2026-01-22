@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import WhatsAppTest from "./pages/WhatsAppTest";
 import Scraper from "./pages/Scraper";
+import FileManager from "./pages/FileManager";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Scraper />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/tools/files"
+                element={
+                  <ProtectedRoute>
+                    <FileManager />
                   </ProtectedRoute>
                 }
               />

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Search, Download, Mail, Phone, MessageCircle, Loader2, FolderOpen, Globe, AlertCircle } from "lucide-react";
+import { Search, Download, Mail, Phone, MessageCircle, Loader2, FolderOpen, Globe, AlertCircle, ArrowLeft } from "lucide-react";
 
 interface ScrapeResult {
   emails: string[];
@@ -32,6 +33,7 @@ const VIRTUAL_FOLDERS = [
 ];
 
 export default function Scraper() {
+  const navigate = useNavigate();
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ScrapeResult | null>(null);
@@ -164,14 +166,20 @@ export default function Scraper() {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            <Globe className="h-8 w-8 text-primary" />
-            Scraper de Contactos
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Extrae emails, teléfonos y WhatsApp de cualquier página web
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+              <Globe className="h-8 w-8 text-primary" />
+              Scraper de Contactos
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Extrae emails, teléfonos y WhatsApp de cualquier página web
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate("/")} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Volver al CRM
+          </Button>
         </div>
 
         {/* Search Input */}
