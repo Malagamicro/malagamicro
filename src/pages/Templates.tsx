@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -14,13 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,27 +30,15 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-
-const CATEGORIES = [
-  { value: 'general', label: 'General' },
-  { value: 'bienvenida', label: 'Bienvenida' },
-  { value: 'seguimiento', label: 'Seguimiento' },
-  { value: 'promocion', label: 'Promoción' },
-  { value: 'recordatorio', label: 'Recordatorio' },
-  { value: 'despedida', label: 'Despedida' },
-];
 
 interface TemplateFormData {
   name: string;
   content: string;
-  category: string;
 }
 
 const defaultFormData: TemplateFormData = {
   name: '',
   content: '',
-  category: 'general',
 };
 
 export default function Templates() {
@@ -70,17 +50,11 @@ export default function Templates() {
     deleteTemplate,
     isCreating,
     isUpdating,
-    isDeleting,
   } = useMessageTemplates();
 
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
   const [formData, setFormData] = useState<TemplateFormData>(defaultFormData);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-
-  const filteredTemplates = selectedCategory === 'all' 
-    ? templates 
-    : templates.filter(t => t.category === selectedCategory);
 
   const handleOpenCreate = () => {
     setEditingTemplate(null);
@@ -93,7 +67,6 @@ export default function Templates() {
     setFormData({
       name: template.name,
       content: template.content,
-      category: template.category || 'general',
     });
     setShowModal(true);
   };
@@ -109,13 +82,11 @@ export default function Templates() {
         id: editingTemplate.id,
         name: formData.name.trim(),
         content: formData.content.trim(),
-        category: formData.category,
       });
     } else {
       createTemplate({
         name: formData.name.trim(),
         content: formData.content.trim(),
-        category: formData.category,
       });
     }
 
@@ -133,22 +104,6 @@ export default function Templates() {
   const handleCopyContent = (content: string) => {
     navigator.clipboard.writeText(content);
     toast.success('Contenido copiado al portapapeles');
-  };
-
-  const getCategoryLabel = (value: string) => {
-    return CATEGORIES.find(c => c.value === value)?.label || value;
-  };
-
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      general: 'bg-gray-500/10 text-gray-500',
-      bienvenida: 'bg-green-500/10 text-green-500',
-      seguimiento: 'bg-blue-500/10 text-blue-500',
-      promocion: 'bg-purple-500/10 text-purple-500',
-      recordatorio: 'bg-orange-500/10 text-orange-500',
-      despedida: 'bg-red-500/10 text-red-500',
-    };
-    return colors[category] || colors.general;
   };
 
   const isSaving = isCreating || isUpdating;
@@ -172,64 +127,32 @@ export default function Templates() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-4">
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Filtrar por categoría" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las categorías</SelectItem>
-            {CATEGORIES.map((cat) => (
-              <SelectItem key={cat.value} value={cat.value}>
-                {cat.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="text-sm text-muted-foreground">
-          {filteredTemplates.length} plantilla{filteredTemplates.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-
       {/* Templates Grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
-      ) : filteredTemplates.length === 0 ? (
+      ) : templates.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <MessageSquare className="w-12 h-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-1">No hay plantillas</h3>
             <p className="text-muted-foreground text-center mb-4">
-              {selectedCategory === 'all' 
-                ? 'Crea tu primera plantilla para agilizar tus mensajes'
-                : `No hay plantillas en la categoría "${getCategoryLabel(selectedCategory)}"`}
+              Crea tu primera plantilla para agilizar tus mensajes
             </p>
-            {selectedCategory === 'all' && (
-              <Button onClick={handleOpenCreate} variant="outline" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Crear plantilla
-              </Button>
-            )}
+            <Button onClick={handleOpenCreate} variant="outline" className="gap-2">
+              <Plus className="w-4 h-4" />
+              Crear plantilla
+            </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredTemplates.map((template) => (
+          {templates.map((template) => (
             <Card key={template.id} className="group hover:shadow-md transition-shadow">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base truncate">{template.name}</CardTitle>
-                    <span className={cn(
-                      "inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                      getCategoryColor(template.category || 'general')
-                    )}>
-                      {getCategoryLabel(template.category || 'general')}
-                    </span>
-                  </div>
+                  <CardTitle className="text-base truncate flex-1">{template.name}</CardTitle>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -290,26 +213,6 @@ export default function Templates() {
                 placeholder="Ej: Saludo inicial"
                 disabled={isSaving}
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="category">Categoría</Label>
-              <Select 
-                value={formData.category} 
-                onValueChange={(v) => setFormData(prev => ({ ...prev, category: v }))}
-                disabled={isSaving}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-2">
