@@ -3,11 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Search, Download, Mail, Phone, MessageCircle, Loader2, FolderOpen, Globe, AlertCircle, ArrowLeft, Save, Plus } from "lucide-react";
+import { 
+  Search, Mail, Phone, MessageCircle, Loader2, FolderOpen, Globe, 
+  AlertCircle, ArrowLeft, Save, Plus, Link2, Share2, Zap
+} from "lucide-react";
 import { useFileManager } from "@/hooks/useFileManager";
 import {
   Dialog,
@@ -23,7 +27,8 @@ interface ScrapeResult {
   emails: string[];
   phones: string[];
   whatsapp: string[];
-  url: string;
+  socials: string[];
+  source_urls_scanned: string[];
   scannedAt: string;
 }
 
@@ -33,11 +38,21 @@ interface SelectedItems {
   whatsapp: Set<string>;
 }
 
+const LOADING_MESSAGES = [
+  "Analizando página principal...",
+  "Buscando secciones de contacto...",
+  "Extrayendo emails y teléfonos...",
+  "Escaneando páginas internas...",
+  "Procesando datos estructurados...",
+  "Consolidando resultados...",
+];
+
 export default function Scraper() {
   const navigate = useNavigate();
   const { folders, addFile, addFolder } = useFileManager();
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [result, setResult] = useState<ScrapeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<SelectedItems>({
@@ -60,10 +75,20 @@ export default function Scraper() {
     setResult(null);
     setSelectedItems({ emails: new Set(), phones: new Set(), whatsapp: new Set() });
 
+    // Animate loading messages
+    let messageIndex = 0;
+    setLoadingMessage(LOADING_MESSAGES[0]);
+    const messageInterval = setInterval(() => {
+      messageIndex = (messageIndex + 1) % LOADING_MESSAGES.length;
+      setLoadingMessage(LOADING_MESSAGES[messageIndex]);
+    }, 1500);
+
     try {
       const { data, error: fnError } = await supabase.functions.invoke("scrape-contact-info", {
         body: { url: url.trim() },
       });
+
+      clearInterval(messageInterval);
 
       if (fnError) {
         throw new Error(fnError.message);
@@ -83,17 +108,21 @@ export default function Scraper() {
       });
 
       const total = data.data.emails.length + data.data.phones.length + data.data.whatsapp.length;
+      const pagesScanned = data.data.source_urls_scanned?.length || 1;
+      
       if (total > 0) {
-        toast.success(`Encontrados ${total} contactos`);
+        toast.success(`Encontrados ${total} contactos en ${pagesScanned} páginas`);
       } else {
-        toast.info("No se encontraron contactos en esta página");
+        toast.info("No se encontraron contactos en este sitio");
       }
     } catch (err) {
+      clearInterval(messageInterval);
       const message = err instanceof Error ? err.message : "Error desconocido";
       setError(message);
       toast.error(message);
     } finally {
       setIsLoading(false);
+      setLoadingMessage("");
     }
   };
 
@@ -121,7 +150,8 @@ export default function Scraper() {
     const lines: string[] = [];
     const date = new Date().toISOString().split("T")[0];
     
-    lines.push(`# Contactos extraídos de: ${result?.url}`);
+    lines.push(`# Contactos extraídos de: ${result?.source_urls_scanned?.[0] || url}`);
+    lines.push(`# Páginas escaneadas: ${result?.source_urls_scanned?.length || 1}`);
     lines.push(`# Fecha: ${date}`);
     lines.push("");
 
@@ -140,6 +170,12 @@ export default function Scraper() {
     if (selectedItems.whatsapp.size > 0) {
       lines.push("## WHATSAPP");
       lines.push(...Array.from(selectedItems.whatsapp));
+      lines.push("");
+    }
+
+    if (result?.socials && result.socials.length > 0) {
+      lines.push("## REDES SOCIALES");
+      lines.push(...result.socials);
       lines.push("");
     }
 
@@ -192,11 +228,11 @@ export default function Scraper() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-              <Globe className="h-8 w-8 text-primary" />
-              Scraper de Contactos
+              <Zap className="h-8 w-8 text-primary" />
+              Super Scraper
             </h1>
             <p className="text-muted-foreground mt-1">
-              Extrae emails, teléfonos y WhatsApp de cualquier página web
+              Crawler multi-página que analiza el sitio completo en busca de contactos
             </p>
           </div>
           <Button variant="outline" onClick={() => navigate("/")} className="gap-2">
@@ -212,7 +248,7 @@ export default function Scraper() {
               <div className="relative flex-1">
                 <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="https://ejemplo.com/contacto"
+                  placeholder="https://ejemplo.com"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleScan()}
@@ -220,20 +256,38 @@ export default function Scraper() {
                   disabled={isLoading}
                 />
               </div>
-              <Button onClick={handleScan} disabled={isLoading} className="min-w-[120px]">
+              <Button onClick={handleScan} disabled={isLoading} className="min-w-[140px]">
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Escaneando...
+                    Analizando...
                   </>
                 ) : (
                   <>
                     <Search className="h-4 w-4 mr-2" />
-                    Escanear
+                    Escanear Sitio
                   </>
                 )}
               </Button>
             </div>
+            
+            {/* Loading State */}
+            {isLoading && (
+              <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                    <Zap className="h-4 w-4 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">{loadingMessage}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Analizando Home y secciones de contacto automáticamente...
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -252,15 +306,36 @@ export default function Scraper() {
         {/* Results */}
         {result && (
           <>
+            {/* Scanned Pages Summary */}
+            {result.source_urls_scanned && result.source_urls_scanned.length > 1 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+                    <Link2 className="h-4 w-4" />
+                    Páginas analizadas ({result.source_urls_scanned.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {result.source_urls_scanned.map((scannedUrl, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-xs font-normal">
+                        {new URL(scannedUrl).pathname || '/'}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Results Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Emails */}
               <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Mail className="h-5 w-5 text-primary" />
-                    Emails ({result.emails.length})
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Mail className="h-5 w-5 text-primary" />
+                      Emails ({result.emails.length})
                     </CardTitle>
                     {result.emails.length > 0 && (
                       <Checkbox
@@ -277,7 +352,7 @@ export default function Scraper() {
                     </p>
                   ) : (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {result.emails.map((email) => (
+                      {result.emails.map((email, idx) => (
                         <label
                           key={email}
                           className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm"
@@ -286,7 +361,10 @@ export default function Scraper() {
                             checked={selectedItems.emails.has(email)}
                             onCheckedChange={() => toggleItem("emails", email)}
                           />
-                          <span className="truncate">{email}</span>
+                          <span className="truncate flex-1">{email}</span>
+                          {idx === 0 && result.emails.length > 1 && (
+                            <Badge variant="outline" className="text-xs">Principal</Badge>
+                          )}
                         </label>
                       ))}
                     </div>
@@ -296,11 +374,11 @@ export default function Scraper() {
 
               {/* Phones */}
               <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Phone className="h-5 w-5 text-primary" />
-                    Teléfonos ({result.phones.length})
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Phone className="h-5 w-5 text-primary" />
+                      Teléfonos ({result.phones.length})
                     </CardTitle>
                     {result.phones.length > 0 && (
                       <Checkbox
@@ -317,7 +395,7 @@ export default function Scraper() {
                     </p>
                   ) : (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {result.phones.map((phone) => (
+                      {result.phones.map((phone, idx) => (
                         <label
                           key={phone}
                           className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm"
@@ -326,7 +404,10 @@ export default function Scraper() {
                             checked={selectedItems.phones.has(phone)}
                             onCheckedChange={() => toggleItem("phones", phone)}
                           />
-                          <span className="font-mono">{phone}</span>
+                          <span className="font-mono flex-1">{phone}</span>
+                          {idx === 0 && result.phones.length > 1 && (
+                            <Badge variant="outline" className="text-xs">Móvil</Badge>
+                          )}
                         </label>
                       ))}
                     </div>
@@ -336,11 +417,11 @@ export default function Scraper() {
 
               {/* WhatsApp */}
               <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <MessageCircle className="h-5 w-5 text-primary" />
-                    WhatsApp ({result.whatsapp.length})
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <MessageCircle className="h-5 w-5 text-primary" />
+                      WhatsApp ({result.whatsapp.length})
                     </CardTitle>
                     {result.whatsapp.length > 0 && (
                       <Checkbox
@@ -374,6 +455,34 @@ export default function Scraper() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Social Links */}
+            {result.socials && result.socials.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Share2 className="h-5 w-5 text-primary" />
+                    Redes Sociales ({result.socials.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {result.socials.map((social, idx) => (
+                      <a
+                        key={idx}
+                        href={social.startsWith('http') ? social : `https://${social}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 text-sm transition-colors"
+                      >
+                        <Share2 className="h-3 w-3" />
+                        {social.replace(/^https?:\/\//, '').split('/').slice(0, 2).join('/')}
+                      </a>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Save Section */}
             {(result.emails.length > 0 || result.phones.length > 0 || result.whatsapp.length > 0) && (
@@ -451,10 +560,11 @@ export default function Scraper() {
           <Card>
             <CardContent className="py-12">
               <div className="text-center text-muted-foreground">
-                <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-lg">Introduce una URL para comenzar</p>
-                <p className="text-sm mt-1">
-                  Escanea páginas de contacto, directorios o cualquier web pública
+                <Zap className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">Introduce una URL para comenzar</p>
+                <p className="text-sm mt-2 max-w-md mx-auto">
+                  El crawler analizará automáticamente la Home y hasta 5 páginas internas 
+                  (Contacto, Legal, About) para extraer todos los datos de contacto.
                 </p>
               </div>
             </CardContent>
