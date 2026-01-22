@@ -257,6 +257,33 @@ export type Database = {
           },
         ]
       }
+      lead_folders: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           address: string | null
@@ -267,6 +294,7 @@ export type Database = {
           email: string | null
           email_unsubscribed: boolean | null
           equipment_count: number | null
+          folder_id: string | null
           id: string
           last_contacted_at: string | null
           latitude: number | null
@@ -291,6 +319,7 @@ export type Database = {
           email?: string | null
           email_unsubscribed?: boolean | null
           equipment_count?: number | null
+          folder_id?: string | null
           id?: string
           last_contacted_at?: string | null
           latitude?: number | null
@@ -315,6 +344,7 @@ export type Database = {
           email?: string | null
           email_unsubscribed?: boolean | null
           equipment_count?: number | null
+          folder_id?: string | null
           id?: string
           last_contacted_at?: string | null
           latitude?: number | null
@@ -330,7 +360,15 @@ export type Database = {
           user_id?: string
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "lead_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_preferences: {
         Row: {

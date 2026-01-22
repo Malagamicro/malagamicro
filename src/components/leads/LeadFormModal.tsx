@@ -19,8 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, FolderOpen } from 'lucide-react';
 import { z } from 'zod';
+import { useLeadFolders } from '@/hooks/useLeadFolders';
 
 const leadSchema = z.object({
   companyName: z.string().min(1, 'El nombre de empresa es obligatorio'),
@@ -36,6 +37,7 @@ const leadSchema = z.object({
   equipmentCount: z.number().optional(),
   notes: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  folderId: z.string().optional(),
 });
 
 type LeadFormData = z.infer<typeof leadSchema>;
@@ -56,6 +58,10 @@ export function LeadFormModal({
   isLoading = false 
 }: LeadFormModalProps) {
   const isEditing = !!lead;
+  const { folders, createFolder, isCreating: isCreatingFolder } = useLeadFolders();
+  const [showNewFolderInput, setShowNewFolderInput] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderColor, setNewFolderColor] = useState('#6366f1');
   
   const [formData, setFormData] = useState<LeadFormData>({
     companyName: '',
@@ -71,6 +77,7 @@ export function LeadFormModal({
     equipmentCount: undefined,
     notes: '',
     tags: [],
+    folderId: undefined,
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -92,6 +99,7 @@ export function LeadFormModal({
         equipmentCount: lead.equipmentCount,
         notes: lead.notes || '',
         tags: lead.tags || [],
+        folderId: lead.folderId,
       });
       setTagsInput(lead.tags?.join(', ') || '');
     } else {
@@ -109,11 +117,28 @@ export function LeadFormModal({
         equipmentCount: undefined,
         notes: '',
         tags: [],
+        folderId: undefined,
       });
       setTagsInput('');
     }
     setErrors({});
+    setShowNewFolderInput(false);
+    setNewFolderName('');
   }, [lead, open]);
+
+  const handleCreateFolder = () => {
+    if (newFolderName.trim()) {
+      createFolder(
+        { name: newFolderName.trim(), color: newFolderColor },
+        {
+          onSuccess: () => {
+            setNewFolderName('');
+            setShowNewFolderInput(false);
+          },
+        }
+      );
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,6 +153,7 @@ export function LeadFormModal({
       ...formData,
       tags,
       email: formData.email || undefined,
+      folderId: formData.folderId || undefined,
     };
 
     try {
@@ -339,6 +365,95 @@ export function LeadFormModal({
               placeholder="hostelería, urgente, servidor (separadas por coma)"
               disabled={isLoading}
             />
+          </div>
+
+          {/* Folder */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <FolderOpen className="w-4 h-4" />
+              Carpeta
+            </Label>
+            {!showNewFolderInput ? (
+              <div className="flex gap-2">
+                <Select
+                  value={formData.folderId || 'none'}
+                  onValueChange={(v) => setFormData(prev => ({ 
+                    ...prev, 
+                    folderId: v === 'none' ? undefined : v 
+                  }))}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Sin carpeta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin carpeta</SelectItem>
+                    {folders.map((folder) => (
+                      <SelectItem key={folder.id} value={folder.id}>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: folder.color }}
+                          />
+                          {folder.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowNewFolderInput(true)}
+                  disabled={isLoading}
+                  title="Crear nueva carpeta"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    placeholder="Nombre de la carpeta"
+                    disabled={isCreatingFolder}
+                  />
+                  <input
+                    type="color"
+                    value={newFolderColor}
+                    onChange={(e) => setNewFolderColor(e.target.value)}
+                    className="w-10 h-10 rounded border cursor-pointer"
+                    disabled={isCreatingFolder}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleCreateFolder}
+                    disabled={!newFolderName.trim() || isCreatingFolder}
+                  >
+                    {isCreatingFolder && <Loader2 className="mr-1 w-3 h-3 animate-spin" />}
+                    Crear
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowNewFolderInput(false);
+                      setNewFolderName('');
+                    }}
+                    disabled={isCreatingFolder}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes */}

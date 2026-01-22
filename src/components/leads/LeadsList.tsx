@@ -15,7 +15,9 @@ import {
   Upload,
   Download,
   ArrowUpDown,
-  MessageSquare
+  MessageSquare,
+  Loader2,
+  FolderOpen,
 } from 'lucide-react';
 import {
   Select,
@@ -33,20 +35,37 @@ import {
 import { exportToCSV, exportToExcel } from '@/lib/exportLeads';
 import { toast } from 'sonner';
 import { WhatsAppBulkModal } from './WhatsAppBulkModal';
+import { useLeadFolders, type LeadFolder } from '@/hooks/useLeadFolders';
 
 type SortOption = 'recent' | 'score' | 'name';
 
 interface LeadsListProps {
   leads: Lead[];
+  totalCount?: number;
   onViewLead: (id: string) => void;
   onAddLead: () => void;
   onImportLeads: () => void;
+  // Pagination props
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
 }
 
-export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: LeadsListProps) {
+export function LeadsList({ 
+  leads, 
+  totalCount,
+  onViewLead, 
+  onAddLead, 
+  onImportLeads,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+}: LeadsListProps) {
+  const { folders } = useLeadFolders();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [segmentFilter, setSegmentFilter] = useState<LeadSegment | 'all'>('all');
+  const [folderFilter, setFolderFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<SortOption>('score');
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
@@ -61,8 +80,10 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
       
       const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
       const matchesSegment = segmentFilter === 'all' || lead.segment === segmentFilter;
+      const matchesFolder = folderFilter === 'all' || 
+        (folderFilter === 'none' ? !lead.folderId : lead.folderId === folderFilter);
       
-      return matchesSearch && matchesStatus && matchesSegment;
+      return matchesSearch && matchesStatus && matchesSegment && matchesFolder;
     });
 
     // Sort the filtered leads
@@ -77,7 +98,7 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
           return b.createdAt.getTime() - a.createdAt.getTime();
       }
     });
-  }, [leads, searchTerm, statusFilter, segmentFilter, sortBy]);
+  }, [leads, searchTerm, statusFilter, segmentFilter, folderFilter, sortBy]);
 
   const toggleLeadSelection = (leadId: string) => {
     setSelectedLeadIds(prev => 
@@ -189,6 +210,29 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="franquicia">Franquicia</SelectItem>
             <SelectItem value="pyme">PYME</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Folder Filter */}
+        <Select value={folderFilter} onValueChange={setFolderFilter}>
+          <SelectTrigger className="w-40">
+            <FolderOpen className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Carpeta" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las carpetas</SelectItem>
+            <SelectItem value="none">Sin carpeta</SelectItem>
+            {folders.map((folder) => (
+              <SelectItem key={folder.id} value={folder.id}>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: folder.color }}
+                  />
+                  {folder.name}
+                </div>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -315,6 +359,29 @@ export function LeadsList({ leads, onViewLead, onAddLead, onImportLeads }: Leads
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Load More Button */}
+      {hasNextPage && (
+        <div className="flex justify-center py-4">
+          <Button
+            variant="outline"
+            onClick={onLoadMore}
+            disabled={isFetchingNextPage}
+            className="gap-2"
+          >
+            {isFetchingNextPage ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Cargando...
+              </>
+            ) : (
+              <>
+                Cargar más ({totalCount ? `${leads.length} de ${totalCount}` : 'más leads'})
+              </>
+            )}
+          </Button>
         </div>
       )}
 
