@@ -29,7 +29,7 @@ function mapRowToLead(row: any): Lead {
     status: row.status as LeadStatus,
     segment: row.segment as Lead['segment'],
     source: row.source as Lead['source'],
-    equipmentCount: row.equipment_count,
+    equipmentCount: row.equipment_count ?? undefined,
     notes: row.notes,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),

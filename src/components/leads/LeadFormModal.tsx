@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -77,7 +78,8 @@ export function LeadFormModal({
     equipmentCount: undefined,
     notes: '',
     tags: [],
-    folderId: undefined,
+    // Use null to represent "Sin carpeta" (never undefined).
+    folderId: null,
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -96,10 +98,11 @@ export function LeadFormModal({
         status: lead.status,
         segment: lead.segment,
         source: lead.source,
-        equipmentCount: lead.equipmentCount,
+        // Avoid null -> Zod expects number | undefined
+        equipmentCount: lead.equipmentCount ?? undefined,
         notes: lead.notes || '',
         tags: lead.tags || [],
-        folderId: lead.folderId,
+        folderId: lead.folderId ?? null,
       });
       setTagsInput(lead.tags?.join(', ') || '');
     } else {
@@ -117,7 +120,7 @@ export function LeadFormModal({
         equipmentCount: undefined,
         notes: '',
         tags: [],
-        folderId: undefined,
+        folderId: null,
       });
       setTagsInput('');
     }
@@ -140,7 +143,7 @@ export function LeadFormModal({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     // Parse tags from input
@@ -154,7 +157,9 @@ export function LeadFormModal({
       tags,
       email: formData.email || undefined,
       // CRITICAL: folderId must be null (not undefined) when no folder is selected
-      folderId: formData.folderId === 'none' || !formData.folderId ? null : formData.folderId,
+      folderId: formData.folderId ?? null,
+      // Ensure optional number is never null
+      equipmentCount: formData.equipmentCount ?? undefined,
     };
 
     try {
@@ -170,6 +175,12 @@ export function LeadFormModal({
           }
         });
         setErrors(fieldErrors);
+
+        toast({
+          title: 'No se pudo guardar',
+          description: 'Revisa los campos marcados en rojo.',
+          variant: 'destructive',
+        });
       }
     }
   };
@@ -188,7 +199,7 @@ export function LeadFormModal({
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Company Name */}
           <div className="space-y-2">
             <Label htmlFor="companyName">Nombre de Empresa *</Label>
@@ -346,7 +357,7 @@ export function LeadFormModal({
               id="equipmentCount"
               type="number"
               min={0}
-              value={formData.equipmentCount || ''}
+              value={formData.equipmentCount ?? ''}
               onChange={(e) => setFormData(prev => ({ 
                 ...prev, 
                 equipmentCount: e.target.value ? parseInt(e.target.value) : undefined 
@@ -354,6 +365,9 @@ export function LeadFormModal({
               placeholder="0"
               disabled={isLoading}
             />
+            {errors.equipmentCount && (
+              <p className="text-sm text-destructive">{errors.equipmentCount}</p>
+            )}
           </div>
 
           {/* Tags */}
@@ -377,10 +391,10 @@ export function LeadFormModal({
             {!showNewFolderInput ? (
               <div className="flex gap-2">
                 <Select
-                  value={formData.folderId || 'none'}
+                  value={formData.folderId ?? 'none'}
                   onValueChange={(v) => setFormData(prev => ({ 
                     ...prev, 
-                    folderId: v === 'none' ? undefined : v 
+                    folderId: v === 'none' ? null : v,
                   }))}
                   disabled={isLoading}
                 >
@@ -469,26 +483,21 @@ export function LeadFormModal({
               disabled={isLoading}
             />
           </div>
-        </div>
-
-        <DialogFooter className="mt-4">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            type="button" 
-            onClick={handleSubmit}
-            disabled={isLoading}
-          >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? 'Guardar Cambios' : 'Crear Lead'}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="mt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditing ? 'Guardar Cambios' : 'Crear Lead'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

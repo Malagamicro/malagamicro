@@ -96,13 +96,26 @@ const Index = () => {
   };
 
   const handleFormSubmit = (data: any) => {
+    // Only close the modal when the mutation succeeds.
     if (editingLead) {
-      updateLead({ id: editingLead.id, ...data });
-    } else {
-      addLead(data);
+      updateLead(
+        { id: editingLead.id, ...data },
+        {
+          onSuccess: () => {
+            setIsFormOpen(false);
+            setEditingLead(null);
+          },
+        }
+      );
+      return;
     }
-    setIsFormOpen(false);
-    setEditingLead(null);
+
+    addLead(data, {
+      onSuccess: () => {
+        setIsFormOpen(false);
+        setEditingLead(null);
+      },
+    });
   };
 
   const handleImportLeads = (leadsData: any[]) => {
