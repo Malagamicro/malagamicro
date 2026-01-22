@@ -17,6 +17,7 @@ import {
   Building2,
   Phone,
   Plus,
+  RefreshCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -24,15 +25,16 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function Inbox() {
-  const { chats, isLoadingChats, useMessagesForChat, sendMessage, isSendingMessage } = useWahaMessages();
+  const { chats, isLoadingChats, useMessagesForChat, refetchChats } = useWahaMessages();
   const { templates } = useMessageTemplates();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: messages = [], isLoading: isLoadingMessages } = useMessagesForChat(selectedChatId);
+  const { data: messages = [], isLoading: isLoadingMessages, refetch: refetchMessages } = useMessagesForChat(selectedChatId);
 
   const selectedChat = chats.find(c => c.chatId === selectedChatId);
 
@@ -41,6 +43,21 @@ export default function Inbox() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetchChats();
+      if (selectedChatId) {
+        await refetchMessages();
+      }
+      toast.success('Conversaciones actualizadas');
+    } catch (error) {
+      toast.error('Error al actualizar');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!messageInput.trim() || !selectedChatId || isSending) return;
 
@@ -48,18 +65,21 @@ export default function Inbox() {
     
     setIsSending(true);
     try {
-      // Send via WAHA
-      await sendText({ phone, message: messageInput.trim() });
-      
-      // Record in database
-      sendMessage({
-        chatId: selectedChatId,
-        content: messageInput.trim(),
-        leadId: selectedChat?.leadId || undefined,
+      // Send via WAHA - it will automatically log to DB
+      await sendText({ 
+        phone, 
+        message: messageInput.trim(),
+        leadId: selectedChat?.leadId || null,
       });
 
       setMessageInput('');
       toast.success('Mensaje enviado');
+      
+      // Refresh to show the new message
+      await refetchChats();
+      if (selectedChatId) {
+        await refetchMessages();
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Error al enviar mensaje');
@@ -102,11 +122,20 @@ export default function Inbox() {
         "w-full md:w-80 lg:w-96 border-r border-border flex flex-col",
         selectedChatId && "hidden md:flex"
       )}>
-        <div className="p-4 border-b border-border">
+        <div className="p-4 border-b border-border flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-primary" />
             Inbox WhatsApp
           </h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refrescar conversaciones"
+          >
+            <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+          </Button>
         </div>
         
         <ScrollArea className="flex-1">
