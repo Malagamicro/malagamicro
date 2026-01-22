@@ -22,6 +22,7 @@ import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
 import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
 import { WhatsAppPanel } from '@/components/whatsapp/WhatsAppPanel';
 import Inbox from '@/pages/Inbox';
+import Templates from '@/pages/Templates';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -221,6 +222,8 @@ const Index = () => {
             <WhatsAppPanel />
           </div>
         );
+      case 'templates':
+        return <Templates />;
       case 'settings':
         return (
           <div className="p-8 space-y-6 animate-fade-in">

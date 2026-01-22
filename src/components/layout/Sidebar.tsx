@@ -15,7 +15,9 @@ import {
   Kanban,
   BarChart3,
   Sun,
-  Moon
+  Moon,
+  Inbox,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,8 +27,6 @@ interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
-
-import { Inbox } from 'lucide-react';
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -38,6 +38,7 @@ const menuItems = [
   { id: 'reports', label: 'Reportes', icon: BarChart3 },
   { id: 'inbox', label: 'Inbox', icon: Inbox },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
+  { id: 'templates', label: 'Plantillas', icon: FileText },
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
