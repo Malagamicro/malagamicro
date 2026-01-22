@@ -187,7 +187,7 @@ export function LeadFormModal({
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           {/* Company Name */}
           <div className="space-y-2">
             <Label htmlFor="companyName">Nombre de Empresa *</Label>
@@ -468,22 +468,26 @@ export function LeadFormModal({
               disabled={isLoading}
             />
           </div>
+        </div>
 
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? 'Guardar Cambios' : 'Crear Lead'}
-            </Button>
-          </DialogFooter>
-        </form>
+        <DialogFooter className="mt-4">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            type="button" 
+            onClick={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditing ? 'Guardar Cambios' : 'Crear Lead'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
