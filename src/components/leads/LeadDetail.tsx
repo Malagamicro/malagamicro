@@ -9,6 +9,7 @@ import { WhatsAppComposeModal } from './WhatsAppComposeModal';
 import { ReminderModal } from './ReminderModal';
 import { RemindersList } from './RemindersList';
 import { Button } from '@/components/ui/button';
+import { buildExternalUrl, formatUrlForDisplay } from '@/lib/urlUtils';
 import { 
   ArrowLeft, 
   Building2, 
@@ -149,7 +150,8 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete, onG
                   </div>
                 </div>
               )}
-              {lead.phone && (
+              {/* Phone - hidden as per TAREA 1.2 */}
+              {/* {lead.phone && (
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Phone className="w-5 h-5 text-primary" />
@@ -161,6 +163,17 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete, onG
                     </a>
                   </div>
                 </div>
+              )} */}
+              {lead.phone && (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Phone className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Teléfono</p>
+                    <p className="font-medium text-foreground">{lead.phone}</p>
+                  </div>
+                </div>
               )}
               {lead.website && (
                 <div className="flex items-center gap-3">
@@ -170,12 +183,12 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete, onG
                   <div>
                     <p className="text-sm text-muted-foreground">Web</p>
                     <a 
-                      href={`https://${lead.website}`} 
+                      href={buildExternalUrl(lead.website)} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="font-medium text-primary hover:underline"
                     >
-                      {lead.website}
+                      {formatUrlForDisplay(lead.website)}
                     </a>
                   </div>
                 </div>
@@ -221,7 +234,8 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete, onG
                 <MessageSquare className="w-4 h-4" />
                 WhatsApp
               </Button>
-              <Button 
+              {/* Botón Llamar - OCULTO por TAREA 1.2 */}
+              {/* <Button 
                 variant="outline" 
                 className="w-full justify-start gap-2"
                 onClick={() => lead.phone && window.open(`tel:${lead.phone}`, '_self')}
@@ -229,7 +243,7 @@ export function LeadDetail({ lead, onBack, onUpdateStatus, onEdit, onDelete, onG
               >
                 <Phone className="w-4 h-4" />
                 Llamar
-              </Button>
+              </Button> */}
               <Button 
                 variant="outline" 
                 className="w-full justify-start gap-2"

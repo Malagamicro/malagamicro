@@ -14,21 +14,17 @@ import {
   WifiOff
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-const WAHA_API_URL = 'http://localhost:3000';
-const WAHA_API_KEY = '12345678';
-const SESSION_NAME = 'default';
-
-type SessionStatus = 'STOPPED' | 'STARTING' | 'SCAN_QR_CODE' | 'WORKING' | 'FAILED' | 'NOT_FOUND';
-
-interface SessionInfo {
-  name: string;
-  status: SessionStatus;
-  me?: {
-    id: string;
-    pushName: string;
-  };
-}
+import {
+  getSessionStatus,
+  getSessionQrCode,
+  createSession,
+  startSession,
+  stopSession,
+  restartSession,
+  deleteSession,
+  type SessionStatus,
+  type SessionInfo,
+} from '@/services/wahaService';
 
 export function WahaSessionManager() {
   const [status, setStatus] = useState<SessionStatus>('NOT_FOUND');
@@ -37,32 +33,24 @@ export function WahaSessionManager() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchSessionStatus = useCallback(async () => {
+  const fetchStatus = useCallback(async () => {
     try {
-      const response = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}`, {
-        headers: {
-          'X-Api-Key': WAHA_API_KEY,
-        },
-      });
-
-      if (response.status === 404) {
+      const data = await getSessionStatus();
+      
+      if (!data) {
         setStatus('NOT_FOUND');
         setSessionInfo(null);
         setQrCode(null);
         return;
       }
 
-      if (!response.ok) {
-        throw new Error('Error al obtener estado de sesión');
-      }
-
-      const data: SessionInfo = await response.json();
       setSessionInfo(data);
       setStatus(data.status);
 
       // If status is SCAN_QR_CODE, fetch the QR
       if (data.status === 'SCAN_QR_CODE') {
-        await fetchQrCode();
+        const qr = await getSessionQrCode();
+        setQrCode(qr);
       } else {
         setQrCode(null);
       }
@@ -74,55 +62,12 @@ export function WahaSessionManager() {
     }
   }, []);
 
-  const fetchQrCode = async () => {
-    try {
-      const response = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr`, {
-        headers: {
-          'X-Api-Key': WAHA_API_KEY,
-        },
-      });
-
-      if (response.ok) {
-        // The QR endpoint returns an image
-        const blob = await response.blob();
-        const imageUrl = URL.createObjectURL(blob);
-        setQrCode(imageUrl);
-      }
-    } catch (error) {
-      console.error('Error fetching QR code:', error);
-    }
-  };
-
-  const createSession = async () => {
+  const handleCreateSession = async () => {
     setActionLoading(true);
     try {
-      const response = await fetch(`${WAHA_API_URL}/api/sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': WAHA_API_KEY,
-        },
-        body: JSON.stringify({
-          name: SESSION_NAME,
-          start: true,
-          config: {
-            noweb: {
-              store: {
-                enabled: true,
-                fullSync: false,
-              },
-            },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al crear sesión');
-      }
-
+      await createSession();
       toast.success('Sesión creada correctamente');
-      await fetchSessionStatus();
+      await fetchStatus();
     } catch (error: any) {
       console.error('Error creating session:', error);
       toast.error(error.message || 'Error al crear la sesión');
@@ -131,33 +76,12 @@ export function WahaSessionManager() {
     }
   };
 
-  const startSession = async () => {
+  const handleStartSession = async () => {
     setActionLoading(true);
     try {
-      const response = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': WAHA_API_KEY,
-        },
-        body: JSON.stringify({
-          config: {
-            noweb: {
-              store: {
-                enabled: true,
-                fullSync: false,
-              },
-            },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al iniciar sesión');
-      }
-
+      await startSession();
       toast.success('Sesión iniciada');
-      await fetchSessionStatus();
+      await fetchStatus();
     } catch (error: any) {
       console.error('Error starting session:', error);
       toast.error(error.message || 'Error al iniciar la sesión');
@@ -166,22 +90,12 @@ export function WahaSessionManager() {
     }
   };
 
-  const stopSession = async () => {
+  const handleStopSession = async () => {
     setActionLoading(true);
     try {
-      const response = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}/stop`, {
-        method: 'POST',
-        headers: {
-          'X-Api-Key': WAHA_API_KEY,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al detener sesión');
-      }
-
+      await stopSession();
       toast.success('Sesión detenida');
-      await fetchSessionStatus();
+      await fetchStatus();
     } catch (error: any) {
       console.error('Error stopping session:', error);
       toast.error(error.message || 'Error al detener la sesión');
@@ -190,20 +104,10 @@ export function WahaSessionManager() {
     }
   };
 
-  const deleteSession = async () => {
+  const handleDeleteSession = async () => {
     setActionLoading(true);
     try {
-      const response = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}`, {
-        method: 'DELETE',
-        headers: {
-          'X-Api-Key': WAHA_API_KEY,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al eliminar sesión');
-      }
-
+      await deleteSession();
       toast.success('Sesión eliminada');
       setStatus('NOT_FOUND');
       setSessionInfo(null);
@@ -216,22 +120,12 @@ export function WahaSessionManager() {
     }
   };
 
-  const restartSession = async () => {
+  const handleRestartSession = async () => {
     setActionLoading(true);
     try {
-      const response = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}/restart`, {
-        method: 'POST',
-        headers: {
-          'X-Api-Key': WAHA_API_KEY,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al reiniciar sesión');
-      }
-
+      await restartSession();
       toast.success('Sesión reiniciada');
-      await fetchSessionStatus();
+      await fetchStatus();
     } catch (error: any) {
       console.error('Error restarting session:', error);
       toast.error(error.message || 'Error al reiniciar la sesión');
@@ -241,12 +135,12 @@ export function WahaSessionManager() {
   };
 
   useEffect(() => {
-    fetchSessionStatus();
+    fetchStatus();
     
     // Poll for status updates every 5 seconds
-    const interval = setInterval(fetchSessionStatus, 5000);
+    const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
-  }, [fetchSessionStatus]);
+  }, [fetchStatus]);
 
   const getStatusBadge = () => {
     switch (status) {
@@ -330,7 +224,7 @@ export function WahaSessionManager() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={fetchSessionStatus}
+                onClick={fetchStatus}
                 disabled={actionLoading}
                 title="Actualizar estado"
               >
@@ -340,7 +234,7 @@ export function WahaSessionManager() {
               {status === 'NOT_FOUND' && (
                 <Button
                   size="sm"
-                  onClick={createSession}
+                  onClick={handleCreateSession}
                   disabled={actionLoading}
                 >
                   {actionLoading ? (
@@ -355,7 +249,7 @@ export function WahaSessionManager() {
               {status === 'STOPPED' && (
                 <Button
                   size="sm"
-                  onClick={startSession}
+                  onClick={handleStartSession}
                   disabled={actionLoading}
                 >
                   {actionLoading ? (
@@ -372,7 +266,7 @@ export function WahaSessionManager() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={restartSession}
+                    onClick={handleRestartSession}
                     disabled={actionLoading}
                     title="Reiniciar sesión"
                   >
@@ -382,7 +276,7 @@ export function WahaSessionManager() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={deleteSession}
+                    onClick={handleDeleteSession}
                     disabled={actionLoading}
                     title="Eliminar sesión"
                   >
