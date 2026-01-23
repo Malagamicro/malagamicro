@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   Loader2, 
   CheckCircle2, 
@@ -41,6 +42,7 @@ export function WahaSessionManager() {
         setStatus('NOT_FOUND');
         setSessionInfo(null);
         setQrCode(null);
+        setLoading(false);
         return;
       }
 
@@ -49,15 +51,20 @@ export function WahaSessionManager() {
 
       // If status is SCAN_QR_CODE, fetch the QR
       if (data.status === 'SCAN_QR_CODE') {
+        // Don't show loading spinner when refreshing QR
+        setLoading(false);
+        
         const qr = await getSessionQrCode();
-        setQrCode(qr);
+        if (qr) {
+          setQrCode(qr);
+        }
       } else {
         setQrCode(null);
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error fetching session status:', error);
       setStatus('NOT_FOUND');
-    } finally {
       setLoading(false);
     }
   }, []);
@@ -190,6 +197,42 @@ export function WahaSessionManager() {
     }
   };
 
+  const renderQrCode = () => {
+    if (!qrCode) {
+      return (
+        <div className="w-64 h-64 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Cargando QR...</p>
+        </div>
+      );
+    }
+
+    // Check if it's an image URL (prefixed with "image:")
+    if (qrCode.startsWith('image:')) {
+      return (
+        <div className="bg-white p-4 rounded-lg">
+          <img 
+            src={qrCode.replace('image:', '')} 
+            alt="WhatsApp QR Code" 
+            className="w-64 h-64 object-contain"
+          />
+        </div>
+      );
+    }
+
+    // Otherwise it's raw QR data, render with qrcode.react
+    return (
+      <div className="bg-white p-4 rounded-lg">
+        <QRCodeSVG 
+          value={qrCode} 
+          size={256}
+          level="M"
+          includeMargin={false}
+        />
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <Card className="mb-4">
@@ -294,21 +337,9 @@ export function WahaSessionManager() {
               <p className="text-sm text-muted-foreground">
                 Escanea este código QR con WhatsApp en tu teléfono
               </p>
-              {qrCode ? (
-                <div className="bg-white p-4 rounded-lg">
-                  <img 
-                    src={qrCode} 
-                    alt="WhatsApp QR Code" 
-                    className="w-48 h-48 object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="w-48 h-48 bg-muted rounded-lg flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              )}
+              {renderQrCode()}
               <p className="text-xs text-muted-foreground">
-                El código se actualiza automáticamente
+                El código se actualiza automáticamente cada 5 segundos
               </p>
             </div>
           )}
