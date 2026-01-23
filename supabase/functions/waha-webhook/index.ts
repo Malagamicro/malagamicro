@@ -54,18 +54,17 @@ interface WahaWebhook {
 
 // Map WAHA ack codes to human-readable status
 const ackStatusMap: Record<number, string> = {
-  0: 'pending',     // Message pending
-  1: 'sent',        // Message sent to server
-  2: 'delivered',   // Message delivered to recipient
-  3: 'read',        // Message read by recipient
-  4: 'played',      // Voice/video message played
+  0: 'pending',
+  1: 'sent',
+  2: 'delivered',
+  3: 'read',
+  4: 'played',
 };
 
 Deno.serve(async (req) => {
   console.log("=== WAHA Webhook received ===");
   console.log("Method:", req.method);
 
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -101,7 +100,6 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Handle different event types
     switch (body.event) {
       case 'session.status':
         console.log("📱 Session status update:", body.payload);
@@ -154,6 +152,75 @@ Deno.serve(async (req) => {
   }
 });
 
+// Helper to get or create a chat entry
+async function getOrCreateChat(
+  supabase: any, 
+  userId: string, 
+  chatId: string, 
+  phoneNumber: string
+) {
+  // Check if chat exists
+  const { data: existingChat } = await supabase
+    .from("whatsapp_chats")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("chat_id", chatId)
+    .single();
+
+  if (existingChat) {
+    // Update last message timestamp
+    await supabase
+      .from("whatsapp_chats")
+      .update({ 
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existingChat.id);
+    return existingChat;
+  }
+
+  // Create new chat
+  const { data: newChat, error } = await supabase
+    .from("whatsapp_chats")
+    .insert({
+      user_id: userId,
+      chat_id: chatId,
+      phone: phoneNumber,
+      last_message_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error creating chat:", error);
+  }
+
+  console.log("📱 New chat created:", chatId);
+  return newChat;
+}
+
+// Helper to increment unread count for incoming messages
+async function incrementUnreadCount(supabase: any, userId: string, chatId: string) {
+  // Get current count
+  const { data: chat } = await supabase
+    .from("whatsapp_chats")
+    .select("unread_count")
+    .eq("user_id", userId)
+    .eq("chat_id", chatId)
+    .single();
+
+  if (chat) {
+    await supabase
+      .from("whatsapp_chats")
+      .update({ 
+        unread_count: (chat.unread_count || 0) + 1,
+        last_message_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId)
+      .eq("chat_id", chatId);
+  }
+}
+
 // Handle new incoming/outgoing messages
 async function handleNewMessage(supabase: any, body: WahaWebhook) {
   const payload = body.payload;
@@ -191,6 +258,14 @@ async function handleNewMessage(supabase: any, body: WahaWebhook) {
     });
   }
 
+  // Get or create the chat entry
+  await getOrCreateChat(supabase, userId, chatId, phoneNumber);
+
+  // Increment unread count for incoming messages
+  if (!payload.fromMe) {
+    await incrementUnreadCount(supabase, userId, chatId);
+  }
+
   const messageTimestamp = payload.timestamp
     ? new Date(payload.timestamp * 1000).toISOString()
     : new Date().toISOString();
@@ -224,7 +299,7 @@ async function handleNewMessage(supabase: any, body: WahaWebhook) {
   });
 }
 
-// Handle message acknowledgment (sent, delivered, read)
+// Handle message acknowledgment
 async function handleMessageAck(supabase: any, body: WahaWebhook) {
   const payload = body.payload;
   const messageId = payload.id || payload._data?.id?._serialized;
@@ -252,7 +327,7 @@ async function handleMessageAck(supabase: any, body: WahaWebhook) {
   });
 }
 
-// Handle message reactions (emoji reactions)
+// Handle message reactions
 async function handleMessageReaction(supabase: any, body: WahaWebhook) {
   const payload = body.payload;
   const reactionData = payload.reaction;
@@ -279,7 +354,7 @@ async function handleMessageReaction(supabase: any, body: WahaWebhook) {
   });
 }
 
-// Handle revoked (deleted) messages
+// Handle revoked messages
 async function handleMessageRevoked(supabase: any, body: WahaWebhook) {
   const payload = body.payload;
   const messageId = payload.id || payload._data?.id?._serialized;

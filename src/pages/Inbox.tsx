@@ -1,17 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useWahaMessages, ChatSummary, WahaMessage } from '@/hooks/useWahaMessages';
-import { useMessageTemplates } from '@/hooks/useMessageTemplates';
-import { sendText } from '@/services/wahaService';
+import { useWhatsAppChats } from '@/hooks/useWhatsAppChats';
+
+import { sendTextMessage } from '@/services/wahaService';
 import { TemplatesModal } from '@/components/whatsapp/TemplatesModal';
+import { EditContactModal } from '@/components/whatsapp/EditContactModal';
+import { NewChatModal } from '@/components/whatsapp/NewChatModal';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   MessageSquare, 
   Send, 
   Loader2, 
   ArrowLeft, 
-  User,
   Phone,
   Plus,
   RefreshCw,
@@ -19,13 +22,22 @@ import {
   CheckCheck,
   AlertCircle,
   FileText,
+  MoreVertical,
+  Pencil,
+  Clock,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
-// Mensaje optimista pendiente
+// Pending message for optimistic UI
 interface PendingMessage {
   id: string;
   content: string;
@@ -33,7 +45,7 @@ interface PendingMessage {
   status: 'sending' | 'sent' | 'error';
 }
 
-// Función para detectar y convertir URLs en links
+// Function to detect and convert URLs to links
 function linkifyText(text: string): React.ReactNode[] {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = text.split(urlRegex);
@@ -57,12 +69,25 @@ function linkifyText(text: string): React.ReactNode[] {
 }
 
 export default function Inbox() {
-  const { chats, isLoadingChats, useMessagesForChat, refetchChats } = useWahaMessages();
-  const { templates } = useMessageTemplates();
+  const { user } = useAuth();
+  const { 
+    chats, 
+    isLoadingChats, 
+    refetchChats, 
+    useMessagesForChat, 
+    getOrCreateChat,
+    updateChat,
+    uploadAvatar,
+    updateChatLastMessage,
+  } = useWhatsAppChats();
+  
+  
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
   
@@ -74,7 +99,7 @@ export default function Inbox() {
 
   const selectedChat = chats.find(c => c.chatId === selectedChatId);
 
-  // Auto-scroll al final cuando cambian los mensajes o hay mensajes pendientes
+  // Auto-scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
@@ -83,14 +108,21 @@ export default function Inbox() {
     scrollToBottom();
   }, [messages, pendingMessages, scrollToBottom]);
 
-  // Auto-resize del textarea
+  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       const scrollHeight = textareaRef.current.scrollHeight;
-      textareaRef.current.style.height = `${Math.min(scrollHeight, 120)}px`; // max 4 líneas aprox
+      textareaRef.current.style.height = `${Math.min(scrollHeight, 120)}px`;
     }
   }, [messageInput]);
+
+  // Reset unread when selecting a chat
+  useEffect(() => {
+    if (selectedChatId && selectedChat?.unreadCount && selectedChat.unreadCount > 0) {
+      updateChatLastMessage({ chatId: selectedChatId, resetUnread: true });
+    }
+  }, [selectedChatId]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -107,14 +139,19 @@ export default function Inbox() {
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!messageInput.trim() || !selectedChatId || isSending) return;
+  const handleCreateChat = async (phone: string, name?: string) => {
+    const chatId = `${phone}@c.us`;
+    await getOrCreateChat({ chatId, phone, customName: name });
+    setSelectedChatId(chatId);
+  };
 
-    const phone = selectedChatId.replace('@c.us', '').replace('@s.whatsapp.net', '');
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !selectedChatId || isSending || !user?.id) return;
+
     const content = messageInput.trim();
     const pendingId = `pending-${Date.now()}`;
     
-    // Optimistic UI: añadir mensaje pendiente
+    // Optimistic UI: add pending message
     const pendingMsg: PendingMessage = {
       id: pendingId,
       content,
@@ -131,27 +168,39 @@ export default function Inbox() {
 
     setIsSending(true);
     try {
-      await sendText({ 
-        phone, 
-        message: content,
-        leadId: selectedChat?.leadId || null,
+      // Send via WAHA
+      const wahaResponse = await sendTextMessage(selectedChatId, content);
+
+      // Save to database
+      await supabase.from('waha_messages').insert({
+        chat_id: selectedChatId,
+        content,
+        from_me: true,
+        user_id: user.id,
+        timestamp: new Date().toISOString(),
+        message_id: wahaResponse?.id || null,
+        message_type: 'text',
+        ack_status: 'sent',
       });
 
-      // Marcar como enviado
+      // Update chat last message
+      await updateChatLastMessage({ chatId: selectedChatId });
+
+      // Mark as sent
       setPendingMessages(prev => 
         prev.map(m => m.id === pendingId ? { ...m, status: 'sent' as const } : m)
       );
       
-      // Refrescar para obtener el mensaje real de la BD
+      // Refresh to get real message from DB
       await refetchChats();
       await refetchMessages();
       
-      // Limpiar mensaje pendiente después de refrescar
+      // Clean pending message after refresh
       setPendingMessages(prev => prev.filter(m => m.id !== pendingId));
       
     } catch (error) {
       console.error('Error sending message:', error);
-      // Marcar como error
+      // Mark as error
       setPendingMessages(prev => 
         prev.map(m => m.id === pendingId ? { ...m, status: 'error' as const } : m)
       );
@@ -162,20 +211,25 @@ export default function Inbox() {
   };
 
   const handleRetryMessage = async (pendingMsg: PendingMessage) => {
-    if (!selectedChatId) return;
+    if (!selectedChatId || !user?.id) return;
     
-    const phone = selectedChatId.replace('@c.us', '').replace('@s.whatsapp.net', '');
-    
-    // Marcar como enviando
+    // Mark as sending
     setPendingMessages(prev => 
       prev.map(m => m.id === pendingMsg.id ? { ...m, status: 'sending' as const } : m)
     );
 
     try {
-      await sendText({ 
-        phone, 
-        message: pendingMsg.content,
-        leadId: selectedChat?.leadId || null,
+      const wahaResponse = await sendTextMessage(selectedChatId, pendingMsg.content);
+
+      await supabase.from('waha_messages').insert({
+        chat_id: selectedChatId,
+        content: pendingMsg.content,
+        from_me: true,
+        user_id: user.id,
+        timestamp: new Date().toISOString(),
+        message_id: wahaResponse?.id || null,
+        message_type: 'text',
+        ack_status: 'sent',
       });
 
       setPendingMessages(prev => 
@@ -192,6 +246,28 @@ export default function Inbox() {
         prev.map(m => m.id === pendingMsg.id ? { ...m, status: 'error' as const } : m)
       );
       toast.error('Error al reintentar');
+    }
+  };
+
+  const handleSaveContact = async (name: string, avatarFile?: File) => {
+    if (!selectedChatId) return;
+    
+    try {
+      let newAvatarUrl: string | undefined;
+      
+      if (avatarFile) {
+        newAvatarUrl = await uploadAvatar(selectedChatId, avatarFile);
+      }
+      
+      await updateChat({ 
+        chatId: selectedChatId, 
+        customName: name, 
+        avatarUrl: newAvatarUrl,
+      });
+      
+      await refetchChats();
+    } catch (err) {
+      throw err;
     }
   };
 
@@ -214,8 +290,7 @@ export default function Inbox() {
     }
   };
 
-  const getPhoneDisplay = (chatId: string) => {
-    const phone = chatId.replace('@c.us', '').replace('@s.whatsapp.net', '');
+  const getPhoneDisplay = (phone: string) => {
     if (phone.startsWith('34')) {
       return `+34 ${phone.slice(2, 5)} ${phone.slice(5, 8)} ${phone.slice(8)}`;
     }
@@ -229,9 +304,25 @@ export default function Inbox() {
     }
   };
 
-  // Combinar mensajes reales con pendientes
+  const getAckIcon = (ackStatus: string | null | undefined) => {
+    switch (ackStatus) {
+      case 'pending':
+        return <Clock className="w-3 h-3 opacity-70" />;
+      case 'sent':
+        return <Check className="w-3 h-3" />;
+      case 'delivered':
+        return <CheckCheck className="w-3 h-3" />;
+      case 'read':
+      case 'played':
+        return <CheckCheck className="w-3 h-3 text-sky-400" />;
+      default:
+        return <CheckCheck className="w-3 h-3" />;
+    }
+  };
+
+  // Combine real messages with pending ones
   const allMessages = [
-    ...messages,
+    ...messages.map(m => ({ ...m, _pending: null as string | null })),
     ...pendingMessages.map(p => ({
       id: p.id,
       chatId: selectedChatId || '',
@@ -242,13 +333,19 @@ export default function Inbox() {
       userId: '',
       messageId: null,
       mediaUrl: null,
+      messageType: 'text',
+      ackStatus: null,
+      reaction: null,
+      isRevoked: false,
+      isEdited: false,
+      replyToId: null,
       createdAt: p.timestamp,
       _pending: p.status,
     })),
   ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
+    <div className="flex h-full overflow-hidden bg-background">
       {/* Chat List - Sidebar */}
       <div className={cn(
         "w-full md:w-80 lg:w-[30%] min-w-[320px] max-w-[400px] border-r border-border flex flex-col bg-card",
@@ -260,15 +357,25 @@ export default function Inbox() {
             <MessageSquare className="w-5 h-5 text-primary" />
             Inbox
           </h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            title="Refrescar conversaciones"
-          >
-            <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowNewChatModal(true)}
+              title="Nueva conversación"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              title="Refrescar conversaciones"
+            >
+              <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+            </Button>
+          </div>
         </div>
         
         {/* Chat List */}
@@ -284,12 +391,19 @@ export default function Inbox() {
               <p className="text-sm text-muted-foreground/70 mt-1">
                 Los mensajes aparecerán aquí
               </p>
+              <Button
+                variant="link"
+                onClick={() => setShowNewChatModal(true)}
+                className="mt-2"
+              >
+                Iniciar conversación
+              </Button>
             </div>
           ) : (
             <div>
               {chats.map((chat) => (
                 <button
-                  key={chat.chatId}
+                  key={chat.id}
                   onClick={() => setSelectedChatId(chat.chatId)}
                   className={cn(
                     "w-full px-4 py-3 text-left transition-colors flex items-center gap-3",
@@ -298,22 +412,30 @@ export default function Inbox() {
                   )}
                 >
                   <Avatar className="w-12 h-12 shrink-0">
+                    {chat.avatarUrl && <AvatarImage src={chat.avatarUrl} alt={chat.customName || chat.phone} />}
                     <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                      {chat.leadCompany?.[0]?.toUpperCase() || chat.leadName?.[0]?.toUpperCase() || <User className="w-5 h-5" />}
+                      {chat.customName?.[0]?.toUpperCase() || chat.phone.slice(-2)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-medium truncate text-foreground">
-                        {chat.leadCompany || chat.leadName || getPhoneDisplay(chat.chatId)}
+                        {chat.customName || getPhoneDisplay(chat.phone)}
                       </p>
                       <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                        {formatTime(chat.lastTimestamp)}
+                        {formatTime(chat.lastMessageAt)}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">
-                      {chat.lastMessage}
-                    </p>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className="text-sm text-muted-foreground truncate">
+                        {chat.lastMessage || 'Sin mensajes'}
+                      </p>
+                      {chat.unreadCount > 0 && (
+                        <span className="ml-2 bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full">
+                          {chat.unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}
@@ -327,7 +449,7 @@ export default function Inbox() {
         "flex-1 flex flex-col min-w-0",
         !selectedChatId && "hidden md:flex"
       )}>
-        {selectedChatId ? (
+        {selectedChatId && selectedChat ? (
           <>
             {/* Chat Header */}
             <div className="h-16 px-4 border-b border-border flex items-center gap-3 bg-card shrink-0">
@@ -340,28 +462,39 @@ export default function Inbox() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <Avatar className="w-10 h-10 shrink-0">
+                {selectedChat.avatarUrl && <AvatarImage src={selectedChat.avatarUrl} alt={selectedChat.customName || selectedChat.phone} />}
                 <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                  {selectedChat?.leadCompany?.[0]?.toUpperCase() || selectedChat?.leadName?.[0]?.toUpperCase() || <User className="w-4 h-4" />}
+                  {selectedChat.customName?.[0]?.toUpperCase() || selectedChat.phone.slice(-2)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">
-                  {selectedChat?.leadCompany || selectedChat?.leadName || getPhoneDisplay(selectedChatId)}
+                  {selectedChat.customName || getPhoneDisplay(selectedChat.phone)}
                 </p>
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Phone className="w-3 h-3" />
-                  <span className="truncate">{getPhoneDisplay(selectedChatId)}</span>
+                  <span className="truncate">{getPhoneDisplay(selectedChat.phone)}</span>
                 </div>
               </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setShowEditModal(true)}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Editar contacto
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Messages Area - WhatsApp style background */}
             <div 
               ref={messagesContainerRef}
-              className="flex-1 overflow-y-auto p-4 bg-[#efeae2] dark:bg-[#0b141a]"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-              }}
+              className="flex-1 overflow-y-auto p-4 bg-muted/30"
             >
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center h-full">
@@ -379,8 +512,8 @@ export default function Inbox() {
               ) : (
                 <div className="space-y-1 max-w-3xl mx-auto">
                   {allMessages.map((message) => {
-                    const isPending = '_pending' in message;
-                    const pendingStatus = isPending ? (message as any)._pending : null;
+                    const isPending = message._pending !== null;
+                    const pendingStatus = message._pending;
                     
                     return (
                       <div
@@ -394,22 +527,30 @@ export default function Inbox() {
                           className={cn(
                             "max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative",
                             message.fromMe
-                              ? "bg-[#d9fdd3] dark:bg-emerald-900 rounded-tr-none"
-                              : "bg-card dark:bg-slate-800 rounded-tl-none",
+                              ? "bg-primary/10 rounded-tr-none"
+                              : "bg-card rounded-tl-none",
                             pendingStatus === 'sending' && "opacity-70",
-                            pendingStatus === 'error' && "opacity-90"
+                            pendingStatus === 'error' && "opacity-90",
+                            message.isRevoked && "opacity-60 italic"
                           )}
                         >
-                          <p className={cn(
-                            "whitespace-pre-wrap break-words text-sm",
-                            message.fromMe ? "text-foreground" : "text-foreground"
-                          )}>
+                          {message.mediaUrl && !message.isRevoked && (
+                            <img
+                              src={message.mediaUrl}
+                              alt="Media"
+                              className="max-w-full rounded mb-2"
+                            />
+                          )}
+                          <p className="whitespace-pre-wrap break-words text-sm">
                             {linkifyText(message.content)}
+                            {message.isEdited && (
+                              <span className="text-xs opacity-70 ml-1">(editado)</span>
+                            )}
                           </p>
-                          <div className={cn(
-                            "flex items-center justify-end gap-1 mt-1",
-                            message.fromMe ? "text-muted-foreground/70" : "text-muted-foreground/70"
-                          )}>
+                          {message.reaction && (
+                            <span className="text-lg">{message.reaction}</span>
+                          )}
+                          <div className="flex items-center justify-end gap-1 mt-1 text-muted-foreground/70">
                             <span className="text-[10px]">
                               {format(message.timestamp, 'HH:mm')}
                             </span>
@@ -430,9 +571,7 @@ export default function Inbox() {
                                     <AlertCircle className="w-3 h-3" />
                                   </button>
                                 )}
-                                {!isPending && (
-                                  <CheckCheck className="w-3 h-3 text-primary" />
-                                )}
+                                {!isPending && getAckIcon(message.ackStatus)}
                               </>
                             )}
                           </div>
@@ -464,50 +603,71 @@ export default function Inbox() {
                     onChange={(e) => setMessageInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Escribe un mensaje..."
-                    disabled={isSending}
+                    className="min-h-[40px] max-h-[120px] resize-none pr-12"
                     rows={1}
-                    className="resize-none min-h-[42px] max-h-[120px] py-2.5 pr-4 bg-background"
                   />
                 </div>
-                <Button
-                  onClick={handleSendMessage}
+                <Button 
+                  onClick={handleSendMessage} 
                   disabled={!messageInput.trim() || isSending}
-                  size="icon"
-                  className="shrink-0 mb-0.5 bg-primary hover:bg-primary/90"
+                  className="shrink-0 mb-0.5"
                 >
                   {isSending ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Send className="w-5 h-5" />
+                    <Send className="w-4 h-4" />
                   )}
                 </Button>
               </div>
             </div>
           </>
         ) : (
-          /* Empty State */
-          <div className="flex-1 flex items-center justify-center bg-[#f0f2f5] dark:bg-[#222e35]">
-            <div className="text-center max-w-md px-8">
-              <div className="w-64 h-64 mx-auto mb-6 opacity-30">
-                <MessageSquare className="w-full h-full text-muted-foreground" strokeWidth={0.5} />
-              </div>
-              <h2 className="text-2xl font-light text-muted-foreground mb-2">
-                Inbox WhatsApp
+          <div className="flex-1 flex items-center justify-center bg-muted/20">
+            <div className="text-center">
+              <MessageSquare className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
+              <h2 className="text-xl font-medium text-muted-foreground">
+                Selecciona una conversación
               </h2>
-              <p className="text-muted-foreground/70">
-                Selecciona una conversación para ver los mensajes
+              <p className="text-sm text-muted-foreground/70 mt-1">
+                O inicia una nueva
               </p>
+              <Button
+                variant="outline"
+                onClick={() => setShowNewChatModal(true)}
+                className="mt-4"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nueva conversación
+              </Button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Templates Modal */}
+      {/* Modals */}
       <TemplatesModal
         open={showTemplatesModal}
         onOpenChange={setShowTemplatesModal}
         onSelectTemplate={insertTemplate}
       />
+
+      <NewChatModal
+        isOpen={showNewChatModal}
+        onClose={() => setShowNewChatModal(false)}
+        onCreateChat={handleCreateChat}
+      />
+
+      {selectedChat && (
+        <EditContactModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          chatId={selectedChatId || ''}
+          phone={selectedChat.phone}
+          currentName={selectedChat.customName}
+          currentAvatar={selectedChat.avatarUrl}
+          onSave={handleSaveContact}
+        />
+      )}
     </div>
   );
 }

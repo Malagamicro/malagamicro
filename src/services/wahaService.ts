@@ -325,6 +325,56 @@ export async function sendImage(payload: SendImagePayload): Promise<void> {
   }
 }
 
+// ============================================
+// DIRECT CHAT ID MESSAGING (for Inbox)
+// These functions work directly with chatId instead of phone
+// and don't log to DB (Inbox handles its own logging)
+// ============================================
+
+export async function sendTextMessage(
+  chatId: string, 
+  text: string
+): Promise<{ id?: string }> {
+  console.log('📤 Enviando WhatsApp directo:', { chatId, text: text.substring(0, 50) + '...' });
+  
+  const response = await wahaFetch<{ id?: string }>('/api/sendText', {
+    method: 'POST',
+    body: JSON.stringify({
+      chatId,
+      text,
+      session: SESSION_NAME,
+    }),
+  });
+  
+  return response;
+}
+
+export async function sendImageMessage(
+  chatId: string,
+  imageBase64: string,
+  imageMimeType: string,
+  imageFilename: string,
+  caption: string = ''
+): Promise<{ id?: string }> {
+  console.log('📤 Enviando imagen WhatsApp directo:', { chatId, caption: caption.substring(0, 50) + '...', filename: imageFilename });
+  
+  const response = await wahaFetch<{ id?: string }>('/api/sendImage', {
+    method: 'POST',
+    body: JSON.stringify({
+      chatId,
+      file: {
+        mimetype: imageMimeType,
+        filename: imageFilename,
+        data: imageBase64,
+      },
+      caption,
+      session: SESSION_NAME,
+    }),
+  });
+  
+  return response;
+}
+
 // Export config for components that need to check connection
 export const wahaConfig = {
   apiUrl: WAHA_API_URL,
