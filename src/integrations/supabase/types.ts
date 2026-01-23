@@ -471,38 +471,56 @@ export type Database = {
       }
       waha_messages: {
         Row: {
+          ack_status: string | null
           chat_id: string
           content: string
           created_at: string
           from_me: boolean
           id: string
+          is_edited: boolean | null
+          is_revoked: boolean | null
           lead_id: string | null
           media_url: string | null
           message_id: string | null
+          message_type: string | null
+          reaction: string | null
+          reply_to_id: string | null
           timestamp: string
           user_id: string
         }
         Insert: {
+          ack_status?: string | null
           chat_id: string
           content: string
           created_at?: string
           from_me?: boolean
           id?: string
+          is_edited?: boolean | null
+          is_revoked?: boolean | null
           lead_id?: string | null
           media_url?: string | null
           message_id?: string | null
+          message_type?: string | null
+          reaction?: string | null
+          reply_to_id?: string | null
           timestamp?: string
           user_id: string
         }
         Update: {
+          ack_status?: string | null
           chat_id?: string
           content?: string
           created_at?: string
           from_me?: boolean
           id?: string
+          is_edited?: boolean | null
+          is_revoked?: boolean | null
           lead_id?: string | null
           media_url?: string | null
           message_id?: string | null
+          message_type?: string | null
+          reaction?: string | null
+          reply_to_id?: string | null
           timestamp?: string
           user_id?: string
         }

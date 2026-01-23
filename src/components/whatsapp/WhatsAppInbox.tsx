@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Search, MessageSquare } from 'lucide-react';
+import { RefreshCw, Search, MessageSquare, Check, CheckCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { getSessionStatus } from '@/services/wahaService';
 
 interface Chat {
   id: string;
@@ -18,6 +19,8 @@ interface Chat {
   timestamp: number;
   unreadCount: number;
   phone: string;
+  ackStatus?: string;
+  reaction?: string;
 }
 
 interface WhatsAppInboxProps {
@@ -25,21 +28,35 @@ interface WhatsAppInboxProps {
   selectedChatId: string | null;
 }
 
+const WAHA_API_URL = import.meta.env.VITE_WAHA_API_URL || 'http://localhost:3000';
+const WAHA_API_KEY = import.meta.env.VITE_WAHA_API_KEY || '12345678';
+
 export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxProps) {
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+
+  // Check WAHA connection status
+  const checkConnection = async () => {
+    try {
+      const sessionInfo = await getSessionStatus();
+      setConnectionStatus(sessionInfo?.status === 'WORKING' ? 'connected' : 'disconnected');
+    } catch {
+      setConnectionStatus('disconnected');
+    }
+  };
 
   const fetchChats = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const response = await fetch('http://localhost:3000/api/default/chats', {
+      const response = await fetch(`${WAHA_API_URL}/api/default/chats`, {
         headers: {
-          'X-Api-Key': '12345678',
+          'X-Api-Key': WAHA_API_KEY,
         },
       });
       
@@ -75,9 +92,11 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
         .sort((a: Chat, b: Chat) => b.timestamp - a.timestamp);
       
       setChats(transformedChats);
+      setConnectionStatus('connected');
     } catch (err) {
       console.error('Error fetching chats:', err);
-      setError('No se pudo conectar con WAHA. Asegúrate de que esté corriendo en localhost:3000');
+      setError('No se pudo conectar con WAHA');
+      setConnectionStatus('disconnected');
     } finally {
       setIsLoading(false);
     }
