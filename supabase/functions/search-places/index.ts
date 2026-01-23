@@ -22,6 +22,43 @@ interface PlaceResult {
   };
 }
 
+// Fetch place details with timeout
+async function fetchPlaceDetails(
+  placeId: string, 
+  apiKey: string, 
+  timeoutMs = 3000
+): Promise<{ phone?: string; website?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const detailsUrl = new URL('https://maps.googleapis.com/maps/api/place/details/json');
+    detailsUrl.searchParams.set('place_id', placeId);
+    detailsUrl.searchParams.set('fields', 'formatted_phone_number,website,international_phone_number');
+    detailsUrl.searchParams.set('key', apiKey);
+    
+    const response = await fetch(detailsUrl.toString(), { signal: controller.signal });
+    const data = await response.json();
+    
+    if (data.status === 'OK' && data.result) {
+      let website = data.result.website;
+      if (website) {
+        website = website.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      }
+      return {
+        phone: data.result.formatted_phone_number || data.result.international_phone_number,
+        website,
+      };
+    }
+    return {};
+  } catch (error) {
+    // Timeout or network error - return empty details
+    return {};
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -122,38 +159,24 @@ serve(async (req) => {
       );
     }
 
-    const places: PlaceResult[] = [];
-    
-    // Get details for each place (up to 20 results)
+    // Process up to 20 results
     const placesToProcess = (textSearchData.results || []).slice(0, 20);
     
-    for (const place of placesToProcess) {
-      // Get place details for phone and website
-      const detailsUrl = new URL('https://maps.googleapis.com/maps/api/place/details/json');
-      detailsUrl.searchParams.set('place_id', place.place_id);
-      detailsUrl.searchParams.set('fields', 'formatted_phone_number,website,international_phone_number');
-      detailsUrl.searchParams.set('key', apiKey);
+    // OPTIMIZATION: Fetch all place details in PARALLEL with Promise.allSettled
+    console.log(`Fetching details for ${placesToProcess.length} places in parallel...`);
+    
+    const detailsPromises = placesToProcess.map((place: any) => 
+      fetchPlaceDetails(place.place_id, apiKey)
+    );
+    
+    const detailsResults = await Promise.allSettled(detailsPromises);
+    
+    // Build places array with details
+    const places: PlaceResult[] = placesToProcess.map((place: any, index: number) => {
+      const detailsResult = detailsResults[index];
+      const details = detailsResult.status === 'fulfilled' ? detailsResult.value : {};
       
-      let phone: string | undefined;
-      let website: string | undefined;
-      
-      try {
-        const detailsResponse = await fetch(detailsUrl.toString());
-        const detailsData = await detailsResponse.json();
-        
-        if (detailsData.status === 'OK' && detailsData.result) {
-          phone = detailsData.result.formatted_phone_number || detailsData.result.international_phone_number;
-          website = detailsData.result.website;
-          // Clean up website URL
-          if (website) {
-            website = website.replace(/^https?:\/\//, '').replace(/\/$/, '');
-          }
-        }
-      } catch (detailError) {
-        console.error('Error fetching place details:', detailError);
-      }
-      
-      places.push({
+      return {
         id: place.place_id,
         placeId: place.place_id,
         name: place.name,
@@ -161,14 +184,14 @@ serve(async (req) => {
         category: place.types?.[0] || 'business',
         rating: place.rating,
         userRatingsTotal: place.user_ratings_total,
-        phone,
-        website,
+        phone: details.phone,
+        website: details.website,
         location: place.geometry?.location ? {
           lat: place.geometry.location.lat,
           lng: place.geometry.location.lng,
         } : undefined,
-      });
-    }
+      };
+    });
 
     console.log('Returning', places.length, 'places with details');
     

@@ -24,6 +24,8 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useLeads } from '@/hooks/useLeads';
+import { useAuth } from '@/hooks/useAuth';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const businessCategories = [
   { value: 'all', label: 'Todas las categorías' },
@@ -65,8 +67,32 @@ export function ProspectingPanel() {
   const [addingLeadId, setAddingLeadId] = useState<string | null>(null);
   const [isAddingAll, setIsAddingAll] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
-  const { addLead, isAddingLead } = useLeads();
+  const { user } = useAuth();
+  const { addLead, importLeads, isAddingLead, isImportingLeads } = useLeads();
+
+  // Toggle selection for a single result
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Select/deselect all
+  const toggleSelectAll = () => {
+    if (selectedIds.size === results.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(results.map(r => r.id)));
+    }
+  };
 
   const handleSearch = async (isLoadMore = false) => {
     if (!location.trim()) {
@@ -164,51 +190,57 @@ export function ProspectingPanel() {
     });
   };
 
+  // OPTIMIZED: Bulk insert using importLeads (single DB call)
   const handleAddAllToLeads = () => {
-    const toAdd = results.slice(0, 10); // Limit to 10 at a time
-    setIsAddingAll(true);
-    let added = 0;
-    let processed = 0;
+    // Get selected results, or all results if none selected
+    const toAdd = selectedIds.size > 0 
+      ? results.filter(r => selectedIds.has(r.id))
+      : results;
     
-    toAdd.forEach((place) => {
+    if (toAdd.length === 0) {
+      toast.error('No hay empresas seleccionadas para añadir');
+      return;
+    }
+    
+    setIsAddingAll(true);
+    
+    // Format all leads for bulk insert
+    const leadsToInsert = toAdd.map(place => {
       const addressParts = place.address.split(',');
       const city = addressParts.length > 1 
         ? addressParts[addressParts.length - 2]?.trim() || 'Málaga'
         : 'Málaga';
-
-      addLead({
+      
+      return {
         companyName: place.name,
         address: place.address,
         city: city,
         phone: place.phone || undefined,
         website: place.website ? `https://${place.website}` : undefined,
-        source: 'google_maps',
-        status: 'nuevo',
-        segment: 'pyme',
+        source: 'google_maps' as const,
+        status: 'nuevo' as const,
+        segment: 'pyme' as const,
         latitude: place.location?.lat,
         longitude: place.location?.lng,
         notes: place.rating ? `Rating: ${place.rating}/5 (${place.userRatingsTotal || 0} reseñas)` : undefined,
-      }, {
-        onSuccess: () => {
-          added++;
-          processed++;
-          if (processed === toAdd.length) {
-            toast.success(`${added} empresas añadidas a leads`);
-            setResults(prev => prev.filter(p => !toAdd.some(t => t.id === p.id)));
-            setIsAddingAll(false);
-          }
-        },
-        onError: () => {
-          processed++;
-          if (processed === toAdd.length) {
-            if (added > 0) {
-              toast.success(`${added} empresas añadidas a leads`);
-              setResults(prev => prev.filter(p => !toAdd.some(t => t.id === p.id)));
-            }
-            setIsAddingAll(false);
-          }
-        },
-      });
+      };
+    });
+    
+    // Single bulk insert call
+    importLeads(leadsToInsert, {
+      onSuccess: () => {
+        toast.success(`${leadsToInsert.length} empresas añadidas a leads`);
+        // Remove added results from the list
+        const addedIds = new Set(toAdd.map(p => p.id));
+        setResults(prev => prev.filter(p => !addedIds.has(p.id)));
+        setSelectedIds(new Set());
+        setIsAddingAll(false);
+      },
+      onError: (error) => {
+        console.error('Bulk insert error:', error);
+        toast.error('Error al añadir las empresas. Inténtalo de nuevo.');
+        setIsAddingAll(false);
+      },
     });
   };
 
@@ -328,21 +360,51 @@ export function ProspectingPanel() {
       {/* Results */}
       {hasSearched && !error && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              Resultados {results.length > 0 && `(${results.length})`}
-            </h2>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-foreground">
+                Resultados {results.length > 0 && `(${results.length})`}
+              </h2>
+              {selectedIds.size > 0 && (
+                <span className="text-sm text-primary font-medium">
+                  {selectedIds.size} seleccionados
+                </span>
+              )}
+            </div>
             {results.length > 0 && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-2"
-                onClick={handleAddAllToLeads}
-                disabled={isAddingAll || isAddingLead}
-              >
-                <Plus className="w-4 h-4" />
-                Añadir todos a Leads
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={toggleSelectAll}
+                  className="gap-2"
+                >
+                  <Checkbox 
+                    checked={selectedIds.size === results.length && results.length > 0}
+                    className="pointer-events-none"
+                  />
+                  {selectedIds.size === results.length ? 'Deseleccionar' : 'Seleccionar'} todos
+                </Button>
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  className="gap-2"
+                  onClick={handleAddAllToLeads}
+                  disabled={isAddingAll || isImportingLeads}
+                >
+                  {isAddingAll || isImportingLeads ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Guardando {selectedIds.size > 0 ? selectedIds.size : results.length}...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Añadir {selectedIds.size > 0 ? `${selectedIds.size} seleccionados` : 'todos'} a Leads
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
 
@@ -359,10 +421,21 @@ export function ProspectingPanel() {
               {results.map((result) => (
                 <div
                   key={result.id}
-                  className="bg-card rounded-xl p-5 border border-border shadow-card hover:shadow-lg transition-all animate-slide-up"
+                  className={`bg-card rounded-xl p-5 border shadow-card hover:shadow-lg transition-all animate-slide-up cursor-pointer ${
+                    selectedIds.has(result.id) 
+                      ? 'border-primary ring-2 ring-primary/20' 
+                      : 'border-border'
+                  }`}
+                  onClick={() => toggleSelection(result.id)}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
+                      <Checkbox 
+                        checked={selectedIds.has(result.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onCheckedChange={() => toggleSelection(result.id)}
+                        className="flex-shrink-0"
+                      />
                       <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center">
                         <Building2 className="w-6 h-6 text-primary" />
                       </div>
@@ -375,7 +448,7 @@ export function ProspectingPanel() {
                       </div>
                     </div>
                     {result.rating && (
-                      <div className="flex items-center gap-1 text-sm font-medium text-amber-500 flex-shrink-0">
+                      <div className="flex items-center gap-1 text-sm font-medium text-accent flex-shrink-0">
                         <Star className="w-4 h-4 fill-current" />
                         {result.rating}
                         {result.userRatingsTotal && (
