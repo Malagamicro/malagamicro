@@ -299,8 +299,10 @@ export type Database = {
           last_contacted_at: string | null
           latitude: number | null
           longitude: number | null
+          mobile_phone: string | null
           notes: string | null
           phone: string | null
+          phone_type: string | null
           score: number | null
           segment: string
           source: string
@@ -309,6 +311,7 @@ export type Database = {
           updated_at: string
           user_id: string
           website: string | null
+          whatsapp_verified: boolean | null
         }
         Insert: {
           address?: string | null
@@ -324,8 +327,10 @@ export type Database = {
           last_contacted_at?: string | null
           latitude?: number | null
           longitude?: number | null
+          mobile_phone?: string | null
           notes?: string | null
           phone?: string | null
+          phone_type?: string | null
           score?: number | null
           segment?: string
           source?: string
@@ -334,6 +339,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           website?: string | null
+          whatsapp_verified?: boolean | null
         }
         Update: {
           address?: string | null
@@ -349,8 +355,10 @@ export type Database = {
           last_contacted_at?: string | null
           latitude?: number | null
           longitude?: number | null
+          mobile_phone?: string | null
           notes?: string | null
           phone?: string | null
+          phone_type?: string | null
           score?: number | null
           segment?: string
           source?: string
@@ -359,6 +367,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           website?: string | null
+          whatsapp_verified?: boolean | null
         }
         Relationships: [
           {
