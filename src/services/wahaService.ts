@@ -149,66 +149,90 @@ export async function getSessionStatus(): Promise<SessionInfo | null> {
 
 export async function getSessionQrCode(): Promise<string | null> {
   try {
-    // WAHA endpoint for QR (most versions): /api/sessions/{session}/auth/qr
-    // Try different formats
+    // WAHA QR endpoint varies by version.
+    // Common variants:
+    // - GET/POST /api/{session}/auth/qr?format=raw
+    // - GET/POST /api/{session}/auth/qr (image)
+    // Some setups also expose /api/sessions/{session}/auth/qr.
+    // We try the most likely ones first.
 
-    // Format 1: /api/{session}/auth/qr?format=raw (returns text)
-    try {
-      const textResponse = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr?format=raw`, {
-        headers: {
-          'X-Api-Key': WAHA_API_KEY,
-        },
-      });
+    const candidates = [
+      // Most common (per WAHA docs)
+      { method: 'GET', url: `${WAHA_API_URL}/api/${SESSION_NAME}/auth/qr?format=raw`, accept: 'text/plain' },
+      { method: 'POST', url: `${WAHA_API_URL}/api/${SESSION_NAME}/auth/qr?format=raw`, accept: 'text/plain' },
 
-      if (textResponse.ok) {
-        const text = await textResponse.text();
+      // Some installations
+      { method: 'GET', url: `${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr?format=raw`, accept: 'text/plain' },
+      { method: 'POST', url: `${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr?format=raw`, accept: 'text/plain' },
+    ] as const;
+
+    for (const c of candidates) {
+      try {
+        const res = await fetch(c.url, {
+          method: c.method,
+          headers: {
+            'X-Api-Key': WAHA_API_KEY,
+            Accept: c.accept,
+          },
+        });
+
+        if (!res.ok) continue;
+
+        const contentType = res.headers.get('content-type') || '';
+
+        // JSON response (some versions)
+        if (contentType.includes('application/json')) {
+          const json = await res.json().catch(() => null);
+          const qr =
+            (typeof json?.qr === 'string' && json.qr) ||
+            (typeof json?.value === 'string' && json.value) ||
+            (typeof json?.data === 'string' && json.data) ||
+            (typeof json?.qr?.value === 'string' && json.qr.value) ||
+            (typeof json?.qr?.data === 'string' && json.qr.data) ||
+            null;
+          if (qr && qr.length > 10) return qr;
+          continue;
+        }
+
+        // Text response
+        const text = await res.text();
         if (text && text.length > 10 && !text.includes('<!DOCTYPE')) {
-          console.log('QR obtained as raw text');
           return text;
         }
+      } catch {
+        // keep trying
       }
-    } catch (e) {
-      console.log('Raw QR format not available');
     }
 
-    // Format 2: /api/{session}/auth/qr (returns image)
-    try {
-      const imageResponse = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr`, {
-        headers: {
-          'X-Api-Key': WAHA_API_KEY,
-          'Accept': 'image/png',
-        },
-      });
+    // Image QR variant
+    const imageCandidates = [
+      { method: 'GET', url: `${WAHA_API_URL}/api/${SESSION_NAME}/auth/qr` },
+      { method: 'POST', url: `${WAHA_API_URL}/api/${SESSION_NAME}/auth/qr` },
+      { method: 'GET', url: `${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr` },
+      { method: 'POST', url: `${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr` },
+    ] as const;
 
-      if (imageResponse.ok) {
-        const contentType = imageResponse.headers.get('content-type');
-        if (contentType?.includes('image')) {
-          const blob = await imageResponse.blob();
-          console.log('QR obtained as image');
-          return `image:${URL.createObjectURL(blob)}`;
-        }
+    for (const c of imageCandidates) {
+      try {
+        const res = await fetch(c.url, {
+          method: c.method,
+          headers: {
+            'X-Api-Key': WAHA_API_KEY,
+            Accept: 'image/png',
+          },
+        });
+
+        if (!res.ok) continue;
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('image')) continue;
+
+        const blob = await res.blob();
+        if (blob.size < 1000) continue;
+
+        return `image:${URL.createObjectURL(blob)}`;
+      } catch {
+        // keep trying
       }
-    } catch (e) {
-      console.log('Image QR format not available');
-    }
-
-    // Format 3: /api/screenshot?session={session} (some WAHA versions)
-    try {
-      const screenshotResponse = await fetch(`${WAHA_API_URL}/api/screenshot?session=${SESSION_NAME}`, {
-        headers: {
-          'X-Api-Key': WAHA_API_KEY,
-        },
-      });
-
-      if (screenshotResponse.ok) {
-        const blob = await screenshotResponse.blob();
-        if (blob.size > 1000) {
-          console.log('QR obtained via screenshot');
-          return `image:${URL.createObjectURL(blob)}`;
-        }
-      }
-    } catch (e) {
-      console.log('Screenshot not available');
     }
 
     console.log('No QR code available');

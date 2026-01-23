@@ -33,6 +33,7 @@ export function WahaSessionManager() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [qrLoading, setQrLoading] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -79,6 +80,23 @@ export function WahaSessionManager() {
       setLoading(false);
     }
   }, []);
+
+  const handleRefreshQr = useCallback(async () => {
+    if (status !== 'SCAN_QR_CODE') return;
+    setQrLoading(true);
+    try {
+      const qr = await getSessionQrCode();
+      setQrCode(qr);
+      if (!qr) {
+        toast.error('Aún no hay QR disponible. Intenta reiniciar la sesión.');
+      }
+    } catch (e) {
+      console.error('Error refreshing QR:', e);
+      toast.error('Error al actualizar el QR');
+    } finally {
+      setQrLoading(false);
+    }
+  }, [status]);
 
   const handleCreateSession = async () => {
     setActionLoading(true);
@@ -344,6 +362,15 @@ export function WahaSessionManager() {
                 Escanea este código QR con WhatsApp en tu teléfono
               </p>
               {renderQrCode()}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshQr}
+                disabled={actionLoading || qrLoading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${qrLoading ? 'animate-spin' : ''}`} />
+                Actualizar QR
+              </Button>
               <p className="text-xs text-muted-foreground">
                 El código se actualiza automáticamente cada 5 segundos
               </p>
