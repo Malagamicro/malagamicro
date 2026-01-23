@@ -115,8 +115,42 @@ export function useLeads() {
         });
       }
     },
+    // Optimistic update - update local cache immediately
+    onMutate: async ({ id, status }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['leads'] });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(['leads']);
+
+      // Optimistically update the cache
+      queryClient.setQueryData(['leads'], (oldData: any) => {
+        if (!oldData?.pages) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: LeadsPage) => ({
+            ...page,
+            leads: page.leads.map((lead: Lead) =>
+              lead.id === id ? { ...lead, status } : lead
+            ),
+          })),
+        };
+      });
+
+      return { previousData };
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(['leads'], context.previousData);
+      }
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el estado del lead.',
+        variant: 'destructive',
+      });
+    },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['lead-activities', variables.id] });
       // Audit log
       if (variables.previousStatus) {
@@ -127,12 +161,9 @@ export function useLeads() {
         description: 'El estado del lead ha sido actualizado correctamente.',
       });
     },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar el estado del lead.',
-        variant: 'destructive',
-      });
+    onSettled: () => {
+      // Refetch after mutation settles to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
     },
   });
 
