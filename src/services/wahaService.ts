@@ -20,11 +20,8 @@ export interface SessionInfo {
     id: string;
     pushName: string;
   };
-  // QR code can be in the response directly
-  qr?: {
-    value?: string;
-    data?: string;
-  };
+  // QR code comes directly in the session response when status is SCAN_QR_CODE
+  qr?: string;
 }
 
 export interface SendTextPayload {

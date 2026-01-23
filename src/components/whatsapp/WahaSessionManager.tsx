@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { QRCodeSVG } from 'qrcode.react';
-import { 
+import {
   Loader2, 
   CheckCircle2, 
   XCircle, 
@@ -17,7 +17,6 @@ import {
 import { toast } from 'sonner';
 import {
   getSessionStatus,
-  getSessionQrCode,
   createSession,
   startSession,
   stopSession,
@@ -46,21 +45,17 @@ export function WahaSessionManager() {
         return;
       }
 
+      console.log('📱 Session data:', data);
       setSessionInfo(data);
       setStatus(data.status);
+      setLoading(false);
 
-      // If status is SCAN_QR_CODE, fetch the QR
-      if (data.status === 'SCAN_QR_CODE') {
-        // Don't show loading spinner when refreshing QR
-        setLoading(false);
-        
-        const qr = await getSessionQrCode();
-        if (qr) {
-          setQrCode(qr);
-        }
+      // If status is SCAN_QR_CODE, the QR comes directly in the response
+      if (data.status === 'SCAN_QR_CODE' && data.qr) {
+        console.log('📲 QR from session response:', data.qr.substring(0, 50) + '...');
+        setQrCode(data.qr);
       } else {
         setQrCode(null);
-        setLoading(false);
       }
     } catch (error) {
       console.error('Error fetching session status:', error);
@@ -202,27 +197,14 @@ export function WahaSessionManager() {
       return (
         <div className="w-64 h-64 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Cargando QR...</p>
+          <p className="text-sm text-muted-foreground">Esperando QR de WhatsApp...</p>
         </div>
       );
     }
 
-    // Check if it's an image URL (prefixed with "image:")
-    if (qrCode.startsWith('image:')) {
-      return (
-        <div className="bg-white p-4 rounded-lg">
-          <img 
-            src={qrCode.replace('image:', '')} 
-            alt="WhatsApp QR Code" 
-            className="w-64 h-64 object-contain"
-          />
-        </div>
-      );
-    }
-
-    // Otherwise it's raw QR data, render with qrcode.react
+    // The QR from WAHA is raw text that can be rendered with qrcode.react
     return (
-      <div className="bg-white p-4 rounded-lg">
+      <div className="bg-white p-4 rounded-lg shadow-lg">
         <QRCodeSVG 
           value={qrCode} 
           size={256}
