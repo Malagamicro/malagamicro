@@ -12,7 +12,9 @@ import {
   Sparkles,
   Phone,
   Star,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  Info
 } from 'lucide-react';
 import {
   Select,
@@ -26,6 +28,15 @@ import { toast } from 'sonner';
 import { useLeads } from '@/hooks/useLeads';
 import { useAuth } from '@/hooks/useAuth';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Progress } from '@/components/ui/progress';
 
 const businessCategories = [
   { value: 'all', label: 'Todas las categorías' },
@@ -69,6 +80,11 @@ export function ProspectingPanel() {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
+  // Deep Search Mode
+  const [deepSearchEnabled, setDeepSearchEnabled] = useState(false);
+  const [deepSearchProgress, setDeepSearchProgress] = useState(0);
+  const [deepSearchStatus, setDeepSearchStatus] = useState('');
+  
   const { user } = useAuth();
   const { addLead, importLeads, isAddingLead, isImportingLeads } = useLeads();
 
@@ -108,9 +124,17 @@ export function ProspectingPanel() {
       setError(null);
       setResults([]);
       setNextPageToken(null);
+      setDeepSearchProgress(0);
+      setDeepSearchStatus('');
     }
     
     try {
+      // If Deep Search is enabled and NOT loading more, do grid search
+      if (deepSearchEnabled && !isLoadMore) {
+        await handleDeepSearch();
+        return;
+      }
+
       const { data, error: fnError } = await supabase.functions.invoke('search-places', {
         body: {
           query: searchQuery,
@@ -153,6 +177,80 @@ export function ProspectingPanel() {
     } finally {
       setIsSearching(false);
       setIsLoadingMore(false);
+    }
+  };
+
+  // Deep Search: Grid Search Strategy (2x2 grid = 4 searches)
+  const handleDeepSearch = async () => {
+    setDeepSearchProgress(0);
+    setDeepSearchStatus('Iniciando búsqueda profunda...');
+    
+    // Create 4 sub-zone queries by appending directional modifiers
+    const subZones = [
+      `${location} norte`,
+      `${location} sur`,
+      `${location} este`,
+      `${location} oeste`,
+    ];
+
+    const allResults = new Map<string, PlaceResult>();
+    let completedZones = 0;
+
+    try {
+      // Execute all 4 searches in parallel
+      const searchPromises = subZones.map(async (zone, index) => {
+        setDeepSearchStatus(`Escaneando cuadrante ${index + 1} de 4...`);
+        
+        const { data, error: fnError } = await supabase.functions.invoke('search-places', {
+          body: {
+            query: searchQuery,
+            location: zone,
+            category: category,
+            deepSearch: true,
+          },
+        });
+
+        completedZones++;
+        setDeepSearchProgress((completedZones / 4) * 100);
+
+        if (fnError || data?.error) {
+          console.warn(`Error in zone ${zone}:`, fnError || data?.error);
+          return [];
+        }
+
+        return data?.places || [];
+      });
+
+      const resultsArrays = await Promise.allSettled(searchPromises);
+      
+      // Deduplicate by placeId
+      resultsArrays.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          result.value.forEach((place: PlaceResult) => {
+            if (!allResults.has(place.placeId)) {
+              allResults.set(place.placeId, place);
+            }
+          });
+        }
+      });
+
+      const deduplicatedResults = Array.from(allResults.values());
+      setResults(deduplicatedResults);
+      
+      if (deduplicatedResults.length === 0) {
+        toast.info('No se encontraron resultados en la búsqueda profunda');
+      } else {
+        toast.success(`Búsqueda profunda: ${deduplicatedResults.length} empresas encontradas (4 cuadrantes)`);
+      }
+      
+      setNextPageToken(null); // No pagination in deep search
+      setDeepSearchStatus('');
+    } catch (err) {
+      console.error('Deep search error:', err);
+      setError('Error en la búsqueda profunda. Inténtalo de nuevo.');
+    } finally {
+      setIsSearching(false);
+      setDeepSearchProgress(0);
     }
   };
 
@@ -325,7 +423,32 @@ export function ProspectingPanel() {
           </div>
         </div>
 
-        <div className="flex justify-end mt-6">
+        {/* Deep Search Toggle */}
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
+          <div className="flex items-center gap-3">
+            <Switch
+              id="deep-search"
+              checked={deepSearchEnabled}
+              onCheckedChange={setDeepSearchEnabled}
+            />
+            <Label htmlFor="deep-search" className="flex items-center gap-2 cursor-pointer">
+              <Zap className={`w-4 h-4 ${deepSearchEnabled ? 'text-amber-500' : 'text-muted-foreground'}`} />
+              <span className={deepSearchEnabled ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                Búsqueda Profunda (4x)
+              </span>
+            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Divide la zona en 4 cuadrantes para encontrar hasta 400% más resultados. Consume más cuota de API.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          
           <Button 
             onClick={() => handleSearch(false)} 
             disabled={isSearching}
@@ -334,16 +457,27 @@ export function ProspectingPanel() {
             {isSearching ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Buscando en Google Maps...
+                {deepSearchEnabled ? 'Búsqueda profunda...' : 'Buscando...'}
               </>
             ) : (
               <>
-                <Search className="w-4 h-4" />
-                Buscar Empresas
+                {deepSearchEnabled ? <Zap className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+                {deepSearchEnabled ? 'Búsqueda Profunda' : 'Buscar Empresas'}
               </>
             )}
           </Button>
         </div>
+        
+        {/* Deep Search Progress */}
+        {isSearching && deepSearchEnabled && (
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{deepSearchStatus}</span>
+              <span className="font-medium">{Math.round(deepSearchProgress)}%</span>
+            </div>
+            <Progress value={deepSearchProgress} className="h-2" />
+          </div>
+        )}
       </div>
 
       {/* Error Message */}

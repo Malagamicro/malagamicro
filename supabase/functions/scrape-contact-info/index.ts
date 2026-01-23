@@ -26,6 +26,14 @@ const MEDIUM_PRIORITY_KEYWORDS = ['legal', 'aviso-legal', 'politica', 'privacy',
 const LOW_PRIORITY_KEYWORDS = ['sobre-nosotros', 'about', 'about-us', 'equipo', 'team', 'quienes-somos', 'empresa', 'company'];
 const IGNORE_KEYWORDS = ['blog', 'producto', 'product', 'categoria', 'category', 'tienda', 'shop', 'cart', 'carrito', 'login', 'registro', 'search'];
 
+// Discovery/fuzzing paths to try if no email/phone found
+const DISCOVERY_PATHS = [
+  '/contacto', '/contact', '/contact-us', '/contactenos',
+  '/sobre-nosotros', '/about', '/about-us', '/quienes-somos',
+  '/aviso-legal', '/legal', '/politica-privacidad', '/privacy-policy',
+  '/sitemap.xml',
+];
+
 // Social media patterns
 const SOCIAL_PATTERNS = {
   facebook: /(?:facebook\.com|fb\.com)\/[a-zA-Z0-9._-]+/gi,
@@ -122,12 +130,12 @@ function extractInternalLinks($: cheerio.CheerioAPI, baseUrl: string): { url: st
     }
   });
   
-  // Sort by score and return top candidates
+  // Sort by score and return top candidates (increased to 10 pages max)
   return Array.from(links.entries())
     .map(([url, score]) => ({ url, score }))
     .filter(item => item.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+    .slice(0, 10);
 }
 
 function cleanHtml($: cheerio.CheerioAPI): string {
@@ -533,6 +541,48 @@ Deno.serve(async (req) => {
           allData.whatsapp.push(...data.whatsapp);
           allData.socials.push(...data.socials);
           console.log(`✅ Extracted from ${pageUrl}`);
+        }
+      });
+    }
+
+    // === STEP 4B: Discovery/Fuzzing Phase - if no emails/phones found ===
+    const filteredEmails = filterEmails(allData.emails);
+    const filteredPhones = filterPhones(allData.phones);
+    
+    if (filteredEmails.length === 0 || filteredPhones.length === 0) {
+      console.log('🔎 No contacts found, trying discovery paths...');
+      
+      const baseUrl = getBaseUrl(formattedUrl);
+      const discoveryPromises = DISCOVERY_PATHS
+        .filter(path => !scannedUrls.some(u => u.includes(path)))
+        .slice(0, 10) // Max 10 more paths
+        .map(async (path) => {
+          const fullUrl = `${baseUrl}${path}`;
+          try {
+            // Use HEAD request first to check if page exists
+            const headResponse = await fetchWithTimeout(fullUrl, 2000);
+            if (headResponse && headResponse.ok) {
+              const html = await headResponse.text();
+              const data = await extractFromPage(html);
+              return { url: fullUrl, data, success: true };
+            }
+            return { url: fullUrl, success: false };
+          } catch {
+            return { url: fullUrl, success: false };
+          }
+        });
+
+      const discoveryResults = await Promise.allSettled(discoveryPromises);
+      
+      discoveryResults.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value.success && result.value.data) {
+          const { url: pageUrl, data } = result.value;
+          scannedUrls.push(pageUrl);
+          allData.emails.push(...data.emails);
+          allData.phones.push(...data.phones);
+          allData.whatsapp.push(...data.whatsapp);
+          allData.socials.push(...data.socials);
+          console.log(`🔍 Discovery hit: ${pageUrl}`);
         }
       });
     }

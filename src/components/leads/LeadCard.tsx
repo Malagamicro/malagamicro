@@ -1,7 +1,7 @@
 import { Lead } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
 import { LeadScoreBadge } from './LeadScoreBadge';
-import { Building2, MapPin, Phone, Mail, Monitor } from 'lucide-react';
+import { Building2, MapPin, Phone, Mail, Monitor, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LeadCardProps {
@@ -10,6 +10,12 @@ interface LeadCardProps {
 }
 
 export function LeadCard({ lead, onClick }: LeadCardProps) {
+  // Build Google Maps URL for address
+  const getMapsUrl = () => {
+    const query = lead.address || lead.city;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  };
+
   return (
     <div
       onClick={onClick}
@@ -28,10 +34,20 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
             <h3 className="font-semibold text-foreground leading-tight">
               {lead.companyName}
             </h3>
-            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-              <MapPin className="w-3 h-3" />
-              {lead.city}
-            </p>
+            {/* Clickable address link */}
+            <a
+              href={getMapsUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5 hover:text-primary hover:underline transition-colors"
+            >
+              <MapPin className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate max-w-[180px]">
+                {lead.address || lead.city || 'Sin dirección'}
+              </span>
+              <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-100" />
+            </a>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -51,13 +67,12 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
             {lead.email}
           </p>
         )}
-        {/* Phone icon hidden per TAREA 1.2 */}
-        {/* {lead.phone && (
+        {lead.phone && (
           <p className="flex items-center gap-2">
             <Phone className="w-4 h-4 flex-shrink-0" />
             {lead.phone}
           </p>
-        )} */}
+        )}
         {lead.equipmentCount && (
           <p className="flex items-center gap-2">
             <Monitor className="w-4 h-4 flex-shrink-0" />

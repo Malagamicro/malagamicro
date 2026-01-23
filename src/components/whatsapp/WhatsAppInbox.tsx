@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Search, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Chat {
   id: string;
@@ -24,6 +26,7 @@ interface WhatsAppInboxProps {
 }
 
 export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxProps) {
+  const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,8 +88,35 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
     
     // Poll for new messages every 10 seconds
     const interval = setInterval(fetchChats, 10000);
+    
+    // Subscribe to realtime updates from waha_messages table
+    if (user) {
+      const channel = supabase
+        .channel('waha-inbox-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'waha_messages',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('📩 New message received via realtime:', payload);
+            // Refresh chats when a new message arrives
+            fetchChats();
+          }
+        )
+        .subscribe();
+      
+      return () => {
+        clearInterval(interval);
+        supabase.removeChannel(channel);
+      };
+    }
+    
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const filteredChats = chats.filter(chat =>
     chat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -443,6 +443,44 @@ export function useLeads() {
     },
   });
 
+  // BULK DELETE leads
+  const bulkDeleteLeads = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!user?.id) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      // Delete in batches of 50 to avoid potential issues
+      const chunkSize = 50;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const { error } = await supabase
+          .from('leads')
+          .delete()
+          .in('id', chunk);
+        
+        if (error) throw error;
+      }
+      
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast({
+        title: 'Leads eliminados',
+        description: `Se han eliminado ${count} leads correctamente.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: 'No se pudieron eliminar los leads.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     leads,
     totalCount,
@@ -460,6 +498,7 @@ export function useLeads() {
     importLeads: importLeads.mutate,
     geocodeLead: geocodeLead.mutate,
     bulkGeocode: bulkGeocode.mutate,
+    bulkDeleteLeads: bulkDeleteLeads.mutate,
     // Loading states
     isAddingLead: addLead.isPending,
     isUpdatingLead: updateLead.isPending,
@@ -467,6 +506,7 @@ export function useLeads() {
     isImportingLeads: importLeads.isPending,
     isGeocodingLead: geocodeLead.isPending,
     isBulkGeocoding: bulkGeocode.isPending,
+    isBulkDeleting: bulkDeleteLeads.isPending,
   };
 }
 

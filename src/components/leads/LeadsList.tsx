@@ -18,6 +18,8 @@ import {
   MessageSquare,
   Loader2,
   FolderOpen,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Select,
@@ -32,10 +34,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { exportToCSV, exportToExcel } from '@/lib/exportLeads';
 import { toast } from 'sonner';
 import { WhatsAppBulkModal } from './WhatsAppBulkModal';
 import { useLeadFolders, type LeadFolder } from '@/hooks/useLeadFolders';
+import { useLeads } from '@/hooks/useLeads';
 
 type SortOption = 'recent' | 'score' | 'name';
 
@@ -62,6 +75,7 @@ export function LeadsList({
   onLoadMore,
 }: LeadsListProps) {
   const { folders } = useLeadFolders();
+  const { bulkDeleteLeads, isBulkDeleting } = useLeads();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [segmentFilter, setSegmentFilter] = useState<LeadSegment | 'all'>('all');
@@ -70,6 +84,7 @@ export function LeadsList({
   const [sortBy, setSortBy] = useState<SortOption>('score');
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const filteredAndSortedLeads = useMemo(() => {
     const filtered = leads.filter((lead) => {
@@ -119,8 +134,57 @@ export function LeadsList({
   const selectedLeads = leads.filter(lead => selectedLeadIds.includes(lead.id));
   const allSelected = selectedLeadIds.length === filteredAndSortedLeads.length && filteredAndSortedLeads.length > 0;
 
+  // Bulk delete handler
+  const handleBulkDelete = () => {
+    bulkDeleteLeads(selectedLeadIds, {
+      onSuccess: () => {
+        setSelectedLeadIds([]);
+        setShowDeleteConfirm(false);
+      },
+    });
+  };
+
   return (
     <div className="p-8 space-y-6 animate-fade-in">
+      {/* Floating bulk action bar */}
+      {selectedLeadIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-card border border-border shadow-lg rounded-xl px-4 py-3 flex items-center gap-4 animate-slide-up">
+          <span className="text-sm font-medium text-foreground">
+            {selectedLeadIds.length} leads seleccionados
+          </span>
+          <div className="h-6 w-px bg-border" />
+          <Button 
+            onClick={() => setShowWhatsAppModal(true)} 
+            size="sm"
+            className="gap-2 bg-green-600 hover:bg-green-700"
+          >
+            <MessageSquare className="w-4 h-4" />
+            WhatsApp
+          </Button>
+          <Button 
+            onClick={() => setShowDeleteConfirm(true)} 
+            size="sm"
+            variant="destructive"
+            className="gap-2"
+            disabled={isBulkDeleting}
+          >
+            {isBulkDeleting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+            Eliminar
+          </Button>
+          <Button 
+            onClick={() => setSelectedLeadIds([])} 
+            size="sm"
+            variant="ghost"
+          >
+            Cancelar
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -135,15 +199,6 @@ export function LeadsList({
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {selectedLeadIds.length > 0 && (
-            <Button 
-              onClick={() => setShowWhatsAppModal(true)} 
-              className="gap-2 bg-green-600 hover:bg-green-700"
-            >
-              <MessageSquare className="w-4 h-4" />
-              WhatsApp ({selectedLeadIds.length})
-            </Button>
-          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2" disabled={leads.length === 0}>
@@ -395,6 +450,41 @@ export function LeadsList({
           setShowWhatsAppModal(false);
         }}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Eliminar {selectedLeadIds.length} leads
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminarán permanentemente los {selectedLeadIds.length} leads seleccionados junto con todas sus actividades y recordatorios asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isBulkDeleting}
+            >
+              {isBulkDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Eliminar {selectedLeadIds.length} leads
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
