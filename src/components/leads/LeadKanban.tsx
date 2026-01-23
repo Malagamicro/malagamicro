@@ -54,10 +54,10 @@ export function LeadKanban({ leads, onViewLead, onUpdateStatus }: LeadKanbanProp
           return (
             <div
               key={column.id}
-              className="flex-shrink-0 w-80 bg-muted/30 rounded-xl border border-border"
+              className="flex-shrink-0 w-80 bg-muted/30 rounded-xl border border-border flex flex-col max-h-[calc(100vh-180px)]"
             >
               {/* Column Header */}
-              <div className="p-4 border-b border-border">
+              <div className="p-4 border-b border-border flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className={cn('w-3 h-3 rounded-full', column.color)} />
@@ -69,16 +69,17 @@ export function LeadKanban({ leads, onViewLead, onUpdateStatus }: LeadKanbanProp
                 </div>
               </div>
 
-              {/* Droppable Column */}
+              {/* Droppable Column with scroll */}
               <Droppable droppableId={column.id}>
                 {(provided, snapshot) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     className={cn(
-                      'p-2 min-h-[200px] transition-colors',
+                      'p-2 min-h-[200px] transition-colors flex-1 overflow-y-auto overflow-x-hidden',
                       snapshot.isDraggingOver && 'bg-primary/5'
                     )}
+                    style={{ maxHeight: 'calc(100vh - 280px)' }}
                   >
                     {columnLeads.map((lead, index) => (
                       <Draggable key={lead.id} draggableId={lead.id} index={index}>
