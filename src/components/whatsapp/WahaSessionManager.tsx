@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import {
   getSessionStatus,
+  getSessionQrCode,
   createSession,
   startSession,
   stopSession,
@@ -50,13 +51,28 @@ export function WahaSessionManager() {
       setStatus(data.status);
       setLoading(false);
 
-      // If status is SCAN_QR_CODE, the QR comes directly in the response
-      if (data.status === 'SCAN_QR_CODE' && data.qr) {
-        console.log('📲 QR from session response:', data.qr.substring(0, 50) + '...');
-        setQrCode(data.qr);
-      } else {
-        setQrCode(null);
+      // If status is SCAN_QR_CODE, obtain the WhatsApp login QR.
+      // Some WAHA versions return it directly in `qr`, others require calling /auth/qr.
+      if (data.status === 'SCAN_QR_CODE') {
+        const directQr =
+          typeof (data as any).qr === 'string'
+            ? ((data as any).qr as string)
+            : ((data as any).qr?.value as string | undefined) ||
+              ((data as any).qr?.data as string | undefined) ||
+              null;
+
+        if (directQr) {
+          console.log('📲 QR from session response:', directQr.substring(0, 50) + '...');
+          setQrCode(directQr);
+          return;
+        }
+
+        const qr = await getSessionQrCode();
+        setQrCode(qr);
+        return;
       }
+
+      setQrCode(null);
     } catch (error) {
       console.error('Error fetching session status:', error);
       setStatus('NOT_FOUND');
@@ -202,15 +218,23 @@ export function WahaSessionManager() {
       );
     }
 
-    // The QR from WAHA is raw text that can be rendered with qrcode.react
+    // Some fetch paths return an image blob (we prefix it with image: in the service)
+    if (qrCode.startsWith('image:')) {
+      return (
+        <div className="bg-white p-4 rounded-lg shadow-lg">
+          <img
+            src={qrCode.replace('image:', '')}
+            alt="Código QR de inicio de sesión de WhatsApp"
+            className="w-64 h-64 object-contain"
+          />
+        </div>
+      );
+    }
+
+    // Otherwise it's raw QR data, render with qrcode.react
     return (
       <div className="bg-white p-4 rounded-lg shadow-lg">
-        <QRCodeSVG 
-          value={qrCode} 
-          size={256}
-          level="M"
-          includeMargin={false}
-        />
+        <QRCodeSVG value={qrCode} size={256} level="M" includeMargin={false} />
       </div>
     );
   };
