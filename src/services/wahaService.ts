@@ -20,6 +20,11 @@ export interface SessionInfo {
     id: string;
     pushName: string;
   };
+  // QR code can be in the response directly
+  qr?: {
+    value?: string;
+    data?: string;
+  };
 }
 
 export interface SendTextPayload {
@@ -147,16 +152,69 @@ export async function getSessionStatus(): Promise<SessionInfo | null> {
 
 export async function getSessionQrCode(): Promise<string | null> {
   try {
-    const response = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr`, {
-      headers: {
-        'X-Api-Key': WAHA_API_KEY,
-      },
-    });
+    // WAHA endpoint for QR: /api/{session}/auth/qr
+    // Try different formats
 
-    if (response.ok) {
-      const blob = await response.blob();
-      return URL.createObjectURL(blob);
+    // Format 1: /api/{session}/auth/qr?format=raw (returns text)
+    try {
+      const textResponse = await fetch(`${WAHA_API_URL}/api/${SESSION_NAME}/auth/qr?format=raw`, {
+        headers: {
+          'X-Api-Key': WAHA_API_KEY,
+        },
+      });
+
+      if (textResponse.ok) {
+        const text = await textResponse.text();
+        if (text && text.length > 10 && !text.includes('<!DOCTYPE')) {
+          console.log('QR obtained as raw text');
+          return text;
+        }
+      }
+    } catch (e) {
+      console.log('Raw QR format not available');
     }
+
+    // Format 2: /api/{session}/auth/qr (returns image)
+    try {
+      const imageResponse = await fetch(`${WAHA_API_URL}/api/${SESSION_NAME}/auth/qr`, {
+        headers: {
+          'X-Api-Key': WAHA_API_KEY,
+          'Accept': 'image/png',
+        },
+      });
+
+      if (imageResponse.ok) {
+        const contentType = imageResponse.headers.get('content-type');
+        if (contentType?.includes('image')) {
+          const blob = await imageResponse.blob();
+          console.log('QR obtained as image');
+          return `image:${URL.createObjectURL(blob)}`;
+        }
+      }
+    } catch (e) {
+      console.log('Image QR format not available');
+    }
+
+    // Format 3: /api/screenshot?session={session} (some WAHA versions)
+    try {
+      const screenshotResponse = await fetch(`${WAHA_API_URL}/api/screenshot?session=${SESSION_NAME}`, {
+        headers: {
+          'X-Api-Key': WAHA_API_KEY,
+        },
+      });
+
+      if (screenshotResponse.ok) {
+        const blob = await screenshotResponse.blob();
+        if (blob.size > 1000) {
+          console.log('QR obtained via screenshot');
+          return `image:${URL.createObjectURL(blob)}`;
+        }
+      }
+    } catch (e) {
+      console.log('Screenshot not available');
+    }
+
+    console.log('No QR code available');
     return null;
   } catch (error) {
     console.error('Error fetching QR code:', error);
