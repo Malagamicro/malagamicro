@@ -6,6 +6,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-api-key",
 };
 
+// WAHA event types we handle
+type WahaEventType = 
+  | 'session.status'
+  | 'message'
+  | 'message.any'
+  | 'message.reaction'
+  | 'message.ack'
+  | 'message.waiting'
+  | 'message.ack.group'
+  | 'message.revoked'
+  | 'message.edited'
+  | 'chat.archive';
+
 interface WahaPayload {
   id: string;
   timestamp: number;
@@ -15,13 +28,38 @@ interface WahaPayload {
   body: string;
   hasMedia: boolean;
   mediaUrl?: string;
+  type?: string;
+  ack?: number;
+  reaction?: {
+    text: string;
+    messageId: string;
+  };
+  _data?: {
+    id?: {
+      id: string;
+      _serialized: string;
+    };
+  };
 }
 
 interface WahaWebhook {
-  event: string;
+  event: WahaEventType;
   session: string;
   payload: WahaPayload;
+  me?: {
+    id: string;
+    pushname: string;
+  };
 }
+
+// Map WAHA ack codes to human-readable status
+const ackStatusMap: Record<number, string> = {
+  0: 'pending',     // Message pending
+  1: 'sent',        // Message sent to server
+  2: 'delivered',   // Message delivered to recipient
+  3: 'read',        // Message read by recipient
+  4: 'played',      // Voice/video message played
+};
 
 Deno.serve(async (req) => {
   console.log("=== WAHA Webhook received ===");
@@ -33,20 +71,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Log headers for debugging
-    const apiKey = req.headers.get("x-api-key");
-    console.log("Has API Key header:", !!apiKey);
-
-    // Optional API key validation (skip if not configured)
-    const expectedKey = Deno.env.get("WAHA_WEBHOOK_SECRET");
-    if (expectedKey && apiKey && apiKey !== expectedKey) {
-      console.log("Unauthorized: API key mismatch");
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const rawBody = await req.text();
     console.log("Raw body:", rawBody);
 
@@ -64,27 +88,6 @@ Deno.serve(async (req) => {
     console.log("Event type:", body.event);
     console.log("Session:", body.session);
 
-    // Only process message events
-    if (body.event !== "message") {
-      console.log("Ignoring non-message event:", body.event);
-      return new Response(JSON.stringify({ status: "ignored", event: body.event }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const payload = body.payload;
-    if (!payload) {
-      console.error("No payload in message");
-      return new Response(JSON.stringify({ error: "No payload" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    console.log("Payload:", JSON.stringify(payload, null, 2));
-    console.log("fromMe:", payload.fromMe);
-    console.log("body:", payload.body);
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -98,96 +101,235 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Extract chat ID - for incoming messages, use 'from'; for outgoing, use 'to'
-    const chatId = payload.fromMe ? payload.to : payload.from;
-    const phoneNumber = chatId.replace("@c.us", "").replace("@s.whatsapp.net", "");
+    // Handle different event types
+    switch (body.event) {
+      case 'session.status':
+        console.log("📱 Session status update:", body.payload);
+        return new Response(JSON.stringify({ status: "ok", event: "session.status" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
 
-    console.log("Chat ID:", chatId);
-    console.log("Phone number:", phoneNumber);
+      case 'message':
+      case 'message.any':
+        return await handleNewMessage(supabase, body);
 
-    // Try to find a lead with matching phone number
-    const { data: leads, error: leadError } = await supabase
-      .from("leads")
-      .select("id, user_id")
-      .or(`phone.ilike.%${phoneNumber}%,phone.ilike.%${phoneNumber.slice(-9)}%`)
-      .limit(1);
+      case 'message.ack':
+      case 'message.ack.group':
+        return await handleMessageAck(supabase, body);
 
-    if (leadError) {
-      console.error("Error searching for lead:", leadError);
+      case 'message.reaction':
+        return await handleMessageReaction(supabase, body);
+
+      case 'message.revoked':
+        return await handleMessageRevoked(supabase, body);
+
+      case 'message.edited':
+        return await handleMessageEdited(supabase, body);
+
+      case 'message.waiting':
+        console.log("⏳ Message waiting:", body.payload);
+        return new Response(JSON.stringify({ status: "ok", event: "message.waiting" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+
+      case 'chat.archive':
+        console.log("📦 Chat archived:", body.payload);
+        return new Response(JSON.stringify({ status: "ok", event: "chat.archive" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+
+      default:
+        console.log("Unknown event type:", body.event);
+        return new Response(JSON.stringify({ status: "ignored", event: body.event }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
     }
-
-    const lead = leads?.[0];
-    console.log("Found lead:", lead ? lead.id : "none");
-
-    // If no lead found, we need to find a user to assign this message to
-    // Get the first user in the system (or a default admin)
-    let userId = lead?.user_id;
-    
-    if (!userId) {
-      // Try to get any user from profiles
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .limit(1);
-      
-      userId = profiles?.[0]?.user_id;
-      console.log("Using fallback user_id:", userId);
-    }
-
-    if (!userId) {
-      console.error("No user found to assign message to");
-      // Still return OK to WAHA, but log the issue
-      return new Response(JSON.stringify({ status: "ok", warning: "no user to assign" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Calculate proper timestamp
-    const messageTimestamp = payload.timestamp 
-      ? new Date(payload.timestamp * 1000).toISOString()
-      : new Date().toISOString();
-
-    // Insert message into database
-    const insertData = {
-      chat_id: chatId,
-      content: payload.body || "",
-      from_me: payload.fromMe ?? false,
-      timestamp: messageTimestamp,
-      lead_id: lead?.id || null,
-      user_id: userId,
-      message_id: payload.id || null,
-      media_url: payload.mediaUrl || null,
-    };
-
-    console.log("Inserting message:", JSON.stringify(insertData, null, 2));
-
-    const { error: insertError } = await supabase
-      .from("waha_messages")
-      .insert(insertData);
-
-    if (insertError) {
-      console.error("Error inserting message:", insertError);
-      return new Response(JSON.stringify({ error: insertError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    console.log("✅ Message inserted successfully!");
-    console.log("   - Chat:", chatId);
-    console.log("   - From me:", payload.fromMe);
-    console.log("   - Lead:", lead?.id || "none");
-
-    return new Response(JSON.stringify({ status: "ok" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Webhook error:", message);
-    console.error("Full error:", error);
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
+
+// Handle new incoming/outgoing messages
+async function handleNewMessage(supabase: any, body: WahaWebhook) {
+  const payload = body.payload;
+  if (!payload) {
+    console.error("No payload in message");
+    return new Response(JSON.stringify({ error: "No payload" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  console.log("📨 New message:", JSON.stringify(payload, null, 2));
+
+  const chatId = payload.fromMe ? payload.to : payload.from;
+  const phoneNumber = chatId.replace("@c.us", "").replace("@s.whatsapp.net", "");
+
+  // Try to find a lead with matching phone number
+  const { data: leads } = await supabase
+    .from("leads")
+    .select("id, user_id")
+    .or(`phone.ilike.%${phoneNumber}%,phone.ilike.%${phoneNumber.slice(-9)}%`)
+    .limit(1);
+
+  const lead = leads?.[0];
+  let userId = lead?.user_id;
+
+  if (!userId) {
+    const { data: profiles } = await supabase.from("profiles").select("user_id").limit(1);
+    userId = profiles?.[0]?.user_id;
+  }
+
+  if (!userId) {
+    return new Response(JSON.stringify({ status: "ok", warning: "no user to assign" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const messageTimestamp = payload.timestamp
+    ? new Date(payload.timestamp * 1000).toISOString()
+    : new Date().toISOString();
+
+  const insertData = {
+    chat_id: chatId,
+    content: payload.body || "",
+    from_me: payload.fromMe ?? false,
+    timestamp: messageTimestamp,
+    lead_id: lead?.id || null,
+    user_id: userId,
+    message_id: payload.id || null,
+    media_url: payload.mediaUrl || null,
+    message_type: payload.type || 'text',
+    ack_status: payload.ack !== undefined ? ackStatusMap[payload.ack] || 'unknown' : null,
+  };
+
+  const { error: insertError } = await supabase.from("waha_messages").insert(insertData);
+
+  if (insertError) {
+    console.error("Error inserting message:", insertError);
+    return new Response(JSON.stringify({ error: insertError.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  console.log("✅ Message inserted!");
+  return new Response(JSON.stringify({ status: "ok" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Handle message acknowledgment (sent, delivered, read)
+async function handleMessageAck(supabase: any, body: WahaWebhook) {
+  const payload = body.payload;
+  const messageId = payload.id || payload._data?.id?._serialized;
+  const ackStatus = payload.ack !== undefined ? ackStatusMap[payload.ack] || 'unknown' : null;
+
+  console.log(`✓ ACK update: ${messageId} -> ${ackStatus}`);
+
+  if (!messageId) {
+    return new Response(JSON.stringify({ status: "ok", warning: "no message id" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { error } = await supabase
+    .from("waha_messages")
+    .update({ ack_status: ackStatus })
+    .eq("message_id", messageId);
+
+  if (error) {
+    console.error("Error updating ack:", error);
+  }
+
+  return new Response(JSON.stringify({ status: "ok", event: "message.ack", ack: ackStatus }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Handle message reactions (emoji reactions)
+async function handleMessageReaction(supabase: any, body: WahaWebhook) {
+  const payload = body.payload;
+  const reactionData = payload.reaction;
+
+  console.log("😀 Reaction:", reactionData);
+
+  if (!reactionData?.messageId) {
+    return new Response(JSON.stringify({ status: "ok", warning: "no reaction data" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { error } = await supabase
+    .from("waha_messages")
+    .update({ reaction: reactionData.text })
+    .eq("message_id", reactionData.messageId);
+
+  if (error) {
+    console.error("Error updating reaction:", error);
+  }
+
+  return new Response(JSON.stringify({ status: "ok", event: "message.reaction" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Handle revoked (deleted) messages
+async function handleMessageRevoked(supabase: any, body: WahaWebhook) {
+  const payload = body.payload;
+  const messageId = payload.id || payload._data?.id?._serialized;
+
+  console.log("🗑️ Message revoked:", messageId);
+
+  if (!messageId) {
+    return new Response(JSON.stringify({ status: "ok", warning: "no message id" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { error } = await supabase
+    .from("waha_messages")
+    .update({ is_revoked: true, content: "🚫 Mensaje eliminado" })
+    .eq("message_id", messageId);
+
+  if (error) {
+    console.error("Error marking message as revoked:", error);
+  }
+
+  return new Response(JSON.stringify({ status: "ok", event: "message.revoked" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// Handle edited messages
+async function handleMessageEdited(supabase: any, body: WahaWebhook) {
+  const payload = body.payload;
+  const messageId = payload.id || payload._data?.id?._serialized;
+  const newContent = payload.body;
+
+  console.log("✏️ Message edited:", messageId);
+
+  if (!messageId) {
+    return new Response(JSON.stringify({ status: "ok", warning: "no message id" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { error } = await supabase
+    .from("waha_messages")
+    .update({ content: newContent, is_edited: true })
+    .eq("message_id", messageId);
+
+  if (error) {
+    console.error("Error updating edited message:", error);
+  }
+
+  return new Response(JSON.stringify({ status: "ok", event: "message.edited" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
