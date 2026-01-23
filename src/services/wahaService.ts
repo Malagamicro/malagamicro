@@ -149,12 +149,12 @@ export async function getSessionStatus(): Promise<SessionInfo | null> {
 
 export async function getSessionQrCode(): Promise<string | null> {
   try {
-    // WAHA endpoint for QR: /api/{session}/auth/qr
+    // WAHA endpoint for QR (most versions): /api/sessions/{session}/auth/qr
     // Try different formats
 
     // Format 1: /api/{session}/auth/qr?format=raw (returns text)
     try {
-      const textResponse = await fetch(`${WAHA_API_URL}/api/${SESSION_NAME}/auth/qr?format=raw`, {
+      const textResponse = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr?format=raw`, {
         headers: {
           'X-Api-Key': WAHA_API_KEY,
         },
@@ -173,7 +173,7 @@ export async function getSessionQrCode(): Promise<string | null> {
 
     // Format 2: /api/{session}/auth/qr (returns image)
     try {
-      const imageResponse = await fetch(`${WAHA_API_URL}/api/${SESSION_NAME}/auth/qr`, {
+      const imageResponse = await fetch(`${WAHA_API_URL}/api/sessions/${SESSION_NAME}/auth/qr`, {
         headers: {
           'X-Api-Key': WAHA_API_KEY,
           'Accept': 'image/png',
