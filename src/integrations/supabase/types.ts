@@ -534,6 +534,48 @@ export type Database = {
           },
         ]
       }
+      whatsapp_chats: {
+        Row: {
+          avatar_url: string | null
+          chat_id: string
+          created_at: string
+          custom_name: string | null
+          id: string
+          is_archived: boolean | null
+          last_message_at: string | null
+          phone: string
+          unread_count: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          chat_id: string
+          created_at?: string
+          custom_name?: string | null
+          id?: string
+          is_archived?: boolean | null
+          last_message_at?: string | null
+          phone: string
+          unread_count?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          chat_id?: string
+          created_at?: string
+          custom_name?: string | null
+          id?: string
+          is_archived?: boolean | null
+          last_message_at?: string | null
+          phone?: string
+          unread_count?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
