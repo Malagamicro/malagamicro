@@ -1,6 +1,7 @@
 export type LeadStatus = 'nuevo' | 'contactado' | 'interesado' | 'cliente';
 export type LeadSegment = 'franquicia' | 'pyme';
 export type LeadSource = 'google_maps' | 'web_scraping' | 'referido' | 'manual';
+export type PhoneType = 'mobile' | 'landline' | 'unknown';
 
 export interface Lead {
   id: string;
@@ -25,6 +26,10 @@ export interface Lead {
   latitude?: number;
   longitude?: number;
   folderId?: string;
+  // Phone enrichment fields
+  phoneType?: PhoneType;
+  mobilePhone?: string;
+  whatsappVerified?: boolean;
 }
 
 export interface LeadActivity {

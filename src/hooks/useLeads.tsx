@@ -40,6 +40,10 @@ function mapRowToLead(row: any): Lead {
     latitude: row.latitude ?? undefined,
     longitude: row.longitude ?? undefined,
     folderId: row.folder_id ?? undefined,
+    // Phone enrichment fields
+    phoneType: row.phone_type as Lead['phoneType'] ?? undefined,
+    mobilePhone: row.mobile_phone ?? undefined,
+    whatsappVerified: row.whatsapp_verified ?? undefined,
   };
 }
 
@@ -173,6 +177,9 @@ export function useLeads() {
         throw new Error('Usuario no autenticado');
       }
 
+      // Import the phone analysis function
+      const { analyzeSpanishPhone } = await import('@/lib/phoneEnrichment');
+
       // Geocode the address
       let latitude: number | undefined;
       let longitude: number | undefined;
@@ -184,6 +191,9 @@ export function useLeads() {
           longitude = coords.longitude;
         }
       }
+
+      // Analyze phone type
+      const phoneType = lead.phone ? analyzeSpanishPhone(lead.phone) : 'unknown';
 
       const { data, error } = await supabase.from('leads').insert({
         company_name: lead.companyName,
@@ -203,7 +213,9 @@ export function useLeads() {
         latitude,
         longitude,
         folder_id: lead.folderId || null,
-      }).select('id').single();
+        phone_type: phoneType,
+        mobile_phone: phoneType === 'mobile' ? lead.phone?.replace(/\D/g, '').replace(/^34/, '') : null,
+      }).select('id, phone, website').single();
       
       if (error) throw error;
 
@@ -215,9 +227,21 @@ export function useLeads() {
           description: `Lead "${lead.companyName}" creado`,
           user_id: user?.id,
         });
+        
+        // Trigger enrichment for landline leads with websites
+        if (phoneType === 'landline' && lead.website) {
+          // Fire and forget
+          supabase.functions.invoke('enrich-lead-phone', {
+            body: { 
+              phone: lead.phone, 
+              website: lead.website, 
+              leadId: data.id 
+            },
+          }).catch(e => console.error('Enrichment failed:', e));
+        }
       }
 
-      return data;
+      return { ...data, phoneType };
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
@@ -343,30 +367,51 @@ export function useLeads() {
         throw new Error('Usuario no autenticado');
       }
 
-      const leadsToInsert = leads.map(lead => ({
-        company_name: lead.companyName,
-        contact_name: lead.contactName || null,
-        email: lead.email || null,
-        phone: lead.phone || null,
-        website: lead.website || null,
-        address: lead.address || null,
-        city: lead.city,
-        status: lead.status || 'nuevo',
-        segment: lead.segment || 'pyme',
-        source: lead.source || 'manual',
-        equipment_count: lead.equipmentCount || null,
-        notes: lead.notes || null,
-        tags: lead.tags || null,
-        user_id: user.id,
-        folder_id: lead.folderId || null,
-      }));
+      // Import the phone analysis function
+      const { analyzeSpanishPhone } = await import('@/lib/phoneEnrichment');
+
+      const leadsToInsert = leads.map(lead => {
+        // Analyze phone type immediately
+        const phoneType = lead.phone ? analyzeSpanishPhone(lead.phone) : 'unknown';
+        
+        return {
+          company_name: lead.companyName,
+          contact_name: lead.contactName || null,
+          email: lead.email || null,
+          phone: lead.phone || null,
+          website: lead.website || null,
+          address: lead.address || null,
+          city: lead.city,
+          status: lead.status || 'nuevo',
+          segment: lead.segment || 'pyme',
+          source: lead.source || 'manual',
+          equipment_count: lead.equipmentCount || null,
+          notes: lead.notes || null,
+          tags: lead.tags || null,
+          user_id: user.id,
+          folder_id: lead.folderId || null,
+          // Add phone type from analysis
+          phone_type: phoneType,
+          // If it's already a mobile, mark it (verification will happen async)
+          mobile_phone: phoneType === 'mobile' ? lead.phone?.replace(/\D/g, '').replace(/^34/, '') : null,
+        };
+      });
       
-      const { error } = await supabase.from('leads').insert(leadsToInsert);
+      // Insert leads and get their IDs back
+      const { data, error } = await supabase
+        .from('leads')
+        .insert(leadsToInsert)
+        .select('id, phone, website, company_name, phone_type');
       
       if (error) throw error;
-      return leadsToInsert.length;
+      
+      // Return inserted leads for enrichment
+      return { 
+        count: leadsToInsert.length, 
+        insertedLeads: data || [] 
+      };
     },
-    onSuccess: (count) => {
+    onSuccess: ({ count, insertedLeads }) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       // Audit log
@@ -375,6 +420,37 @@ export function useLeads() {
         title: 'Importación completada',
         description: `Se han importado ${count} leads correctamente.`,
       });
+      
+      // Trigger async enrichment for landline leads with websites
+      const landlineLeadsWithWebsite = insertedLeads.filter(
+        l => l.phone_type === 'landline' && l.website
+      );
+      
+      if (landlineLeadsWithWebsite.length > 0) {
+        toast({
+          title: 'Enriquecimiento en progreso',
+          description: `Buscando móviles en ${landlineLeadsWithWebsite.length} webs...`,
+        });
+        
+        // Fire and forget - enrichment happens in background
+        Promise.all(
+          landlineLeadsWithWebsite.map(async (lead) => {
+            try {
+              await supabase.functions.invoke('enrich-lead-phone', {
+                body: { 
+                  phone: lead.phone, 
+                  website: lead.website, 
+                  leadId: lead.id 
+                },
+              });
+            } catch (e) {
+              console.error(`Failed to enrich lead ${lead.company_name}:`, e);
+            }
+          })
+        ).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['leads'] });
+        });
+      }
     },
     onError: (error) => {
       toast({

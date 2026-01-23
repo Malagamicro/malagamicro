@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -14,7 +14,9 @@ import {
   Star,
   AlertCircle,
   Zap,
-  Info
+  Info,
+  Smartphone,
+  PhoneCall
 } from 'lucide-react';
 import {
   Select,
@@ -37,6 +39,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
+import { analyzeSpanishPhone, PhoneType } from '@/lib/phoneEnrichment';
+import { Badge } from '@/components/ui/badge';
 
 const businessCategories = [
   { value: 'all', label: 'Todas las categorías' },
@@ -64,6 +68,39 @@ interface PlaceResult {
     lat: number;
     lng: number;
   };
+  // Computed phone type
+  phoneType?: PhoneType;
+}
+
+// Helper to get phone type indicator
+function getPhoneIndicator(phone?: string): { icon: React.ReactNode; label: string; color: string; type: PhoneType } {
+  if (!phone) return { icon: <Phone className="w-4 h-4" />, label: 'Sin teléfono', color: 'text-muted-foreground', type: 'unknown' };
+  
+  const type = analyzeSpanishPhone(phone);
+  
+  switch (type) {
+    case 'mobile':
+      return { 
+        icon: <Smartphone className="w-4 h-4" />, 
+        label: 'Móvil (WhatsApp potencial)', 
+        color: 'text-green-600', 
+        type 
+      };
+    case 'landline':
+      return { 
+        icon: <PhoneCall className="w-4 h-4" />, 
+        label: 'Fijo (sin WhatsApp)', 
+        color: 'text-amber-600', 
+        type 
+      };
+    default:
+      return { 
+        icon: <Phone className="w-4 h-4" />, 
+        label: 'Tipo desconocido', 
+        color: 'text-muted-foreground', 
+        type 
+      };
+  }
 }
 
 export function ProspectingPanel() {
@@ -542,6 +579,49 @@ export function ProspectingPanel() {
             )}
           </div>
 
+          {/* Phone Quality Summary */}
+          {results.length > 0 && (() => {
+            const phoneStats = results.reduce((acc, r) => {
+              if (!r.phone) {
+                acc.noPhone++;
+              } else {
+                const type = analyzeSpanishPhone(r.phone);
+                if (type === 'mobile') acc.mobile++;
+                else if (type === 'landline') acc.landline++;
+                else acc.unknown++;
+              }
+              return acc;
+            }, { mobile: 0, landline: 0, unknown: 0, noPhone: 0 });
+            
+            const total = results.length;
+            const mobilePercent = Math.round((phoneStats.mobile / total) * 100);
+            
+            return (
+              <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="flex items-center gap-1.5 text-green-600">
+                    <Smartphone className="w-4 h-4" />
+                    <span className="font-medium">{phoneStats.mobile}</span> móviles
+                  </span>
+                  <span className="flex items-center gap-1.5 text-amber-600">
+                    <PhoneCall className="w-4 h-4" />
+                    <span className="font-medium">{phoneStats.landline}</span> fijos
+                  </span>
+                  {phoneStats.noPhone > 0 && (
+                    <span className="text-muted-foreground">
+                      {phoneStats.noPhone} sin teléfono
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm">
+                  <span className={`font-medium ${mobilePercent >= 50 ? 'text-green-600' : mobilePercent >= 25 ? 'text-amber-600' : 'text-destructive'}`}>
+                    {mobilePercent}% WhatsApp-ready
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
           {results.length === 0 && !isSearching ? (
             <div className="bg-card rounded-xl p-12 border border-border text-center">
               <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -607,12 +687,39 @@ export function ProspectingPanel() {
                         <ExternalLink className="w-3 h-3 flex-shrink-0" />
                       </a>
                     )}
-                    {result.phone && (
-                      <p className="flex items-center gap-2">
-                        <Phone className="w-4 h-4" />
-                        {result.phone}
-                      </p>
-                    )}
+                    {result.phone && (() => {
+                      const phoneInfo = getPhoneIndicator(result.phone);
+                      return (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className={`flex items-center gap-2 ${phoneInfo.color}`}>
+                                {phoneInfo.icon}
+                                <span>{result.phone}</span>
+                                {phoneInfo.type === 'mobile' && (
+                                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                    📱 WhatsApp
+                                  </Badge>
+                                )}
+                                {phoneInfo.type === 'landline' && (
+                                  <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                    ☎️ Fijo
+                                  </Badge>
+                                )}
+                              </p>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{phoneInfo.label}</p>
+                              {phoneInfo.type === 'landline' && result.website && (
+                                <p className="text-xs text-muted-foreground">
+                                  Al añadir, buscaremos móvil en su web
+                                </p>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    })()}
                     {!result.website && !result.phone && (
                       <p className="text-muted-foreground/60 italic">
                         Sin datos de contacto disponibles

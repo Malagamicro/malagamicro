@@ -1,8 +1,15 @@
 import { Lead } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
 import { LeadScoreBadge } from './LeadScoreBadge';
-import { Building2, MapPin, Phone, Mail, Monitor, ExternalLink } from 'lucide-react';
+import { Building2, MapPin, Phone, Mail, Monitor, ExternalLink, Smartphone, PhoneCall } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPhoneTypeDisplay } from '@/lib/phoneEnrichment';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface LeadCardProps {
   lead: Lead;
@@ -15,6 +22,14 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
     const query = lead.address || lead.city;
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
   };
+
+  // Get phone type display info
+  const phoneDisplay = getPhoneTypeDisplay(lead.phoneType, lead.whatsappVerified);
+
+  // Determine which phone to show (mobile if available, otherwise original)
+  const displayPhone = lead.mobilePhone 
+    ? `+34 ${lead.mobilePhone.slice(0, 3)} ${lead.mobilePhone.slice(3, 6)} ${lead.mobilePhone.slice(6)}`
+    : lead.phone;
 
   return (
     <div
@@ -67,11 +82,33 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
             {lead.email}
           </p>
         )}
-        {lead.phone && (
-          <p className="flex items-center gap-2">
-            <Phone className="w-4 h-4 flex-shrink-0" />
-            {lead.phone}
-          </p>
+        {(lead.phone || lead.mobilePhone) && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p className={cn("flex items-center gap-2", phoneDisplay.color)}>
+                  {lead.whatsappVerified === true ? (
+                    <Smartphone className="w-4 h-4 flex-shrink-0" />
+                  ) : lead.phoneType === 'landline' ? (
+                    <PhoneCall className="w-4 h-4 flex-shrink-0" />
+                  ) : (
+                    <Phone className="w-4 h-4 flex-shrink-0" />
+                  )}
+                  <span>{displayPhone}</span>
+                  <span className="text-xs">{phoneDisplay.icon}</span>
+                </p>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{phoneDisplay.label}</p>
+                {lead.mobilePhone && lead.phone && lead.mobilePhone !== lead.phone?.replace(/\D/g, '') && (
+                  <p className="text-xs text-muted-foreground">Original: {lead.phone}</p>
+                )}
+                {lead.whatsappVerified === true && (
+                  <p className="text-xs text-green-600">WhatsApp disponible</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
         {lead.equipmentCount && (
           <p className="flex items-center gap-2">
