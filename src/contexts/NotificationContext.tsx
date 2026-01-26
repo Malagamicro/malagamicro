@@ -1,8 +1,10 @@
-import { createContext, useContext, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useEffect, ReactNode, useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Bell, BellOff, X } from 'lucide-react';
 
 interface NotificationContextType {
   permission: NotificationPermission;
@@ -11,6 +13,8 @@ interface NotificationContextType {
   requestPermission: () => Promise<NotificationPermission | 'denied'>;
   toggleSound: () => void;
   refreshUnreadCount: () => void;
+  showPermissionBanner: boolean;
+  dismissBanner: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | null>(null);
@@ -18,6 +22,9 @@ const NotificationContext = createContext<NotificationContextType | null>(null);
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [showPermissionBanner, setShowPermissionBanner] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  
   const {
     permission,
     unreadCount,
@@ -28,16 +35,29 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     refreshUnreadCount,
   } = useNotifications();
 
-  // Request permission on mount
+  // Show permission banner if not granted and not dismissed
   useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      // Wait a bit before requesting to avoid being intrusive
-      const timer = setTimeout(() => {
-        requestPermission();
-      }, 5000);
-      return () => clearTimeout(timer);
+    if (typeof Notification !== 'undefined' && 
+        Notification.permission !== 'granted' && 
+        !bannerDismissed) {
+      setShowPermissionBanner(true);
+    } else {
+      setShowPermissionBanner(false);
     }
-  }, [requestPermission]);
+  }, [permission, bannerDismissed]);
+
+  const handleRequestPermission = async () => {
+    const result = await requestPermission();
+    if (result === 'granted') {
+      setShowPermissionBanner(false);
+    }
+    return result;
+  };
+
+  const dismissBanner = () => {
+    setBannerDismissed(true);
+    setShowPermissionBanner(false);
+  };
 
   // Subscribe to incoming WhatsApp messages for notifications
   useEffect(() => {
@@ -146,18 +166,86 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id, handleNewMessage, queryClient]);
 
+  // Subscribe to reminders that are due
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Check for due reminders every minute
+    const checkReminders = async () => {
+      const now = new Date();
+      const fiveMinutesLater = new Date(now.getTime() + 5 * 60 * 1000);
+      
+      const { data: dueReminders } = await supabase
+        .from('follow_up_reminders')
+        .select('id, message, reminder_date, leads(company_name)')
+        .eq('user_id', user.id)
+        .eq('is_completed', false)
+        .gte('reminder_date', now.toISOString())
+        .lte('reminder_date', fiveMinutesLater.toISOString());
+
+      if (dueReminders && dueReminders.length > 0) {
+        for (const reminder of dueReminders) {
+          const lead = reminder.leads as { company_name?: string } | null;
+          const title = `⏰ Recordatorio`;
+          const body = reminder.message || `Seguimiento: ${lead?.company_name || 'Lead'}`;
+          handleNewMessage(title, body);
+        }
+      }
+    };
+
+    // Check immediately and then every minute
+    checkReminders();
+    const interval = setInterval(checkReminders, 60000);
+
+    return () => clearInterval(interval);
+  }, [user?.id, handleNewMessage]);
+
   return (
     <NotificationContext.Provider
       value={{
         permission,
         unreadCount,
         soundEnabled,
-        requestPermission,
+        requestPermission: handleRequestPermission,
         toggleSound,
         refreshUnreadCount,
+        showPermissionBanner,
+        dismissBanner,
       }}
     >
-      {children}
+      {/* Permission Banner */}
+      {showPermissionBanner && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-3">
+            <Bell className="h-5 w-5" />
+            <span className="text-sm font-medium">
+              Activa las notificaciones para recibir alertas de mensajes y recordatorios
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleRequestPermission}
+              className="gap-2"
+            >
+              <Bell className="h-4 w-4" />
+              Activar
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={dismissBanner}
+              className="h-8 w-8 p-0 hover:bg-primary-foreground/20"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className={showPermissionBanner ? 'pt-14' : ''}>
+        {children}
+      </div>
     </NotificationContext.Provider>
   );
 }
@@ -165,7 +253,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 export function useNotificationContext() {
   const context = useContext(NotificationContext);
   if (!context) {
-    throw new Error('useNotificationContext must be used within NotificationProvider');
+    // Return safe defaults when used outside provider
+    return {
+      permission: 'default' as NotificationPermission,
+      unreadCount: 0,
+      soundEnabled: true,
+      requestPermission: async () => 'denied' as NotificationPermission,
+      toggleSound: () => {},
+      refreshUnreadCount: () => {},
+      showPermissionBanner: false,
+      dismissBanner: () => {},
+    };
   }
   return context;
 }
