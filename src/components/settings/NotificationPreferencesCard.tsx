@@ -1,8 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
-import { Bell, Loader2, Mail, FileText, Calendar, Shield } from 'lucide-react';
+import { useNotificationContext } from '@/contexts/NotificationContext';
+import { toast } from '@/hooks/use-toast';
+import { Bell, Loader2, Mail, FileText, Calendar, Shield, TestTube2 } from 'lucide-react';
 
 interface PreferenceItemProps {
   id: string;
@@ -42,6 +45,7 @@ function PreferenceItem({ id, label, description, icon, checked, onCheckedChange
 
 export function NotificationPreferencesCard() {
   const { preferences, isLoading, updatePreferences, isUpdating } = useNotificationPreferences();
+  const { permission, requestPermission } = useNotificationContext();
 
   const handleToggle = (key: string, value: boolean) => {
     updatePreferences({ [key]: value });
@@ -118,6 +122,74 @@ export function NotificationPreferencesCard() {
           onCheckedChange={(checked) => handleToggle('email_security_alerts', checked)}
           disabled={isUpdating}
         />
+
+        {/* Desktop notifications controls */}
+        <div className="pt-6 mt-6 border-t">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Notificaciones de escritorio</p>
+              <p className="text-sm text-muted-foreground">
+                Mensajes y recordatorios en tu ordenador (solo cuando la pestaña esté en segundo plano)
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Estado: <span className="font-medium">{permission}</span> · Visibilidad: <span className="font-medium">{typeof document !== 'undefined' ? document.visibilityState : 'unknown'}</span>
+              </p>
+            </div>
+
+            {(permission === 'default' || permission === 'denied') && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={async () => {
+                  const result = await requestPermission();
+                  if (result === 'granted') {
+                    toast({ title: '✅ Notificaciones activadas', description: 'Ya puedes recibir notificaciones cuando estés en otra pestaña.' });
+                  }
+                }}
+                className="gap-2"
+              >
+                <Bell className="h-4 w-4" />
+                🔔 Activar Notificaciones
+              </Button>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-3">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                try {
+                  if (typeof Notification === 'undefined') {
+                    toast({ title: 'No compatible', description: 'Este navegador no soporta notificaciones.' });
+                    return;
+                  }
+                  if (Notification.permission === 'denied') {
+                    toast({
+                      title: '⚠️ Notificaciones bloqueadas',
+                      description: 'Tienes las notificaciones bloqueadas en el navegador. Pulsa en el candado de la URL para permitirlas.',
+                    });
+                    return;
+                  }
+                  if (Notification.permission !== 'granted') {
+                    toast({ title: 'Permiso requerido', description: 'Pulsa "🔔 Activar Notificaciones" primero.' });
+                    return;
+                  }
+                  // Required by request: immediate native notification
+                  new Notification('Prueba', { body: 'Si lees esto, funcionan ✅' });
+                } catch (e) {
+                  console.error(e);
+                  toast({ title: 'Error', description: 'No se pudo mostrar la notificación de prueba.' });
+                }
+              }}
+              className="gap-2"
+            >
+              <TestTube2 className="h-4 w-4" />
+              Probar notificación
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
