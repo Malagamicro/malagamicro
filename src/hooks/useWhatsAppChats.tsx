@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { useEffect } from 'react';
 
 export interface WhatsAppChat {
   id: string;
@@ -15,7 +14,6 @@ export interface WhatsAppChat {
   unreadCount: number;
   createdAt: Date;
   updatedAt: Date;
-  // Computed from last message
   lastMessage?: string;
 }
 
@@ -84,7 +82,6 @@ export function useWhatsAppChats() {
   const chatsQuery = useQuery({
     queryKey: ['whatsapp-chats'],
     queryFn: async (): Promise<WhatsAppChat[]> => {
-      // First get all chats
       const { data: chats, error: chatsError } = await supabase
         .from('whatsapp_chats')
         .select('*')
@@ -113,6 +110,7 @@ export function useWhatsAppChats() {
       return chatsWithMessages.map(mapChatRow);
     },
     enabled: !!user,
+    staleTime: 5000, // Consider data fresh for 5 seconds
   });
 
   // Get or create a chat
@@ -128,23 +126,19 @@ export function useWhatsAppChats() {
     }): Promise<WhatsAppChat> => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Check if chat exists
       const { data: existingChat, error: fetchError } = await supabase
         .from('whatsapp_chats')
         .select('*')
         .eq('user_id', user.id)
         .eq('chat_id', chatId)
-        .single();
+        .maybeSingle();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
-      }
+      if (fetchError) throw fetchError;
 
       if (existingChat) {
         return mapChatRow(existingChat);
       }
 
-      // Create new chat
       const { data: newChat, error: insertError } = await supabase
         .from('whatsapp_chats')
         .insert({
@@ -226,13 +220,12 @@ export function useWhatsAppChats() {
     mutationFn: async ({ chatId }: { chatId: string }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Get current count
       const { data: chat } = await supabase
         .from('whatsapp_chats')
         .select('unread_count')
         .eq('user_id', user.id)
         .eq('chat_id', chatId)
-        .single();
+        .maybeSingle();
 
       const currentCount = chat?.unread_count || 0;
 
@@ -269,7 +262,6 @@ export function useWhatsAppChats() {
       .from('chat-avatars')
       .getPublicUrl(fileName);
 
-    // Update chat with new avatar URL
     await updateChat.mutateAsync({ chatId, avatarUrl: publicUrl });
 
     return publicUrl;
@@ -292,57 +284,12 @@ export function useWhatsAppChats() {
         return (data || []).map(mapMessageRow);
       },
       enabled: !!user && !!chatId,
+      staleTime: 2000, // Consider messages fresh for 2 seconds
     });
   };
 
-  // Realtime subscriptions
-  useEffect(() => {
-    if (!user) return;
-
-    // Subscribe to chats changes
-    const chatsChannel = supabase
-      .channel('whatsapp-chats-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'whatsapp_chats',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['whatsapp-chats'] });
-        }
-      )
-      .subscribe();
-
-    // Subscribe to messages changes
-    const messagesChannel = supabase
-      .channel('whatsapp-messages-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'waha_messages',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          console.log('📩 Message update:', payload);
-          queryClient.invalidateQueries({ queryKey: ['whatsapp-chats'] });
-          const msg = payload.new as any;
-          if (msg?.chat_id) {
-            queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', msg.chat_id] });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(chatsChannel);
-      supabase.removeChannel(messagesChannel);
-    };
-  }, [user, queryClient]);
+  // NOTE: Realtime subscriptions are now handled by useRealtimeConnection hook
+  // This prevents duplicate subscriptions and provides centralized connection management
 
   return {
     chats: chatsQuery.data || [],

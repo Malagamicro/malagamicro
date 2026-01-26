@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { useEffect } from 'react';
 
 export interface WahaMessage {
   id: string;
@@ -49,8 +48,7 @@ export function useWahaMessages() {
   const chatsQuery = useQuery({
     queryKey: ['waha-chats'],
     queryFn: async (): Promise<ChatSummary[]> => {
-      // Use 'any' to bypass type checking until types are regenerated
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('waha_messages')
         .select(`
           chat_id,
@@ -68,7 +66,7 @@ export function useWahaMessages() {
       
       for (const row of data || []) {
         if (!chatMap.has(row.chat_id)) {
-          const lead = row.leads;
+          const lead = row.leads as { company_name?: string; contact_name?: string } | null;
           chatMap.set(row.chat_id, {
             chatId: row.chat_id,
             leadId: row.lead_id,
@@ -95,7 +93,7 @@ export function useWahaMessages() {
       queryFn: async (): Promise<WahaMessage[]> => {
         if (!chatId) return [];
         
-        const { data, error } = await (supabase as any)
+        const { data, error } = await supabase
           .from('waha_messages')
           .select('*')
           .eq('chat_id', chatId)
@@ -121,7 +119,7 @@ export function useWahaMessages() {
     }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      const { error } = await (supabase as any).from('waha_messages').insert({
+      const { error } = await supabase.from('waha_messages').insert({
         chat_id: chatId,
         content,
         from_me: true,
@@ -138,34 +136,8 @@ export function useWahaMessages() {
     },
   });
 
-  // Realtime subscription for new messages
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel('waha-messages-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'waha_messages',
-        },
-        (payload) => {
-          console.log('New message received:', payload);
-          queryClient.invalidateQueries({ queryKey: ['waha-chats'] });
-          const newMessage = payload.new as any;
-          if (newMessage?.chat_id) {
-            queryClient.invalidateQueries({ queryKey: ['waha-messages', newMessage.chat_id] });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, queryClient]);
+  // NOTE: Realtime subscriptions are now handled by useRealtimeConnection hook
+  // This prevents duplicate subscriptions and provides centralized connection management
 
   return {
     chats: chatsQuery.data || [],

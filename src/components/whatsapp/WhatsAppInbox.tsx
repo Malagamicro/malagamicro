@@ -5,13 +5,13 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Search, MessageSquare, Plus, Wifi, WifiOff } from 'lucide-react';
+import { RefreshCw, Search, MessageSquare, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useWhatsAppChats, WhatsAppChat } from '@/hooks/useWhatsAppChats';
+import { useRealtimeConnection } from '@/hooks/useRealtimeConnection';
 import { NewChatModal } from './NewChatModal';
-import { getSessionStatus } from '@/services/wahaService';
-import { useEffect } from 'react';
+import { ConnectionIndicator } from './ConnectionIndicator';
 
 interface WhatsAppInboxProps {
   onSelectChat: (chatId: string, chatName: string, phone: string) => void;
@@ -27,26 +27,11 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
     updateChatLastMessage,
   } = useWhatsAppChats();
   
+  // Centralized realtime connection
+  const { status: connectionStatus, reconnect } = useRealtimeConnection();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
-
-  // Check WAHA connection status
-  const checkConnection = async () => {
-    setConnectionStatus('checking');
-    try {
-      const sessionInfo = await getSessionStatus();
-      setConnectionStatus(sessionInfo?.status === 'WORKING' ? 'connected' : 'disconnected');
-    } catch {
-      setConnectionStatus('disconnected');
-    }
-  };
-
-  useEffect(() => {
-    checkConnection();
-    const interval = setInterval(checkConnection, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleCreateChat = async (phone: string, name?: string) => {
     const chatId = `${phone}@c.us`;
@@ -55,7 +40,6 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
   };
 
   const handleSelectChat = async (chat: WhatsAppChat) => {
-    // Reset unread when selecting
     if (chat.unreadCount > 0) {
       await updateChatLastMessage({ chatId: chat.chatId, resetUnread: true });
     }
@@ -91,11 +75,10 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
               Inbox
-              {connectionStatus === 'connected' ? (
-                <Wifi className="h-4 w-4 text-emerald-500" />
-              ) : connectionStatus === 'disconnected' ? (
-                <WifiOff className="h-4 w-4 text-destructive" />
-              ) : null}
+              <ConnectionIndicator 
+                status={connectionStatus} 
+                onReconnect={reconnect}
+              />
             </CardTitle>
             <div className="flex items-center gap-2">
               <Button
