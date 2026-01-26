@@ -328,8 +328,20 @@ serve(async (req) => {
       throw new Error("Messages array is required");
     }
 
-    const validModels = ["sonar", "sonar-pro", "sonar-reasoning"];
-    const selectedModel = validModels.includes(model) ? model : "sonar";
+    // Perplexity deprecó `sonar-reasoning` → usamos `sonar-reasoning-pro`.
+    const modelMap: Record<string, string> = {
+      "sonar-reasoning": "sonar-reasoning-pro",
+    };
+    const requestedModel = typeof model === "string" ? model : "sonar";
+    const normalizedModel = modelMap[requestedModel] ?? requestedModel;
+
+    const validModels = ["sonar", "sonar-pro", "sonar-reasoning-pro"];
+    const selectedModel = validModels.includes(normalizedModel) ? normalizedModel : "sonar";
+
+    // Perplexity no soporta tool-calling en todos los modelos.
+    // Para evitar 400, activamos tools solo donde es compatible.
+    const toolSupportedModels = new Set(["sonar-pro"]);
+    const canUseTools = Boolean(userId) && toolSupportedModels.has(selectedModel);
 
     const systemPrompt = `Eres un asistente de CRM inteligente para gestión de leads y clientes. Tienes acceso a herramientas para:
 - Buscar y consultar leads existentes
@@ -356,7 +368,7 @@ Formato tus respuestas con markdown cuando sea útil (listas, negritas, etc.).`;
           { role: "system", content: systemPrompt },
           ...messages,
         ],
-        tools: userId ? tools : undefined,
+        tools: canUseTools ? tools : undefined,
         stream: false,
       }),
     });
@@ -378,12 +390,13 @@ Formato tus respuestas con markdown cuando sea útil (listas, negritas, etc.).`;
     const assistantMessage = initialData.choices?.[0]?.message;
 
     // Check if there are tool calls
-    if (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0 && userId) {
+    if (canUseTools && assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
+      const uid = userId!;
       const toolResults: ChatMessage[] = [];
       
       for (const toolCall of assistantMessage.tool_calls) {
         const args = JSON.parse(toolCall.function.arguments);
-        const result = await executeToolCall(supabase, userId, toolCall.function.name, args);
+        const result = await executeToolCall(supabase, uid, toolCall.function.name, args);
         
         toolResults.push({
           role: "tool",
