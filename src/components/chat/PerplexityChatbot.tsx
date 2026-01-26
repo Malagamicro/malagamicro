@@ -53,8 +53,8 @@ const MODELS = [
     color: 'text-purple-500',
   },
   { 
-    id: 'sonar-reasoning', 
-    name: 'Reasoning', 
+    id: 'sonar-reasoning-pro', 
+    name: 'Reasoning Pro', 
     description: 'Razonamiento avanzado',
     icon: Brain,
     color: 'text-blue-500',
