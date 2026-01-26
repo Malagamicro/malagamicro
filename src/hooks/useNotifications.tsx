@@ -123,12 +123,11 @@ export function useNotifications() {
   // Show browser notification
   const showNotification = useCallback((title: string, body: string, options?: NotificationOptions) => {
     if (state.permission !== 'granted') {
-      console.log('Notification permission not granted');
-      return null;
-    }
-
-    // Only show if tab is not focused
-    if (!document.hidden) {
+      console.log('Notification permission not granted, requesting...');
+      // Try to request permission
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
       return null;
     }
 
@@ -137,7 +136,8 @@ export function useNotifications() {
         body,
         icon: '/favicon.ico',
         badge: '/favicon.ico',
-        tag: 'whatsapp-message',
+        tag: `message-${Date.now()}`, // Unique tag for each notification
+        requireInteraction: false,
         ...options,
       });
 
@@ -159,16 +159,14 @@ export function useNotifications() {
 
   // Handle new incoming message
   const handleNewMessage = useCallback((senderName: string, messageContent: string) => {
-    // Play sound
+    // Play sound always
     playSound();
 
-    // Show browser notification if tab not focused
-    if (document.hidden) {
-      showNotification(
-        senderName,
-        messageContent.length > 100 ? messageContent.substring(0, 100) + '...' : messageContent
-      );
-    }
+    // Show browser notification (removed document.hidden check to always notify)
+    showNotification(
+      senderName,
+      messageContent.length > 100 ? messageContent.substring(0, 100) + '...' : messageContent
+    );
 
     // Invalidate unread count
     queryClient.invalidateQueries({ queryKey: ['unread-messages-count'] });

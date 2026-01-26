@@ -39,12 +39,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [requestPermission]);
 
-  // Subscribe to incoming messages for notifications
+  // Subscribe to incoming WhatsApp messages for notifications
   useEffect(() => {
     if (!user?.id) return;
 
     const channel = supabase
-      .channel(`notifications-${user.id}`)
+      .channel(`whatsapp-notifications-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -63,7 +63,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           // Only notify for incoming messages
           if (msg.from_me) return;
 
-          console.log('🔔 New incoming message, triggering notification');
+          console.log('🔔 New WhatsApp message, triggering notification');
           
           // Try to get chat name
           const { data: chat } = await supabase
@@ -72,8 +72,71 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             .eq('chat_id', msg.chat_id)
             .maybeSingle();
 
-          const senderName = chat?.custom_name || chat?.phone || 'Nuevo mensaje';
-          handleNewMessage(senderName, msg.content);
+          const senderName = chat?.custom_name || chat?.phone || 'WhatsApp';
+          handleNewMessage(`📱 ${senderName}`, msg.content);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, handleNewMessage]);
+
+  // Subscribe to internal chat messages for notifications
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`internal-chat-notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'internal_messages',
+        },
+        async (payload) => {
+          const msg = payload.new as { 
+            sender_id: string; 
+            content: string | null; 
+            conversation_id: string;
+            message_type: string;
+          };
+          
+          // Don't notify for own messages
+          if (msg.sender_id === user.id) return;
+
+          // Check if user is participant of this conversation
+          const { data: participation } = await supabase
+            .from('conversation_participants')
+            .select('id')
+            .eq('conversation_id', msg.conversation_id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (!participation) return;
+
+          console.log('🔔 New internal message, triggering notification');
+          
+          // Get sender name
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('user_id', msg.sender_id)
+            .maybeSingle();
+
+          const senderName = senderProfile?.full_name || 'Usuario';
+          const messagePreview = msg.message_type === 'text' 
+            ? (msg.content || 'Mensaje')
+            : msg.message_type === 'image' 
+              ? '📷 Imagen'
+              : '📎 Archivo';
+          
+          handleNewMessage(`💬 ${senderName}`, messagePreview);
+          
+          // Invalidate internal conversations to update unread counts
+          queryClient.invalidateQueries({ queryKey: ['internal-conversations'] });
         }
       )
       .subscribe();
