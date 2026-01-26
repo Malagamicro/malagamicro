@@ -97,13 +97,25 @@ Deno.serve(async (req) => {
         user_id: user.id,
       });
 
-      // Update last_contacted_at
+      // Get current whatsapp_sent_count and increment it
+      const { data: leadData } = await supabase
+        .from('leads')
+        .select('whatsapp_sent_count')
+        .eq('id', leadId)
+        .single();
+
+      const currentCount = leadData?.whatsapp_sent_count || 0;
+
+      // Update last_contacted_at and increment whatsapp_sent_count
       await supabase
         .from('leads')
-        .update({ last_contacted_at: new Date().toISOString() })
+        .update({ 
+          last_contacted_at: new Date().toISOString(),
+          whatsapp_sent_count: currentCount + 1
+        })
         .eq('id', leadId);
 
-      console.log('Activity logged for lead:', leadId);
+      console.log('Activity logged for lead:', leadId, 'WhatsApp count:', currentCount + 1);
     }
 
     return new Response(

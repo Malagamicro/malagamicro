@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_chat_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          model: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -478,6 +540,7 @@ export type Database = {
           updated_at: string
           user_id: string
           website: string | null
+          whatsapp_sent_count: number
           whatsapp_verified: boolean | null
         }
         Insert: {
@@ -506,6 +569,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           website?: string | null
+          whatsapp_sent_count?: number
           whatsapp_verified?: boolean | null
         }
         Update: {
@@ -534,6 +598,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           website?: string | null
+          whatsapp_sent_count?: number
           whatsapp_verified?: boolean | null
         }
         Relationships: [
@@ -710,12 +775,40 @@ export type Database = {
           },
         ]
       }
+      whatsapp_chat_folders: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_chats: {
         Row: {
           avatar_url: string | null
           chat_id: string
           created_at: string
           custom_name: string | null
+          folder_id: string | null
           id: string
           is_archived: boolean | null
           last_message_at: string | null
@@ -729,6 +822,7 @@ export type Database = {
           chat_id: string
           created_at?: string
           custom_name?: string | null
+          folder_id?: string | null
           id?: string
           is_archived?: boolean | null
           last_message_at?: string | null
@@ -742,6 +836,7 @@ export type Database = {
           chat_id?: string
           created_at?: string
           custom_name?: string | null
+          folder_id?: string | null
           id?: string
           is_archived?: boolean | null
           last_message_at?: string | null
@@ -750,7 +845,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_chats_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_chat_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

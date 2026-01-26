@@ -1,7 +1,8 @@
 import { Lead } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
 import { LeadScoreBadge } from './LeadScoreBadge';
-import { Building2, MapPin, Phone, Mail, Monitor, ExternalLink, Smartphone, PhoneCall } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Building2, MapPin, Phone, Mail, Monitor, ExternalLink, Smartphone, PhoneCall, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPhoneTypeDisplay } from '@/lib/phoneEnrichment';
 import {
@@ -66,6 +67,21 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {(lead.whatsappSentCount ?? 0) > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="gap-1 text-xs bg-green-500/10 text-green-600 border-green-500/30">
+                    <MessageCircle className="h-3 w-3" />
+                    {lead.whatsappSentCount}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{lead.whatsappSentCount} WhatsApp{(lead.whatsappSentCount ?? 0) > 1 ? 's' : ''} enviado{(lead.whatsappSentCount ?? 0) > 1 ? 's' : ''}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           <LeadScoreBadge score={lead.score ?? 0} />
           <LeadStatusBadge status={lead.status} />
         </div>

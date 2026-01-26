@@ -44,6 +44,8 @@ function mapRowToLead(row: any): Lead {
     phoneType: row.phone_type as Lead['phoneType'] ?? undefined,
     mobilePhone: row.mobile_phone ?? undefined,
     whatsappVerified: row.whatsapp_verified ?? undefined,
+    // WhatsApp counter
+    whatsappSentCount: row.whatsapp_sent_count ?? 0,
   };
 }
 
