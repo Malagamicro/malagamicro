@@ -27,6 +27,7 @@ import Inbox from '@/pages/Inbox';
 import Templates from '@/pages/Templates';
 import { GoogleSheetsImportModal } from '@/components/leads/GoogleSheetsImportModal';
 import { PerplexityChatbot } from '@/components/chat/PerplexityChatbot';
+import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -230,6 +231,18 @@ const IndexContent = () => {
         );
       case 'templates':
         return <Templates />;
+      case 'mensajes':
+        return (
+          <div className="p-8 space-y-6 animate-fade-in">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Mensajes Internos</h1>
+              <p className="text-muted-foreground mt-1">
+                Comunícate con tu equipo en tiempo real
+              </p>
+            </div>
+            <InternalChatPage />
+          </div>
+        );
       case 'chat-ai':
         return (
           <div className="p-8 space-y-6 animate-fade-in max-w-4xl mx-auto">
