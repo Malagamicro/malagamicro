@@ -15,6 +15,7 @@ export interface WhatsAppChat {
   createdAt: Date;
   updatedAt: Date;
   lastMessage?: string;
+  folderId?: string | null;
 }
 
 export interface WahaMessage {
@@ -50,6 +51,7 @@ function mapChatRow(row: any): WhatsAppChat {
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
     lastMessage: row.last_message,
+    folderId: row.folder_id,
   };
 }
 

@@ -10,6 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   Send, 
   Bot, 
@@ -19,16 +25,24 @@ import {
   Zap,
   Brain,
   RotateCcw,
-  Users,
   BarChart3,
   Plus,
   Search,
   Bell,
+  MessageSquare,
+  Trash2,
+  MoreVertical,
+  PanelLeftClose,
+  PanelLeft,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAIChatHistory, AIChatSession, AIChatMessage } from '@/hooks/useAIChatHistory';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Message {
   id: string;
@@ -75,9 +89,42 @@ export function PerplexityChatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('sonar-pro');
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string | null>(null);
+  const [editTitleValue, setEditTitleValue] = useState('');
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  
+  const {
+    sessions,
+    isLoadingSessions,
+    useSessionMessages,
+    createSession,
+    updateSessionTitle,
+    deleteSession,
+    addMessage,
+    generateTitle,
+  } = useAIChatHistory();
+
+  // Load messages when session changes
+  const { data: sessionMessages } = useSessionMessages(activeSessionId);
+
+  // Sync messages from DB to local state when session changes
+  useEffect(() => {
+    if (sessionMessages) {
+      setMessages(sessionMessages.map(m => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        timestamp: m.createdAt,
+      })));
+    } else if (!activeSessionId) {
+      setMessages([]);
+    }
+  }, [sessionMessages, activeSessionId]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -94,7 +141,7 @@ export function PerplexityChatbot() {
     return session?.access_token;
   };
 
-  const streamChat = async (userMessages: { role: string; content: string }[]) => {
+  const streamChat = async (userMessages: { role: string; content: string }[], sessionId: string) => {
     const token = await getAuthToken();
     
     const resp = await fetch(CHAT_URL, {
@@ -164,6 +211,15 @@ export function PerplexityChatbot() {
       }
     }
 
+    // Save assistant message to DB
+    if (assistantContent) {
+      await addMessage.mutateAsync({
+        sessionId,
+        role: 'assistant',
+        content: assistantContent,
+      });
+    }
+
     // Invalidate queries if lead was created/updated
     if (assistantContent.toLowerCase().includes('creado') || 
         assistantContent.toLowerCase().includes('actualizado')) {
@@ -174,6 +230,18 @@ export function PerplexityChatbot() {
   const handleSend = async (customPrompt?: string) => {
     const messageText = customPrompt || input.trim();
     if (!messageText || isLoading) return;
+
+    let sessionId = activeSessionId;
+
+    // Create new session if none active
+    if (!sessionId) {
+      const newSession = await createSession.mutateAsync({ 
+        title: generateTitle(messageText),
+        model: selectedModel,
+      });
+      sessionId = newSession.id;
+      setActiveSessionId(sessionId);
+    }
 
     const userMessage: Message = { 
       id: crypto.randomUUID(),
@@ -187,8 +255,15 @@ export function PerplexityChatbot() {
     setInput('');
     setIsLoading(true);
 
+    // Save user message to DB
+    await addMessage.mutateAsync({
+      sessionId,
+      role: 'user',
+      content: messageText,
+    });
+
     try {
-      await streamChat(newMessages.map(m => ({ role: m.role, content: m.content })));
+      await streamChat(newMessages.map(m => ({ role: m.role, content: m.content })), sessionId);
     } catch (error) {
       console.error('Chat error:', error);
       toast.error(error instanceof Error ? error.message : 'Error al enviar mensaje');
@@ -205,174 +280,320 @@ export function PerplexityChatbot() {
     }
   };
 
-  const clearChat = () => {
+  const handleNewChat = () => {
+    setActiveSessionId(null);
     setMessages([]);
+  };
+
+  const handleSelectSession = (session: AIChatSession) => {
+    setActiveSessionId(session.id);
+    setSelectedModel(session.model);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    await deleteSession.mutateAsync(sessionId);
+    if (activeSessionId === sessionId) {
+      setActiveSessionId(null);
+      setMessages([]);
+    }
+  };
+
+  const handleStartEditTitle = (session: AIChatSession) => {
+    setEditingTitle(session.id);
+    setEditTitleValue(session.title);
+  };
+
+  const handleSaveTitle = async () => {
+    if (editingTitle && editTitleValue.trim()) {
+      await updateSessionTitle.mutateAsync({
+        sessionId: editingTitle,
+        title: editTitleValue.trim(),
+      });
+    }
+    setEditingTitle(null);
   };
 
   const selectedModelInfo = MODELS.find(m => m.id === selectedModel)!;
 
+  const formatSessionDate = (date: Date) => {
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Hoy';
+    if (diffDays === 1) return 'Ayer';
+    if (diffDays < 7) return format(date, 'EEEE', { locale: es });
+    return format(date, 'dd/MM/yyyy');
+  };
+
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] bg-gradient-to-b from-background to-muted/20 rounded-2xl border shadow-xl overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b bg-background/80 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
-              <Bot className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-background" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-lg">Asistente CRM</h2>
-            <p className="text-xs text-muted-foreground">Conectado con tus datos</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <Select value={selectedModel} onValueChange={setSelectedModel}>
-            <SelectTrigger className="w-[140px] h-9 bg-muted/50 border-0">
-              <div className="flex items-center gap-2">
-                <selectedModelInfo.icon className={`h-4 w-4 ${selectedModelInfo.color}`} />
-                <span className="text-sm">{selectedModelInfo.name}</span>
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {MODELS.map(model => (
-                <SelectItem key={model.id} value={model.id}>
-                  <div className="flex items-center gap-3">
-                    <model.icon className={`h-4 w-4 ${model.color}`} />
-                    <div>
-                      <p className="font-medium">{model.name}</p>
-                      <p className="text-xs text-muted-foreground">{model.description}</p>
-                    </div>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          {messages.length > 0 && (
+    <div className="flex h-[calc(100vh-12rem)] bg-gradient-to-b from-background to-muted/20 rounded-2xl border shadow-xl overflow-hidden">
+      {/* Sessions Sidebar */}
+      {showSidebar && (
+        <div className="w-64 border-r bg-muted/30 flex flex-col">
+          <div className="p-3 border-b flex items-center justify-between">
+            <h3 className="font-medium text-sm flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Conversaciones
+            </h3>
             <Button
               variant="ghost"
               size="icon"
-              onClick={clearChat}
-              className="h-9 w-9"
+              className="h-7 w-7"
+              onClick={handleNewChat}
             >
-              <RotateCcw className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
             </Button>
-          )}
-        </div>
-      </div>
-      
-      {/* Messages */}
-      <ScrollArea className="flex-1 px-6" ref={scrollRef}>
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center py-12">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
-              <Sparkles className="h-10 w-10 text-primary" />
-            </div>
-            <h3 className="font-semibold text-xl mb-2">¿En qué puedo ayudarte?</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-8">
-              Puedo buscar leads, crear nuevos, ver estadísticas, recordatorios y más. 
-              Estoy conectado con todos tus datos del CRM.
-            </p>
-            
-            {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-              {QUICK_ACTIONS.map((action) => (
-                <button
-                  key={action.label}
-                  onClick={() => handleSend(action.prompt)}
-                  className="flex items-center gap-3 p-4 rounded-xl border bg-card hover:bg-accent transition-colors text-left group"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                    <action.icon className="h-5 w-5 text-primary" />
+          </div>
+          
+          <ScrollArea className="flex-1">
+            {isLoadingSessions ? (
+              <div className="p-4 text-center text-muted-foreground text-sm">
+                Cargando...
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground text-sm">
+                No hay conversaciones
+              </div>
+            ) : (
+              <div className="p-2 space-y-1">
+                {sessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className={`group relative rounded-lg p-2 cursor-pointer transition-colors ${
+                      activeSessionId === session.id 
+                        ? 'bg-accent' 
+                        : 'hover:bg-accent/50'
+                    }`}
+                    onClick={() => handleSelectSession(session)}
+                  >
+                    {editingTitle === session.id ? (
+                      <Input
+                        value={editTitleValue}
+                        onChange={(e) => setEditTitleValue(e.target.value)}
+                        onBlur={handleSaveTitle}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveTitle();
+                          if (e.key === 'Escape') setEditingTitle(null);
+                        }}
+                        className="h-6 text-sm"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium truncate pr-8">
+                          {session.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatSessionDate(session.updatedAt)}
+                        </p>
+                      </>
+                    )}
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-1 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleStartEditTitle(session)}>
+                          <Pencil className="h-3 w-3 mr-2" />
+                          Renombrar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteSession(session.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-3 w-3 mr-2" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <span className="text-sm font-medium">{action.label}</span>
-                </button>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-background/80 backdrop-blur-sm">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setShowSidebar(!showSidebar)}
+            >
+              {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+            </Button>
+            <div className="relative">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
+                <Bot className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-background" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-lg">Asistente CRM</h2>
+              <p className="text-xs text-muted-foreground">Conectado con tus datos</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-[140px] h-9 bg-muted/50 border-0">
+                <div className="flex items-center gap-2">
+                  <selectedModelInfo.icon className={`h-4 w-4 ${selectedModelInfo.color}`} />
+                  <span className="text-sm">{selectedModelInfo.name}</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {MODELS.map(model => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <div className="flex items-center gap-3">
+                      <model.icon className={`h-4 w-4 ${model.color}`} />
+                      <div>
+                        <p className="font-medium">{model.name}</p>
+                        <p className="text-xs text-muted-foreground">{model.description}</p>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {messages.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNewChat}
+                className="h-9 w-9"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+        
+        {/* Messages */}
+        <ScrollArea className="flex-1 px-6" ref={scrollRef}>
+          {messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center py-12">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
+                <Sparkles className="h-10 w-10 text-primary" />
+              </div>
+              <h3 className="font-semibold text-xl mb-2">¿En qué puedo ayudarte?</h3>
+              <p className="text-muted-foreground text-center max-w-md mb-8">
+                Puedo buscar leads, crear nuevos, ver estadísticas, recordatorios y más. 
+                Estoy conectado con todos tus datos del CRM.
+              </p>
+              
+              {/* Quick Actions */}
+              <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                {QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.label}
+                    onClick={() => handleSend(action.prompt)}
+                    className="flex items-center gap-3 p-4 rounded-xl border bg-card hover:bg-accent transition-colors text-left group"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                      <action.icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <span className="text-sm font-medium">{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="py-6 space-y-6">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+                >
+                  <Avatar className={`h-9 w-9 ${message.role === 'user' ? 'bg-primary' : 'bg-gradient-to-br from-primary to-primary/60'}`}>
+                    <AvatarFallback className="bg-transparent">
+                      {message.role === 'user' ? (
+                        <User className="h-4 w-4 text-primary-foreground" />
+                      ) : (
+                        <Bot className="h-4 w-4 text-primary-foreground" />
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className={`flex-1 max-w-[80%] ${message.role === 'user' ? 'text-right' : ''}`}>
+                    <div
+                      className={`inline-block rounded-2xl px-4 py-3 ${
+                        message.role === 'user'
+                          ? 'bg-primary text-primary-foreground rounded-tr-md'
+                          : 'bg-muted rounded-tl-md'
+                      }`}
+                    >
+                      {message.role === 'assistant' ? (
+                        message.content ? (
+                          <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Pensando...</span>
+                          </div>
+                        )
+                      ) : (
+                        <p className="text-sm">{message.content}</p>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1 px-1">
+                      {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-        ) : (
-          <div className="py-6 space-y-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
-              >
-                <Avatar className={`h-9 w-9 ${message.role === 'user' ? 'bg-primary' : 'bg-gradient-to-br from-primary to-primary/60'}`}>
-                  <AvatarFallback className="bg-transparent">
-                    {message.role === 'user' ? (
-                      <User className="h-4 w-4 text-primary-foreground" />
-                    ) : (
-                      <Bot className="h-4 w-4 text-primary-foreground" />
-                    )}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className={`flex-1 max-w-[80%] ${message.role === 'user' ? 'text-right' : ''}`}>
-                  <div
-                    className={`inline-block rounded-2xl px-4 py-3 ${
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-tr-md'
-                        : 'bg-muted rounded-tl-md'
-                    }`}
-                  >
-                    {message.role === 'assistant' ? (
-                      message.content ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                          <ReactMarkdown>{message.content}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm">Pensando...</span>
-                        </div>
-                      )
-                    ) : (
-                      <p className="text-sm">{message.content}</p>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-1 px-1">
-                    {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </ScrollArea>
+          )}
+        </ScrollArea>
 
-      {/* Input */}
-      <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
-        <div className="flex gap-3 items-center">
-          <div className="flex-1 relative">
-            <Input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Escribe tu mensaje..."
-              disabled={isLoading}
-              className="pr-12 h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-1"
-            />
+        {/* Input */}
+        <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
+          <div className="flex gap-3 items-center">
+            <div className="flex-1 relative">
+              <Input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Escribe tu mensaje..."
+                disabled={isLoading}
+                className="pr-12 h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-1"
+              />
+            </div>
+            <Button 
+              onClick={() => handleSend()} 
+              disabled={!input.trim() || isLoading}
+              size="icon"
+              className="h-12 w-12 rounded-xl"
+            >
+              {isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+            </Button>
           </div>
-          <Button 
-            onClick={() => handleSend()} 
-            disabled={!input.trim() || isLoading}
-            size="icon"
-            className="h-12 w-12 rounded-xl"
-          >
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Send className="h-5 w-5" />
-            )}
-          </Button>
+          <p className="text-[10px] text-muted-foreground text-center mt-2">
+            Powered by Perplexity • Modelo: {selectedModelInfo.name}
+          </p>
         </div>
-        <p className="text-[10px] text-muted-foreground text-center mt-2">
-          Powered by Perplexity • Modelo: {selectedModelInfo.name}
-        </p>
       </div>
     </div>
   );

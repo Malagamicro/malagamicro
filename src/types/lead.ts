@@ -30,6 +30,8 @@ export interface Lead {
   phoneType?: PhoneType;
   mobilePhone?: string;
   whatsappVerified?: boolean;
+  // WhatsApp counter
+  whatsappSentCount?: number;
 }
 
 export interface LeadActivity {
