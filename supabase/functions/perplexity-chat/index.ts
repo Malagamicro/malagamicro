@@ -115,6 +115,33 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "send_internal_message",
+      description: "Enviar un mensaje interno a otro usuario del sistema. Usa esto cuando el usuario te pida enviar un mensaje a un compañero o miembro del equipo.",
+      parameters: {
+        type: "object",
+        properties: {
+          recipient_name: { type: "string", description: "Nombre del usuario destinatario" },
+          message: { type: "string", description: "Contenido del mensaje a enviar" },
+        },
+        required: ["recipient_name", "message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_team_users",
+      description: "Obtener lista de usuarios del equipo disponibles para mensajería. Usa esto cuando necesites saber a quién se puede enviar mensajes.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 async function executeToolCall(
@@ -289,6 +316,124 @@ async function executeToolCall(
         });
       }
       
+      case "get_team_users": {
+        const { data: users, error } = await supabase
+          .from("profiles")
+          .select("user_id, full_name, avatar_url")
+          .neq("user_id", userId);
+        
+        if (error) throw error;
+        
+        return JSON.stringify({
+          usuarios: users?.map((u: any) => ({
+            id: u.user_id,
+            nombre: u.full_name || "Usuario sin nombre",
+            avatar: u.avatar_url,
+          })) || [],
+        });
+      }
+      
+      case "send_internal_message": {
+        const { recipient_name, message } = args;
+        
+        // Find recipient by name
+        const { data: recipients, error: recipientError } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .ilike("full_name", `%${recipient_name}%`)
+          .limit(1);
+        
+        if (recipientError) throw recipientError;
+        
+        if (!recipients || recipients.length === 0) {
+          return JSON.stringify({
+            success: false,
+            error: `No se encontró usuario con nombre "${recipient_name}"`,
+          });
+        }
+        
+        const recipientId = recipients[0].user_id;
+        const recipientFullName = recipients[0].full_name;
+        
+        // Check for existing 1:1 conversation
+        const { data: existingParticipations } = await supabase
+          .from("conversation_participants")
+          .select("conversation_id")
+          .eq("user_id", userId);
+        
+        let conversationId: string | null = null;
+        
+        if (existingParticipations && existingParticipations.length > 0) {
+          const convIds = existingParticipations.map((p: { conversation_id: string }) => p.conversation_id);
+          
+          // Find a 1:1 conversation with the recipient
+          const { data: conversations } = await supabase
+            .from("internal_conversations")
+            .select("id")
+            .in("id", convIds)
+            .eq("is_group", false);
+          
+          if (conversations) {
+            for (const conv of conversations) {
+              const { data: participants } = await supabase
+                .from("conversation_participants")
+                .select("user_id")
+                .eq("conversation_id", conv.id);
+              
+              const participantIds = participants?.map((p: { user_id: string }) => p.user_id) || [];
+              if (participantIds.includes(recipientId) && participantIds.length === 2) {
+                conversationId = conv.id;
+                break;
+              }
+            }
+          }
+        }
+        
+        // Create new conversation if none exists
+        if (!conversationId) {
+          const { data: newConv, error: convError } = await supabase
+            .from("internal_conversations")
+            .insert({
+              is_group: false,
+              created_by: userId,
+            })
+            .select("id")
+            .single();
+          
+          if (convError) throw convError;
+          conversationId = newConv.id;
+          
+          // Add both participants
+          await supabase.from("conversation_participants").insert([
+            { conversation_id: conversationId, user_id: userId, is_admin: true },
+            { conversation_id: conversationId, user_id: recipientId, is_admin: false },
+          ]);
+        }
+        
+        // Send the message
+        const { error: msgError } = await supabase
+          .from("internal_messages")
+          .insert({
+            conversation_id: conversationId,
+            sender_id: userId,
+            content: message,
+            message_type: "text",
+          });
+        
+        if (msgError) throw msgError;
+        
+        // Update conversation timestamp
+        await supabase
+          .from("internal_conversations")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", conversationId);
+        
+        return JSON.stringify({
+          success: true,
+          message: `Mensaje enviado a ${recipientFullName}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`,
+        });
+      }
+      
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
@@ -343,15 +488,19 @@ serve(async (req) => {
     const toolSupportedModels = new Set(["sonar-pro"]);
     const canUseTools = Boolean(userId) && toolSupportedModels.has(selectedModel);
 
-    const systemPrompt = `Eres un asistente de CRM inteligente para gestión de leads y clientes. Tienes acceso a herramientas para:
+const systemPrompt = `Eres un asistente de CRM inteligente para gestión de leads y clientes. Tienes acceso a herramientas para:
 - Buscar y consultar leads existentes
 - Ver estadísticas y métricas del negocio
 - Crear nuevos leads
 - Actualizar información de leads
 - Ver actividades recientes
 - Consultar recordatorios pendientes
+- Enviar mensajes internos a otros usuarios del equipo
+- Ver lista de usuarios del equipo
 
 Responde siempre en español de forma amigable y profesional. Cuando el usuario pregunte sobre datos, usa las herramientas disponibles. Si necesitas el ID de un lead para actualizarlo, primero búscalo por nombre.
+
+Cuando el usuario te pida enviar un mensaje a alguien, usa la herramienta send_internal_message. Si no conoces el nombre exacto, primero usa get_team_users para ver los usuarios disponibles.
 
 Formato tus respuestas con markdown cuando sea útil (listas, negritas, etc.).`;
 
