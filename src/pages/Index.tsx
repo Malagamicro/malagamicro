@@ -21,6 +21,7 @@ import { TwoFactorAuthCard } from '@/components/settings/TwoFactorAuthCard';
 import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
 import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
 import { WhatsAppPanel } from '@/components/whatsapp/WhatsAppPanel';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import Inbox from '@/pages/Inbox';
 import Templates from '@/pages/Templates';
 import { useLeads } from '@/hooks/useLeads';
@@ -28,7 +29,7 @@ import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
 import { Loader2 } from 'lucide-react';
 
-const Index = () => {
+const IndexContent = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -283,6 +284,14 @@ const Index = () => {
         onLogout={logout}
       />
     </div>
+  );
+};
+
+const Index = () => {
+  return (
+    <NotificationProvider>
+      <IndexContent />
+    </NotificationProvider>
   );
 };
 
