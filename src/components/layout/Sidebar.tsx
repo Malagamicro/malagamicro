@@ -20,6 +20,7 @@ import {
   FileText,
   Globe,
   FolderOpen,
+  Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +45,7 @@ const menuItems = [
   { id: 'inbox', label: 'Inbox', icon: Inbox, showBadge: true },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
   { id: 'templates', label: 'Plantillas', icon: FileText },
+  { id: 'chat-ai', label: 'Chat IA', icon: Bot },
 ];
 
 const toolsItems = [
