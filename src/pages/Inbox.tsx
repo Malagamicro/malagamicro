@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useWhatsAppChats } from '@/hooks/useWhatsAppChats';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 
 import { sendTextMessage } from '@/services/wahaService';
 import { TemplatesModal } from '@/components/whatsapp/TemplatesModal';
@@ -25,6 +26,8 @@ import {
   MoreVertical,
   Pencil,
   Clock,
+  Bell,
+  BellOff,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -36,6 +39,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // Pending message for optimistic UI
 interface PendingMessage {
@@ -70,6 +79,7 @@ function linkifyText(text: string): React.ReactNode[] {
 
 export default function Inbox() {
   const { user } = useAuth();
+  const { permission, requestPermission } = useNotificationContext();
   const { 
     chats, 
     isLoadingChats, 
@@ -358,6 +368,44 @@ export default function Inbox() {
             Inbox
           </h1>
           <div className="flex items-center gap-1">
+            {/* Notification Permission Button */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      if (permission !== 'granted') {
+                        requestPermission().then((result) => {
+                          if (result === 'granted') {
+                            toast.success('Notificaciones activadas');
+                          } else if (result === 'denied') {
+                            toast.error('Permiso de notificaciones denegado');
+                          }
+                        });
+                      } else {
+                        toast.info('Las notificaciones ya están activadas');
+                      }
+                    }}
+                    className={cn(
+                      permission === 'granted' && "text-primary"
+                    )}
+                  >
+                    {permission === 'granted' ? (
+                      <Bell className="w-4 h-4" />
+                    ) : (
+                      <BellOff className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {permission === 'granted' 
+                    ? 'Notificaciones activadas' 
+                    : 'Activar notificaciones'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Button
               variant="ghost"
               size="icon"
