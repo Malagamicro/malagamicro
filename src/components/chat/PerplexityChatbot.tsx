@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Select,
   SelectContent,
@@ -18,37 +18,54 @@ import {
   Sparkles,
   Zap,
   Brain,
-  X,
-  Maximize2,
-  Minimize2,
+  RotateCcw,
+  Users,
+  BarChart3,
+  Plus,
+  Search,
+  Bell,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Message {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
+  timestamp: Date;
 }
 
 const MODELS = [
   { 
     id: 'sonar', 
     name: 'Sonar', 
-    description: 'Rápido y ligero',
+    description: 'Rápido y eficiente',
     icon: Zap,
+    color: 'text-amber-500',
   },
   { 
     id: 'sonar-pro', 
     name: 'Sonar Pro', 
-    description: 'Más citas y razonamiento',
+    description: 'Más citas y detalle',
     icon: Sparkles,
+    color: 'text-purple-500',
   },
   { 
     id: 'sonar-reasoning', 
-    name: 'Sonar Reasoning', 
+    name: 'Reasoning', 
     description: 'Razonamiento avanzado',
     icon: Brain,
+    color: 'text-blue-500',
   },
+];
+
+const QUICK_ACTIONS = [
+  { icon: BarChart3, label: 'Ver estadísticas', prompt: '¿Cuáles son mis estadísticas de leads?' },
+  { icon: Search, label: 'Buscar leads', prompt: 'Busca mis leads más recientes' },
+  { icon: Plus, label: 'Crear lead', prompt: 'Quiero crear un nuevo lead' },
+  { icon: Bell, label: 'Recordatorios', prompt: '¿Qué recordatorios tengo pendientes?' },
 ];
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/perplexity-chat`;
@@ -58,22 +75,33 @@ export function PerplexityChatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('sonar');
-  const [isExpanded, setIsExpanded] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, []);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
-    }
-  }, [messages]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
-  const streamChat = async (userMessages: Message[]) => {
+  const getAuthToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token;
+  };
+
+  const streamChat = async (userMessages: { role: string; content: string }[]) => {
+    const token = await getAuthToken();
+    
     const resp = await fetch(CHAT_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        'Authorization': `Bearer ${token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
       body: JSON.stringify({ 
         messages: userMessages,
@@ -92,6 +120,15 @@ export function PerplexityChatbot() {
     const decoder = new TextDecoder();
     let textBuffer = '';
     let assistantContent = '';
+    const assistantId = crypto.randomUUID();
+
+    // Add empty assistant message
+    setMessages(prev => [...prev, {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+    }]);
 
     while (true) {
       const { done, value } = await reader.read();
@@ -116,15 +153,9 @@ export function PerplexityChatbot() {
           const content = parsed.choices?.[0]?.delta?.content;
           if (content) {
             assistantContent += content;
-            setMessages(prev => {
-              const last = prev[prev.length - 1];
-              if (last?.role === 'assistant') {
-                return prev.map((m, i) => 
-                  i === prev.length - 1 ? { ...m, content: assistantContent } : m
-                );
-              }
-              return [...prev, { role: 'assistant', content: assistantContent }];
-            });
+            setMessages(prev => prev.map(m => 
+              m.id === assistantId ? { ...m, content: assistantContent } : m
+            ));
           }
         } catch {
           textBuffer = line + '\n' + textBuffer;
@@ -132,24 +163,35 @@ export function PerplexityChatbot() {
         }
       }
     }
+
+    // Invalidate queries if lead was created/updated
+    if (assistantContent.toLowerCase().includes('creado') || 
+        assistantContent.toLowerCase().includes('actualizado')) {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (customPrompt?: string) => {
+    const messageText = customPrompt || input.trim();
+    if (!messageText || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input.trim() };
+    const userMessage: Message = { 
+      id: crypto.randomUUID(),
+      role: 'user', 
+      content: messageText,
+      timestamp: new Date(),
+    };
+    
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
 
     try {
-      await streamChat(newMessages);
+      await streamChat(newMessages.map(m => ({ role: m.role, content: m.content })));
     } catch (error) {
       console.error('Chat error:', error);
       toast.error(error instanceof Error ? error.message : 'Error al enviar mensaje');
-      // Remove the assistant message if there was an error
-      setMessages(prev => prev.filter(m => m.role !== 'assistant' || m.content));
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
@@ -167,142 +209,144 @@ export function PerplexityChatbot() {
     setMessages([]);
   };
 
-  const selectedModelInfo = MODELS.find(m => m.id === selectedModel);
-  const ModelIcon = selectedModelInfo?.icon || Zap;
+  const selectedModelInfo = MODELS.find(m => m.id === selectedModel)!;
 
   return (
-    <Card className={`flex flex-col transition-all duration-300 ${isExpanded ? 'fixed inset-4 z-50' : 'h-[600px]'}`}>
-      <CardHeader className="pb-3 border-b flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Bot className="h-5 w-5 text-primary" />
+    <div className="flex flex-col h-[calc(100vh-12rem)] bg-gradient-to-b from-background to-muted/20 rounded-2xl border shadow-xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b bg-background/80 backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
+              <Bot className="h-6 w-6 text-primary-foreground" />
             </div>
-            <div>
-              <CardTitle className="text-lg">Asistente IA</CardTitle>
-              <p className="text-xs text-muted-foreground">Powered by Perplexity</p>
-            </div>
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-background" />
           </div>
-          <div className="flex items-center gap-2">
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[160px]">
-                <div className="flex items-center gap-2">
-                  <ModelIcon className="h-4 w-4" />
-                  <SelectValue />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                {MODELS.map(model => (
-                  <SelectItem key={model.id} value={model.id}>
-                    <div className="flex items-center gap-2">
-                      <model.icon className="h-4 w-4" />
-                      <div>
-                        <p className="font-medium">{model.name}</p>
-                        <p className="text-xs text-muted-foreground">{model.description}</p>
-                      </div>
+          <div>
+            <h2 className="font-semibold text-lg">Asistente CRM</h2>
+            <p className="text-xs text-muted-foreground">Conectado con tus datos</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <Select value={selectedModel} onValueChange={setSelectedModel}>
+            <SelectTrigger className="w-[140px] h-9 bg-muted/50 border-0">
+              <div className="flex items-center gap-2">
+                <selectedModelInfo.icon className={`h-4 w-4 ${selectedModelInfo.color}`} />
+                <span className="text-sm">{selectedModelInfo.name}</span>
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {MODELS.map(model => (
+                <SelectItem key={model.id} value={model.id}>
+                  <div className="flex items-center gap-3">
+                    <model.icon className={`h-4 w-4 ${model.color}`} />
+                    <div>
+                      <p className="font-medium">{model.name}</p>
+                      <p className="text-xs text-muted-foreground">{model.description}</p>
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {messages.length > 0 && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={clearChat}
+              className="h-9 w-9"
             >
-              {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              <RotateCcw className="h-4 w-4" />
             </Button>
-            {messages.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={clearChat}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          )}
         </div>
-      </CardHeader>
+      </div>
       
-      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
-        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8">
-              <div className="p-4 rounded-full bg-primary/10 mb-4">
-                <Sparkles className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">¿En qué puedo ayudarte?</h3>
-              <p className="text-muted-foreground text-sm max-w-sm">
-                Soy un asistente con acceso a búsqueda en tiempo real. 
-                Puedo responder preguntas, buscar información actualizada y más.
-              </p>
-              <div className="flex flex-wrap gap-2 mt-4 justify-center">
-                {['¿Qué pasó hoy en el mundo?', '¿Cómo mejorar mis ventas?', 'Últimas noticias de IA'].map(suggestion => (
-                  <Button
-                    key={suggestion}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setInput(suggestion);
-                      inputRef.current?.focus();
-                    }}
-                  >
-                    {suggestion}
-                  </Button>
-                ))}
-              </div>
+      {/* Messages */}
+      <ScrollArea className="flex-1 px-6" ref={scrollRef}>
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center py-12">
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
+              <Sparkles className="h-10 w-10 text-primary" />
             </div>
-          ) : (
-            <div className="space-y-4">
-              {messages.map((message, idx) => (
-                <div
-                  key={idx}
-                  className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            <h3 className="font-semibold text-xl mb-2">¿En qué puedo ayudarte?</h3>
+            <p className="text-muted-foreground text-center max-w-md mb-8">
+              Puedo buscar leads, crear nuevos, ver estadísticas, recordatorios y más. 
+              Estoy conectado con todos tus datos del CRM.
+            </p>
+            
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+              {QUICK_ACTIONS.map((action) => (
+                <button
+                  key={action.label}
+                  onClick={() => handleSend(action.prompt)}
+                  className="flex items-center gap-3 p-4 rounded-xl border bg-card hover:bg-accent transition-colors text-left group"
                 >
-                  {message.role === 'assistant' && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-primary" />
-                    </div>
-                  )}
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <action.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium">{action.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="py-6 space-y-6">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+              >
+                <Avatar className={`h-9 w-9 ${message.role === 'user' ? 'bg-primary' : 'bg-gradient-to-br from-primary to-primary/60'}`}>
+                  <AvatarFallback className="bg-transparent">
+                    {message.role === 'user' ? (
+                      <User className="h-4 w-4 text-primary-foreground" />
+                    ) : (
+                      <Bot className="h-4 w-4 text-primary-foreground" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className={`flex-1 max-w-[80%] ${message.role === 'user' ? 'text-right' : ''}`}>
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                    className={`inline-block rounded-2xl px-4 py-3 ${
                       message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
+                        ? 'bg-primary text-primary-foreground rounded-tr-md'
+                        : 'bg-muted rounded-tl-md'
                     }`}
                   >
                     {message.role === 'assistant' ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
-                      </div>
+                      message.content ? (
+                        <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">Pensando...</span>
+                        </div>
+                      )
                     ) : (
                       <p className="text-sm">{message.content}</p>
                     )}
                   </div>
-                  {message.role === 'user' && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                      <User className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                  )}
+                  <p className="text-[10px] text-muted-foreground mt-1 px-1">
+                    {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 </div>
-              ))}
-              {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                <div className="flex gap-3 justify-start">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="bg-muted rounded-2xl px-4 py-3">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </ScrollArea>
+              </div>
+            ))}
+          </div>
+        )}
+      </ScrollArea>
 
-        <div className="p-4 border-t">
-          <div className="flex gap-2">
+      {/* Input */}
+      <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
+        <div className="flex gap-3 items-center">
+          <div className="flex-1 relative">
             <Input
               ref={inputRef}
               value={input}
@@ -310,22 +354,26 @@ export function PerplexityChatbot() {
               onKeyDown={handleKeyDown}
               placeholder="Escribe tu mensaje..."
               disabled={isLoading}
-              className="flex-1"
+              className="pr-12 h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-1"
             />
-            <Button 
-              onClick={handleSend} 
-              disabled={!input.trim() || isLoading}
-              size="icon"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
           </div>
+          <Button 
+            onClick={() => handleSend()} 
+            disabled={!input.trim() || isLoading}
+            size="icon"
+            className="h-12 w-12 rounded-xl"
+          >
+            {isLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+        <p className="text-[10px] text-muted-foreground text-center mt-2">
+          Powered by Perplexity • Modelo: {selectedModelInfo.name}
+        </p>
+      </div>
+    </div>
   );
 }
