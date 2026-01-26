@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,8 +13,8 @@ import {
   Check,
   CheckCheck,
   Clock,
-  AlertCircle,
   Pencil,
+  ChevronDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -40,7 +40,7 @@ interface WhatsAppChatProps {
 
 export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: WhatsAppChatProps) {
   const { user } = useAuth();
-  const { useMessagesForChat, updateChat, uploadAvatar, getOrCreateChat, updateChatLastMessage } = useWhatsAppChats();
+  const { useMessagesForChat, updateChat, uploadAvatar, updateChatLastMessage } = useWhatsAppChats();
   const { data: messages = [], isLoading, refetch } = useMessagesForChat(chatId);
   
   const [isSending, setIsSending] = useState(false);
@@ -50,17 +50,70 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState(avatarUrl);
   const [currentName, setCurrentName] = useState(chatName);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isAtBottomRef = useRef(true);
+  const prevMessageCountRef = useRef(messages.length);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
+  // Check if user is at bottom of scroll
+  const checkIfAtBottom = useCallback(() => {
+    const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (!scrollContainer) return true;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+    const threshold = 100; // pixels from bottom
+    return scrollHeight - scrollTop - clientHeight < threshold;
+  }, []);
+
+  // Scroll to bottom
+  const scrollToBottom = useCallback((smooth = true) => {
     setTimeout(() => {
-      scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  }, [messages]);
+      scrollRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+      setShowScrollButton(false);
+    }, 50);
+  }, []);
+
+  // Handle scroll events
+  const handleScroll = useCallback(() => {
+    isAtBottomRef.current = checkIfAtBottom();
+    setShowScrollButton(!isAtBottomRef.current);
+  }, [checkIfAtBottom]);
+
+  // Setup scroll listener
+  useEffect(() => {
+    const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', handleScroll);
+      return () => scrollContainer.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
+
+  // Smart scroll on new messages
+  useEffect(() => {
+    const hasNewMessages = messages.length > prevMessageCountRef.current;
+    prevMessageCountRef.current = messages.length;
+
+    if (hasNewMessages) {
+      // Auto-scroll only if user was already at bottom
+      if (isAtBottomRef.current) {
+        scrollToBottom();
+      } else {
+        // Show notification button for new messages
+        setShowScrollButton(true);
+      }
+    }
+  }, [messages.length, scrollToBottom]);
+
+  // Initial scroll to bottom
+  useEffect(() => {
+    if (messages.length > 0 && !isLoading) {
+      scrollToBottom(false);
+    }
+  }, [chatId]); // Only on chat change
 
   // Auto-resize textarea
   useEffect(() => {
@@ -210,9 +263,8 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
       case 'delivered':
         return <CheckCheck className="h-3 w-3" />;
       case 'read':
-        return <CheckCheck className="h-3 w-3 text-sky-400" />;
       case 'played':
-        return <CheckCheck className="h-3 w-3 text-sky-400" />;
+        return <CheckCheck className="h-3 w-3 text-primary/70" />;
       default:
         return null;
     }
@@ -256,9 +308,9 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
           </div>
         </CardHeader>
         
-        <CardContent className="flex-1 p-0 flex flex-col">
+        <CardContent className="flex-1 p-0 flex flex-col relative">
           {/* Messages area */}
-          <ScrollArea className="flex-1 p-4">
+          <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
             <div className="space-y-3">
               {messages.length === 0 && !isLoading ? (
                 <div className="text-center text-muted-foreground py-8">
@@ -311,6 +363,19 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
               <div ref={scrollRef} />
             </div>
           </ScrollArea>
+          
+          {/* Scroll to bottom button */}
+          {showScrollButton && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="absolute bottom-24 right-6 rounded-full shadow-lg z-10"
+              onClick={() => scrollToBottom()}
+            >
+              <ChevronDown className="h-4 w-4 mr-1" />
+              Nuevos mensajes
+            </Button>
+          )}
           
           {/* Image preview */}
           {imagePreview && (
