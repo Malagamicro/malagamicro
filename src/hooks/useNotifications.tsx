@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { toast } from '@/hooks/use-toast';
 
 interface NotificationState {
   permission: NotificationPermission;
@@ -9,27 +10,54 @@ interface NotificationState {
   soundEnabled: boolean;
 }
 
-// Generate a simple pop sound using Web Audio API
-function createPopSound(): () => void {
+// Generate a simple pop sound using Web Audio API (fallback)
+function createSynthPopSound(): () => void {
   return () => {
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
+
       oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
       oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
-      
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
-      
+
+      gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.12);
+
       oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.15);
+      oscillator.stop(audioContext.currentTime + 0.12);
     } catch (err) {
       console.warn('Could not play notification sound:', err);
+    }
+  };
+}
+
+function createMp3PopSound(): () => boolean {
+  const audio = new Audio('/pop.mp3');
+  audio.preload = 'auto';
+  audio.volume = 0.35;
+  let available = true;
+
+  audio.addEventListener('error', () => {
+    available = false;
+  });
+
+  return () => {
+    if (!available) return false;
+    try {
+      audio.currentTime = 0;
+      audio.play().catch((err) => {
+        available = false;
+        console.warn('Could not play /pop.mp3:', err);
+      });
+      return true;
+    } catch (err) {
+      available = false;
+      console.warn('Could not play /pop.mp3:', err);
+      return false;
     }
   };
 }
@@ -38,6 +66,7 @@ export function useNotifications() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const playSoundRef = useRef<(() => void) | null>(null);
+  const lastDeniedToastAtRef = useRef<number>(0);
   const originalTitleRef = useRef(document.title);
   const [state, setState] = useState<NotificationState>({
     permission: typeof Notification !== 'undefined' ? Notification.permission : 'denied',
@@ -47,7 +76,13 @@ export function useNotifications() {
 
   // Initialize sound function
   useEffect(() => {
-    playSoundRef.current = createPopSound();
+    // Prefer /pop.mp3 if present, fallback to synthesized pop.
+    const mp3 = createMp3PopSound();
+    const synth = createSynthPopSound();
+    playSoundRef.current = () => {
+      const ok = mp3();
+      if (!ok) synth();
+    };
   }, []);
 
   // Request notification permission
@@ -122,14 +157,7 @@ export function useNotifications() {
 
   // Show browser notification
   const showNotification = useCallback((title: string, body: string, options?: NotificationOptions) => {
-    if (state.permission !== 'granted') {
-      console.log('Notification permission not granted, requesting...');
-      // Try to request permission
-      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
-      return null;
-    }
+    if (state.permission !== 'granted') return null;
 
     try {
       const notification = new Notification(title, {
@@ -159,18 +187,35 @@ export function useNotifications() {
 
   // Handle new incoming message
   const handleNewMessage = useCallback((senderName: string, messageContent: string) => {
-    // Play sound always
-    playSound();
+    // If blocked, show a diagnostic toast (throttled)
+    if (state.permission === 'denied') {
+      const now = Date.now();
+      if (now - lastDeniedToastAtRef.current > 15000) {
+        lastDeniedToastAtRef.current = now;
+        toast({
+          title: '⚠️ Notificaciones bloqueadas',
+          description: 'Tienes las notificaciones bloqueadas en el navegador. Pulsa en el candado de la URL para permitirlas.',
+        });
+      }
+      // Still play sound (if user has interacted)
+      playSound();
+      return;
+    }
 
-    // Show browser notification (removed document.hidden check to always notify)
-    showNotification(
-      senderName,
-      messageContent.length > 100 ? messageContent.substring(0, 100) + '...' : messageContent
-    );
+    const isHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    const preview = messageContent.length > 100 ? messageContent.substring(0, 100) + '...' : messageContent;
+
+    if (isHidden) {
+      // Background tab -> show native notification
+      showNotification(senderName, preview);
+    } else {
+      // Foreground -> only play subtle sound
+      playSound();
+    }
 
     // Invalidate unread count
     queryClient.invalidateQueries({ queryKey: ['unread-messages-count'] });
-  }, [playSound, showNotification, queryClient]);
+  }, [playSound, showNotification, queryClient, state.permission]);
 
   // Toggle sound
   const toggleSound = useCallback(() => {

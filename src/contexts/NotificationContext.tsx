@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Bell, BellOff, X } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface NotificationContextType {
   permission: NotificationPermission;
@@ -47,9 +48,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [permission, bannerDismissed]);
 
   const handleRequestPermission = async () => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+      toast({
+        title: '⚠️ Notificaciones bloqueadas',
+        description: 'Tienes las notificaciones bloqueadas en el navegador. Pulsa en el candado de la URL para permitirlas.',
+      });
+      return 'denied' as NotificationPermission;
+    }
+
     const result = await requestPermission();
     if (result === 'granted') {
       setShowPermissionBanner(false);
+    } else if (result === 'denied') {
+      toast({
+        title: '⚠️ Notificaciones bloqueadas',
+        description: 'Tienes las notificaciones bloqueadas en el navegador. Pulsa en el candado de la URL para permitirlas.',
+      });
     }
     return result;
   };
@@ -230,7 +244,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               className="gap-2"
             >
               <Bell className="h-4 w-4" />
-              Activar
+              🔔 Activar Notificaciones
             </Button>
             <Button
               size="sm"
