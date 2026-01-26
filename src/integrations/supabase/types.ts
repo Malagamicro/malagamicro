@@ -222,6 +222,48 @@ export type Database = {
           },
         ]
       }
+      google_sheets_configs: {
+        Row: {
+          auto_sync_enabled: boolean
+          auto_sync_interval: number
+          created_at: string
+          custom_columns: Json | null
+          id: string
+          last_sync_at: string | null
+          name: string
+          sheet_name: string
+          spreadsheet_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_sync_enabled?: boolean
+          auto_sync_interval?: number
+          created_at?: string
+          custom_columns?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          name: string
+          sheet_name?: string
+          spreadsheet_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_sync_enabled?: boolean
+          auto_sync_interval?: number
+          created_at?: string
+          custom_columns?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          name?: string
+          sheet_name?: string
+          spreadsheet_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       lead_activities: {
         Row: {
           created_at: string
