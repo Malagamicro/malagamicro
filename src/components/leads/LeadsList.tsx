@@ -20,6 +20,7 @@ import {
   FolderOpen,
   Trash2,
   AlertTriangle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   Select,
@@ -58,6 +59,7 @@ interface LeadsListProps {
   onViewLead: (id: string) => void;
   onAddLead: () => void;
   onImportLeads: () => void;
+  onImportFromGoogleSheets: () => void;
   // Pagination props
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
@@ -70,6 +72,7 @@ export function LeadsList({
   onViewLead, 
   onAddLead, 
   onImportLeads,
+  onImportFromGoogleSheets,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
@@ -221,10 +224,24 @@ export function LeadsList({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" onClick={onImportLeads} className="gap-2">
-            <Upload className="w-4 h-4" />
-            Importar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Upload className="w-4 h-4" />
+                Importar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onImportLeads}>
+                <Upload className="w-4 h-4 mr-2" />
+                Importar Excel/CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onImportFromGoogleSheets}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Importar desde Google Sheets
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button onClick={onAddLead} className="gap-2">
             <Plus className="w-4 h-4" />
             Nuevo Lead

@@ -1,64 +1,64 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
-interface GoogleSheetsConfig {
-  spreadsheetId: string;
-  sheetName: string;
-  autoSyncEnabled: boolean;
-  autoSyncInterval: number; // minutes
-  lastSyncAt: Date | null;
+export interface CustomColumnMapping {
+  sheetColumn: string;
+  leadField: string;
+}
+
+export interface GoogleSheetConfig {
+  id: string;
+  user_id: string;
+  name: string;
+  spreadsheet_id: string;
+  sheet_name: string;
+  auto_sync_enabled: boolean;
+  auto_sync_interval: number;
+  last_sync_at: string | null;
+  custom_columns: CustomColumnMapping[];
+  created_at: string;
+  updated_at: string;
 }
 
 interface SheetRow {
   [key: string]: string;
 }
 
-interface SyncResult {
+export interface SyncResult {
   inserted: number;
   updated: number;
   skipped: number;
   errors: string[];
 }
 
-const CONFIG_KEY = 'google_sheets_config';
-
 // Phone normalization for Spanish numbers
 function normalizePhone(phone: string | undefined | null): string | null {
   if (!phone) return null;
   
-  // Remove all non-numeric characters
   let cleaned = phone.toString().replace(/\D/g, '');
-  
-  // If empty after cleaning, return null
   if (!cleaned) return null;
   
-  // If starts with 00, remove it (international prefix)
   if (cleaned.startsWith('00')) {
     cleaned = cleaned.substring(2);
   }
   
-  // If it's a 9-digit Spanish number (starts with 6, 7, 8, 9), add 34
   if (cleaned.length === 9 && /^[6789]/.test(cleaned)) {
     cleaned = '34' + cleaned;
   }
   
-  // If starts with +34 but we already stripped the +
   if (cleaned.startsWith('34') && cleaned.length === 11) {
     return cleaned;
   }
   
-  // Return as-is for other international numbers
   return cleaned || null;
 }
 
-// Detect phone type
 function detectPhoneType(phone: string): 'mobile' | 'landline' | 'unknown' {
   if (!phone) return 'unknown';
   
-  // Remove country code if present
   let localNumber = phone;
   if (phone.startsWith('34') && phone.length === 11) {
     localNumber = phone.substring(2);
@@ -74,9 +74,8 @@ function detectPhoneType(phone: string): 'mobile' | 'landline' | 'unknown' {
   return 'unknown';
 }
 
-// Column mapping - tries to match common Spanish/English headers
-const COLUMN_MAPPINGS: { [key: string]: string } = {
-  // Company name
+// Default column mappings
+const DEFAULT_COLUMN_MAPPINGS: { [key: string]: string } = {
   'empresa': 'company_name',
   'nombre empresa': 'company_name',
   'company': 'company_name',
@@ -84,16 +83,12 @@ const COLUMN_MAPPINGS: { [key: string]: string } = {
   'negocio': 'company_name',
   'razón social': 'company_name',
   'razon social': 'company_name',
-  
-  // Contact name
   'contacto': 'contact_name',
   'nombre contacto': 'contact_name',
   'contact': 'contact_name',
   'contact name': 'contact_name',
   'nombre': 'contact_name',
   'name': 'contact_name',
-  
-  // Phone
   'teléfono': 'phone',
   'telefono': 'phone',
   'phone': 'phone',
@@ -101,207 +96,303 @@ const COLUMN_MAPPINGS: { [key: string]: string } = {
   'móvil': 'phone',
   'movil': 'phone',
   'mobile': 'phone',
-  
-  // Email
   'email': 'email',
   'correo': 'email',
   'e-mail': 'email',
   'mail': 'email',
-  
-  // Address
   'dirección': 'address',
   'direccion': 'address',
   'address': 'address',
   'domicilio': 'address',
-  
-  // City
   'ciudad': 'city',
   'city': 'city',
   'localidad': 'city',
   'población': 'city',
   'poblacion': 'city',
-  
-  // Website
   'web': 'website',
   'website': 'website',
   'sitio web': 'website',
   'página web': 'website',
   'pagina web': 'website',
   'url': 'website',
-  
-  // Notes
   'notas': 'notes',
   'notes': 'notes',
   'comentarios': 'notes',
   'observaciones': 'notes',
-  
-  // Segment
   'segmento': 'segment',
   'segment': 'segment',
   'tipo': 'segment',
-  
-  // Status
   'estado': 'status',
   'status': 'status',
+  'tags': 'tags',
+  'etiquetas': 'tags',
 };
 
-function mapColumns(headers: string[]): { [originalHeader: string]: string } {
+export const LEAD_FIELDS = [
+  { value: 'company_name', label: 'Empresa' },
+  { value: 'contact_name', label: 'Contacto' },
+  { value: 'phone', label: 'Teléfono' },
+  { value: 'email', label: 'Email' },
+  { value: 'address', label: 'Dirección' },
+  { value: 'city', label: 'Ciudad' },
+  { value: 'website', label: 'Web' },
+  { value: 'notes', label: 'Notas' },
+  { value: 'segment', label: 'Segmento' },
+  { value: 'status', label: 'Estado' },
+  { value: 'tags', label: 'Etiquetas' },
+];
+
+function mapColumns(headers: string[], customMappings: CustomColumnMapping[]): { [originalHeader: string]: string } {
   const mapping: { [key: string]: string } = {};
   
+  // First apply custom mappings
+  customMappings.forEach(cm => {
+    if (cm.sheetColumn && cm.leadField) {
+      mapping[cm.sheetColumn] = cm.leadField;
+    }
+  });
+  
+  // Then apply default mappings for unmapped columns
   headers.forEach(header => {
-    const normalized = header.toLowerCase().trim();
-    if (COLUMN_MAPPINGS[normalized]) {
-      mapping[header] = COLUMN_MAPPINGS[normalized];
+    if (!mapping[header]) {
+      const normalized = header.toLowerCase().trim();
+      if (DEFAULT_COLUMN_MAPPINGS[normalized]) {
+        mapping[header] = DEFAULT_COLUMN_MAPPINGS[normalized];
+      }
     }
   });
   
   return mapping;
 }
 
-export function useGoogleSheetsSync() {
+export function useGoogleSheetsConfigs() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: configs = [], isLoading } = useQuery({
+    queryKey: ['google-sheets-configs', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('google_sheets_configs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      return (data || []).map(config => ({
+        ...config,
+        custom_columns: (Array.isArray(config.custom_columns) ? config.custom_columns : []) as unknown as CustomColumnMapping[],
+      })) as GoogleSheetConfig[];
+    },
+    enabled: !!user?.id,
+  });
+
+  const createConfig = useMutation({
+    mutationFn: async (data: Omit<GoogleSheetConfig, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_sync_at'>) => {
+      if (!user?.id) throw new Error('No autenticado');
+      
+      const { data: result, error } = await supabase
+        .from('google_sheets_configs')
+        .insert([{
+          user_id: user.id,
+          name: data.name,
+          spreadsheet_id: data.spreadsheet_id,
+          sheet_name: data.sheet_name,
+          auto_sync_enabled: data.auto_sync_enabled,
+          auto_sync_interval: data.auto_sync_interval,
+          custom_columns: JSON.stringify(data.custom_columns),
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-configs'] });
+      toast.success('Hoja de cálculo añadida');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Error al añadir hoja');
+    },
+  });
+
+  const updateConfig = useMutation({
+    mutationFn: async ({ id, ...data }: Partial<GoogleSheetConfig> & { id: string }) => {
+      const updateData: Record<string, unknown> = {};
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.spreadsheet_id !== undefined) updateData.spreadsheet_id = data.spreadsheet_id;
+      if (data.sheet_name !== undefined) updateData.sheet_name = data.sheet_name;
+      if (data.auto_sync_enabled !== undefined) updateData.auto_sync_enabled = data.auto_sync_enabled;
+      if (data.auto_sync_interval !== undefined) updateData.auto_sync_interval = data.auto_sync_interval;
+      if (data.custom_columns !== undefined) updateData.custom_columns = JSON.stringify(data.custom_columns);
+      if (data.last_sync_at !== undefined) updateData.last_sync_at = data.last_sync_at;
+      
+      const { error } = await supabase
+        .from('google_sheets_configs')
+        .update(updateData)
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-configs'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Error al actualizar');
+    },
+  });
+
+  const deleteConfig = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('google_sheets_configs')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-configs'] });
+      toast.success('Hoja eliminada');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Error al eliminar');
+    },
+  });
+
+  return {
+    configs,
+    isLoading,
+    createConfig,
+    updateConfig,
+    deleteConfig,
+  };
+}
+
+export function useGoogleSheetsSync(configId?: string) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const autoSyncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  const [config, setConfig] = useState<GoogleSheetsConfig>(() => {
-    const saved = localStorage.getItem(CONFIG_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return {
-          ...parsed,
-          lastSyncAt: parsed.lastSyncAt ? new Date(parsed.lastSyncAt) : null,
-        };
-      } catch {
-        return getDefaultConfig();
-      }
-    }
-    return getDefaultConfig();
-  });
-  
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
+  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
 
-  function getDefaultConfig(): GoogleSheetsConfig {
-    return {
-      spreadsheetId: '',
-      sheetName: 'Hoja 1',
-      autoSyncEnabled: false,
-      autoSyncInterval: 10,
-      lastSyncAt: null,
-    };
-  }
+  const { configs, updateConfig } = useGoogleSheetsConfigs();
+  const config = configs.find(c => c.id === configId);
 
-  // Save config to localStorage
-  const saveConfig = useCallback((newConfig: Partial<GoogleSheetsConfig>) => {
-    setConfig(prev => {
-      const updated = { ...prev, ...newConfig };
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(updated));
-      return updated;
-    });
+  // Fetch headers from sheet (for column mapping UI)
+  const fetchHeaders = useCallback(async (spreadsheetId: string, sheetName: string): Promise<string[]> => {
+    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('No se pudo acceder a la hoja. Asegúrate de que es pública.');
+    }
+    
+    const text = await response.text();
+    const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?$/);
+    if (!jsonMatch) {
+      throw new Error('Formato de respuesta no válido.');
+    }
+    
+    const data = JSON.parse(jsonMatch[1]);
+    const table = data.table;
+    
+    if (!table || !table.rows || table.rows.length === 0) {
+      return [];
+    }
+    
+    let headers: string[] = table.cols.map((col: any) => col.label || col.id || '');
+    
+    if (headers.every((h: string) => !h || h.match(/^[A-Z]$/))) {
+      if (table.rows[0]) {
+        headers = table.rows[0].c.map((cell: any) => cell?.v?.toString() || '');
+      }
+    }
+    
+    return headers.filter((h: string) => h);
   }, []);
 
-  // Fetch data from Google Sheets using the public CSV export
-  const fetchSheetData = async (): Promise<SheetRow[]> => {
-    if (!config.spreadsheetId) {
-      throw new Error('No se ha configurado el ID de la hoja de cálculo');
-    }
-
-    // Use the Google Sheets API v4 with public access
-    // Format: https://docs.google.com/spreadsheets/d/{spreadsheetId}/gviz/tq?tqx=out:json
-    const url = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(config.sheetName)}`;
+  // Fetch data from Google Sheets
+  const fetchSheetData = async (spreadsheetId: string, sheetName: string): Promise<SheetRow[]> => {
+    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
     
-    try {
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Error al acceder a la hoja: ${response.status}. Asegúrate de que la hoja es pública.`);
-      }
-      
-      const text = await response.text();
-      
-      // Google returns JSONP-like format: google.visualization.Query.setResponse({...})
-      const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?$/);
-      if (!jsonMatch) {
-        throw new Error('Formato de respuesta no válido. Asegúrate de que la hoja es pública.');
-      }
-      
-      const data = JSON.parse(jsonMatch[1]);
-      
-      if (data.status === 'error') {
-        throw new Error(data.errors?.[0]?.detailed_message || 'Error al leer la hoja');
-      }
-      
-      const table = data.table;
-      if (!table || !table.rows || table.rows.length === 0) {
-        return [];
-      }
-      
-      // Extract headers from first row
-      const headers: string[] = table.cols.map((col: any) => col.label || col.id || '');
-      
-      // If no labels, try to get from first data row
-      let dataStartIndex = 0;
-      if (headers.every(h => !h || h.match(/^[A-Z]$/))) {
-        // Headers are just column letters, use first row as headers
-        if (table.rows[0]) {
-          const firstRow = table.rows[0].c;
-          headers.length = 0;
-          firstRow.forEach((cell: any) => {
-            headers.push(cell?.v?.toString() || '');
-          });
-          dataStartIndex = 1;
-        }
-      }
-      
-      // Convert rows to objects
-      const rows: SheetRow[] = [];
-      for (let i = dataStartIndex; i < table.rows.length; i++) {
-        const row = table.rows[i];
-        if (!row || !row.c) continue;
-        
-        const obj: SheetRow = {};
-        let hasData = false;
-        
-        row.c.forEach((cell: any, idx: number) => {
-          const header = headers[idx];
-          if (header) {
-            const value = cell?.v?.toString() || '';
-            obj[header] = value;
-            if (value) hasData = true;
-          }
-        });
-        
-        if (hasData) {
-          rows.push(obj);
-        }
-      }
-      
-      return rows;
-    } catch (err: any) {
-      if (err.message.includes('Failed to fetch')) {
-        throw new Error('No se pudo conectar con Google Sheets. Verifica que la hoja es pública y el ID es correcto.');
-      }
-      throw err;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Error al acceder a la hoja: ${response.status}`);
     }
+    
+    const text = await response.text();
+    const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?$/);
+    if (!jsonMatch) {
+      throw new Error('Formato de respuesta no válido.');
+    }
+    
+    const data = JSON.parse(jsonMatch[1]);
+    if (data.status === 'error') {
+      throw new Error(data.errors?.[0]?.detailed_message || 'Error al leer la hoja');
+    }
+    
+    const table = data.table;
+    if (!table || !table.rows || table.rows.length === 0) {
+      return [];
+    }
+    
+    let headers: string[] = table.cols.map((col: any) => col.label || col.id || '');
+    let dataStartIndex = 0;
+    
+    if (headers.every(h => !h || h.match(/^[A-Z]$/))) {
+      if (table.rows[0]) {
+        headers = table.rows[0].c.map((cell: any) => cell?.v?.toString() || '');
+        dataStartIndex = 1;
+      }
+    }
+    
+    const rows: SheetRow[] = [];
+    for (let i = dataStartIndex; i < table.rows.length; i++) {
+      const row = table.rows[i];
+      if (!row || !row.c) continue;
+      
+      const obj: SheetRow = {};
+      let hasData = false;
+      
+      row.c.forEach((cell: any, idx: number) => {
+        const header = headers[idx];
+        if (header) {
+          const value = cell?.v?.toString() || '';
+          obj[header] = value;
+          if (value) hasData = true;
+        }
+      });
+      
+      if (hasData) {
+        rows.push(obj);
+      }
+    }
+    
+    return rows;
   };
 
   // Sync mutation
   const syncMutation = useMutation({
-    mutationFn: async (): Promise<SyncResult> => {
+    mutationFn: async (targetConfig: GoogleSheetConfig): Promise<SyncResult> => {
       if (!user?.id) throw new Error('Usuario no autenticado');
       
-      const rows = await fetchSheetData();
+      const rows = await fetchSheetData(targetConfig.spreadsheet_id, targetConfig.sheet_name);
       
       if (rows.length === 0) {
         return { inserted: 0, updated: 0, skipped: 0, errors: ['La hoja está vacía'] };
       }
       
-      // Get headers and create mapping
       const headers = Object.keys(rows[0]);
-      const columnMapping = mapColumns(headers);
+      setDetectedHeaders(headers);
+      const columnMapping = mapColumns(headers, targetConfig.custom_columns);
       
-      // Check we have at least company_name or phone
       const hasCompany = Object.values(columnMapping).includes('company_name');
       const hasPhone = Object.values(columnMapping).includes('phone');
       
@@ -313,7 +404,6 @@ export function useGoogleSheetsSync() {
       
       for (const row of rows) {
         try {
-          // Map row data to lead fields
           const leadData: any = {
             user_id: user.id,
             source: 'google_sheets',
@@ -322,25 +412,26 @@ export function useGoogleSheetsSync() {
           for (const [originalHeader, dbField] of Object.entries(columnMapping)) {
             const value = row[originalHeader]?.trim();
             if (value) {
-              leadData[dbField] = value;
+              if (dbField === 'tags') {
+                leadData[dbField] = value.split(',').map((t: string) => t.trim()).filter(Boolean);
+              } else {
+                leadData[dbField] = value;
+              }
             }
           }
           
-          // Normalize phone
           if (leadData.phone) {
             const normalizedPhone = normalizePhone(leadData.phone);
             if (normalizedPhone) {
               leadData.phone = normalizedPhone;
               leadData.phone_type = detectPhoneType(normalizedPhone);
               
-              // If mobile, also set mobile_phone
               if (leadData.phone_type === 'mobile') {
                 leadData.mobile_phone = normalizedPhone;
               }
             }
           }
           
-          // Default values
           if (!leadData.company_name && leadData.contact_name) {
             leadData.company_name = leadData.contact_name;
           }
@@ -357,9 +448,7 @@ export function useGoogleSheetsSync() {
             leadData.status = 'nuevo';
           }
           
-          // Upsert by phone number (if available)
           if (leadData.phone) {
-            // Check if lead with this phone exists
             const { data: existing } = await supabase
               .from('leads')
               .select('id')
@@ -368,7 +457,6 @@ export function useGoogleSheetsSync() {
               .maybeSingle();
             
             if (existing) {
-              // Update existing
               const { error } = await supabase
                 .from('leads')
                 .update({
@@ -380,16 +468,11 @@ export function useGoogleSheetsSync() {
               if (error) throw error;
               result.updated++;
             } else {
-              // Insert new
-              const { error } = await supabase
-                .from('leads')
-                .insert(leadData);
-              
+              const { error } = await supabase.from('leads').insert(leadData);
               if (error) throw error;
               result.inserted++;
             }
           } else {
-            // No phone - check by company name
             const { data: existing } = await supabase
               .from('leads')
               .select('id')
@@ -409,10 +492,7 @@ export function useGoogleSheetsSync() {
               if (error) throw error;
               result.updated++;
             } else {
-              const { error } = await supabase
-                .from('leads')
-                .insert(leadData);
-              
+              const { error } = await supabase.from('leads').insert(leadData);
               if (error) throw error;
               result.inserted++;
             }
@@ -425,9 +505,12 @@ export function useGoogleSheetsSync() {
       
       return result;
     },
-    onSuccess: (result) => {
+    onSuccess: (result, targetConfig) => {
       setLastResult(result);
-      saveConfig({ lastSyncAt: new Date() });
+      updateConfig.mutate({ 
+        id: targetConfig.id, 
+        last_sync_at: new Date().toISOString() 
+      });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       
       const message = `Sincronización completada: ${result.inserted} nuevos, ${result.updated} actualizados`;
@@ -442,16 +525,17 @@ export function useGoogleSheetsSync() {
     },
   });
 
-  // Manual sync
-  const sync = useCallback(async () => {
-    if (isSyncing) return;
+  const sync = useCallback(async (targetConfig?: GoogleSheetConfig) => {
+    const configToSync = targetConfig || config;
+    if (!configToSync || isSyncing) return;
+    
     setIsSyncing(true);
     try {
-      await syncMutation.mutateAsync();
+      await syncMutation.mutateAsync(configToSync);
     } finally {
       setIsSyncing(false);
     }
-  }, [isSyncing, syncMutation]);
+  }, [config, isSyncing, syncMutation]);
 
   // Auto-sync effect
   useEffect(() => {
@@ -460,15 +544,15 @@ export function useGoogleSheetsSync() {
       autoSyncIntervalRef.current = null;
     }
     
-    if (config.autoSyncEnabled && config.spreadsheetId) {
-      const intervalMs = config.autoSyncInterval * 60 * 1000;
+    if (config?.auto_sync_enabled && config?.spreadsheet_id) {
+      const intervalMs = config.auto_sync_interval * 60 * 1000;
       
       autoSyncIntervalRef.current = setInterval(() => {
-        console.log('🔄 Auto-sync triggered');
-        sync();
+        console.log('🔄 Auto-sync triggered for', config.name);
+        sync(config);
       }, intervalMs);
       
-      console.log(`⏰ Auto-sync enabled: every ${config.autoSyncInterval} minutes`);
+      console.log(`⏰ Auto-sync enabled for ${config.name}: every ${config.auto_sync_interval} minutes`);
     }
     
     return () => {
@@ -476,14 +560,14 @@ export function useGoogleSheetsSync() {
         clearInterval(autoSyncIntervalRef.current);
       }
     };
-  }, [config.autoSyncEnabled, config.autoSyncInterval, config.spreadsheetId, sync]);
+  }, [config?.auto_sync_enabled, config?.auto_sync_interval, config?.spreadsheet_id, config?.name]);
 
   return {
     config,
-    saveConfig,
     sync,
     isSyncing,
     lastResult,
-    isConfigured: !!config.spreadsheetId,
+    detectedHeaders,
+    fetchHeaders,
   };
 }

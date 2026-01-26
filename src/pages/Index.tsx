@@ -25,6 +25,7 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { GoogleSheetsCard } from '@/components/settings/GoogleSheetsCard';
 import Inbox from '@/pages/Inbox';
 import Templates from '@/pages/Templates';
+import { GoogleSheetsImportModal } from '@/components/leads/GoogleSheetsImportModal';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -36,6 +37,7 @@ const IndexContent = () => {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isGoogleSheetsImportOpen, setIsGoogleSheetsImportOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   
   const { 
@@ -166,6 +168,7 @@ const IndexContent = () => {
             onViewLead={handleViewLead}
             onAddLead={handleAddLead}
             onImportLeads={() => setIsImportOpen(true)}
+            onImportFromGoogleSheets={() => setIsGoogleSheetsImportOpen(true)}
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             onLoadMore={() => fetchNextPage()}
@@ -284,6 +287,11 @@ const IndexContent = () => {
         onOpenChange={setIsImportOpen}
         onImport={handleImportLeads}
         isImporting={isImportingLeads}
+      />
+
+      <GoogleSheetsImportModal
+        open={isGoogleSheetsImportOpen}
+        onOpenChange={setIsGoogleSheetsImportOpen}
       />
 
       {/* Session timeout warning */}
