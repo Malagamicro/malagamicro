@@ -74,6 +74,25 @@ export function useNotifications() {
     soundEnabled: true,
   });
 
+  // Keep permission in sync (user can change it from browser UI without reloading)
+  useEffect(() => {
+    if (typeof Notification === 'undefined') return;
+
+    const syncPermission = () => {
+      const perm = Notification.permission;
+      setState((prev) => (prev.permission === perm ? prev : { ...prev, permission: perm }));
+    };
+
+    syncPermission();
+    window.addEventListener('focus', syncPermission);
+    document.addEventListener('visibilitychange', syncPermission);
+
+    return () => {
+      window.removeEventListener('focus', syncPermission);
+      document.removeEventListener('visibilitychange', syncPermission);
+    };
+  }, []);
+
   // Initialize sound function
   useEffect(() => {
     // Prefer /pop.mp3 if present, fallback to synthesized pop.
