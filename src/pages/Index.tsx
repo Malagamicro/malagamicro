@@ -22,6 +22,7 @@ import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
 import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
 import { WhatsAppPanel } from '@/components/whatsapp/WhatsAppPanel';
 import { NotificationProvider } from '@/contexts/NotificationContext';
+import { GoogleSheetsCard } from '@/components/settings/GoogleSheetsCard';
 import Inbox from '@/pages/Inbox';
 import Templates from '@/pages/Templates';
 import { useLeads } from '@/hooks/useLeads';
@@ -236,6 +237,15 @@ const IndexContent = () => {
             </div>
             <ProfileSettings />
             <ThemeToggleCard />
+            
+            {/* Integraciones Section */}
+            <div className="pt-4">
+              <h2 className="text-xl font-semibold text-foreground mb-4">Integraciones</h2>
+              <div className="space-y-4">
+                <GoogleSheetsCard />
+              </div>
+            </div>
+            
             <PasswordChangeCard />
             <TwoFactorAuthCard />
             <NotificationPreferencesCard />
