@@ -10,6 +10,27 @@ interface NotificationState {
   soundEnabled: boolean;
 }
 
+type NotificationDeliveryMethod = 'serviceWorker' | 'constructor' | 'none';
+export type NotificationAttemptResult =
+  | { ok: true; method: Exclude<NotificationDeliveryMethod, 'none'> }
+  | { ok: false; method: NotificationDeliveryMethod; error: string };
+
+function getRuntimePermission(): NotificationPermission {
+  if (typeof Notification === 'undefined') return 'denied';
+  return Notification.permission;
+}
+
+function formatNotifyError(err: unknown): string {
+  if (err instanceof Error) {
+    return err.name ? `${err.name}: ${err.message}` : err.message;
+  }
+  try {
+    return typeof err === 'string' ? err : JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
 // Generate a simple pop sound using Web Audio API (fallback)
 function createSynthPopSound(): () => void {
   return () => {
@@ -67,29 +88,63 @@ export function useNotifications() {
   const queryClient = useQueryClient();
   const playSoundRef = useRef<(() => void) | null>(null);
   const lastDeniedToastAtRef = useRef<number>(0);
+  const lastNotificationErrorToastAtRef = useRef<number>(0);
   const originalTitleRef = useRef(document.title);
   const [state, setState] = useState<NotificationState>({
-    permission: typeof Notification !== 'undefined' ? Notification.permission : 'denied',
+    permission: getRuntimePermission(),
     unreadCount: 0,
     soundEnabled: true,
   });
 
   // Keep permission in sync (user can change it from browser UI without reloading)
   useEffect(() => {
-    if (typeof Notification === 'undefined') return;
-
     const syncPermission = () => {
-      const perm = Notification.permission;
+      const perm = getRuntimePermission();
       setState((prev) => (prev.permission === perm ? prev : { ...prev, permission: perm }));
     };
 
-    syncPermission();
-    window.addEventListener('focus', syncPermission);
-    document.addEventListener('visibilitychange', syncPermission);
+    let status: PermissionStatus | null = null;
+    let cancelled = false;
+
+    const setup = async () => {
+      syncPermission();
+      window.addEventListener('focus', syncPermission);
+      document.addEventListener('visibilitychange', syncPermission);
+
+      // Last-resort polling (some browsers won't emit any event when toggling permission via the URL lock)
+      const interval = window.setInterval(syncPermission, 2000);
+
+      // Best-effort: live updates via Permissions API (more reliable than focus/visibility)
+      try {
+        if (navigator.permissions?.query) {
+          status = await navigator.permissions.query({ name: 'notifications' as PermissionName });
+          if (cancelled) return;
+          status.onchange = () => syncPermission();
+        }
+      } catch (err) {
+        // Not supported on some browsers (e.g. iOS Safari)
+        console.debug('Permissions API not available for notifications:', err);
+      }
+
+      return () => window.clearInterval(interval);
+    };
+
+    const teardownPromise = setup();
 
     return () => {
+      cancelled = true;
       window.removeEventListener('focus', syncPermission);
       document.removeEventListener('visibilitychange', syncPermission);
+      if (status) status.onchange = null;
+
+      // If setup created an interval, clear it
+      Promise.resolve(teardownPromise)
+        .then((teardown) => {
+          if (typeof teardown === 'function') teardown();
+        })
+        .catch(() => {
+          // ignore
+        });
     };
   }, []);
 
@@ -176,7 +231,7 @@ export function useNotifications() {
 
   // Show browser notification
   const showNotification = useCallback((title: string, body: string, options?: NotificationOptions) => {
-    if (state.permission !== 'granted') return null;
+    if (getRuntimePermission() !== 'granted') return null;
 
     try {
       const notification = new Notification(title, {
@@ -199,15 +254,92 @@ export function useNotifications() {
 
       return notification;
     } catch (error) {
-      console.error('Error showing notification:', error);
+      console.error('Error showing notification (constructor):', error);
       return null;
     }
-  }, [state.permission]);
+  }, []);
+
+  const showNotificationSmart = useCallback(
+    async (
+      title: string,
+      body: string,
+      options?: NotificationOptions,
+      config?: { notifyOnError?: boolean },
+    ): Promise<NotificationAttemptResult> => {
+      const perm = getRuntimePermission();
+      if (perm !== 'granted') {
+        return { ok: false, method: 'none', error: `Notification.permission = ${perm}` };
+      }
+
+      const notifOptions: NotificationOptions = {
+        body,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: `message-${Date.now()}`,
+        requireInteraction: false,
+        ...options,
+      };
+
+      // 1) Prefer Service Worker (more reliable in PWA contexts)
+      let swError: string | null = null;
+      try {
+        if ('serviceWorker' in navigator) {
+          // If a SW is controlling the page, ready resolves immediately and gives the right registration.
+          const reg = navigator.serviceWorker.controller
+            ? await navigator.serviceWorker.ready
+            : await navigator.serviceWorker.getRegistration();
+          if (reg && typeof reg.showNotification === 'function') {
+            await reg.showNotification(title, notifOptions);
+            return { ok: true, method: 'serviceWorker' };
+          }
+          swError = 'Service Worker missing';
+        } else {
+          swError = 'Service Worker missing';
+        }
+      } catch (err) {
+        swError = formatNotifyError(err);
+      }
+
+      // 2) Fallback to constructor
+      try {
+        const notification = new Notification(title, notifOptions);
+
+        setTimeout(() => notification.close(), 5000);
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+
+        return { ok: true, method: 'constructor' };
+      } catch (err) {
+        const ctorError = formatNotifyError(err);
+        const errorText = swError ? `SW: ${swError} | Notification(): ${ctorError}` : ctorError;
+
+        console.error('Error showing notification:', { swError, ctorError });
+
+        if (config?.notifyOnError) {
+          const now = Date.now();
+          if (now - lastNotificationErrorToastAtRef.current > 30000) {
+            lastNotificationErrorToastAtRef.current = now;
+            toast({
+              title: 'Error al mostrar notificación',
+              description: errorText,
+            });
+          }
+        }
+
+        return { ok: false, method: 'constructor', error: errorText };
+      }
+    },
+    [],
+  );
 
   // Handle new incoming message
   const handleNewMessage = useCallback((senderName: string, messageContent: string) => {
+    const perm = getRuntimePermission();
+
     // If blocked, show a diagnostic toast (throttled)
-    if (state.permission === 'denied') {
+    if (perm === 'denied') {
       const now = Date.now();
       if (now - lastDeniedToastAtRef.current > 15000) {
         lastDeniedToastAtRef.current = now;
@@ -226,7 +358,10 @@ export function useNotifications() {
 
     if (isHidden) {
       // Background tab -> show native notification
-      showNotification(senderName, preview);
+      void showNotificationSmart(senderName, preview, undefined, { notifyOnError: false }).then((result) => {
+        // Visual notification failed for any reason -> sound fallback so the user doesn't miss it
+        if (!result.ok) playSound();
+      });
     } else {
       // Foreground -> only play subtle sound
       playSound();
@@ -234,7 +369,20 @@ export function useNotifications() {
 
     // Invalidate unread count
     queryClient.invalidateQueries({ queryKey: ['unread-messages-count'] });
-  }, [playSound, showNotification, queryClient, state.permission]);
+  }, [playSound, queryClient, showNotificationSmart]);
+
+  const sendTestNotification = useCallback(async (): Promise<NotificationAttemptResult> => {
+    const result = await showNotificationSmart('Prueba', 'Si lees esto, funcionan ✅', undefined, {
+      notifyOnError: true,
+    });
+
+    // If visual notification fails, ensure we still alert with sound
+    if (!result.ok) {
+      playSound();
+    }
+
+    return result;
+  }, [playSound, showNotificationSmart]);
 
   // Toggle sound
   const toggleSound = useCallback(() => {
@@ -247,13 +395,15 @@ export function useNotifications() {
   }, [queryClient]);
 
   return {
-    permission: state.permission,
+    // Always expose the real runtime permission (not just local state)
+    permission: getRuntimePermission(),
     unreadCount: state.unreadCount,
     soundEnabled: state.soundEnabled,
     requestPermission,
     showNotification,
     playSound,
     handleNewMessage,
+    sendTestNotification,
     toggleSound,
     refreshUnreadCount,
     isLoading: unreadQuery.isLoading,

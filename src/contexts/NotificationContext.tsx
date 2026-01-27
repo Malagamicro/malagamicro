@@ -12,6 +12,7 @@ interface NotificationContextType {
   unreadCount: number;
   soundEnabled: boolean;
   requestPermission: () => Promise<NotificationPermission | 'denied'>;
+  sendTestNotification: () => Promise<{ ok: boolean; method: string; error?: string }>;
   toggleSound: () => void;
   refreshUnreadCount: () => void;
   showPermissionBanner: boolean;
@@ -32,6 +33,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     soundEnabled,
     requestPermission,
     handleNewMessage,
+    sendTestNotification,
     toggleSound,
     refreshUnreadCount,
   } = useNotifications();
@@ -221,6 +223,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         unreadCount,
         soundEnabled,
         requestPermission: handleRequestPermission,
+        sendTestNotification: async () => {
+          const result = await sendTestNotification();
+          if ('error' in result) {
+            return { ok: false, method: result.method, error: result.error };
+          }
+          return { ok: true, method: result.method };
+        },
         toggleSound,
         refreshUnreadCount,
         showPermissionBanner,
@@ -273,6 +282,11 @@ export function useNotificationContext() {
       unreadCount: 0,
       soundEnabled: true,
       requestPermission: async () => 'denied' as NotificationPermission,
+      sendTestNotification: async () => ({
+        ok: false as const,
+        method: 'none',
+        error: 'NotificationProvider no está montado',
+      }),
       toggleSound: () => {},
       refreshUnreadCount: () => {},
       showPermissionBanner: false,
