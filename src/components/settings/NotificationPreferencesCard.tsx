@@ -45,7 +45,11 @@ function PreferenceItem({ id, label, description, icon, checked, onCheckedChange
 
 export function NotificationPreferencesCard() {
   const { preferences, isLoading, updatePreferences, isUpdating } = useNotificationPreferences();
-  const { permission, requestPermission } = useNotificationContext();
+  const { permission, requestPermission, sendTestNotification } = useNotificationContext();
+
+  // Always read the real permission at render-time (avoids stale local state)
+  const runtimePermission: NotificationPermission =
+    typeof Notification !== 'undefined' ? Notification.permission : permission;
 
   const handleToggle = (key: string, value: boolean) => {
     updatePreferences({ [key]: value });
@@ -132,18 +136,48 @@ export function NotificationPreferencesCard() {
                 Mensajes y recordatorios en tu ordenador (solo cuando la pestaña esté en segundo plano)
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Estado: <span className="font-medium">{permission}</span> · Visibilidad: <span className="font-medium">{typeof document !== 'undefined' ? document.visibilityState : 'unknown'}</span>
+                Estado: <span className="font-medium">{runtimePermission}</span> · Visibilidad: <span className="font-medium">{typeof document !== 'undefined' ? document.visibilityState : 'unknown'}</span>
               </p>
             </div>
 
-            {(permission === 'default' || permission === 'denied') && (
+            {runtimePermission === 'granted' ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  const result = await sendTestNotification();
+                  if (result.ok) {
+                    toast({
+                      title: '✅ Notificación enviada',
+                      description:
+                        result.method === 'serviceWorker'
+                          ? 'Enviada vía Service Worker (PWA)'
+                          : 'Enviada vía Notification() (constructor)',
+                    });
+                  } else {
+                    console.error('Test notification failed:', result.error);
+                    toast({
+                      title: '❌ Error al notificar',
+                      description: result.error || 'Error desconocido',
+                    });
+                  }
+                }}
+                className="gap-2"
+              >
+                <TestTube2 className="h-4 w-4" />
+                Enviar notificación de prueba
+              </Button>
+            ) : (
               <Button
                 type="button"
                 variant="secondary"
                 onClick={async () => {
                   const result = await requestPermission();
                   if (result === 'granted') {
-                    toast({ title: '✅ Notificaciones activadas', description: 'Ya puedes recibir notificaciones cuando estés en otra pestaña.' });
+                    toast({
+                      title: '✅ Notificaciones activadas',
+                      description: 'Ya puedes recibir notificaciones cuando estés en otra pestaña.',
+                    });
                   }
                 }}
                 className="gap-2"
@@ -152,42 +186,6 @@ export function NotificationPreferencesCard() {
                 🔔 Activar Notificaciones
               </Button>
             )}
-          </div>
-
-          <div className="flex justify-end pt-3">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                try {
-                  if (typeof Notification === 'undefined') {
-                    toast({ title: 'No compatible', description: 'Este navegador no soporta notificaciones.' });
-                    return;
-                  }
-                  if (Notification.permission === 'denied') {
-                    toast({
-                      title: '⚠️ Notificaciones bloqueadas',
-                      description: 'Tienes las notificaciones bloqueadas en el navegador. Pulsa en el candado de la URL para permitirlas.',
-                    });
-                    return;
-                  }
-                  if (Notification.permission !== 'granted') {
-                    toast({ title: 'Permiso requerido', description: 'Pulsa "🔔 Activar Notificaciones" primero.' });
-                    return;
-                  }
-                  // Required by request: immediate native notification
-                  new Notification('Prueba', { body: 'Si lees esto, funcionan ✅' });
-                } catch (e) {
-                  console.error(e);
-                  toast({ title: 'Error', description: 'No se pudo mostrar la notificación de prueba.' });
-                }
-              }}
-              className="gap-2"
-            >
-              <TestTube2 className="h-4 w-4" />
-              Probar notificación
-            </Button>
           </div>
         </div>
       </CardContent>
