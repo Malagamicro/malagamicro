@@ -3,7 +3,6 @@ import { useEmailTemplates, useEmailCampaigns } from '@/hooks/useEmailCampaigns'
 import { useLeads } from '@/hooks/useLeads';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -54,12 +53,14 @@ import {
   Users,
   Clock,
   CheckCircle,
-  AlertCircle,
   Loader2,
-  Info
+  Info,
+  Pencil,
+  Eye,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { EmailTemplateEditor, EmailBlock, generateEmailHtml } from './EmailTemplateEditor';
 
 export function EmailCampaigns() {
   const { templates, addTemplate, deleteTemplate, isAddingTemplate } = useEmailTemplates();
@@ -68,11 +69,13 @@ export function EmailCampaigns() {
   
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showCampaignDialog, setShowCampaignDialog] = useState(false);
+  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
   
   // Template form state
   const [templateName, setTemplateName] = useState('');
   const [templateSubject, setTemplateSubject] = useState('');
-  const [templateBody, setTemplateBody] = useState('');
+  const [templateBlocks, setTemplateBlocks] = useState<EmailBlock[]>([]);
+  const [templateHtml, setTemplateHtml] = useState('');
   
   // Campaign form state
   const [campaignName, setCampaignName] = useState('');
@@ -82,17 +85,25 @@ export function EmailCampaigns() {
   // Filter leads with valid email and not unsubscribed
   const eligibleLeads = leads.filter(l => l.email && !l.emailUnsubscribed);
 
+  const previewTemplate = templates.find(t => t.id === previewTemplateId);
+
+  const handleEditorChange = (blocks: EmailBlock[], html: string) => {
+    setTemplateBlocks(blocks);
+    setTemplateHtml(html);
+  };
+
   const handleCreateTemplate = () => {
-    if (!templateName || !templateSubject || !templateBody) return;
+    if (!templateName || !templateSubject || !templateHtml) return;
     
     addTemplate(
-      { name: templateName, subject: templateSubject, body: templateBody },
+      { name: templateName, subject: templateSubject, body: templateHtml },
       {
         onSuccess: () => {
           setShowTemplateDialog(false);
           setTemplateName('');
           setTemplateSubject('');
-          setTemplateBody('');
+          setTemplateBlocks([]);
+          setTemplateHtml('');
         },
       }
     );
@@ -285,34 +296,55 @@ export function EmailCampaigns() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {templates.map((template) => (
-                <Card key={template.id}>
+                <Card key={template.id} className="group hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-lg">{template.name}</CardTitle>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="icon" variant="ghost" className="text-destructive h-8 w-8">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Eliminar plantilla?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción no se puede deshacer.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteTemplate(template.id)}>
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <div className="flex gap-1">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => setPreviewTemplateId(template.id)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="text-destructive h-8 w-8">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar plantilla?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteTemplate(template.id)}>
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                     <CardDescription>Asunto: {template.subject}</CardDescription>
                   </CardHeader>
+                  <CardContent className="pt-0">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full gap-2"
+                      onClick={() => setPreviewTemplateId(template.id)}
+                    >
+                      <Eye className="w-4 h-4" />
+                      Ver plantilla
+                    </Button>
+                  </CardContent>
                 </Card>
               ))}
             </div>
@@ -320,50 +352,66 @@ export function EmailCampaigns() {
         </TabsContent>
       </Tabs>
 
-      {/* Template Dialog */}
+      {/* Template Dialog - Full Editor */}
       <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full">
           <DialogHeader>
             <DialogTitle>Nueva Plantilla de Email</DialogTitle>
             <DialogDescription>
-              Usa variables como {`{{nombre}}`}, {`{{empresa}}`}, {`{{ciudad}}`} para personalizar.
+              Usa variables como {`{{nombre}}`}, {`{{empresa}}`}, {`{{ciudad}}`} para personalizar el contenido.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Nombre de la plantilla</Label>
-              <Input
-                placeholder="Ej: Presentación servicios"
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-              />
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nombre de la plantilla</Label>
+                <Input
+                  placeholder="Ej: Presentación servicios"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Asunto del email</Label>
+                <Input
+                  placeholder="Ej: {{empresa}} - Propuesta de servicios"
+                  value={templateSubject}
+                  onChange={(e) => setTemplateSubject(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label>Asunto del email</Label>
-              <Input
-                placeholder="Ej: {{empresa}} - Propuesta de servicios"
-                value={templateSubject}
-                onChange={(e) => setTemplateSubject(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Cuerpo del email (HTML)</Label>
-              <Textarea
-                placeholder={`<p>Hola {{nombre}},</p>\n<p>Le escribo desde MalagaMicro...</p>`}
-                value={templateBody}
-                onChange={(e) => setTemplateBody(e.target.value)}
-                rows={8}
-              />
-            </div>
+            
+            <EmailTemplateEditor onChange={handleEditorChange} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateTemplate} disabled={isAddingTemplate}>
-              {isAddingTemplate ? 'Guardando...' : 'Guardar'}
+            <Button onClick={handleCreateTemplate} disabled={isAddingTemplate || !templateName || !templateSubject || !templateHtml}>
+              {isAddingTemplate ? 'Guardando...' : 'Guardar Plantilla'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Preview Dialog */}
+      <Dialog open={!!previewTemplateId} onOpenChange={(open) => !open && setPreviewTemplateId(null)}>
+        <DialogContent className="max-w-[700px] max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              Vista previa: {previewTemplate?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Asunto: {previewTemplate?.subject}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div 
+              className="border rounded-lg p-4 bg-muted/30"
+              dangerouslySetInnerHTML={{ __html: previewTemplate?.body || '' }}
+            />
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
