@@ -718,6 +718,7 @@ export type Database = {
           file_path: string
           file_size: number
           file_type: string | null
+          folder_id: string | null
           folder_path: string | null
           id: string
           updated_at: string | null
@@ -730,6 +731,7 @@ export type Database = {
           file_path: string
           file_size: number
           file_type?: string | null
+          folder_id?: string | null
           folder_path?: string | null
           id?: string
           updated_at?: string | null
@@ -742,12 +744,59 @@ export type Database = {
           file_path?: string
           file_size?: number
           file_type?: string | null
+          folder_id?: string | null
           folder_path?: string | null
           id?: string
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shared_files_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "shared_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shared_folders: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "shared_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       waha_messages: {
         Row: {

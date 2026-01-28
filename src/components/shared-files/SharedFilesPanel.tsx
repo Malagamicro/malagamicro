@@ -15,7 +15,14 @@ import {
   Search,
   MoreVertical,
   Edit,
-  User,
+  FolderPlus,
+  Folder,
+  FolderOpen,
+  ChevronRight,
+  Home,
+  X,
+  Eye,
+  ArrowLeft,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,7 +53,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useSharedFiles, formatFileSize, SharedFile } from '@/hooks/useSharedFiles';
+import { useSharedFiles, useSharedFolders, formatFileSize, SharedFile, SharedFolder } from '@/hooks/useSharedFiles';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -65,23 +72,69 @@ function getInitials(name: string | null | undefined) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
+function canPreview(fileType: string | null): boolean {
+  if (!fileType) return false;
+  return fileType.startsWith('image/') || fileType === 'application/pdf';
+}
+
+// Breadcrumb type
+interface BreadcrumbItem {
+  id: string | null;
+  name: string;
+}
+
 export function SharedFilesPanel() {
   const { user } = useAuth();
-  const { files, isLoading, uploadFile, deleteFile, updateDescription } = useSharedFiles('/');
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([{ id: null, name: 'Inicio' }]);
+  
+  const { files, isLoading: filesLoading, uploadFile, deleteFile, updateDescription } = useSharedFiles(currentFolderId);
+  const { folders, isLoading: foldersLoading, createFolder, deleteFolder, renameFolder } = useSharedFolders(currentFolderId);
+  
   const [search, setSearch] = useState('');
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteType, setDeleteType] = useState<'file' | 'folder'>('file');
+  const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false);
+  const [renameFolderDialogOpen, setRenameFolderDialogOpen] = useState(false);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  
   const [selectedFile, setSelectedFile] = useState<SharedFile | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<SharedFolder | null>(null);
   const [description, setDescription] = useState('');
+  const [newFolderName, setNewFolderName] = useState('');
   const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isLoading = filesLoading || foldersLoading;
 
   const filteredFiles = files.filter(file =>
     file.file_name.toLowerCase().includes(search.toLowerCase()) ||
     file.description?.toLowerCase().includes(search.toLowerCase()) ||
     file.uploader?.full_name?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const filteredFolders = folders.filter(folder =>
+    folder.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const navigateToFolder = (folder: SharedFolder) => {
+    setCurrentFolderId(folder.id);
+    setBreadcrumbs(prev => [...prev, { id: folder.id, name: folder.name }]);
+  };
+
+  const navigateToBreadcrumb = (index: number) => {
+    const target = breadcrumbs[index];
+    setCurrentFolderId(target.id);
+    setBreadcrumbs(prev => prev.slice(0, index + 1));
+  };
+
+  const goBack = () => {
+    if (breadcrumbs.length > 1) {
+      navigateToBreadcrumb(breadcrumbs.length - 2);
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,6 +161,7 @@ export function SharedFilesPanel() {
       await uploadFile.mutateAsync({
         file: selectedUploadFile,
         description: description || undefined,
+        folderId: currentFolderId,
       });
       setUploadDialogOpen(false);
       setSelectedUploadFile(null);
@@ -117,10 +171,46 @@ export function SharedFilesPanel() {
     }
   };
 
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+
+    try {
+      await createFolder.mutateAsync({
+        name: newFolderName.trim(),
+        parentId: currentFolderId,
+      });
+      setCreateFolderDialogOpen(false);
+      setNewFolderName('');
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleRenameFolder = async () => {
+    if (!selectedFolder || !newFolderName.trim()) return;
+
+    try {
+      await renameFolder.mutateAsync({
+        id: selectedFolder.id,
+        name: newFolderName.trim(),
+      });
+      setRenameFolderDialogOpen(false);
+      setSelectedFolder(null);
+      setNewFolderName('');
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const handleEdit = (file: SharedFile) => {
     setSelectedFile(file);
     setDescription(file.description || '');
     setEditDialogOpen(true);
+  };
+
+  const handlePreview = (file: SharedFile) => {
+    setSelectedFile(file);
+    setPreviewDialogOpen(true);
   };
 
   const handleUpdateDescription = async () => {
@@ -138,18 +228,34 @@ export function SharedFilesPanel() {
     }
   };
 
-  const handleDeleteClick = (file: SharedFile) => {
+  const handleDeleteFileClick = (file: SharedFile) => {
     setSelectedFile(file);
+    setDeleteType('file');
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!selectedFile) return;
+  const handleDeleteFolderClick = (folder: SharedFolder) => {
+    setSelectedFolder(folder);
+    setDeleteType('folder');
+    setDeleteDialogOpen(true);
+  };
 
+  const handleRenameFolderClick = (folder: SharedFolder) => {
+    setSelectedFolder(folder);
+    setNewFolderName(folder.name);
+    setRenameFolderDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
     try {
-      await deleteFile.mutateAsync(selectedFile.id);
+      if (deleteType === 'file' && selectedFile) {
+        await deleteFile.mutateAsync(selectedFile.id);
+      } else if (deleteType === 'folder' && selectedFolder) {
+        await deleteFolder.mutateAsync(selectedFolder.id);
+      }
       setDeleteDialogOpen(false);
       setSelectedFile(null);
+      setSelectedFolder(null);
     } catch (error) {
       console.error(error);
     }
@@ -171,16 +277,46 @@ export function SharedFilesPanel() {
                 </p>
               </div>
             </div>
-            <Button onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4 mr-2" />
-              Subir Archivo
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setCreateFolderDialogOpen(true)}>
+                <FolderPlus className="h-4 w-4 mr-2" />
+                Nueva Carpeta
+              </Button>
+              <Button onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-4 w-4 mr-2" />
+                Subir Archivo
+              </Button>
+            </div>
           </div>
 
-          <div className="relative mt-4">
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-1 mt-4 text-sm">
+            {breadcrumbs.length > 1 && (
+              <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={goBack}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            {breadcrumbs.map((crumb, index) => (
+              <div key={crumb.id || 'root'} className="flex items-center">
+                {index > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-1" />}
+                <button
+                  onClick={() => navigateToBreadcrumb(index)}
+                  className={cn(
+                    'px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1',
+                    index === breadcrumbs.length - 1 && 'font-medium text-foreground'
+                  )}
+                >
+                  {index === 0 && <Home className="h-3.5 w-3.5" />}
+                  {crumb.name}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar archivos..."
+              placeholder="Buscar archivos y carpetas..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10"
@@ -201,18 +337,78 @@ export function SharedFilesPanel() {
             <div className="flex items-center justify-center h-48">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredFiles.length === 0 ? (
+          ) : filteredFolders.length === 0 && filteredFiles.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
               <Cloud className="h-12 w-12 mb-3 opacity-30" />
-              <p className="font-medium">No hay archivos</p>
-              <p className="text-sm">Sube el primero para compartir con tu equipo</p>
+              <p className="font-medium">Esta carpeta está vacía</p>
+              <p className="text-sm">Sube archivos o crea carpetas para organizar</p>
             </div>
           ) : (
-            <ScrollArea className="h-[calc(100vh-280px)]">
+            <ScrollArea className="h-[calc(100vh-340px)]">
               <div className="grid gap-3">
+                {/* Folders */}
+                {filteredFolders.map((folder) => {
+                  const isOwner = folder.user_id === user?.id;
+
+                  return (
+                    <div
+                      key={folder.id}
+                      className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                      onClick={() => navigateToFolder(folder)}
+                    >
+                      <div className="p-3 rounded-lg bg-amber-500/10">
+                        <Folder className="h-6 w-6 text-amber-500" />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{folder.name}</p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          <span>{format(new Date(folder.created_at), "d MMM yyyy", { locale: es })}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-7 w-7">
+                          {folder.owner?.avatar_url && (
+                            <AvatarImage src={folder.owner.avatar_url} />
+                          )}
+                          <AvatarFallback className="text-xs">
+                            {getInitials(folder.owner?.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        {isOwner && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRenameFolderClick(folder); }}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Renombrar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={(e) => { e.stopPropagation(); handleDeleteFolderClick(folder); }}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Files */}
                 {filteredFiles.map((file) => {
                   const FileIcon = getFileIcon(file.file_type);
                   const isOwner = file.user_id === user?.id;
+                  const showPreview = canPreview(file.file_type);
 
                   return (
                     <div
@@ -224,6 +420,7 @@ export function SharedFilesPanel() {
                         file.file_type?.startsWith('image/') ? 'bg-pink-500/10' :
                         file.file_type?.startsWith('video/') ? 'bg-purple-500/10' :
                         file.file_type?.startsWith('audio/') ? 'bg-orange-500/10' :
+                        file.file_type?.includes('pdf') ? 'bg-red-500/10' :
                         'bg-blue-500/10'
                       )}>
                         <FileIcon className={cn(
@@ -231,6 +428,7 @@ export function SharedFilesPanel() {
                           file.file_type?.startsWith('image/') ? 'text-pink-500' :
                           file.file_type?.startsWith('video/') ? 'text-purple-500' :
                           file.file_type?.startsWith('audio/') ? 'text-orange-500' :
+                          file.file_type?.includes('pdf') ? 'text-red-500' :
                           'text-blue-500'
                         )} />
                       </div>
@@ -264,6 +462,17 @@ export function SharedFilesPanel() {
                           </span>
                         </div>
 
+                        {showPreview && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handlePreview(file)}
+                            title="Vista previa"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+
                         <Button
                           variant="ghost"
                           size="icon"
@@ -287,7 +496,7 @@ export function SharedFilesPanel() {
                                 Editar descripción
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => handleDeleteClick(file)}
+                                onClick={() => handleDeleteFileClick(file)}
                                 className="text-destructive"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
@@ -353,7 +562,69 @@ export function SharedFilesPanel() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
+      {/* Create Folder Dialog */}
+      <Dialog open={createFolderDialogOpen} onOpenChange={setCreateFolderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva Carpeta</DialogTitle>
+          </DialogHeader>
+          <div>
+            <label className="text-sm font-medium">Nombre de la carpeta</label>
+            <Input
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              placeholder="Mi carpeta..."
+              className="mt-1.5"
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateFolderDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleCreateFolder}
+              disabled={createFolder.isPending || !newFolderName.trim()}
+            >
+              {createFolder.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Crear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Folder Dialog */}
+      <Dialog open={renameFolderDialogOpen} onOpenChange={setRenameFolderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renombrar Carpeta</DialogTitle>
+          </DialogHeader>
+          <div>
+            <label className="text-sm font-medium">Nuevo nombre</label>
+            <Input
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              placeholder="Nombre de la carpeta..."
+              className="mt-1.5"
+              onKeyDown={(e) => e.key === 'Enter' && handleRenameFolder()}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameFolderDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleRenameFolder}
+              disabled={renameFolder.isPending || !newFolderName.trim()}
+            >
+              {renameFolder.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Description Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -381,13 +652,59 @@ export function SharedFilesPanel() {
         </DialogContent>
       </Dialog>
 
+      {/* Preview Dialog */}
+      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center justify-between pr-8">
+              <span className="truncate">{selectedFile?.file_name}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {selectedFile?.file_type?.startsWith('image/') ? (
+              <img 
+                src={selectedFile.file_path} 
+                alt={selectedFile.file_name}
+                className="max-w-full h-auto mx-auto rounded-lg"
+              />
+            ) : selectedFile?.file_type === 'application/pdf' ? (
+              <iframe
+                src={selectedFile.file_path}
+                className="w-full h-[70vh] rounded-lg border"
+                title={selectedFile.file_name}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-48 text-muted-foreground">
+                Vista previa no disponible
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex-shrink-0">
+            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>
+              Cerrar
+            </Button>
+            <Button asChild>
+              <a href={selectedFile?.file_path} target="_blank" rel="noopener noreferrer" download>
+                <Download className="h-4 w-4 mr-2" />
+                Descargar
+              </a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar archivo?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿Eliminar {deleteType === 'folder' ? 'carpeta' : 'archivo'}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. El archivo "{selectedFile?.file_name}" será eliminado permanentemente.
+              {deleteType === 'folder' 
+                ? `Esta acción no se puede deshacer. La carpeta "${selectedFolder?.name}" y todo su contenido serán eliminados permanentemente.`
+                : `Esta acción no se puede deshacer. El archivo "${selectedFile?.file_name}" será eliminado permanentemente.`
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -396,7 +713,7 @@ export function SharedFilesPanel() {
               onClick={handleConfirmDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteFile.isPending ? (
+              {(deleteFile.isPending || deleteFolder.isPending) ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Trash2 className="h-4 w-4 mr-2" />
