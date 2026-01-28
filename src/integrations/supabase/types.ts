@@ -710,6 +710,45 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_files: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string | null
+          folder_path: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type?: string | null
+          folder_path?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: string | null
+          folder_path?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       waha_messages: {
         Row: {
           ack_status: string | null

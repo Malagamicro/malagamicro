@@ -30,6 +30,7 @@ import Templates from '@/pages/Templates';
 import { GoogleSheetsImportModal } from '@/components/leads/GoogleSheetsImportModal';
 import { PerplexityChatbot } from '@/components/chat/PerplexityChatbot';
 import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
+import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -245,7 +246,12 @@ const IndexContent = () => {
             <InternalChatPage />
           </div>
         );
-      case 'chat-ai':
+      case 'shared-files':
+        return (
+          <div className="p-8 h-full animate-fade-in">
+            <SharedFilesPanel />
+          </div>
+        );
         return (
           <div className="p-8 space-y-6 animate-fade-in max-w-4xl mx-auto">
             <div>
