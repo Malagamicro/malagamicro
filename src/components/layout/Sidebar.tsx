@@ -22,6 +22,7 @@ import {
   Globe,
   FolderOpen,
   Bot,
+  Cloud,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +46,7 @@ const menuItems = [
   { id: 'reports', label: 'Reportes', icon: BarChart3 },
   { id: 'inbox', label: 'Inbox', icon: Inbox, showBadge: true },
   { id: 'mensajes', label: 'Mensajes', icon: MessagesSquare },
+  { id: 'shared-files', label: 'Archivos', icon: Cloud },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
   { id: 'templates', label: 'Plantillas', icon: FileText },
   { id: 'chat-ai', label: 'Chat IA', icon: Bot },
