@@ -81,25 +81,26 @@ export default defineConfig(({ mode }) => ({
           },
         ],
       },
-      workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "supabase-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24, // 24 hours
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
+    workbox: {
+      globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+      maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit
+      runtimeCaching: [
+        {
+          urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+          handler: "NetworkFirst",
+          options: {
+            cacheName: "supabase-cache",
+            expiration: {
+              maxEntries: 50,
+              maxAgeSeconds: 60 * 60 * 24, // 24 hours
+            },
+            cacheableResponse: {
+              statuses: [0, 200],
             },
           },
-        ],
-      },
+        },
+      ],
+    },
       devOptions: {
         enabled: true,
       },
