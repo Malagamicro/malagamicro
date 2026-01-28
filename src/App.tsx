@@ -13,6 +13,7 @@ import ResetPassword from "./pages/ResetPassword";
 import WhatsAppTest from "./pages/WhatsAppTest";
 import Scraper from "./pages/Scraper";
 import FileManager from "./pages/FileManager";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/install" element={<Install />} />
               <Route path="/whatsapp-test" element={<WhatsAppTest />} />
               <Route
                 path="/tools/scraper"
