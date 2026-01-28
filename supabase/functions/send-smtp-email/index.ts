@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import nodemailer from "nodemailer";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,42 +50,41 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Connecting to SMTP: ${smtpHost}:${smtpPort}`);
 
-    // Create SMTP client
-    const client = new SmtpClient();
-
-    // Connect with STARTTLS (Office 365 / Outlook uses port 587 with STARTTLS)
-    await client.connectTLS({
-      hostname: smtpHost,
+    // Create nodemailer transporter for Office 365
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
       port: smtpPort,
-      username: smtpUser,
-      password: smtpPassword,
+      secure: false, // false for STARTTLS on port 587
+      auth: {
+        user: smtpUser,
+        pass: smtpPassword,
+      },
+      tls: {
+        ciphers: 'SSLv3',
+        rejectUnauthorized: false,
+      },
     });
 
     // Prepare recipients
-    const recipients = Array.isArray(to) ? to : [to];
-    const toList = recipients.join(", ");
-
-    // Build email content - for HTML, wrap it properly
-    const emailContent = html || text || "";
+    const recipients = Array.isArray(to) ? to.join(", ") : to;
 
     // Send email
-    await client.send({
-      from: `${fromName} <${fromEmail}>`,
-      to: toList,
+    const info = await transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: recipients,
       subject: subject,
-      content: emailContent,
+      text: text || undefined,
       html: html || undefined,
+      replyTo: replyTo || undefined,
     });
 
-    await client.close();
-
-    console.log("Email sent successfully to:", toList);
+    console.log("Email sent successfully:", info.messageId);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: "Email sent successfully",
-        recipients: recipients.length 
+        messageId: info.messageId,
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
