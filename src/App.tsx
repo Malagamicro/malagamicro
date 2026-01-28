@@ -27,10 +27,25 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              <Route path="/login" element={<Auth />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/install" element={<Install />} />
-              <Route path="/whatsapp-test" element={<WhatsAppTest />} />
+              <Route
+                path="/install"
+                element={
+                  <ProtectedRoute>
+                    <Install />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/whatsapp-test"
+                element={
+                  <ProtectedRoute>
+                    <WhatsAppTest />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/tools/scraper"
                 element={

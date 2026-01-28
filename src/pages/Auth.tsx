@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Building2 } from 'lucide-react';
 import { z } from 'zod';
-import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 import { RateLimitWarning } from '@/components/auth/RateLimitWarning';
 import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
 import { useLoginRateLimit } from '@/hooks/useLoginRateLimit';
@@ -19,14 +18,13 @@ const authSchema = z.object({
 });
 
 export default function Auth() {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
-  const { signIn, signUp, user, loading } = useAuth();
+  const { signIn, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -68,8 +66,7 @@ export default function Auth() {
     
     if (!validateForm()) return;
     
-    // Check rate limit for login attempts
-    if (!isSignUp && isLocked) {
+    if (isLocked) {
       toast({
         title: 'Cuenta bloqueada',
         description: 'Demasiados intentos fallidos. Espera antes de intentar de nuevo.',
@@ -81,51 +78,25 @@ export default function Auth() {
     setIsLoading(true);
 
     try {
-      if (isSignUp) {
-        const { error } = await signUp(email, password);
-        if (error) {
-          if (error.message.includes('User already registered')) {
-            toast({
-              title: 'Error',
-              description: 'Este email ya está registrado. Intenta iniciar sesión.',
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: 'Error',
-              description: error.message,
-              variant: 'destructive',
-            });
-          }
+      const { error } = await signIn(email, password);
+      if (error) {
+        recordFailedAttempt();
+        
+        if (error.message.includes('Invalid login credentials')) {
+          toast({
+            title: 'Error',
+            description: 'Email o contraseña incorrectos.',
+            variant: 'destructive',
+          });
         } else {
           toast({
-            title: 'Cuenta creada',
-            description: '¡Bienvenido! Tu cuenta ha sido creada correctamente.',
+            title: 'Error',
+            description: error.message,
+            variant: 'destructive',
           });
         }
       } else {
-        const { error } = await signIn(email, password);
-        if (error) {
-          // Record failed attempt for rate limiting
-          recordFailedAttempt();
-          
-          if (error.message.includes('Invalid login credentials')) {
-            toast({
-              title: 'Error',
-              description: 'Email o contraseña incorrectos.',
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: 'Error',
-              description: error.message,
-              variant: 'destructive',
-            });
-          }
-        } else {
-          // Successful login, reset attempts
-          resetAttempts();
-        }
+        resetAttempts();
       }
     } finally {
       setIsLoading(false);
@@ -149,26 +120,19 @@ export default function Auth() {
               <Building2 className="w-6 h-6 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">
-            {isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}
-          </CardTitle>
+          <CardTitle className="text-2xl">MalagaMicro CRM</CardTitle>
           <CardDescription>
-            {isSignUp 
-              ? 'Crea tu cuenta para gestionar tus leads' 
-              : 'Accede a tu panel de gestión de leads'}
+            Accede a tu panel de gestión de leads
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            {/* Rate limit warning for login */}
-            {!isSignUp && (
-              <RateLimitWarning
-                isLocked={isLocked}
-                attemptsRemaining={attemptsRemaining}
-                formattedTime={formatRemainingTime()}
-                maxAttempts={maxAttempts}
-              />
-            )}
+            <RateLimitWarning
+              isLocked={isLocked}
+              attemptsRemaining={attemptsRemaining}
+              formattedTime={formatRemainingTime()}
+              maxAttempts={maxAttempts}
+            />
             
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -194,48 +158,34 @@ export default function Auth() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading || isLocked}
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                autoComplete="current-password"
               />
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
               )}
-              {isSignUp && <PasswordStrengthIndicator password={password} />}
             </div>
             
-            {/* Forgot password link */}
-            {!isSignUp && (
-              <button
-                type="button"
-                onClick={() => setShowForgotPassword(true)}
-                className="text-sm text-primary hover:underline self-start"
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="text-sm text-primary hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4">
+          <CardFooter>
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={isLoading || (!isSignUp && isLocked)}
+              disabled={isLoading || isLocked}
             >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}
+              Iniciar sesión
             </Button>
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {isSignUp 
-                ? '¿Ya tienes cuenta? Inicia sesión' 
-                : '¿No tienes cuenta? Regístrate'}
-            </button>
           </CardFooter>
         </form>
       </Card>
       
-      {/* Forgot Password Modal */}
       <ForgotPasswordModal
         open={showForgotPassword}
         onOpenChange={setShowForgotPassword}
