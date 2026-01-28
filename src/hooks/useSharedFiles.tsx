@@ -3,6 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
+export interface SharedFolder {
+  id: string;
+  user_id: string;
+  name: string;
+  parent_id: string | null;
+  color: string;
+  created_at: string;
+  updated_at: string;
+  owner?: {
+    full_name: string | null;
+    avatar_url: string | null;
+  };
+}
+
 export interface SharedFile {
   id: string;
   user_id: string;
@@ -11,6 +25,7 @@ export interface SharedFile {
   file_size: number;
   file_type: string | null;
   description: string | null;
+  folder_id: string | null;
   folder_path: string;
   created_at: string;
   updated_at: string;
@@ -20,23 +35,144 @@ export interface SharedFile {
   };
 }
 
-export function useSharedFiles(folderPath: string = '/') {
+export function useSharedFolders(parentId: string | null = null) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: folders = [], isLoading } = useQuery({
+    queryKey: ['shared-folders', parentId],
+    queryFn: async (): Promise<SharedFolder[]> => {
+      let query = supabase
+        .from('shared_folders')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (parentId === null) {
+        query = query.is('parent_id', null);
+      } else {
+        query = query.eq('parent_id', parentId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Get owner profiles
+      const userIds = [...new Set((data || []).map(f => f.user_id))];
+      if (userIds.length === 0) return data || [];
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, avatar_url')
+        .in('user_id', userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
+
+      return (data || []).map(folder => ({
+        ...folder,
+        owner: profileMap.get(folder.user_id),
+      }));
+    },
+    enabled: !!user,
+  });
+
+  const createFolder = useMutation({
+    mutationFn: async ({ name, parentId: parent, color }: { name: string; parentId?: string | null; color?: string }) => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('shared_folders')
+        .insert({
+          user_id: user.id,
+          name,
+          parent_id: parent || null,
+          color: color || '#6366f1',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shared-folders'] });
+      toast.success('Carpeta creada');
+    },
+    onError: () => {
+      toast.error('Error al crear carpeta');
+    },
+  });
+
+  const deleteFolder = useMutation({
+    mutationFn: async (folderId: string) => {
+      const { error } = await supabase
+        .from('shared_folders')
+        .delete()
+        .eq('id', folderId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shared-folders'] });
+      queryClient.invalidateQueries({ queryKey: ['shared-files'] });
+      toast.success('Carpeta eliminada');
+    },
+    onError: () => {
+      toast.error('Error al eliminar carpeta');
+    },
+  });
+
+  const renameFolder = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from('shared_folders')
+        .update({ name })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shared-folders'] });
+      toast.success('Carpeta renombrada');
+    },
+    onError: () => {
+      toast.error('Error al renombrar carpeta');
+    },
+  });
+
+  return {
+    folders,
+    isLoading,
+    createFolder,
+    deleteFolder,
+    renameFolder,
+  };
+}
+
+export function useSharedFiles(folderId: string | null = null) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: files = [], isLoading } = useQuery({
-    queryKey: ['shared-files', folderPath],
+    queryKey: ['shared-files', folderId],
     queryFn: async (): Promise<SharedFile[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('shared_files')
         .select('*')
-        .eq('folder_path', folderPath)
         .order('created_at', { ascending: false });
 
+      if (folderId === null) {
+        query = query.is('folder_id', null);
+      } else {
+        query = query.eq('folder_id', folderId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
 
       // Get uploader profiles
       const userIds = [...new Set((data || []).map(f => f.user_id))];
+      if (userIds.length === 0) return data || [];
+
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, full_name, avatar_url')
@@ -56,11 +192,11 @@ export function useSharedFiles(folderPath: string = '/') {
     mutationFn: async ({ 
       file, 
       description,
-      folderPath: targetFolder = '/' 
+      folderId: targetFolder,
     }: { 
       file: File; 
       description?: string;
-      folderPath?: string;
+      folderId?: string | null;
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
@@ -89,7 +225,8 @@ export function useSharedFiles(folderPath: string = '/') {
           file_size: file.size,
           file_type: file.type || null,
           description: description || null,
-          folder_path: targetFolder,
+          folder_id: targetFolder || null,
+          folder_path: '/',
         });
 
       if (dbError) throw dbError;
@@ -125,13 +262,17 @@ export function useSharedFiles(folderPath: string = '/') {
       }
 
       // Extract storage path from URL
-      const url = new URL(file.file_path);
-      const storagePath = url.pathname.split('/shared-files/')[1];
+      try {
+        const url = new URL(file.file_path);
+        const storagePath = url.pathname.split('/shared-files/')[1];
 
-      if (storagePath) {
-        await supabase.storage
-          .from('shared-files')
-          .remove([storagePath]);
+        if (storagePath) {
+          await supabase.storage
+            .from('shared-files')
+            .remove([decodeURIComponent(storagePath)]);
+        }
+      } catch (e) {
+        console.warn('Could not delete storage file:', e);
       }
 
       // Delete from database
@@ -170,12 +311,31 @@ export function useSharedFiles(folderPath: string = '/') {
     },
   });
 
+  const moveFile = useMutation({
+    mutationFn: async ({ fileId, folderId: targetFolderId }: { fileId: string; folderId: string | null }) => {
+      const { error } = await supabase
+        .from('shared_files')
+        .update({ folder_id: targetFolderId })
+        .eq('id', fileId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shared-files'] });
+      toast.success('Archivo movido');
+    },
+    onError: () => {
+      toast.error('Error al mover archivo');
+    },
+  });
+
   return {
     files,
     isLoading,
     uploadFile,
     deleteFile,
     updateDescription,
+    moveFile,
   };
 }
 
