@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,35 +50,36 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Connecting to SMTP: ${smtpHost}:${smtpPort}`);
 
-    // Create SMTP client for Office 365
-    const client = new SMTPClient({
-      connection: {
-        hostname: smtpHost,
-        port: smtpPort,
-        tls: true, // Office 365 uses STARTTLS
-        auth: {
-          username: smtpUser,
-          password: smtpPassword,
-        },
-      },
+    // Create SMTP client
+    const client = new SmtpClient();
+
+    // Connect with STARTTLS (Office 365 / Outlook uses port 587 with STARTTLS)
+    await client.connectTLS({
+      hostname: smtpHost,
+      port: smtpPort,
+      username: smtpUser,
+      password: smtpPassword,
     });
 
     // Prepare recipients
     const recipients = Array.isArray(to) ? to : [to];
+    const toList = recipients.join(", ");
+
+    // Build email content - for HTML, wrap it properly
+    const emailContent = html || text || "";
 
     // Send email
-    const result = await client.send({
+    await client.send({
       from: `${fromName} <${fromEmail}>`,
-      to: recipients,
+      to: toList,
       subject: subject,
-      content: text || "",
+      content: emailContent,
       html: html || undefined,
-      replyTo: replyTo || undefined,
     });
 
     await client.close();
 
-    console.log("Email sent successfully:", result);
+    console.log("Email sent successfully to:", toList);
 
     return new Response(
       JSON.stringify({ 
