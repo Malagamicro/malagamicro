@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.scrape-contact-info]
 verify_jwt = false
+
+[functions.send-smtp-email]
+verify_jwt = false
