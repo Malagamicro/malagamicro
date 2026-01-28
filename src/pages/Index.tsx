@@ -20,6 +20,7 @@ import { NotificationPreferencesCard } from '@/components/settings/NotificationP
 import { TwoFactorAuthCard } from '@/components/settings/TwoFactorAuthCard';
 import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
 import { SmtpTestCard } from '@/components/settings/SmtpTestCard';
+import { SmtpConfigCard } from '@/components/settings/SmtpConfigCard';
 import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
 import { WhatsAppPanel } from '@/components/whatsapp/WhatsAppPanel';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -273,6 +274,14 @@ const IndexContent = () => {
               <h2 className="text-xl font-semibold text-foreground mb-4">Integraciones</h2>
               <div className="space-y-4">
                 <GoogleSheetsCard />
+              </div>
+            </div>
+            
+            {/* Email SMTP Section */}
+            <div className="pt-4">
+              <h2 className="text-xl font-semibold text-foreground mb-4">Configuración de Email</h2>
+              <div className="space-y-4">
+                <SmtpConfigCard />
                 <SmtpTestCard />
               </div>
             </div>
