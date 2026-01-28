@@ -19,6 +19,7 @@ import { PasswordChangeCard } from '@/components/settings/PasswordChangeCard';
 import { NotificationPreferencesCard } from '@/components/settings/NotificationPreferencesCard';
 import { TwoFactorAuthCard } from '@/components/settings/TwoFactorAuthCard';
 import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
+import { SmtpTestCard } from '@/components/settings/SmtpTestCard';
 import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
 import { WhatsAppPanel } from '@/components/whatsapp/WhatsAppPanel';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -272,6 +273,7 @@ const IndexContent = () => {
               <h2 className="text-xl font-semibold text-foreground mb-4">Integraciones</h2>
               <div className="space-y-4">
                 <GoogleSheetsCard />
+                <SmtpTestCard />
               </div>
             </div>
             
