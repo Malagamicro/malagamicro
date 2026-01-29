@@ -14,7 +14,7 @@ interface Message {
   timestamp: Date;
 }
 
-const N8N_WEBHOOK_URL = 'https://n8n.srv1304274.hstgr.cloud/webhook/crear-presupuesto';
+const N8N_WEBHOOK_URL = 'https://n8n.srv1304274.hstgr.cloud/webhook-test/crear-presupuesto';
 
 export function BudgetChatbot() {
   const [messages, setMessages] = useState<Message[]>([
