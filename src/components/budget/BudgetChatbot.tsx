@@ -67,6 +67,7 @@ export function BudgetChatbot() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          prompt: userMessage.content,
           message: userMessage.content,
           conversationHistory,
           timestamp: new Date().toISOString(),
