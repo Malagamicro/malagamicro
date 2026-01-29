@@ -23,6 +23,7 @@ import {
   FolderOpen,
   Bot,
   Cloud,
+  Calculator,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +50,7 @@ const menuItems = [
   { id: 'shared-files', label: 'Archivos', icon: Cloud },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
   { id: 'templates', label: 'Plantillas', icon: FileText },
+  { id: 'presupuesto', label: 'Presupuesto', icon: Calculator },
   { id: 'chat-ai', label: 'Chat IA', icon: Bot },
 ];
 

@@ -31,6 +31,7 @@ import { GoogleSheetsImportModal } from '@/components/leads/GoogleSheetsImportMo
 import { PerplexityChatbot } from '@/components/chat/PerplexityChatbot';
 import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
 import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
+import { BudgetChatbot } from '@/components/budget/BudgetChatbot';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -252,6 +253,13 @@ const IndexContent = () => {
             <SharedFilesPanel />
           </div>
         );
+      case 'presupuesto':
+        return (
+          <div className="h-full animate-fade-in">
+            <BudgetChatbot />
+          </div>
+        );
+      case 'chat-ai':
         return (
           <div className="p-8 space-y-6 animate-fade-in max-w-4xl mx-auto">
             <div>
