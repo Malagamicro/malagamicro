@@ -1,120 +1,83 @@
-import { useState, useRef, useEffect } from 'react';
-import { Send, FileText, Loader2, Bot, User } from 'lucide-react';
+import { useState } from 'react';
+import { FileText, Loader2, CheckCircle2, Package, Building2, ArrowRight, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import ReactMarkdown from 'react-markdown';
-import { cn } from '@/lib/utils';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
 
 const N8N_WEBHOOK_URL = 'https://n8n.srv1304274.hstgr.cloud/webhook-test/crear-presupuesto';
 
+interface Producto {
+  nombre: string;
+  cantidad: number;
+}
+
+interface Proveedor {
+  nombre: string;
+  email: string;
+  motivo_seleccion: string;
+}
+
+interface BudgetResponse {
+  status: string;
+  mensaje: string;
+  solicitud_id: string;
+  proveedor: Proveedor;
+  productos: Producto[];
+  cliente: string;
+  siguiente_paso: string;
+}
+
 export function BudgetChatbot() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: '¡Hola! Soy tu asistente de presupuestos. Cuéntame qué necesitas y te ayudaré a crear un presupuesto detallado. Puedes indicarme:\n\n- **Tipo de servicio** (mantenimiento, reparación, instalación, etc.)\n- **Cliente** (nombre de empresa o contacto)\n- **Detalles del trabajo** a realizar\n\n¿En qué puedo ayudarte hoy?',
-      timestamp: new Date(),
-    },
-  ]);
-  const [input, setInput] = useState('');
+  const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [response, setResponse] = useState<BudgetResponse | null>(null);
   const { toast } = useToast();
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
-    }
-  }, [messages]);
+  const handleSubmit = async () => {
+    if (!prompt.trim() || isLoading) return;
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
     setIsLoading(true);
+    setResponse(null);
 
     try {
-      // Prepare conversation history for context
-      const conversationHistory = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-      const response = await fetch(N8N_WEBHOOK_URL, {
+      const res = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: userMessage.content,
-          message: userMessage.content,
-          conversationHistory,
-          timestamp: new Date().toISOString(),
+          prompt: prompt.trim(),
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status}`);
       }
 
-      const data = await response.json();
+      const data: BudgetResponse = await res.json();
+      setResponse(data);
       
-      // Handle the response from n8n
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.response || data.message || data.output || 'Presupuesto procesado correctamente.',
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      toast({
+        title: '✅ Solicitud enviada',
+        description: 'La cotización ha sido procesada correctamente.',
+      });
     } catch (error) {
-      console.error('Error sending message to n8n:', error);
+      console.error('Error sending request to n8n:', error);
       toast({
         title: 'Error de conexión',
-        description: 'No se pudo conectar con el servicio de presupuestos. Por favor, inténtalo de nuevo.',
+        description: 'No se pudo conectar con el servicio. Por favor, inténtalo de nuevo.',
         variant: 'destructive',
       });
-
-      // Add error message to chat
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Lo siento, hubo un problema al procesar tu solicitud. Por favor, inténtalo de nuevo en unos momentos.',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+  const handleNewRequest = () => {
+    setPrompt('');
+    setResponse(null);
   };
 
   return (
@@ -125,96 +88,179 @@ export function BudgetChatbot() {
           <FileText className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h2 className="font-semibold">Asistente de Presupuestos</h2>
-          <p className="text-sm text-muted-foreground">Crea presupuestos de forma rápida y sencilla</p>
+          <h2 className="font-semibold">Generador de Presupuestos</h2>
+          <p className="text-sm text-muted-foreground">Solicita cotizaciones automáticas a proveedores</p>
         </div>
       </div>
 
-      {/* Messages */}
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
-        <div className="space-y-4 max-w-3xl mx-auto">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex gap-3",
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              )}
-            >
-              {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-primary" />
-                </div>
-              )}
-              <div
-                className={cn(
-                  "rounded-lg px-4 py-3 max-w-[80%]",
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
-                )}
-              >
-                {message.role === 'assistant' ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                )}
-                <p className={cn(
-                  "text-xs mt-2",
-                  message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                )}>
-                  {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-              {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-primary-foreground" />
-                </div>
-              )}
-            </div>
-          ))}
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-2xl mx-auto space-y-6">
+          {!response ? (
+            <>
+              {/* Form Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Send className="w-5 h-5" />
+                    Nueva Solicitud de Cotización
+                  </CardTitle>
+                  <CardDescription>
+                    Describe lo que necesitas cotizar y enviaremos la solicitud automáticamente al proveedor adecuado
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Describe qué necesitas cotizar... Ejemplo: Necesito 10 SSDs de 1TB Samsung para el cliente TechStore Málaga"
+                    className="min-h-[150px] resize-none"
+                    disabled={isLoading}
+                  />
+                  <Button 
+                    onClick={handleSubmit} 
+                    disabled={!prompt.trim() || isLoading}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Procesando solicitud...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Solicitar Cotización
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
 
-          {/* Loading indicator */}
-          {isLoading && (
-            <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Bot className="w-4 h-4 text-primary" />
-              </div>
-              <div className="bg-muted rounded-lg px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm text-muted-foreground">Procesando...</span>
-                </div>
-              </div>
-            </div>
+              {/* Loading State */}
+              {isLoading && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Procesando tu solicitud...</p>
+                        <p className="text-sm text-muted-foreground">
+                          Analizando productos y seleccionando el mejor proveedor
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Success Response */}
+              <Card className="border-green-500/30 bg-green-500/5">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-green-700 dark:text-green-400">{response.mensaje}</p>
+                      <Badge variant="outline" className="mt-2">
+                        ID: {response.solicitud_id}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Provider Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Building2 className="w-5 h-5" />
+                    Proveedor Seleccionado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Nombre:</span>
+                    <span className="font-medium">{response.proveedor.nombre}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Email:</span>
+                    <span className="font-medium">{response.proveedor.email}</span>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Motivo de selección:</strong> {response.proveedor.motivo_seleccion}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Products */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Package className="w-5 h-5" />
+                    Productos Detectados
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {response.productos.map((producto, index) => (
+                      <div 
+                        key={index}
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                      >
+                        <span>{producto.nombre}</span>
+                        <Badge variant="secondary">x{producto.cantidad}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Client */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Cliente:</span>
+                    <span className="font-medium">{response.cliente}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Next Step */}
+              <Card className="border-blue-500/30 bg-blue-500/5">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                      <ArrowRight className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-blue-700 dark:text-blue-400">Siguiente paso</p>
+                      <p className="text-sm text-muted-foreground mt-1">{response.siguiente_paso}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* New Request Button */}
+              <Button 
+                onClick={handleNewRequest} 
+                variant="outline" 
+                className="w-full"
+                size="lg"
+              >
+                Nueva Solicitud
+              </Button>
+            </>
           )}
         </div>
-      </ScrollArea>
-
-      {/* Input */}
-      <div className="border-t p-4">
-        <div className="max-w-3xl mx-auto flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Describe el presupuesto que necesitas..."
-            disabled={isLoading}
-            className="flex-1"
-          />
-          <Button onClick={sendMessage} disabled={!input.trim() || isLoading}>
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground text-center mt-2">
-          Conectado a tu flujo de n8n para automatización de presupuestos
-        </p>
       </div>
     </div>
   );
