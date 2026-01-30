@@ -476,11 +476,10 @@ export function SharedFilesPanel() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          asChild
+                          onClick={() => window.open(file.file_path, '_blank')}
+                          title="Descargar archivo"
                         >
-                          <a href={file.file_path} target="_blank" rel="noopener noreferrer" download>
-                            <Download className="h-4 w-4" />
-                          </a>
+                          <Download className="h-4 w-4" />
                         </Button>
 
                         {isOwner && (
@@ -683,11 +682,9 @@ export function SharedFilesPanel() {
             <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>
               Cerrar
             </Button>
-            <Button asChild>
-              <a href={selectedFile?.file_path} target="_blank" rel="noopener noreferrer" download>
-                <Download className="h-4 w-4 mr-2" />
-                Descargar
-              </a>
+            <Button onClick={() => selectedFile && window.open(selectedFile.file_path, '_blank')}>
+              <Download className="h-4 w-4 mr-2" />
+              Descargar
             </Button>
           </DialogFooter>
         </DialogContent>

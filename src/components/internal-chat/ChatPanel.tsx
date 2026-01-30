@@ -231,12 +231,10 @@ export function ChatPanel({
                           />
                         </a>
                       ) : message.message_type === 'file' ? (
-                        <a
-                          href={message.file_url!}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => window.open(message.file_url!, '_blank')}
                           className={cn(
-                            'flex items-center gap-2 py-1',
+                            'flex items-center gap-2 py-1 hover:opacity-80 transition-opacity',
                             isMe ? 'text-primary-foreground' : 'text-foreground'
                           )}
                         >
@@ -245,7 +243,7 @@ export function ChatPanel({
                             {message.file_name}
                           </span>
                           <Download className="h-4 w-4" />
-                        </a>
+                        </button>
                       ) : (
                         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                       )}
