@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -700,7 +701,7 @@ ${styles.listItems?.map(item => `      <div style="margin-bottom: 4px;">${item}<
             <div className="p-4">
               <div 
                 className="max-w-[600px] mx-auto bg-card rounded-lg shadow-lg overflow-hidden"
-                dangerouslySetInnerHTML={{ __html: generateHtml(blocks).replace(/<!DOCTYPE html>[\s\S]*?<body[^>]*>/, '').replace(/<\/body>[\s\S]*/, '').replace(/<div style="max-width: 600px[^>]*>/, '').replace(/<\/div>\s*$/, '') }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(generateHtml(blocks).replace(/<!DOCTYPE html>[\s\S]*?<body[^>]*>/, '').replace(/<\/body>[\s\S]*/, '').replace(/<div style="max-width: 600px[^>]*>/, '').replace(/<\/div>\s*$/, '')) }}
               />
             </div>
           )}

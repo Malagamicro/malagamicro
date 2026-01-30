@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEmailTemplates, useEmailCampaigns } from '@/hooks/useEmailCampaigns';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { useLeads } from '@/hooks/useLeads';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -409,7 +410,7 @@ export function EmailCampaigns() {
           <ScrollArea className="max-h-[60vh]">
             <div 
               className="border rounded-lg p-4 bg-muted/30"
-              dangerouslySetInnerHTML={{ __html: previewTemplate?.body || '' }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewTemplate?.body || '') }}
             />
           </ScrollArea>
         </DialogContent>

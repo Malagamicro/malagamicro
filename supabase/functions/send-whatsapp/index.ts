@@ -63,11 +63,13 @@ Deno.serve(async (req) => {
 
     // Send message via WAHA local API
     // Using host.docker.internal for Docker-to-host networking
+    const wahaApiKey = Deno.env.get('WAHA_API_KEY') || '12345678';
+    
     const response = await fetch('http://host.docker.internal:3000/api/sendText', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': '12345678',
+        'X-Api-Key': wahaApiKey,
       },
       body: JSON.stringify({
         chatId: `${cleanPhone}@c.us`,
