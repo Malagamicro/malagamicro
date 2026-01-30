@@ -236,37 +236,38 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         dismissBanner,
       }}
     >
-      {/* Permission Banner */}
+      {/* Permission Banner - Less intrusive toast-like style on mobile */}
       {showPermissionBanner && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between shadow-lg">
-          <div className="flex items-center gap-3">
-            <Bell className="h-5 w-5" />
-            <span className="text-sm font-medium">
-              Activa las notificaciones para recibir alertas de mensajes y recordatorios
+        <div className="fixed bottom-4 left-4 right-4 md:bottom-auto md:top-0 md:left-0 md:right-0 z-50 bg-card border border-border md:border-0 md:bg-primary md:text-primary-foreground px-3 py-2 md:px-4 md:py-3 flex items-center justify-between shadow-lg rounded-xl md:rounded-none">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Bell className="h-4 w-4 md:h-5 md:w-5 shrink-0 text-primary md:text-primary-foreground" />
+            <span className="text-xs md:text-sm font-medium truncate">
+              <span className="hidden md:inline">Activa las notificaciones para recibir alertas de mensajes y recordatorios</span>
+              <span className="md:hidden">Activar notificaciones</span>
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2 shrink-0 ml-2">
             <Button
               size="sm"
-              variant="secondary"
+              variant="default"
               onClick={handleRequestPermission}
-              className="gap-2"
+              className="h-8 px-3 text-xs md:text-sm gap-1 md:gap-2"
             >
-              <Bell className="h-4 w-4" />
-              🔔 Activar Notificaciones
+              <Bell className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Activar</span>
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={dismissBanner}
-              className="h-8 w-8 p-0 hover:bg-primary-foreground/20"
+              className="h-8 w-8 p-0"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
       )}
-      <div className={showPermissionBanner ? 'pt-14' : ''}>
+      <div className={showPermissionBanner ? 'md:pt-14' : ''}>
         {children}
       </div>
     </NotificationContext.Provider>

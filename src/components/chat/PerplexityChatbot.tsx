@@ -89,7 +89,8 @@ export function PerplexityChatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('sonar-pro');
-  const [showSidebar, setShowSidebar] = useState(true);
+  // Hide sidebar by default on mobile
+  const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 768);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
@@ -326,10 +327,10 @@ export function PerplexityChatbot() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] bg-gradient-to-b from-background to-muted/20 rounded-2xl border shadow-xl overflow-hidden">
-      {/* Sessions Sidebar */}
+    <div className="flex h-[calc(100vh-10rem)] md:h-[calc(100vh-12rem)] bg-gradient-to-b from-background to-muted/20 rounded-2xl border shadow-xl overflow-hidden relative">
+      {/* Sessions Sidebar - overlay on mobile */}
       {showSidebar && (
-        <div className="w-64 border-r bg-muted/30 flex flex-col">
+        <div className="absolute md:relative z-20 w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
           <div className="p-3 border-b flex items-center justify-between">
             <h3 className="font-medium text-sm flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
@@ -423,11 +424,19 @@ export function PerplexityChatbot() {
         </div>
       )}
 
+      {/* Overlay backdrop on mobile when sidebar is open */}
+      {showSidebar && (
+        <div 
+          className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 md:hidden"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col w-full">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-background/80 backdrop-blur-sm">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 border-b bg-background/80 backdrop-blur-sm">
+          <div className="flex items-center gap-2 md:gap-4">
             <Button
               variant="ghost"
               size="icon"
@@ -436,24 +445,24 @@ export function PerplexityChatbot() {
             >
               {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
             </Button>
-            <div className="relative">
+            <div className="relative hidden md:block">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
                 <Bot className="h-6 w-6 text-primary-foreground" />
               </div>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-background" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-background" style={{ backgroundColor: 'hsl(142, 71%, 45%)' }} />
             </div>
             <div>
-              <h2 className="font-semibold text-lg">Asistente CRM</h2>
-              <p className="text-xs text-muted-foreground">Conectado con tus datos</p>
+              <h2 className="font-semibold text-base md:text-lg">Asistente CRM</h2>
+              <p className="text-xs text-muted-foreground hidden md:block">Conectado con tus datos</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[140px] h-9 bg-muted/50 border-0">
-                <div className="flex items-center gap-2">
-                  <selectedModelInfo.icon className={`h-4 w-4 ${selectedModelInfo.color}`} />
-                  <span className="text-sm">{selectedModelInfo.name}</span>
+              <SelectTrigger className="w-[100px] md:w-[140px] h-8 md:h-9 bg-muted/50 border-0">
+                <div className="flex items-center gap-1 md:gap-2">
+                  <selectedModelInfo.icon className={`h-3 w-3 md:h-4 md:w-4 ${selectedModelInfo.color}`} />
+                  <span className="text-xs md:text-sm truncate">{selectedModelInfo.name}</span>
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -485,30 +494,29 @@ export function PerplexityChatbot() {
         </div>
         
         {/* Messages */}
-        <ScrollArea className="flex-1 px-6" ref={scrollRef}>
+        <ScrollArea className="flex-1 px-3 md:px-6" ref={scrollRef}>
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center py-12">
-              <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6">
-                <Sparkles className="h-10 w-10 text-primary" />
+            <div className="h-full flex flex-col items-center justify-center py-8 md:py-12">
+              <div className="w-14 h-14 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4 md:mb-6">
+                <Sparkles className="h-7 w-7 md:h-10 md:w-10 text-primary" />
               </div>
-              <h3 className="font-semibold text-xl mb-2">¿En qué puedo ayudarte?</h3>
-              <p className="text-muted-foreground text-center max-w-md mb-8">
+              <h3 className="font-semibold text-lg md:text-xl mb-2 text-center">¿En qué puedo ayudarte?</h3>
+              <p className="text-muted-foreground text-center text-sm md:text-base max-w-md mb-6 md:mb-8 px-4">
                 Puedo buscar leads, crear nuevos, ver estadísticas, recordatorios y más. 
-                Estoy conectado con todos tus datos del CRM.
               </p>
               
               {/* Quick Actions */}
-              <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+              <div className="grid grid-cols-2 gap-2 md:gap-3 w-full max-w-md px-2">
                 {QUICK_ACTIONS.map((action) => (
                   <button
                     key={action.label}
                     onClick={() => handleSend(action.prompt)}
-                    className="flex items-center gap-3 p-4 rounded-xl border bg-card hover:bg-accent transition-colors text-left group"
+                    className="flex items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl border bg-card hover:bg-accent transition-colors text-left group"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                      <action.icon className="h-5 w-5 text-primary" />
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
+                      <action.icon className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                     </div>
-                    <span className="text-sm font-medium">{action.label}</span>
+                    <span className="text-xs md:text-sm font-medium">{action.label}</span>
                   </button>
                 ))}
               </div>
