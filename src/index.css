@@ -124,6 +124,28 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
   }
+
+  /* Mobile-friendly inputs to prevent iOS zoom */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+
+  @media (min-width: 768px) {
+    input, textarea, select {
+      font-size: inherit !important;
+    }
+  }
+
+  /* Touch-friendly minimum sizes */
+  @media (max-width: 767px) {
+    button, 
+    [role="button"],
+    a.btn,
+    .touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
 }
 
 @layer utilities {

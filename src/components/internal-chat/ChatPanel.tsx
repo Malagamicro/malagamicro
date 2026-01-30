@@ -33,6 +33,7 @@ interface ChatPanelProps {
   onSendMessage: (content?: string, file?: { url: string; name: string; size: number }) => void;
   onUploadFile: (file: File) => Promise<{ url: string; name: string; size: number }>;
   isSending: boolean;
+  hideHeader?: boolean;
 }
 
 export function ChatPanel({
@@ -42,6 +43,7 @@ export function ChatPanel({
   onSendMessage,
   onUploadFile,
   isSending,
+  hideHeader = false,
 }: ChatPanelProps) {
   const { user } = useAuth();
   const [input, setInput] = useState('');
@@ -125,41 +127,43 @@ export function ChatPanel({
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
-            {getAvatarUrl() && <AvatarImage src={getAvatarUrl()!} />}
-            <AvatarFallback className={conversation.is_group ? 'bg-primary/20' : ''}>
-              {conversation.is_group ? (
-                <Users className="h-4 w-4 text-primary" />
-              ) : (
-                getInitials(getConversationName())
+      {!hideHeader && (
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10">
+              {getAvatarUrl() && <AvatarImage src={getAvatarUrl()!} />}
+              <AvatarFallback className={conversation.is_group ? 'bg-primary/20' : ''}>
+                {conversation.is_group ? (
+                  <Users className="h-4 w-4 text-primary" />
+                ) : (
+                  getInitials(getConversationName())
+                )}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="font-medium">{getConversationName()}</h3>
+              {conversation.is_group && (
+                <p className="text-xs text-muted-foreground">
+                  {conversation.participants?.length || 0} participantes
+                </p>
               )}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="font-medium">{getConversationName()}</h3>
-            {conversation.is_group && (
-              <p className="text-xs text-muted-foreground">
-                {conversation.participants?.length || 0} participantes
-              </p>
-            )}
+            </div>
           </div>
-        </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Ver participantes</DropdownMenuItem>
-            {conversation.is_group && <DropdownMenuItem>Añadir participante</DropdownMenuItem>}
-            <DropdownMenuItem className="text-destructive">Salir de la conversación</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-11 w-11">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>Ver participantes</DropdownMenuItem>
+              {conversation.is_group && <DropdownMenuItem>Añadir participante</DropdownMenuItem>}
+              <DropdownMenuItem className="text-destructive">Salir de la conversación</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
 
       {/* Messages */}
       <ScrollArea className="flex-1 px-4" ref={scrollRef}>

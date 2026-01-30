@@ -318,9 +318,10 @@ const IndexContent = () => {
         activeTab={activeTab === 'lead-detail' ? 'leads' : activeTab} 
         onTabChange={setActiveTab} 
       />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden md:ml-0">
         <EmailVerificationBanner />
-        <main className="flex-1 overflow-auto">
+        {/* Add top padding on mobile for hamburger button */}
+        <main className="flex-1 overflow-auto pt-14 md:pt-0">
           {renderContent()}
         </main>
       </div>
