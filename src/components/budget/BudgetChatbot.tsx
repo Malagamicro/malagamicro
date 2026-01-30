@@ -40,6 +40,63 @@ export function BudgetChatbot() {
     }
   }, [messages]);
 
+  const callN8nWebhook = async (prompt: string) => {
+    // n8n test webhook in your setup is currently registered for GET.
+    // We try POST first (as per API spec), then fall back to GET if n8n returns the known 404 message.
+    const trimmed = prompt.trim();
+
+    const tryPost = async () => {
+      const res = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: trimmed }),
+      });
+      return res;
+    };
+
+    const tryGet = async () => {
+      const url = `${N8N_WEBHOOK_URL}?prompt=${encodeURIComponent(trimmed)}`;
+      const res = await fetch(url, { method: 'GET' });
+      return res;
+    };
+
+    let res: Response;
+    try {
+      res = await tryPost();
+    } catch {
+      // Network/CORS/etc. — try GET as a fallback as well
+      res = await tryGet();
+    }
+
+    if (!res.ok) {
+      let bodyText = '';
+      try {
+        bodyText = await res.text();
+      } catch {
+        bodyText = '';
+      }
+
+      // Known n8n error when webhook is only registered for GET
+      const looksLikeMethodMismatch =
+        res.status === 404 &&
+        bodyText.toLowerCase().includes('not registered for post') &&
+        bodyText.toLowerCase().includes('get request');
+
+      if (looksLikeMethodMismatch) {
+        const getRes = await tryGet();
+        if (!getRes.ok) {
+          const t = await getRes.text().catch(() => '');
+          throw new Error(`n8n error ${getRes.status}: ${t || 'No response body'}`);
+        }
+        return getRes;
+      }
+
+      throw new Error(`n8n error ${res.status}: ${bodyText || 'No response body'}`);
+    }
+
+    return res;
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -55,21 +112,10 @@ export function BudgetChatbot() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(N8N_WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: userMessage.content,
-        }),
-      });
+      const response = await callN8nWebhook(userMessage.content);
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      const data = contentType.includes('application/json') ? await response.json() : await response.text();
       
       // Handle the response from n8n - support multiple response formats
       let assistantContent = '';
@@ -106,7 +152,7 @@ export function BudgetChatbot() {
       console.error('Error sending message to n8n:', error);
       toast({
         title: 'Error de conexión',
-        description: 'No se pudo conectar con el servicio de presupuestos. Verifica que el flujo de n8n esté activo.',
+        description: error instanceof Error ? error.message : 'No se pudo conectar con el servicio de presupuestos.',
         variant: 'destructive',
       });
 
