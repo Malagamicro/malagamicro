@@ -27,6 +27,7 @@ import {
   Calculator,
   Menu,
   X,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +56,7 @@ const menuItems = [
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, color: 'text-green-500' },
   { id: 'templates', label: 'Plantillas', icon: FileText, color: 'text-amber-500' },
   { id: 'presupuesto', label: 'Presupuesto', icon: Calculator, color: 'text-emerald-500' },
+  { id: 'reminders', label: 'Recordatorios', icon: Bell, route: '/reminders', color: 'text-rose-400' },
   { id: 'osticket', label: 'Tickets', icon: Ticket, color: 'text-yellow-500' },
   { id: 'chat-ai', label: 'Chat IA', icon: Bot, color: 'text-violet-500' },
 ];
@@ -160,7 +162,14 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         {menuItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => handleTabChange(item.id)}
+            onClick={() => {
+              if ('route' in item && item.route) {
+                navigate(item.route);
+                if (isMobile) setMobileOpen(false);
+              } else {
+                handleTabChange(item.id);
+              }
+            }}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative min-h-[44px]",
               "hover:bg-sidebar-accent",

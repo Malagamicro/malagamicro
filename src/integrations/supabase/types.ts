@@ -319,6 +319,45 @@ export type Database = {
           },
         ]
       }
+      general_reminders: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_completed: boolean
+          priority: string
+          reminder_date: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_completed?: boolean
+          priority?: string
+          reminder_date: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_completed?: boolean
+          priority?: string
+          reminder_date?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       google_sheets_configs: {
         Row: {
           auto_sync_enabled: boolean
