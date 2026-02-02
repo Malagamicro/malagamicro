@@ -31,7 +31,9 @@ interface OsTicketConfig {
 }
 
 // WAHA API configuration - using environment variables
-const WAHA_API_URL = Deno.env.get("WAHA_API_URL") || "http://localhost:3000";
+const WAHA_API_URL_RAW = Deno.env.get("WAHA_API_URL") || "http://localhost:3000";
+// Remove trailing slash to avoid double slashes
+const WAHA_API_URL = WAHA_API_URL_RAW.replace(/\/+$/, "");
 const WAHA_API_KEY = Deno.env.get("WAHA_API_KEY") || "";
 const SESSION_NAME = "default";
 
@@ -52,9 +54,12 @@ function buildChatId(phone: string): string {
 async function sendWhatsAppMessage(phone: string, message: string): Promise<boolean> {
   try {
     const chatId = buildChatId(phone);
+    const apiUrl = `${WAHA_API_URL}/api/sendText`;
     console.log(`📤 Sending WhatsApp to ${chatId}`);
+    console.log(`🔗 WAHA URL: ${apiUrl}`);
+    console.log(`🔑 API Key configured: ${WAHA_API_KEY ? "YES (length: " + WAHA_API_KEY.length + ")" : "NO"}`);
 
-    const response = await fetch(`${WAHA_API_URL}/api/sendText`, {
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
