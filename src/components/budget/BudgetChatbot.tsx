@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -13,89 +14,6 @@ interface Message {
   content: string;
   timestamp: Date;
 }
-
-const N8N_WEBHOOK_URL = 'https://n8n.srv1304274.hstgr.cloud/webhook-test/crear-presupuesto';
-
-export function BudgetChatbot() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: '¡Hola! Soy tu asistente de presupuestos. Cuéntame qué necesitas cotizar y me encargaré de enviar la solicitud al proveedor adecuado.\n\n**Ejemplo:** "Necesito 10 SSDs de 1TB Samsung para el cliente TechStore Málaga"',
-      timestamp: new Date(),
-    },
-  ]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
-    }
-  }, [messages]);
-
-  const callN8nWebhook = async (prompt: string) => {
-    // n8n test webhook in your setup is currently registered for GET.
-    // We try POST first (as per API spec), then fall back to GET if n8n returns the known 404 message.
-    const trimmed = prompt.trim();
-
-    const tryPost = async () => {
-      const res = await fetch(N8N_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: trimmed }),
-      });
-      return res;
-    };
-
-    const tryGet = async () => {
-      const url = `${N8N_WEBHOOK_URL}?prompt=${encodeURIComponent(trimmed)}`;
-      const res = await fetch(url, { method: 'GET' });
-      return res;
-    };
-
-    let res: Response;
-    try {
-      res = await tryPost();
-    } catch {
-      // Network/CORS/etc. — try GET as a fallback as well
-      res = await tryGet();
-    }
-
-    if (!res.ok) {
-      let bodyText = '';
-      try {
-        bodyText = await res.text();
-      } catch {
-        bodyText = '';
-      }
-
-      // Known n8n error when webhook is only registered for GET
-      const looksLikeMethodMismatch =
-        res.status === 404 &&
-        bodyText.toLowerCase().includes('not registered for post') &&
-        bodyText.toLowerCase().includes('get request');
-
-      if (looksLikeMethodMismatch) {
-        const getRes = await tryGet();
-        if (!getRes.ok) {
-          const t = await getRes.text().catch(() => '');
-          throw new Error(`n8n error ${getRes.status}: ${t || 'No response body'}`);
-        }
-        return getRes;
-      }
-
-      throw new Error(`n8n error ${res.status}: ${bodyText || 'No response body'}`);
-    }
-
-    return res;
-  };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
