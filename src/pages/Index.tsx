@@ -25,6 +25,7 @@ import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
 import { WhatsAppPanel } from '@/components/whatsapp/WhatsAppPanel';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { GoogleSheetsCard } from '@/components/settings/GoogleSheetsCard';
+import { OsTicketConfigCard } from '@/components/settings/OsTicketConfigCard';
 import Inbox from '@/pages/Inbox';
 import Templates from '@/pages/Templates';
 import { GoogleSheetsImportModal } from '@/components/leads/GoogleSheetsImportModal';
@@ -288,6 +289,7 @@ const IndexContent = () => {
               <h2 className="text-xl font-semibold text-foreground mb-4">Integraciones</h2>
               <div className="space-y-4">
                 <GoogleSheetsCard />
+                <OsTicketConfigCard />
               </div>
             </div>
             

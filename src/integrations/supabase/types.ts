@@ -677,6 +677,42 @@ export type Database = {
         }
         Relationships: []
       }
+      osticket_config: {
+        Row: {
+          api_key: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          message_template: string
+          notification_numbers: string[]
+          osticket_url: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          message_template?: string
+          notification_numbers?: string[]
+          osticket_url?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          message_template?: string
+          notification_numbers?: string[]
+          osticket_url?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
