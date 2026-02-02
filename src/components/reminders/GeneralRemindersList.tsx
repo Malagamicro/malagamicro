@@ -10,7 +10,8 @@ import {
   Calendar,
   AlertTriangle,
   CheckCircle2,
-  Filter
+  Eye,
+  X
 } from 'lucide-react';
 import { useGeneralReminders, GeneralReminder } from '@/hooks/useGeneralReminders';
 import { GeneralReminderModal } from './GeneralReminderModal';
@@ -19,6 +20,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,14 +56,147 @@ const categoryLabels: Record<string, string> = {
   other: 'Otro',
 };
 
+function ReminderDetailModal({ 
+  reminder, 
+  open, 
+  onOpenChange,
+  onToggle,
+  onDelete
+}: { 
+  reminder: GeneralReminder | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  if (!reminder) return null;
+
+  const reminderDate = new Date(reminder.reminder_date);
+  const isOverdue = isPast(reminderDate) && !reminder.is_completed;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-start gap-3">
+            <button
+              onClick={() => {
+                onToggle();
+              }}
+              className={cn(
+                'mt-1 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
+                reminder.is_completed 
+                  ? 'bg-primary border-primary text-primary-foreground' 
+                  : 'border-muted-foreground hover:border-primary'
+              )}
+            >
+              {reminder.is_completed && <Check className="h-3 w-3" />}
+            </button>
+            <span className={cn(reminder.is_completed && 'line-through text-muted-foreground')}>
+              {reminder.title}
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Status badges */}
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className={priorityConfig[reminder.priority].className}>
+              {priorityConfig[reminder.priority].label}
+            </Badge>
+            <Badge variant="secondary">
+              {categoryLabels[reminder.category || 'general']}
+            </Badge>
+            {reminder.is_completed && (
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Completado
+              </Badge>
+            )}
+            {isOverdue && (
+              <Badge variant="destructive">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Vencido
+              </Badge>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Date and time */}
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-muted-foreground">Fecha y hora</h4>
+            <div className={cn(
+              'flex items-center gap-2 text-sm',
+              isOverdue && 'text-destructive'
+            )}>
+              <Calendar className="h-4 w-4" />
+              {format(reminderDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              {format(reminderDate, "HH:mm", { locale: es })} hrs
+            </div>
+          </div>
+
+          {/* Description */}
+          {reminder.description && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Descripción</h4>
+                <p className="text-sm whitespace-pre-wrap">{reminder.description}</p>
+              </div>
+            </>
+          )}
+
+          <Separator />
+
+          {/* Metadata */}
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>Creado: {format(new Date(reminder.created_at), "d MMM yyyy, HH:mm", { locale: es })}</p>
+            {reminder.updated_at !== reminder.created_at && (
+              <p>Actualizado: {format(new Date(reminder.updated_at), "d MMM yyyy, HH:mm", { locale: es })}</p>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-between pt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                onToggle();
+              }}
+            >
+              {reminder.is_completed ? 'Marcar pendiente' : 'Marcar completado'}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                onOpenChange(false);
+                onDelete();
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ReminderItem({ 
   reminder, 
   onToggle, 
-  onDelete 
+  onDelete,
+  onView
 }: { 
   reminder: GeneralReminder; 
   onToggle: () => void; 
   onDelete: () => void;
+  onView: () => void;
 }) {
   const reminderDate = new Date(reminder.reminder_date);
   const isOverdue = isPast(reminderDate) && !reminder.is_completed;
@@ -64,14 +205,18 @@ function ReminderItem({
   return (
     <div 
       className={cn(
-        'flex items-start gap-3 p-4 rounded-lg border transition-colors',
+        'flex items-start gap-3 p-4 rounded-lg border transition-colors cursor-pointer hover:shadow-sm',
         reminder.is_completed && 'opacity-60 bg-muted/30',
         isOverdue && 'border-destructive/50 bg-destructive/5',
         isTodayReminder && !isOverdue && !reminder.is_completed && 'border-primary/50 bg-primary/5'
       )}
+      onClick={onView}
     >
       <button
-        onClick={onToggle}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
         className={cn(
           'mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
           reminder.is_completed 
@@ -136,6 +281,7 @@ function ReminderItem({
 export function GeneralRemindersList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewReminder, setViewReminder] = useState<GeneralReminder | null>(null);
   
   const { 
     pendingReminders, 
@@ -223,6 +369,7 @@ export function GeneralRemindersList() {
                     reminder={reminder}
                     onToggle={() => toggleComplete(reminder.id, reminder.is_completed)}
                     onDelete={() => setDeleteId(reminder.id)}
+                    onView={() => setViewReminder(reminder)}
                   />
                 ))
               )}
@@ -241,6 +388,7 @@ export function GeneralRemindersList() {
                     reminder={reminder}
                     onToggle={() => toggleComplete(reminder.id, reminder.is_completed)}
                     onDelete={() => setDeleteId(reminder.id)}
+                    onView={() => setViewReminder(reminder)}
                   />
                 ))
               )}
@@ -250,6 +398,24 @@ export function GeneralRemindersList() {
       </Card>
 
       <GeneralReminderModal open={modalOpen} onOpenChange={setModalOpen} />
+
+      <ReminderDetailModal
+        reminder={viewReminder}
+        open={!!viewReminder}
+        onOpenChange={(open) => !open && setViewReminder(null)}
+        onToggle={() => {
+          if (viewReminder) {
+            toggleComplete(viewReminder.id, viewReminder.is_completed);
+            setViewReminder(null);
+          }
+        }}
+        onDelete={() => {
+          if (viewReminder) {
+            setDeleteId(viewReminder.id);
+            setViewReminder(null);
+          }
+        }}
+      />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
