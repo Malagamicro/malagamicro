@@ -713,6 +713,54 @@ export type Database = {
         }
         Relationships: []
       }
+      osticket_tickets: {
+        Row: {
+          created_at: string
+          customer_email: string | null
+          customer_name: string | null
+          department: string | null
+          id: string
+          message: string | null
+          notification_phone: string | null
+          notification_sent: boolean
+          priority: string | null
+          subject: string
+          ticket_id: string | null
+          ticket_number: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          department?: string | null
+          id?: string
+          message?: string | null
+          notification_phone?: string | null
+          notification_sent?: boolean
+          priority?: string | null
+          subject: string
+          ticket_id?: string | null
+          ticket_number?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          department?: string | null
+          id?: string
+          message?: string | null
+          notification_phone?: string | null
+          notification_sent?: boolean
+          priority?: string | null
+          subject?: string
+          ticket_id?: string | null
+          ticket_number?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

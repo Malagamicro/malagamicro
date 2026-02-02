@@ -33,6 +33,7 @@ import { PerplexityChatbot } from '@/components/chat/PerplexityChatbot';
 import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
 import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
 import { BudgetChatbot } from '@/components/budget/BudgetChatbot';
+import { OsTicketHistory } from '@/components/osticket/OsTicketHistory';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -258,6 +259,18 @@ const IndexContent = () => {
         return (
           <div className="h-full animate-fade-in">
             <BudgetChatbot />
+          </div>
+        );
+      case 'osticket':
+        return (
+          <div className="p-8 space-y-6 animate-fade-in">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Historial de Tickets</h1>
+              <p className="text-muted-foreground mt-1">
+                Tickets recibidos desde osTicket
+              </p>
+            </div>
+            <OsTicketHistory />
           </div>
         );
       case 'chat-ai':
