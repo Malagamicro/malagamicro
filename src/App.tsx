@@ -14,8 +14,8 @@ import WhatsAppTest from "./pages/WhatsAppTest";
 import Scraper from "./pages/Scraper";
 import FileManager from "./pages/FileManager";
 import Install from "./pages/Install";
+import AdminUsers from "./pages/AdminUsers";
 import NotFound from "./pages/NotFound";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -69,6 +69,14 @@ const App = () => (
                     <ThemeSyncProvider>
                       <Index />
                     </ThemeSyncProvider>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute>
+                    <AdminUsers />
                   </ProtectedRoute>
                 }
               />
