@@ -15,6 +15,42 @@ interface Message {
   timestamp: Date;
 }
 
+export function BudgetChatbot() {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      role: 'assistant',
+      content: '¡Hola! Soy tu asistente de presupuestos. Cuéntame qué necesitas cotizar y me encargaré de enviar la solicitud al proveedor adecuado.\n\n**Ejemplo:** "Necesito 10 SSDs de 1TB Samsung para el cliente TechStore Málaga"',
+      timestamp: new Date(),
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [messages]);
+
+  const callN8nWebhook = async (prompt: string) => {
+    const { data, error } = await supabase.functions.invoke('budget-proxy', {
+      body: { prompt },
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Error calling budget service');
+    }
+
+    return data;
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -30,31 +66,22 @@ interface Message {
     setIsLoading(true);
 
     try {
-      const response = await callN8nWebhook(userMessage.content);
-
-      const contentType = response.headers.get('content-type') || '';
-      const data = contentType.includes('application/json') ? await response.json() : await response.text();
+      const data = await callN8nWebhook(userMessage.content);
       
       // Handle the response from n8n - support multiple response formats
       let assistantContent = '';
       
       if (data.output) {
-        // If n8n sends an 'output' field
         assistantContent = data.output;
       } else if (data.response) {
-        // If n8n sends a 'response' field
         assistantContent = data.response;
       } else if (data.message) {
-        // If n8n sends a 'message' field
         assistantContent = data.message;
       } else if (data.mensaje) {
-        // If n8n sends a 'mensaje' field (Spanish)
         assistantContent = data.mensaje;
       } else if (typeof data === 'string') {
-        // If n8n sends a plain string
         assistantContent = data;
       } else {
-        // Fallback: stringify the entire response
         assistantContent = JSON.stringify(data, null, 2);
       }
 
@@ -74,7 +101,6 @@ interface Message {
         variant: 'destructive',
       });
 
-      // Add error message to chat
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
