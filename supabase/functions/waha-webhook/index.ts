@@ -69,6 +69,21 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Authenticate webhook request using API key
+  const webhookApiKey = Deno.env.get("WAHA_WEBHOOK_SECRET");
+  const providedApiKey = req.headers.get("x-api-key") || 
+                         req.headers.get("authorization")?.replace("Bearer ", "") ||
+                         new URL(req.url).searchParams.get("api_key");
+
+  // If webhook secret is configured, require authentication
+  if (webhookApiKey && webhookApiKey !== providedApiKey) {
+    console.error("Unauthorized webhook request - invalid or missing API key");
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const rawBody = await req.text();
     console.log("Raw body:", rawBody);
