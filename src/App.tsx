@@ -15,6 +15,7 @@ import Scraper from "./pages/Scraper";
 import FileManager from "./pages/FileManager";
 import Install from "./pages/Install";
 import AdminUsers from "./pages/AdminUsers";
+import GeneralReminders from "./pages/GeneralReminders";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -77,6 +78,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <AdminUsers />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reminders"
+                element={
+                  <ProtectedRoute>
+                    <GeneralReminders />
                   </ProtectedRoute>
                 }
               />
