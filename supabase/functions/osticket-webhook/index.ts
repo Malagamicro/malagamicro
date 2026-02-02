@@ -175,14 +175,38 @@ serve(async (req) => {
 
       console.log(`Sending to ${config.notification_numbers.length} numbers for config ${config.id}`);
 
-      // Send WhatsApp to each number
+      // Send WhatsApp to each number and save to history
       for (const phone of config.notification_numbers) {
         // Add a small delay between messages to avoid rate limiting
-        if (totalSent > 0) {
+        if (totalSent > 0 || totalFailed > 0) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
 
         const success = await sendWhatsAppMessage(phone, message);
+        
+        // Save ticket to history
+        const { error: insertError } = await supabase
+          .from("osticket_tickets")
+          .insert({
+            user_id: config.user_id,
+            ticket_id: payload.ticket_id || null,
+            ticket_number: payload.number || null,
+            subject: payload.subject || "Sin asunto",
+            customer_name: payload.name || null,
+            customer_email: payload.email || null,
+            department: payload.department || null,
+            priority: payload.priority || null,
+            message: payload.message || null,
+            notification_sent: success,
+            notification_phone: phone,
+          });
+
+        if (insertError) {
+          console.error("Error saving ticket to history:", insertError);
+        } else {
+          console.log("📝 Ticket saved to history");
+        }
+
         if (success) {
           totalSent++;
         } else {

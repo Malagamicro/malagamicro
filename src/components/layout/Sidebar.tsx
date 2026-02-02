@@ -20,6 +20,7 @@ import {
   Inbox,
   FileText,
   Globe,
+  Ticket,
   FolderOpen,
   Bot,
   Cloud,
@@ -54,6 +55,7 @@ const menuItems = [
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
   { id: 'templates', label: 'Plantillas', icon: FileText },
   { id: 'presupuesto', label: 'Presupuesto', icon: Calculator },
+  { id: 'osticket', label: 'Tickets', icon: Ticket },
   { id: 'chat-ai', label: 'Chat IA', icon: Bot },
 ];
 
