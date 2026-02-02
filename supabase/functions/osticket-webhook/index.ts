@@ -38,11 +38,23 @@ const WAHA_API_KEY = Deno.env.get("WAHA_API_KEY") || "";
 const SESSION_NAME = "default";
 
 function formatPhoneNumber(phone: string): string {
+  // Remove all non-digit characters (including +, spaces, dashes)
   let cleanPhone = phone.replace(/\D/g, "");
-  // If the number doesn't start with country code (34 for Spain), add it
-  if (!cleanPhone.startsWith("34") && cleanPhone.length === 9) {
+  
+  // Handle different formats:
+  // +34651660185 -> 34651660185 (already has country code)
+  // 651660185 -> 34651660185 (add Spain country code)
+  // 0034651660185 -> 34651660185 (remove leading zeros)
+  
+  // Remove leading zeros
+  cleanPhone = cleanPhone.replace(/^0+/, "");
+  
+  // If it's a 9-digit number (Spanish mobile without country code), add 34
+  if (cleanPhone.length === 9) {
     cleanPhone = "34" + cleanPhone;
   }
+  
+  console.log(`📱 Formatted phone: ${phone} -> ${cleanPhone}`);
   return cleanPhone;
 }
 
