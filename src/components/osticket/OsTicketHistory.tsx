@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { sanitizeBasicHtml } from '@/lib/sanitize';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -346,9 +347,10 @@ export function OsTicketHistory() {
               {selectedTicket.message && (
                 <div>
                   <h4 className="font-medium mb-1">Mensaje</h4>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted p-3 rounded-lg max-h-40 overflow-y-auto">
-                    {selectedTicket.message}
-                  </p>
+                  <div 
+                    className="text-sm text-muted-foreground bg-muted p-3 rounded-lg max-h-40 overflow-y-auto prose prose-sm dark:prose-invert max-w-none"
+                    dangerouslySetInnerHTML={{ __html: sanitizeBasicHtml(selectedTicket.message) }}
+                  />
                 </div>
               )}
 
