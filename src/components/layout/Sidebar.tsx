@@ -42,26 +42,26 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'leads', label: 'Leads', icon: Users },
-  { id: 'pipeline', label: 'Pipeline', icon: Kanban },
-  { id: 'prospeccion', label: 'Prospección', icon: Search },
-  { id: 'campaigns', label: 'Campañas', icon: Mail },
-  { id: 'mapa', label: 'Mapa', icon: MapPin },
-  { id: 'reports', label: 'Reportes', icon: BarChart3 },
-  { id: 'inbox', label: 'Inbox', icon: Inbox, showBadge: true },
-  { id: 'mensajes', label: 'Mensajes', icon: MessagesSquare },
-  { id: 'shared-files', label: 'Archivos', icon: Cloud },
-  { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
-  { id: 'templates', label: 'Plantillas', icon: FileText },
-  { id: 'presupuesto', label: 'Presupuesto', icon: Calculator },
-  { id: 'osticket', label: 'Tickets', icon: Ticket },
-  { id: 'chat-ai', label: 'Chat IA', icon: Bot },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-blue-500' },
+  { id: 'leads', label: 'Leads', icon: Users, color: 'text-indigo-500' },
+  { id: 'pipeline', label: 'Pipeline', icon: Kanban, color: 'text-purple-500' },
+  { id: 'prospeccion', label: 'Prospección', icon: Search, color: 'text-cyan-500' },
+  { id: 'campaigns', label: 'Campañas', icon: Mail, color: 'text-pink-500' },
+  { id: 'mapa', label: 'Mapa', icon: MapPin, color: 'text-red-500' },
+  { id: 'reports', label: 'Reportes', icon: BarChart3, color: 'text-orange-500' },
+  { id: 'inbox', label: 'Inbox', icon: Inbox, showBadge: true, color: 'text-teal-500' },
+  { id: 'mensajes', label: 'Mensajes', icon: MessagesSquare, color: 'text-sky-500' },
+  { id: 'shared-files', label: 'Archivos', icon: Cloud, color: 'text-slate-400' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, color: 'text-green-500' },
+  { id: 'templates', label: 'Plantillas', icon: FileText, color: 'text-amber-500' },
+  { id: 'presupuesto', label: 'Presupuesto', icon: Calculator, color: 'text-emerald-500' },
+  { id: 'osticket', label: 'Tickets', icon: Ticket, color: 'text-yellow-500' },
+  { id: 'chat-ai', label: 'Chat IA', icon: Bot, color: 'text-violet-500' },
 ];
 
 const toolsItems = [
-  { id: 'scraper', label: 'Scraper', icon: Globe, route: '/tools/scraper' },
-  { id: 'files', label: 'Archivos', icon: FolderOpen, route: '/tools/files' },
+  { id: 'scraper', label: 'Scraper', icon: Globe, route: '/tools/scraper', color: 'text-lime-500' },
+  { id: 'files', label: 'Archivos', icon: FolderOpen, route: '/tools/files', color: 'text-rose-500' },
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
@@ -168,7 +168,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
             )}
           >
             <div className="relative">
-              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <item.icon className={cn("w-5 h-5 flex-shrink-0", item.color)} />
               {/* Badge for collapsed state */}
               {item.showBadge && unreadCount > 0 && collapsed && !isMobile && (
                 <span className="absolute -top-1 -right-1 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
@@ -218,7 +218,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
               "hover:bg-sidebar-accent"
             )}
           >
-            <item.icon className="w-5 h-5 flex-shrink-0" />
+            <item.icon className={cn("w-5 h-5 flex-shrink-0", item.color)} />
             {(!collapsed || isMobile) && (
               <span className="text-sm font-medium animate-fade-in">{item.label}</span>
             )}
