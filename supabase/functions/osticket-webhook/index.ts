@@ -139,26 +139,41 @@ serve(async (req) => {
       );
     }
 
-    // Check for API key in multiple places
+    // Check for API key in multiple places.
+    // IMPORTANT: Prioritize explicit webhook keys (x-api-key / api_key query) over Authorization,
+    // because internal calls (or some proxies) may include a JWT Authorization header.
     const url = new URL(req.url);
     const headerApiKey = req.headers.get("x-api-key");
     const authHeader = req.headers.get("authorization");
     const queryApiKey = url.searchParams.get("api_key");
-    
-    const providedApiKey = 
-      headerApiKey || 
-      authHeader?.replace("Bearer ", "") ||
-      queryApiKey;
 
-    console.log(`🔐 Auth check - Header x-api-key: ${headerApiKey ? 'present' : 'missing'}`);
-    console.log(`🔐 Auth check - Authorization header: ${authHeader ? 'present' : 'missing'}`);
-    console.log(`🔐 Auth check - Query param api_key: ${queryApiKey ? 'present' : 'missing'}`);
+    const bearerRaw = authHeader?.replace(/^Bearer\s+/i, "") || null;
+    const bearerLooksLikeJwt = !!(bearerRaw && bearerRaw.split(".").length === 3);
+
+    // Source selection
+    const providedApiKey =
+      headerApiKey ||
+      queryApiKey ||
+      (bearerLooksLikeJwt ? null : bearerRaw);
+
+    const keySource = headerApiKey
+      ? "header:x-api-key"
+      : queryApiKey
+        ? "query:api_key"
+        : bearerRaw
+          ? (bearerLooksLikeJwt ? "authorization:jwt(ignored)" : "authorization:bearer")
+          : "none";
+
+    console.log(`🔐 Auth check - Header x-api-key: ${headerApiKey ? "present" : "missing"}`);
+    console.log(`🔐 Auth check - Query param api_key: ${queryApiKey ? "present" : "missing"}`);
+    console.log(
+      `🔐 Auth check - Authorization header: ${authHeader ? "present" : "missing"} (${bearerLooksLikeJwt ? "jwt" : "non-jwt/unknown"})`
+    );
+    console.log(`🔐 Auth check - Key source used: ${keySource}`);
     console.log(`🔐 Expected key length: ${webhookApiKey.length}, Provided key length: ${providedApiKey?.length || 0}`);
-    
+
     if (!providedApiKey || webhookApiKey !== providedApiKey) {
       console.error("❌ Unauthorized webhook request - invalid or missing API key");
-      console.error(`   Expected: ${webhookApiKey.substring(0, 8)}...`);
-      console.error(`   Received: ${providedApiKey ? providedApiKey.substring(0, 8) + '...' : 'NONE'}`);
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
