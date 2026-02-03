@@ -87,10 +87,11 @@ export function useOsTicketHistory() {
     mutationFn: async () => {
       if (!user?.id) throw new Error('No user');
 
+      // Delete all tickets (admin policy allows this, user policy restricts to own)
       const { error } = await (supabase as any)
         .from('osticket_tickets')
         .delete()
-        .eq('user_id', user.id);
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
 
       if (error) throw error;
     },
