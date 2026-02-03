@@ -112,6 +112,132 @@ export type Database = {
         }
         Relationships: []
       }
+      budget_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_url: string | null
+          message: string
+          metadata: Json | null
+          read: boolean
+          request_id: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_url?: string | null
+          message: string
+          metadata?: Json | null
+          read?: boolean
+          request_id?: string | null
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_url?: string | null
+          message?: string
+          metadata?: Json | null
+          read?: boolean
+          request_id?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      budget_requests: {
+        Row: {
+          created_at: string
+          email_empresa: string | null
+          emails: Json
+          emails_preview: Json | null
+          id: string
+          products: Json
+          prompt: string
+          request_id: string | null
+          response_data: Json | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_empresa?: string | null
+          emails?: Json
+          emails_preview?: Json | null
+          id?: string
+          products?: Json
+          prompt: string
+          request_id?: string | null
+          response_data?: Json | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_empresa?: string | null
+          emails?: Json
+          emails_preview?: Json | null
+          id?: string
+          products?: Json
+          prompt?: string
+          request_id?: string | null
+          response_data?: Json | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      budgets_received: {
+        Row: {
+          created_at: string
+          email_proveedor: string
+          fecha_recepcion: string | null
+          id: string
+          invoice_id: string | null
+          observaciones: string | null
+          productos: Json
+          proveedor: string
+          request_id: string
+          selected: boolean
+          total: number | null
+          user_responsible: string
+        }
+        Insert: {
+          created_at?: string
+          email_proveedor: string
+          fecha_recepcion?: string | null
+          id?: string
+          invoice_id?: string | null
+          observaciones?: string | null
+          productos?: Json
+          proveedor: string
+          request_id: string
+          selected?: boolean
+          total?: number | null
+          user_responsible: string
+        }
+        Update: {
+          created_at?: string
+          email_proveedor?: string
+          fecha_recepcion?: string | null
+          id?: string
+          invoice_id?: string | null
+          observaciones?: string | null
+          productos?: Json
+          proveedor?: string
+          request_id?: string
+          selected?: boolean
+          total?: number | null
+          user_responsible?: string
+        }
+        Relationships: []
+      }
       campaign_emails: {
         Row: {
           campaign_id: string
@@ -1086,6 +1212,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      workflow_logs: {
+        Row: {
+          created_at: string
+          error_details: string | null
+          id: string
+          level: string
+          message: string
+          metadata: Json | null
+          node_error: string | null
+          request_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_details?: string | null
+          id?: string
+          level?: string
+          message: string
+          metadata?: Json | null
+          node_error?: string | null
+          request_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_details?: string | null
+          id?: string
+          level?: string
+          message?: string
+          metadata?: Json | null
+          node_error?: string | null
+          request_id?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
