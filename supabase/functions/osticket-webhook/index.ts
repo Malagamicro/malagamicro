@@ -128,23 +128,7 @@ serve(async (req) => {
       );
     }
 
-    // MANDATORY authentication - webhook secret is required
-    const webhookApiKey = Deno.env.get("WAHA_WEBHOOK_SECRET");
-    
-    if (!webhookApiKey) {
-      console.error("❌ WAHA_WEBHOOK_SECRET not configured - webhook disabled for security");
-      return new Response(
-        JSON.stringify({ error: "Webhook not properly configured. WAHA_WEBHOOK_SECRET is required." }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Debug: log first 8 chars of expected key to help diagnose mismatches
-    console.log(`🔑 Expected secret starts with: ${webhookApiKey.substring(0, 8)}`);
-
-    // Check for API key in multiple places.
-    // IMPORTANT: Prioritize explicit webhook keys (x-api-key / api_key query) over Authorization,
-    // because internal calls (or some proxies) may include a JWT Authorization header.
+    // Extract API key from request (check multiple places)
     const url = new URL(req.url);
     const headerApiKey = req.headers.get("x-api-key");
     const authHeader = req.headers.get("authorization");
@@ -153,7 +137,7 @@ serve(async (req) => {
     const bearerRaw = authHeader?.replace(/^Bearer\s+/i, "") || null;
     const bearerLooksLikeJwt = !!(bearerRaw && bearerRaw.split(".").length === 3);
 
-    // Source selection
+    // Source selection - prioritize explicit webhook keys over Authorization
     const providedApiKey =
       headerApiKey ||
       queryApiKey ||
@@ -167,23 +151,48 @@ serve(async (req) => {
           ? (bearerLooksLikeJwt ? "authorization:jwt(ignored)" : "authorization:bearer")
           : "none";
 
-    console.log(`🔐 Auth check - Header x-api-key: ${headerApiKey ? "present" : "missing"}`);
-    console.log(`🔐 Auth check - Query param api_key: ${queryApiKey ? "present" : "missing"}`);
-    console.log(
-      `🔐 Auth check - Authorization header: ${authHeader ? "present" : "missing"} (${bearerLooksLikeJwt ? "jwt" : "non-jwt/unknown"})`
-    );
-    console.log(`🔐 Auth check - Key source used: ${keySource}`);
-    console.log(`🔐 Expected key length: ${webhookApiKey.length}, Provided key length: ${providedApiKey?.length || 0}`);
+    console.log(`🔐 Auth check - Key source: ${keySource}`);
+    console.log(`🔐 Provided key length: ${providedApiKey?.length || 0}`);
 
-    if (!providedApiKey || webhookApiKey !== providedApiKey) {
-      console.error("❌ Unauthorized webhook request - invalid or missing API key");
+    if (!providedApiKey) {
+      console.error("❌ No API key provided in request");
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized - API key required" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("✅ Webhook authenticated successfully");
+    // Initialize Supabase client with service role
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Validate API key against osticket_config table
+    // This allows each user to have their own API key configured in the UI
+    const { data: matchingConfigs, error: authError } = await supabase
+      .from("osticket_config")
+      .select("*")
+      .eq("api_key", providedApiKey.trim())
+      .eq("is_enabled", true);
+
+    if (authError) {
+      console.error("Error validating API key:", authError);
+      return new Response(
+        JSON.stringify({ error: "Authentication error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!matchingConfigs || matchingConfigs.length === 0) {
+      console.error(`❌ Unauthorized - API key not found or config disabled`);
+      console.log(`🔑 Provided key starts with: ${providedApiKey.substring(0, 8)}...`);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - Invalid API key" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`✅ Webhook authenticated via osticket_config (${matchingConfigs.length} matching config(s))`);
 
     // Parse the incoming payload from osTicket
     let payload: OsTicketPayload;
@@ -198,32 +207,8 @@ serve(async (req) => {
 
     console.log("📥 Received osTicket webhook:", JSON.stringify(payload, null, 2));
 
-    // Initialize Supabase client with service role for reading all configs
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Fetch all enabled osTicket configs
-    const { data: configs, error: configError } = await supabase
-      .from("osticket_config")
-      .select("*")
-      .eq("is_enabled", true);
-
-    if (configError) {
-      console.error("Error fetching osTicket configs:", configError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch configurations" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!configs || configs.length === 0) {
-      console.log("No enabled osTicket configurations found");
-      return new Response(
-        JSON.stringify({ message: "No enabled configurations", sent: 0 }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Use the matching configs (already filtered by API key and is_enabled)
+    const configs = matchingConfigs;
 
     let totalSent = 0;
     let totalFailed = 0;
