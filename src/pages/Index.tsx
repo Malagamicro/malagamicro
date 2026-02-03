@@ -33,6 +33,7 @@ import { PerplexityChatbot } from '@/components/chat/PerplexityChatbot';
 import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
 import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
 import { BudgetChatbot } from '@/components/budget/BudgetChatbot';
+import BudgetModule from '@/components/budget/BudgetModule';
 import { OsTicketHistory } from '@/components/osticket/OsTicketHistory';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
@@ -258,7 +259,7 @@ const IndexContent = () => {
       case 'presupuesto':
         return (
           <div className="h-full animate-fade-in">
-            <BudgetChatbot />
+            <BudgetModule />
           </div>
         );
       case 'osticket':
