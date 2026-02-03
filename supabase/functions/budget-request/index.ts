@@ -157,9 +157,9 @@ serve(async (req) => {
     }
 
     // APPROVE/REJECT - For approval button actions
-    if (req.method === 'POST' && action === 'approve') {
+    if (req.method === 'POST' && (action === 'approve' || action === 'reject')) {
       const body = await req.json();
-      const { request_id, approved } = body;
+      const { request_id } = body;
 
       if (!request_id) {
         return new Response(
@@ -168,17 +168,19 @@ serve(async (req) => {
         );
       }
 
+      const approved = action === 'approve';
+
       // Get webhook waiting URL from n8n
       const n8nBaseUrl = n8nWebhookUrl.replace('/webhook/budget-request', '');
       const approvalUrl = `${n8nBaseUrl}/webhook-waiting/${request_id}`;
 
-      console.log('Sending approval to:', approvalUrl, { approved });
+      console.log('Sending approval to:', approvalUrl, { approved, request_id });
 
       try {
         const approvalResponse = await fetch(approvalUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ approved: approved === true })
+          body: JSON.stringify({ approved })
         });
 
         const approvalData = await approvalResponse.text();
@@ -190,6 +192,16 @@ serve(async (req) => {
           .from('budget_requests')
           .update({ status: newStatus })
           .eq('request_id', request_id);
+
+        // Add log entry
+        await serviceClient
+          .from('workflow_logs')
+          .insert({
+            level: 'info',
+            message: `Solicitud ${request_id} ${approved ? 'aprobada' : 'rechazada'} por ${user.email}`,
+            request_id,
+            metadata: { approved, user_email: user.email }
+          });
 
         return new Response(
           JSON.stringify({ 
