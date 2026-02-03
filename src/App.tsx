@@ -16,6 +16,7 @@ import FileManager from "./pages/FileManager";
 import Install from "./pages/Install";
 import AdminUsers from "./pages/AdminUsers";
 import GeneralReminders from "./pages/GeneralReminders";
+import Budgets from "./pages/Budgets";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -86,6 +87,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <GeneralReminders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/budgets"
+                element={
+                  <ProtectedRoute>
+                    <Budgets />
                   </ProtectedRoute>
                 }
               />
