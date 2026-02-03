@@ -40,14 +40,14 @@ export function useGeneralReminders() {
   const queryClient = useQueryClient();
 
   const { data: reminders = [], isLoading } = useQuery({
-    queryKey: ['general-reminders', user?.id],
+    queryKey: ['general-reminders'],
     queryFn: async () => {
       if (!user?.id) return [];
       
+      // Fetch all reminders (visible to everyone)
       const { data, error } = await supabase
         .from('general_reminders')
         .select('*')
-        .eq('user_id', user.id)
         .order('reminder_date', { ascending: true });
 
       if (error) throw error;
