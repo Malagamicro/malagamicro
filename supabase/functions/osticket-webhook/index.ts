@@ -128,6 +128,34 @@ serve(async (req) => {
       );
     }
 
+    // MANDATORY authentication - webhook secret is required
+    const webhookApiKey = Deno.env.get("WAHA_WEBHOOK_SECRET");
+    
+    if (!webhookApiKey) {
+      console.error("❌ WAHA_WEBHOOK_SECRET not configured - webhook disabled for security");
+      return new Response(
+        JSON.stringify({ error: "Webhook not properly configured. WAHA_WEBHOOK_SECRET is required." }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check for API key in multiple places
+    const url = new URL(req.url);
+    const providedApiKey = 
+      req.headers.get("x-api-key") || 
+      req.headers.get("authorization")?.replace("Bearer ", "") ||
+      url.searchParams.get("api_key");
+
+    if (!providedApiKey || webhookApiKey !== providedApiKey) {
+      console.error("❌ Unauthorized webhook request - invalid or missing API key");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("✅ Webhook authenticated successfully");
+
     // Parse the incoming payload from osTicket
     let payload: OsTicketPayload;
     try {
