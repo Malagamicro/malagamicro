@@ -2,6 +2,8 @@ import { StatCard } from './StatCard';
 import { LeadsByStatusChart } from './LeadsByStatusChart';
 import { RecentLeads } from './RecentLeads';
 import { UpcomingReminders } from './UpcomingReminders';
+import { CompanyReminders } from './CompanyReminders';
+import { RecentTickets } from './RecentTickets';
 import { useLeads, useDashboardStats } from '@/hooks/useLeads';
 import { Users, UserPlus, TrendingUp, Target, Loader2 } from 'lucide-react';
 
@@ -72,11 +74,17 @@ export function Dashboard({ onViewLead }: DashboardProps) {
         />
       </div>
 
-      {/* Charts & Lists */}
+      {/* Charts & Lists - Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <LeadsByStatusChart stats={dashboardStats} />
         <RecentLeads leads={leads} onViewLead={onViewLead} />
         <UpcomingReminders onLeadClick={onViewLead} />
+      </div>
+
+      {/* Company Reminders & Tickets - Row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <CompanyReminders />
+        <RecentTickets />
       </div>
     </div>
   );

@@ -25,14 +25,14 @@ export function useOsTicketHistory() {
   const queryClient = useQueryClient();
 
   const { data: tickets, isLoading, refetch } = useQuery({
-    queryKey: ['osticket-tickets', user?.id],
+    queryKey: ['osticket-tickets'],
     queryFn: async () => {
       if (!user?.id) return [];
 
+      // Fetch all tickets (visible to everyone)
       const { data, error } = await (supabase as any)
         .from('osticket_tickets')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -53,7 +53,6 @@ export function useOsTicketHistory() {
           event: 'INSERT',
           schema: 'public',
           table: 'osticket_tickets',
-          filter: `user_id=eq.${user.id}`,
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ['osticket-tickets'] });
