@@ -141,13 +141,24 @@ serve(async (req) => {
 
     // Check for API key in multiple places
     const url = new URL(req.url);
+    const headerApiKey = req.headers.get("x-api-key");
+    const authHeader = req.headers.get("authorization");
+    const queryApiKey = url.searchParams.get("api_key");
+    
     const providedApiKey = 
-      req.headers.get("x-api-key") || 
-      req.headers.get("authorization")?.replace("Bearer ", "") ||
-      url.searchParams.get("api_key");
+      headerApiKey || 
+      authHeader?.replace("Bearer ", "") ||
+      queryApiKey;
 
+    console.log(`🔐 Auth check - Header x-api-key: ${headerApiKey ? 'present' : 'missing'}`);
+    console.log(`🔐 Auth check - Authorization header: ${authHeader ? 'present' : 'missing'}`);
+    console.log(`🔐 Auth check - Query param api_key: ${queryApiKey ? 'present' : 'missing'}`);
+    console.log(`🔐 Expected key length: ${webhookApiKey.length}, Provided key length: ${providedApiKey?.length || 0}`);
+    
     if (!providedApiKey || webhookApiKey !== providedApiKey) {
       console.error("❌ Unauthorized webhook request - invalid or missing API key");
+      console.error(`   Expected: ${webhookApiKey.substring(0, 8)}...`);
+      console.error(`   Received: ${providedApiKey ? providedApiKey.substring(0, 8) + '...' : 'NONE'}`);
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
