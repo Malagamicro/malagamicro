@@ -3,10 +3,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  FileText, ClipboardList, Inbox, BarChart3, History,
+  FileText, ClipboardList, Inbox, History,
   TrendingUp, Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
-import BudgetRequestForm from './BudgetRequestForm';
+import { BudgetChatbot } from './BudgetChatbot';
 import BudgetApprovalPanel from './BudgetApprovalPanel';
 import BudgetNotificationsPopover from './BudgetNotificationsPopover';
 import { useBudgetRequests } from '@/hooks/useBudgetRequests';
@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 const BudgetModule = () => {
   const { user } = useAuth();
   const { requests, budgetsReceived, notifications, unreadCount } = useBudgetRequests();
-  const [activeTab, setActiveTab] = useState('create');
+  const [activeTab, setActiveTab] = useState('chatbot');
 
   // Check if user is admin/inma
   const isApprover = user?.email?.toLowerCase().includes('inma') || 
@@ -56,7 +56,7 @@ const BudgetModule = () => {
             Gestión de Presupuestos
           </h1>
           <p className="text-muted-foreground">
-            Automatización de solicitudes y seguimiento de presupuestos
+            Solicita presupuestos y gestiona las respuestas de proveedores
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -65,7 +65,7 @@ const BudgetModule = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
         <StatCard
           title="Solicitudes este mes"
           value={thisMonthRequests.length}
@@ -95,10 +95,10 @@ const BudgetModule = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-4 pt-0">
+      <div className="flex-1 p-4 pt-0 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="create" className="flex items-center gap-2">
+            <TabsTrigger value="chatbot" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Nueva Solicitud</span>
             </TabsTrigger>
@@ -123,53 +123,19 @@ const BudgetModule = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="create" className="flex-1 mt-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <BudgetRequestForm />
-              <Card>
-                <CardHeader>
-                  <CardTitle>Tus solicitudes recientes</CardTitle>
-                  <CardDescription>Últimas 5 solicitudes enviadas</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[400px]">
-                    {requests.slice(0, 5).map(request => (
-                      <div 
-                        key={request.id} 
-                        className="border-b py-3 last:border-0"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-sm">
-                            {request.request_id}
-                          </span>
-                          <StatusBadge status={request.status} />
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                          {request.prompt}
-                        </p>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(request.created_at), "dd MMM yyyy HH:mm", { locale: es })}
-                        </span>
-                      </div>
-                    ))}
-                    {requests.length === 0 && (
-                      <p className="text-center text-muted-foreground py-8">
-                        No hay solicitudes aún
-                      </p>
-                    )}
-                  </ScrollArea>
-                </CardContent>
-              </Card>
+          <TabsContent value="chatbot" className="flex-1 mt-4 overflow-hidden">
+            <div className="h-full max-w-2xl mx-auto">
+              <BudgetChatbot />
             </div>
           </TabsContent>
 
           {isApprover && (
-            <TabsContent value="approve" className="flex-1 mt-4">
+            <TabsContent value="approve" className="flex-1 mt-4 overflow-auto">
               <BudgetApprovalPanel />
             </TabsContent>
           )}
 
-          <TabsContent value="received" className="flex-1 mt-4">
+          <TabsContent value="received" className="flex-1 mt-4 overflow-auto">
             <Card className="h-full">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -236,7 +202,7 @@ const BudgetModule = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="history" className="flex-1 mt-4">
+          <TabsContent value="history" className="flex-1 mt-4 overflow-auto">
             <Card className="h-full">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -255,7 +221,6 @@ const BudgetModule = () => {
                         <TableHead>ID</TableHead>
                         <TableHead>Descripción</TableHead>
                         <TableHead>Proveedores</TableHead>
-                        <TableHead>Productos</TableHead>
                         <TableHead>Fecha</TableHead>
                         <TableHead>Estado</TableHead>
                       </TableRow>
@@ -270,7 +235,6 @@ const BudgetModule = () => {
                             {request.prompt}
                           </TableCell>
                           <TableCell>{request.emails.length}</TableCell>
-                          <TableCell>{request.products.length}</TableCell>
                           <TableCell>
                             {format(new Date(request.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
                           </TableCell>
@@ -279,6 +243,13 @@ const BudgetModule = () => {
                           </TableCell>
                         </TableRow>
                       ))}
+                      {requests.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            No hay solicitudes aún
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </ScrollArea>

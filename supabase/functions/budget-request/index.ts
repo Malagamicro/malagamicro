@@ -47,14 +47,14 @@ serve(async (req) => {
       auth: { persistSession: false }
     });
 
-    // CREATE REQUEST - Send to n8n
-    if (req.method === 'POST' && action === 'create') {
+    // CREATE REQUEST - Send to n8n (chatbot flow)
+    if (req.method === 'POST' && !action) {
       const body = await req.json();
-      const { prompt, emails, products, email_empresa } = body;
+      const { prompt, emails, products, email_empresa, user_name } = body;
 
-      if (!prompt || !emails || emails.length === 0 || !products || products.length === 0) {
+      if (!prompt || !emails || emails.length === 0) {
         return new Response(
-          JSON.stringify({ error: 'Faltan campos requeridos: prompt, emails y products' }),
+          JSON.stringify({ error: 'Faltan campos requeridos: prompt y emails' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -69,7 +69,7 @@ serve(async (req) => {
           user_id: user.id,
           prompt,
           emails,
-          products,
+          products: typeof products === 'string' ? [{ nombre: products }] : products,
           email_empresa: email_empresa || 'presupuestos@malagamicro.com',
           request_id,
           status: 'pending'
@@ -83,21 +83,23 @@ serve(async (req) => {
         );
       }
 
-      // Send to n8n webhook
+      // Payload for n8n webhook
       const n8nPayload = {
         request_id,
         user_id: user.id,
         user_email: user.email,
+        user_name: user_name || user.email?.split('@')[0] || 'Usuario',
         prompt,
         emails,
-        products,
+        products: typeof products === 'string' ? products : JSON.stringify(products),
         email_empresa: email_empresa || 'presupuestos@malagamicro.com'
       };
 
       console.log('Sending to n8n:', n8nPayload);
 
       try {
-        const n8nResponse = await fetch(n8nWebhookUrl, {
+        // Send POST to n8n
+        const n8nResponse = await fetch(`${n8nWebhookUrl}/budget-request`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(n8nPayload)
@@ -107,29 +109,16 @@ serve(async (req) => {
         console.log('n8n response:', n8nResponse.status, n8nData);
 
         if (!n8nResponse.ok) {
-          // Try GET fallback (for n8n test mode)
-          const params = new URLSearchParams({
-            request_id,
-            user_id: user.id,
-            prompt
-          });
-          
-          const n8nGetResponse = await fetch(`${n8nWebhookUrl}?${params}`, {
-            method: 'GET'
-          });
+          // Update status to error
+          await serviceClient
+            .from('budget_requests')
+            .update({ status: 'error', response_data: { error: n8nData } })
+            .eq('request_id', request_id);
 
-          if (!n8nGetResponse.ok) {
-            // Update status to error
-            await serviceClient
-              .from('budget_requests')
-              .update({ status: 'error', response_data: { error: n8nData } })
-              .eq('request_id', request_id);
-
-            return new Response(
-              JSON.stringify({ error: 'Error al contactar n8n', details: n8nData }),
-              { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
+          return new Response(
+            JSON.stringify({ error: 'Error al contactar n8n', details: n8nData }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
 
         return new Response(
@@ -171,7 +160,7 @@ serve(async (req) => {
       const approved = action === 'approve';
 
       // Get webhook waiting URL from n8n
-      const n8nBaseUrl = n8nWebhookUrl.replace('/webhook/budget-request', '');
+      const n8nBaseUrl = n8nWebhookUrl.replace('/webhook', '');
       const approvalUrl = `${n8nBaseUrl}/webhook-waiting/${request_id}`;
 
       console.log('Sending approval to:', approvalUrl, { approved, request_id });
