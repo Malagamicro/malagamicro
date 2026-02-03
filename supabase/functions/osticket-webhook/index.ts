@@ -139,6 +139,9 @@ serve(async (req) => {
       );
     }
 
+    // Debug: log first 8 chars of expected key to help diagnose mismatches
+    console.log(`🔑 Expected secret starts with: ${webhookApiKey.substring(0, 8)}`);
+
     // Check for API key in multiple places.
     // IMPORTANT: Prioritize explicit webhook keys (x-api-key / api_key query) over Authorization,
     // because internal calls (or some proxies) may include a JWT Authorization header.
