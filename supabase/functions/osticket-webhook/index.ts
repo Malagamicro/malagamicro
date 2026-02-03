@@ -199,6 +199,28 @@ serve(async (req) => {
     let totalSent = 0;
     let totalFailed = 0;
 
+    // Check for duplicate ticket to prevent re-processing
+    if (payload.ticket_id) {
+      const { data: existingTickets } = await supabase
+        .from("osticket_tickets")
+        .select("id")
+        .eq("ticket_id", payload.ticket_id)
+        .limit(1);
+
+      if (existingTickets && existingTickets.length > 0) {
+        console.log(`⚠️ Ticket ${payload.ticket_id} already processed, skipping duplicate`);
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: "Duplicate ticket ignored", 
+            duplicate: true,
+            ticket_id: payload.ticket_id 
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Process each enabled config
     for (const config of configs as OsTicketConfig[]) {
       if (!config.notification_numbers || config.notification_numbers.length === 0) {
