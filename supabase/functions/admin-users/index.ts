@@ -115,7 +115,17 @@ serve(async (req) => {
       });
 
       if (createError) {
-        throw createError;
+        // Handle specific error codes
+        if (createError.code === 'email_exists' || createError.message?.includes('already been registered')) {
+          return new Response(
+            JSON.stringify({ error: 'Este email ya está registrado en el sistema' }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response(
+          JSON.stringify({ error: createError.message || 'Error al crear usuario' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       // Assign role if provided
