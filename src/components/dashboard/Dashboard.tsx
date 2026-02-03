@@ -36,17 +36,17 @@ export function Dashboard({ onViewLead }: DashboardProps) {
   };
 
   return (
-    <div className="p-8 space-y-8 animate-fade-in">
+    <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 lg:space-y-8 animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-0.5 md:mt-1">
           Resumen de actividad y prospección
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Grid - 2 columns on mobile, 4 on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6">
         <StatCard
           title="Total Leads"
           value={dashboardStats.totalLeads}
@@ -74,15 +74,15 @@ export function Dashboard({ onViewLead }: DashboardProps) {
         />
       </div>
 
-      {/* Charts & Lists - Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Charts & Lists - Stack on mobile, 3 cols on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         <LeadsByStatusChart stats={dashboardStats} />
         <RecentLeads leads={leads} onViewLead={onViewLead} />
         <UpcomingReminders onLeadClick={onViewLead} />
       </div>
 
-      {/* Company Reminders & Tickets - Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Company Reminders & Tickets - Stack on mobile */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <CompanyReminders />
         <RecentTickets />
       </div>

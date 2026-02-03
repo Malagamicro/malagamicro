@@ -21,6 +21,7 @@ import {
   Trash2,
   AlertTriangle,
   FileSpreadsheet,
+  X,
 } from 'lucide-react';
 import {
   Select,
@@ -148,68 +149,79 @@ export function LeadsList({
   };
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
-      {/* Floating bulk action bar */}
+    <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 animate-fade-in">
+      {/* Floating bulk action bar - more compact on mobile */}
       {selectedLeadIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-card border border-border shadow-lg rounded-xl px-4 py-3 flex items-center gap-4 animate-slide-up">
-          <span className="text-sm font-medium text-foreground">
-            {selectedLeadIds.length} leads seleccionados
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card border border-border shadow-lg rounded-xl px-3 md:px-4 py-2.5 md:py-3 flex items-center gap-2 md:gap-4 animate-slide-up max-w-[calc(100vw-2rem)]">
+          <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">
+            {selectedLeadIds.length} seleccionados
           </span>
-          <div className="h-6 w-px bg-border" />
+          <div className="h-5 w-px bg-border hidden md:block" />
           <Button 
             onClick={() => setShowWhatsAppModal(true)} 
             size="sm"
-            className="gap-2 bg-green-600 hover:bg-green-700"
+            className="gap-1.5 md:gap-2 bg-green-600 hover:bg-green-700 h-8 md:h-9 px-2.5 md:px-3 text-xs md:text-sm"
           >
-            <MessageSquare className="w-4 h-4" />
-            WhatsApp
+            <MessageSquare className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span className="hidden sm:inline">WhatsApp</span>
           </Button>
           <Button 
             onClick={() => setShowDeleteConfirm(true)} 
             size="sm"
             variant="destructive"
-            className="gap-2"
+            className="gap-1.5 md:gap-2 h-8 md:h-9 px-2.5 md:px-3 text-xs md:text-sm"
             disabled={isBulkDeleting}
           >
             {isBulkDeleting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" />
             ) : (
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
             )}
-            Eliminar
+            <span className="hidden sm:inline">Eliminar</span>
           </Button>
           <Button 
             onClick={() => setSelectedLeadIds([])} 
             size="sm"
             variant="ghost"
+            className="h-8 md:h-9 px-2 md:px-3"
           >
-            Cancelar
+            <X className="w-4 h-4" />
           </Button>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Leads</h1>
-          <p className="text-muted-foreground mt-1">
-            {filteredAndSortedLeads.length} de {leads.length} leads
-            {selectedLeadIds.length > 0 && (
-              <span className="text-primary ml-2">
-                ({selectedLeadIds.length} seleccionados)
-              </span>
-            )}
-          </p>
+      {/* Header - more compact on mobile */}
+      <div className="flex flex-col gap-3 md:gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Leads</h1>
+            <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+              {filteredAndSortedLeads.length} de {leads.length} leads
+              {selectedLeadIds.length > 0 && (
+                <span className="text-primary ml-2">
+                  ({selectedLeadIds.length} selec.)
+                </span>
+              )}
+            </p>
+          </div>
+          {/* Main action button always visible */}
+          <Button onClick={onAddLead} size="sm" className="gap-1.5 md:gap-2 shrink-0 h-9 md:h-10">
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nuevo Lead</span>
+            <span className="sm:hidden">Nuevo</span>
+          </Button>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        
+        {/* Secondary actions - horizontal scroll on mobile */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2" disabled={leads.length === 0}>
-                <Download className="w-4 h-4" />
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 md:h-9 text-xs md:text-sm shrink-0" disabled={leads.length === 0}>
+                <Download className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 Exportar
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={() => {
                 exportToCSV(filteredAndSortedLeads);
                 toast.success(`${filteredAndSortedLeads.length} leads exportados a CSV`);
@@ -226,115 +238,116 @@ export function LeadsList({
           </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Upload className="w-4 h-4" />
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 md:h-9 text-xs md:text-sm shrink-0">
+                <Upload className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 Importar
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={onImportLeads}>
                 <Upload className="w-4 h-4 mr-2" />
                 Importar Excel/CSV
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onImportFromGoogleSheets}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Importar desde Google Sheets
+                Google Sheets
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={onAddLead} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nuevo Lead
-          </Button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
+      {/* Filters - scrollable on mobile */}
+      <div className="space-y-3">
+        {/* Search always visible */}
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por empresa, contacto o ciudad..."
+            placeholder="Buscar empresa, contacto o ciudad..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-9 md:h-10 text-sm"
           />
         </div>
         
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatus | 'all')}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="nuevo">Nuevo</SelectItem>
-            <SelectItem value="contactado">Contactado</SelectItem>
-            <SelectItem value="interesado">Interesado</SelectItem>
-            <SelectItem value="cliente">Cliente</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Filter row - horizontal scroll on mobile */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatus | 'all')}>
+            <SelectTrigger className="w-[120px] md:w-[140px] h-8 md:h-9 text-xs md:text-sm shrink-0">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="nuevo">Nuevo</SelectItem>
+              <SelectItem value="contactado">Contactado</SelectItem>
+              <SelectItem value="interesado">Interesado</SelectItem>
+              <SelectItem value="cliente">Cliente</SelectItem>
+            </SelectContent>
+          </Select>
 
-        <Select value={segmentFilter} onValueChange={(v) => setSegmentFilter(v as LeadSegment | 'all')}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Segmento" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="franquicia">Franquicia</SelectItem>
-            <SelectItem value="pyme">PYME</SelectItem>
-          </SelectContent>
-        </Select>
+          <Select value={segmentFilter} onValueChange={(v) => setSegmentFilter(v as LeadSegment | 'all')}>
+            <SelectTrigger className="w-[110px] md:w-[130px] h-8 md:h-9 text-xs md:text-sm shrink-0">
+              <SelectValue placeholder="Segmento" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="franquicia">Franquicia</SelectItem>
+              <SelectItem value="pyme">PYME</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* Folder Filter */}
-        <Select value={folderFilter} onValueChange={setFolderFilter}>
-          <SelectTrigger className="w-40">
-            <FolderOpen className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Carpeta" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las carpetas</SelectItem>
-            <SelectItem value="none">Sin carpeta</SelectItem>
-            {folders.map((folder) => (
-              <SelectItem key={folder.id} value={folder.id}>
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: folder.color }}
-                  />
-                  {folder.name}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select value={folderFilter} onValueChange={setFolderFilter}>
+            <SelectTrigger className="w-[130px] md:w-[150px] h-8 md:h-9 text-xs md:text-sm shrink-0">
+              <FolderOpen className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+              <SelectValue placeholder="Carpeta" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="none">Sin carpeta</SelectItem>
+              {folders.map((folder) => (
+                <SelectItem key={folder.id} value={folder.id}>
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-2.5 h-2.5 rounded-full shrink-0" 
+                      style={{ backgroundColor: folder.color }}
+                    />
+                    <span className="truncate">{folder.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-          <SelectTrigger className="w-36">
-            <ArrowUpDown className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Ordenar" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="score">Por Score</SelectItem>
-            <SelectItem value="recent">Más recientes</SelectItem>
-            <SelectItem value="name">Por nombre</SelectItem>
-          </SelectContent>
-        </Select>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+            <SelectTrigger className="w-[100px] md:w-[120px] h-8 md:h-9 text-xs md:text-sm shrink-0">
+              <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+              <SelectValue placeholder="Ordenar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="score">Score</SelectItem>
+              <SelectItem value="recent">Recientes</SelectItem>
+              <SelectItem value="name">Nombre</SelectItem>
+            </SelectContent>
+          </Select>
 
-        <div className="flex border rounded-lg overflow-hidden">
-          <Button
-            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-            size="icon"
-            onClick={() => setViewMode('grid')}
-          >
-            <Grid3X3 className="w-4 h-4" />
-          </Button>
-          <Button
-            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-            size="icon"
-            onClick={() => setViewMode('list')}
-          >
-            <List className="w-4 h-4" />
-          </Button>
+          <div className="flex border rounded-lg overflow-hidden shrink-0 ml-auto">
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="h-8 w-8 md:h-9 md:w-9"
+              onClick={() => setViewMode('grid')}
+            >
+              <Grid3X3 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="icon"
+              className="h-8 w-8 md:h-9 md:w-9"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 

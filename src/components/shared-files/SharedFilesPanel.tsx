@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { format } from 'date-fns';
+import { useState, useRef, useMemo } from 'react';
+import { format, isAfter, isBefore, startOfDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   Cloud,
@@ -23,6 +23,10 @@ import {
   X,
   Eye,
   ArrowLeft,
+  Calendar,
+  User,
+  Filter,
+  FileUp,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +49,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -54,9 +66,19 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useSharedFiles, useSharedFolders, formatFileSize, SharedFile, SharedFolder } from '@/hooks/useSharedFiles';
+import { useMessageTemplates } from '@/hooks/useMessageTemplates';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+const TEMPLATE_CATEGORIES = [
+  { value: 'general', label: 'General' },
+  { value: 'ventas', label: 'Ventas' },
+  { value: 'soporte', label: 'Soporte' },
+  { value: 'bienvenida', label: 'Bienvenida' },
+  { value: 'seguimiento', label: 'Seguimiento' },
+  { value: 'otros', label: 'Otros' },
+];
 
 function getFileIcon(fileType: string | null) {
   if (!fileType) return File;
@@ -85,6 +107,7 @@ interface BreadcrumbItem {
 
 export function SharedFilesPanel() {
   const { user } = useAuth();
+  const { createTemplate, isCreating: isCreatingTemplate } = useMessageTemplates();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([{ id: null, name: 'Inicio' }]);
   
@@ -92,6 +115,8 @@ export function SharedFilesPanel() {
   const { folders, isLoading: foldersLoading, createFolder, deleteFolder, renameFolder } = useSharedFolders(currentFolderId);
   
   const [search, setSearch] = useState('');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [userFilter, setUserFilter] = useState<string>('all');
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -99,6 +124,9 @@ export function SharedFilesPanel() {
   const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false);
   const [renameFolderDialogOpen, setRenameFolderDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [createTemplateDialogOpen, setCreateTemplateDialogOpen] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateCategory, setTemplateCategory] = useState('general');
   
   const [selectedFile, setSelectedFile] = useState<SharedFile | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<SharedFolder | null>(null);
@@ -109,15 +137,88 @@ export function SharedFilesPanel() {
 
   const isLoading = filesLoading || foldersLoading;
 
-  const filteredFiles = files.filter(file =>
-    file.file_name.toLowerCase().includes(search.toLowerCase()) ||
-    file.description?.toLowerCase().includes(search.toLowerCase()) ||
-    file.uploader?.full_name?.toLowerCase().includes(search.toLowerCase())
-  );
 
-  const filteredFolders = folders.filter(folder =>
-    folder.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Get unique users for filter
+  const uniqueUsers = useMemo(() => {
+    const usersMap = new Map<string, { id: string; name: string; avatar?: string }>();
+    files.forEach(file => {
+      if (file.user_id && !usersMap.has(file.user_id)) {
+        usersMap.set(file.user_id, {
+          id: file.user_id,
+          name: file.uploader?.full_name || 'Usuario',
+          avatar: file.uploader?.avatar_url || undefined,
+        });
+      }
+    });
+    folders.forEach(folder => {
+      if (folder.user_id && !usersMap.has(folder.user_id)) {
+        usersMap.set(folder.user_id, {
+          id: folder.user_id,
+          name: folder.owner?.full_name || 'Usuario',
+          avatar: folder.owner?.avatar_url || undefined,
+        });
+      }
+    });
+    return Array.from(usersMap.values());
+  }, [files, folders]);
+
+  // Filter files
+  const filteredFiles = useMemo(() => {
+    return files.filter(file => {
+      // Search filter
+      const matchesSearch = 
+        file.file_name.toLowerCase().includes(search.toLowerCase()) ||
+        file.description?.toLowerCase().includes(search.toLowerCase()) ||
+        file.uploader?.full_name?.toLowerCase().includes(search.toLowerCase());
+      
+      // Date filter
+      let matchesDate = true;
+      const fileDate = startOfDay(new Date(file.created_at));
+      const today = startOfDay(new Date());
+      
+      if (dateFilter === 'today') {
+        matchesDate = fileDate.getTime() === today.getTime();
+      } else if (dateFilter === 'week') {
+        matchesDate = isAfter(fileDate, subDays(today, 7));
+      } else if (dateFilter === 'month') {
+        matchesDate = isAfter(fileDate, subDays(today, 30));
+      }
+      
+      // User filter
+      const matchesUser = userFilter === 'all' || file.user_id === userFilter;
+      
+      return matchesSearch && matchesDate && matchesUser;
+    });
+  }, [files, search, dateFilter, userFilter]);
+
+  const filteredFolders = useMemo(() => {
+    return folders.filter(folder => {
+      const matchesSearch = folder.name.toLowerCase().includes(search.toLowerCase());
+      const matchesUser = userFilter === 'all' || folder.user_id === userFilter;
+      
+      // Date filter for folders
+      let matchesDate = true;
+      const folderDate = startOfDay(new Date(folder.created_at));
+      const today = startOfDay(new Date());
+      
+      if (dateFilter === 'today') {
+        matchesDate = folderDate.getTime() === today.getTime();
+      } else if (dateFilter === 'week') {
+        matchesDate = isAfter(folderDate, subDays(today, 7));
+      } else if (dateFilter === 'month') {
+        matchesDate = isAfter(folderDate, subDays(today, 30));
+      }
+      
+      return matchesSearch && matchesDate && matchesUser;
+    });
+  }, [folders, search, dateFilter, userFilter]);
+
+  // Check if any filters are active
+  const hasActiveFilters = dateFilter !== 'all' || userFilter !== 'all';
+  const clearFilters = () => {
+    setDateFilter('all');
+    setUserFilter('all');
+  };
 
   const navigateToFolder = (folder: SharedFolder) => {
     setCurrentFolderId(folder.id);
@@ -261,6 +362,30 @@ export function SharedFilesPanel() {
     }
   };
 
+  const handleCreateTemplateFromFile = (file: SharedFile) => {
+    setSelectedFile(file);
+    setTemplateName(file.file_name.replace(/\.[^/.]+$/, '')); // Remove extension
+    setTemplateCategory('general');
+    setCreateTemplateDialogOpen(true);
+  };
+
+  const handleSaveTemplate = () => {
+    if (!selectedFile || !templateName.trim()) return;
+    
+    // Create template with file URL as content
+    const content = `📎 Archivo adjunto: ${selectedFile.file_name}\n\n🔗 ${selectedFile.file_path}`;
+    
+    createTemplate({
+      name: templateName.trim(),
+      content,
+      category: templateCategory,
+    });
+    
+    setCreateTemplateDialogOpen(false);
+    setSelectedFile(null);
+    setTemplateName('');
+  };
+
   return (
     <div className="h-full flex flex-col">
       <Card className="flex-1 flex flex-col">
@@ -323,15 +448,66 @@ export function SharedFilesPanel() {
             ))}
           </div>
 
-          {/* Search */}
-          <div className="relative mt-2 md:mt-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar archivos y carpetas..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 h-9 md:h-10 text-sm"
-            />
+          {/* Search and Filters */}
+          <div className="space-y-2 mt-2 md:mt-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar archivos y carpetas..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 h-9 md:h-10 text-sm"
+              />
+            </div>
+            
+            {/* Filter row - scrollable on mobile */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-[100px] md:w-[120px] h-8 text-xs md:text-sm shrink-0">
+                  <Calendar className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+                  <SelectValue placeholder="Fecha" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="today">Hoy</SelectItem>
+                  <SelectItem value="week">Esta semana</SelectItem>
+                  <SelectItem value="month">Este mes</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={userFilter} onValueChange={setUserFilter}>
+                <SelectTrigger className="w-[110px] md:w-[140px] h-8 text-xs md:text-sm shrink-0">
+                  <User className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+                  <SelectValue placeholder="Usuario" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {uniqueUsers.map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      <span className="truncate">{u.name}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearFilters}
+                  className="h-8 px-2 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Limpiar
+                </Button>
+              )}
+
+              {(filteredFiles.length > 0 || filteredFolders.length > 0) && (
+                <Badge variant="secondary" className="ml-auto shrink-0 text-xs">
+                  {filteredFolders.length + filteredFiles.length} items
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
 
@@ -504,6 +680,10 @@ export function SharedFilesPanel() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleCreateTemplateFromFile(file)}>
+                                <FileUp className="h-4 w-4 mr-2" />
+                                Crear plantilla
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleEdit(file)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Editar descripción
@@ -734,6 +914,57 @@ export function SharedFilesPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Template from File Dialog */}
+      <Dialog open={createTemplateDialogOpen} onOpenChange={setCreateTemplateDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileUp className="h-5 w-5 text-primary" />
+              Crear plantilla desde archivo
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {selectedFile && (
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                <p className="text-sm font-medium truncate">{selectedFile.file_name}</p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nombre de la plantilla</label>
+              <Input
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Nombre de la plantilla"
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Categoría</label>
+              <Select value={templateCategory} onValueChange={setTemplateCategory}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEMPLATE_CATEGORIES.map(cat => (
+                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setCreateTemplateDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={handleSaveTemplate} disabled={!templateName.trim() || isCreatingTemplate}>
+              {isCreatingTemplate ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Crear plantilla
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
