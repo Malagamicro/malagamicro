@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { Conversation, InternalMessage } from '@/hooks/useInternalChat';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { BudgetApprovalMessage } from './BudgetApprovalMessage';
 
 interface ChatPanelProps {
   conversation: Conversation | null;
@@ -211,47 +212,63 @@ export function ChatPanel({
                         {message.sender?.full_name}
                       </p>
                     )}
-                    <div
-                      className={cn(
-                        'inline-block rounded-2xl px-4 py-2',
-                        isMe
-                          ? 'bg-primary text-primary-foreground rounded-tr-md'
-                          : 'bg-muted rounded-tl-md'
-                      )}
-                    >
-                      {message.is_deleted ? (
-                        <p className="text-sm italic opacity-70">Mensaje eliminado</p>
-                      ) : message.message_type === 'image' ? (
-                        <a 
-                          href={message.file_url!} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="block"
-                        >
-                          <img
-                            src={message.file_url!}
-                            alt={message.file_name || 'Imagen'}
-                            className="max-w-full max-h-64 rounded-lg"
-                          />
-                        </a>
-                      ) : message.message_type === 'file' ? (
-                        <button
-                          onClick={() => window.open(message.file_url!, '_blank')}
-                          className={cn(
-                            'flex items-center gap-2 py-1 hover:opacity-80 transition-opacity',
-                            isMe ? 'text-primary-foreground' : 'text-foreground'
-                          )}
-                        >
-                          <FileText className="h-4 w-4" />
-                          <span className="text-sm truncate max-w-[150px]">
-                            {message.file_name}
-                          </span>
-                          <Download className="h-4 w-4" />
-                        </button>
-                      ) : (
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      )}
-                    </div>
+                    {message.message_type === 'budget_approval' ? (
+                      (() => {
+                        try {
+                          const approvalData = JSON.parse(message.content || '{}');
+                          return (
+                            <BudgetApprovalMessage 
+                              data={approvalData} 
+                              messageId={message.id}
+                            />
+                          );
+                        } catch {
+                          return <p className="text-sm text-destructive">Error al cargar aprobación</p>;
+                        }
+                      })()
+                    ) : (
+                      <div
+                        className={cn(
+                          'inline-block rounded-2xl px-4 py-2',
+                          isMe
+                            ? 'bg-primary text-primary-foreground rounded-tr-md'
+                            : 'bg-muted rounded-tl-md'
+                        )}
+                      >
+                        {message.is_deleted ? (
+                          <p className="text-sm italic opacity-70">Mensaje eliminado</p>
+                        ) : message.message_type === 'image' ? (
+                          <a 
+                            href={message.file_url!} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="block"
+                          >
+                            <img
+                              src={message.file_url!}
+                              alt={message.file_name || 'Imagen'}
+                              className="max-w-full max-h-64 rounded-lg"
+                            />
+                          </a>
+                        ) : message.message_type === 'file' ? (
+                          <button
+                            onClick={() => window.open(message.file_url!, '_blank')}
+                            className={cn(
+                              'flex items-center gap-2 py-1 hover:opacity-80 transition-opacity',
+                              isMe ? 'text-primary-foreground' : 'text-foreground'
+                            )}
+                          >
+                            <FileText className="h-4 w-4" />
+                            <span className="text-sm truncate max-w-[150px]">
+                              {message.file_name}
+                            </span>
+                            <Download className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        )}
+                      </div>
+                    )}
                     <p className={cn(
                       'text-[10px] text-muted-foreground mt-1',
                       isMe ? 'mr-1' : 'ml-1'
