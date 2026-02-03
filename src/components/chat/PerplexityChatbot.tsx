@@ -35,6 +35,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Pencil,
+  FileIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
@@ -53,33 +54,21 @@ interface Message {
 
 const MODELS = [
   { 
-    id: 'sonar', 
-    name: 'Sonar', 
-    description: 'Rápido y eficiente',
-    icon: Zap,
-    color: 'text-amber-500',
-  },
-  { 
-    id: 'sonar-pro', 
-    name: 'Sonar Pro', 
-    description: 'Más citas y detalle',
-    icon: Sparkles,
-    color: 'text-purple-500',
-  },
-  { 
-    id: 'sonar-reasoning-pro', 
-    name: 'Reasoning Pro', 
-    description: 'Razonamiento avanzado',
+    id: 'gpt-oss-120b', 
+    name: 'GPT-OSS 120B', 
+    description: 'IA avanzada con acceso total',
     icon: Brain,
-    color: 'text-blue-500',
+    color: 'text-emerald-500',
   },
 ];
 
 const QUICK_ACTIONS = [
-  { icon: BarChart3, label: 'Ver estadísticas', prompt: '¿Cuáles son mis estadísticas de leads?' },
+  { icon: BarChart3, label: 'Estadísticas', prompt: '¿Cuáles son mis estadísticas de leads?' },
   { icon: Search, label: 'Buscar leads', prompt: 'Busca mis leads más recientes' },
   { icon: Plus, label: 'Crear lead', prompt: 'Quiero crear un nuevo lead' },
   { icon: Bell, label: 'Recordatorios', prompt: '¿Qué recordatorios tengo pendientes?' },
+  { icon: MessageSquare, label: 'WhatsApp', prompt: 'Muéstrame mis chats de WhatsApp recientes' },
+  { icon: FileIcon, label: 'Archivos', prompt: '¿Qué archivos tengo guardados?' },
 ];
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/perplexity-chat`;
@@ -88,7 +77,7 @@ export function PerplexityChatbot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('sonar-pro');
+  const [selectedModel, setSelectedModel] = useState('gpt-oss-120b');
   // Hide sidebar by default on mobile
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 768);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
