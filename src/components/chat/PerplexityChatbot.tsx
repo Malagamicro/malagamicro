@@ -303,7 +303,7 @@ export function PerplexityChatbot() {
     setEditingTitle(null);
   };
 
-  const selectedModelInfo = MODELS.find(m => m.id === selectedModel)!;
+  const selectedModelInfo = MODELS.find(m => m.id === selectedModel) || MODELS[0];
 
   const formatSessionDate = (date: Date) => {
     const now = new Date();
