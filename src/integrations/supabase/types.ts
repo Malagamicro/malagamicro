@@ -159,6 +159,7 @@ export type Database = {
           prompt: string
           request_id: string | null
           response_data: Json | null
+          solicitud_original: string | null
           status: string
           updated_at: string
           user_id: string
@@ -173,6 +174,7 @@ export type Database = {
           prompt: string
           request_id?: string | null
           response_data?: Json | null
+          solicitud_original?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -187,6 +189,7 @@ export type Database = {
           prompt?: string
           request_id?: string | null
           response_data?: Json | null
+          solicitud_original?: string | null
           status?: string
           updated_at?: string
           user_id?: string
@@ -196,45 +199,60 @@ export type Database = {
       budgets_received: {
         Row: {
           created_at: string
+          email_original: string | null
           email_proveedor: string
+          estado: string | null
           fecha_recepcion: string | null
           id: string
           invoice_id: string | null
+          metadata: Json | null
           observaciones: string | null
           productos: Json
           proveedor: string
           request_id: string
           selected: boolean
+          stel_budget_id: string | null
           total: number | null
           user_responsible: string
+          validez: string | null
         }
         Insert: {
           created_at?: string
+          email_original?: string | null
           email_proveedor: string
+          estado?: string | null
           fecha_recepcion?: string | null
           id?: string
           invoice_id?: string | null
+          metadata?: Json | null
           observaciones?: string | null
           productos?: Json
           proveedor: string
           request_id: string
           selected?: boolean
+          stel_budget_id?: string | null
           total?: number | null
           user_responsible: string
+          validez?: string | null
         }
         Update: {
           created_at?: string
+          email_original?: string | null
           email_proveedor?: string
+          estado?: string | null
           fecha_recepcion?: string | null
           id?: string
           invoice_id?: string | null
+          metadata?: Json | null
           observaciones?: string | null
           productos?: Json
           proveedor?: string
           request_id?: string
           selected?: boolean
+          stel_budget_id?: string | null
           total?: number | null
           user_responsible?: string
+          validez?: string | null
         }
         Relationships: []
       }
@@ -955,6 +973,48 @@ export type Database = {
           role?: string | null
           theme_preference?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      providers: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          email: string
+          especialidad: string[] | null
+          id: string
+          metadata: Json | null
+          nombre: string
+          notas: string | null
+          telefono: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          email: string
+          especialidad?: string[] | null
+          id?: string
+          metadata?: Json | null
+          nombre: string
+          notas?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          email?: string
+          especialidad?: string[] | null
+          id?: string
+          metadata?: Json | null
+          nombre?: string
+          notas?: string | null
+          telefono?: string | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
