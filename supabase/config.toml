@@ -53,3 +53,12 @@ verify_jwt = false
 
 [functions.stelorder]
 verify_jwt = false
+
+[functions.receive-budget-from-n8n]
+verify_jwt = false
+
+[functions.send-to-stel-order]
+verify_jwt = false
+
+[functions.notify-n8n-approval]
+verify_jwt = false
