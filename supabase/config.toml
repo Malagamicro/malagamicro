@@ -62,3 +62,12 @@ verify_jwt = false
 
 [functions.notify-n8n-approval]
 verify_jwt = false
+
+[functions.n8n-email-enviado]
+verify_jwt = false
+
+[functions.n8n-configuracion]
+verify_jwt = false
+
+[functions.imap-check]
+verify_jwt = false
