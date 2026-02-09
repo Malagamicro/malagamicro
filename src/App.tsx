@@ -19,6 +19,7 @@ import Install from "./pages/Install";
 import AdminUsers from "./pages/AdminUsers";
 import GeneralReminders from "./pages/GeneralReminders";
 import Budgets from "./pages/Budgets";
+import SeoGenerator from "./pages/SeoGenerator";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -98,6 +99,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Budgets />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tools/seo"
+                  element={
+                    <ProtectedRoute>
+                      <SeoGenerator />
                     </ProtectedRoute>
                   }
                 />

@@ -1019,6 +1019,93 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_articles: {
+        Row: {
+          created_at: string
+          error_details: Json | null
+          error_message: string | null
+          html_content: string | null
+          id: string
+          image_count: number | null
+          images: Json | null
+          images_failed_count: number | null
+          images_success_count: number | null
+          keywords: Json | null
+          meta_description: string | null
+          meta_tags: Json | null
+          optimizations: Json | null
+          research_summary: string | null
+          security_score: number | null
+          seo_score: number | null
+          slug: string | null
+          status: string
+          structured_data: Json | null
+          suggested_links: Json | null
+          title: string | null
+          topic: string
+          updated_at: string
+          user_id: string
+          word_count: number | null
+          workflow_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_details?: Json | null
+          error_message?: string | null
+          html_content?: string | null
+          id?: string
+          image_count?: number | null
+          images?: Json | null
+          images_failed_count?: number | null
+          images_success_count?: number | null
+          keywords?: Json | null
+          meta_description?: string | null
+          meta_tags?: Json | null
+          optimizations?: Json | null
+          research_summary?: string | null
+          security_score?: number | null
+          seo_score?: number | null
+          slug?: string | null
+          status?: string
+          structured_data?: Json | null
+          suggested_links?: Json | null
+          title?: string | null
+          topic: string
+          updated_at?: string
+          user_id: string
+          word_count?: number | null
+          workflow_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_details?: Json | null
+          error_message?: string | null
+          html_content?: string | null
+          id?: string
+          image_count?: number | null
+          images?: Json | null
+          images_failed_count?: number | null
+          images_success_count?: number | null
+          keywords?: Json | null
+          meta_description?: string | null
+          meta_tags?: Json | null
+          optimizations?: Json | null
+          research_summary?: string | null
+          security_score?: number | null
+          seo_score?: number | null
+          slug?: string | null
+          status?: string
+          structured_data?: Json | null
+          suggested_links?: Json | null
+          title?: string | null
+          topic?: string
+          updated_at?: string
+          user_id?: string
+          word_count?: number | null
+          workflow_id?: string | null
+        }
+        Relationships: []
+      }
       shared_files: {
         Row: {
           created_at: string | null
