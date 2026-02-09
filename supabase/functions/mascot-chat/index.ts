@@ -245,10 +245,10 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!OPENROUTER_API_KEY) {
-      throw new Error("OPENROUTER_API_KEY is not configured");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -287,17 +287,15 @@ Si te piden algo que requiere estas herramientas, úsalas. Si te piden algo más
 
     let chatMessages = [{ role: "system", content: systemPrompt }, ...(messages ?? [])];
 
-    // First call to OpenRouter
-    let response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    // First call to Lovable AI Gateway
+    let response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://malagamicro.lovable.app",
-        "X-Title": "MalagaMicro Micro Chat",
       },
       body: JSON.stringify({
-        model: "liquid/lfm2-8b-a1b",
+        model: "google/gemini-3-flash-preview",
         messages: chatMessages,
         tools,
         tool_choice: "auto",
@@ -343,16 +341,14 @@ Si te piden algo que requiere estas herramientas, úsalas. Si te piden algo más
       }
 
       // Call again with tool results
-      response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://malagamicro.lovable.app",
-          "X-Title": "MalagaMicro Micro Chat",
         },
         body: JSON.stringify({
-          model: "liquid/lfm2-8b-a1b",
+          model: "google/gemini-3-flash-preview",
           messages: chatMessages,
           tools,
           tool_choice: "auto",
