@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const N8N_WEBHOOK_URL = "https://n8n.srv1304274.hstgr.cloud/webhook/generate-seo-article";
+const DEFAULT_N8N_WEBHOOK_URL = "https://n8n.srv1304274.hstgr.cloud/webhook/generate-seo-article";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -35,13 +35,17 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { topic, imageCount = 3, articleId } = await req.json();
+    const { topic, imageCount = 3, articleId, webhookUrl } = await req.json();
+    
+    // Usar webhook personalizado o el por defecto
+    const n8nWebhookUrl = webhookUrl || DEFAULT_N8N_WEBHOOK_URL;
 
     if (!topic) {
       throw new Error('Topic is required');
     }
 
     console.log(`Generating SEO article for topic: "${topic}" with ${imageCount} images`);
+    console.log(`Using webhook: ${n8nWebhookUrl}`);
 
     // Crear o actualizar registro en la base de datos
     let recordId = articleId;
@@ -86,7 +90,7 @@ serve(async (req) => {
     };
 
     // Iniciar la llamada sin esperar la respuesta completa
-    fetch(N8N_WEBHOOK_URL, {
+    fetch(n8nWebhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(n8nPayload),
