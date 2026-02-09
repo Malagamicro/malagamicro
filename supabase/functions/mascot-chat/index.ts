@@ -59,7 +59,7 @@ async function executeToolCall(
   supabase: ReturnType<typeof createClient>,
   userId: string,
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<string> {
   try {
     switch (toolName) {
@@ -88,14 +88,9 @@ async function executeToolCall(
         }
 
         // Find recipient
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("user_id, full_name")
-          .neq("user_id", userId);
+        const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").neq("user_id", userId);
 
-        const recipient = profiles?.find(
-          (p) => p.full_name?.toLowerCase().includes(recipientName)
-        );
+        const recipient = profiles?.find((p) => p.full_name?.toLowerCase().includes(recipientName));
 
         if (!recipient) {
           return JSON.stringify({
@@ -202,10 +197,7 @@ async function executeToolCall(
       }
 
       case "get_shared_folders": {
-        const { data, error } = await supabase
-          .from("shared_folders")
-          .select("id, name, color")
-          .order("name");
+        const { data, error } = await supabase.from("shared_folders").select("id, name, color").order("name");
 
         if (error) throw error;
 
@@ -295,7 +287,7 @@ Si te piden algo que requiere estas herramientas, úsalas. Si te piden algo más
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "meta-llama/llama-3.1-8b-instruct",
         messages: chatMessages,
         tools,
         tool_choice: "auto",
@@ -371,9 +363,9 @@ Si te piden algo que requiere estas herramientas, úsalas. Si te piden algo más
     });
   } catch (error) {
     console.error("Mascot chat error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Error desconocido" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Error desconocido" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
