@@ -287,7 +287,7 @@ Si te piden algo que requiere estas herramientas, úsalas. Si te piden algo más
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.1-8b-instruct",
+        model: "google/gemini-3-flash-preview",
         messages: chatMessages,
         tools,
         tool_choice: "auto",
