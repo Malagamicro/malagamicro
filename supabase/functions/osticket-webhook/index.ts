@@ -63,6 +63,45 @@ function buildChatId(phone: string): string {
   return `${cleanPhone}@c.us`;
 }
 
+/**
+ * Strips HTML tags and converts to plain text for WhatsApp
+ */
+function stripHtml(html: string): string {
+  if (!html) return "";
+  
+  return html
+    // Replace common block elements with newlines
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<\/h[1-6]>/gi, "\n\n")
+    // Remove opening tags (we already handled closing tags above)
+    .replace(/<p[^>]*>/gi, "")
+    .replace(/<div[^>]*>/gi, "")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<h[1-6][^>]*>/gi, "*")
+    // Convert bold/strong to WhatsApp formatting
+    .replace(/<\/?(?:b|strong)[^>]*>/gi, "*")
+    // Convert italic/em to WhatsApp formatting
+    .replace(/<\/?(?:i|em)[^>]*>/gi, "_")
+    // Remove all remaining HTML tags
+    .replace(/<[^>]+>/g, "")
+    // Decode common HTML entities
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    // Clean up excessive whitespace
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+/g, " ")
+    .trim();
+}
+
 async function sendWhatsAppMessage(phone: string, message: string): Promise<boolean> {
   try {
     const chatId = buildChatId(phone);
@@ -101,15 +140,20 @@ async function sendWhatsAppMessage(phone: string, message: string): Promise<bool
 function renderTemplate(template: string, data: OsTicketPayload, osticketUrl: string): string {
   const ticketUrl = `${osticketUrl}/scp/tickets.php?id=${data.ticket_id || ""}`;
   
+  // Clean HTML from message content
+  const cleanMessage = stripHtml(data.message || "");
+  const cleanSubject = stripHtml(data.subject || "Sin asunto");
+  const cleanName = stripHtml(data.name || "N/A");
+  
   return template
     .replace(/\{\{ticket_id\}\}/g, data.ticket_id || "N/A")
     .replace(/\{\{number\}\}/g, data.number || "N/A")
-    .replace(/\{\{subject\}\}/g, data.subject || "Sin asunto")
-    .replace(/\{\{name\}\}/g, data.name || "N/A")
+    .replace(/\{\{subject\}\}/g, cleanSubject)
+    .replace(/\{\{name\}\}/g, cleanName)
     .replace(/\{\{email\}\}/g, data.email || "N/A")
     .replace(/\{\{department\}\}/g, data.department || "N/A")
     .replace(/\{\{priority\}\}/g, data.priority || "Normal")
-    .replace(/\{\{message\}\}/g, data.message || "")
+    .replace(/\{\{message\}\}/g, cleanMessage)
     .replace(/\{\{ticket_url\}\}/g, ticketUrl);
 }
 
