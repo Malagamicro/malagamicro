@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -12,10 +12,10 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!OPENROUTER_API_KEY) {
-      throw new Error("OPENROUTER_API_KEY is not configured");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
     const systemPrompt = `Eres Micro, el asistente virtual de MalagaMicro CRM. Eres un pequeño robot amigable y servicial que ayuda a los usuarios con preguntas generales sobre el sistema, productividad y ventas.
@@ -35,16 +35,14 @@ Puedes ayudar con:
 
 No tienes acceso a los datos del CRM, así que si preguntan por leads o datos específicos, sugiere que usen el Chat IA principal que sí tiene acceso a herramientas del sistema.`;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://malagamicro.lovable.app",
-        "X-Title": "MalagaMicro CRM Mascot Chat",
       },
       body: JSON.stringify({
-        model: "google/gemma-3-27b-it:free",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           ...messages,
@@ -55,11 +53,18 @@ No tienes acceso a los datos del CRM, así que si preguntan por leads o datos es
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("OpenRouter API error:", response.status, errorText);
+      console.error("Lovable AI error:", response.status, errorText);
       
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Límite de solicitudes excedido. Intenta de nuevo en unos momentos." }), {
+        return new Response(JSON.stringify({ error: "Demasiadas solicitudes. Espera unos segundos e intenta de nuevo." }), {
           status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Créditos de IA agotados. Contacta al administrador." }), {
+          status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
