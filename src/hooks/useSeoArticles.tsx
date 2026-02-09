@@ -61,7 +61,7 @@ export const useSeoArticles = () => {
   };
 
   // Generar nuevo artículo
-  const generateArticle = async (topic: string, imageCount: number = 3) => {
+  const generateArticle = async (topic: string, imageCount: number = 3, webhookUrl?: string) => {
     if (!user) {
       toast.error('Debes iniciar sesión');
       return null;
@@ -80,7 +80,7 @@ export const useSeoArticles = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session?.access_token}`,
           },
-          body: JSON.stringify({ topic, imageCount }),
+          body: JSON.stringify({ topic, imageCount, webhookUrl }),
         }
       );
 
