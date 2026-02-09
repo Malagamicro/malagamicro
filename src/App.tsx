@@ -8,6 +8,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeSyncProvider } from "@/components/ThemeSyncProvider";
+import { MascotChatWidget } from "@/components/chat/MascotChatWidget";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -100,10 +101,11 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <MascotChatWidget />
+          </BrowserRouter>
           </TooltipProvider>
         </NotificationProvider>
       </AuthProvider>
