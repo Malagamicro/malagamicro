@@ -212,6 +212,7 @@ serve(async (req) => {
 
     let totalSent = 0;
     let totalFailed = 0;
+    let ticketSavedToHistory = false;
 
     // Check for duplicate ticket to prevent re-processing
     if (payload.ticket_id) {
@@ -251,16 +252,8 @@ serve(async (req) => {
 
       console.log(`Sending to ${config.notification_numbers.length} numbers for config ${config.id}`);
 
-      // Send WhatsApp to each number and save to history
-      for (const phone of config.notification_numbers) {
-        // Add a small delay between messages to avoid rate limiting
-        if (totalSent > 0 || totalFailed > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-
-        const success = await sendWhatsAppMessage(phone, message);
-        
-        // Save ticket to history
+      // Save ticket to history ONCE per config (not per phone number)
+      if (!ticketSavedToHistory) {
         const { error: insertError } = await supabase
           .from("osticket_tickets")
           .insert({
@@ -273,15 +266,26 @@ serve(async (req) => {
             department: payload.department || null,
             priority: payload.priority || null,
             message: payload.message || null,
-            notification_sent: success,
-            notification_phone: phone,
+            notification_sent: true, // Will be updated if all fail
+            notification_phone: config.notification_numbers.join(", "),
           });
 
         if (insertError) {
           console.error("Error saving ticket to history:", insertError);
         } else {
-          console.log("📝 Ticket saved to history");
+          console.log("📝 Ticket saved to history (once)");
+          ticketSavedToHistory = true;
         }
+      }
+
+      // Send WhatsApp to each number
+      for (const phone of config.notification_numbers) {
+        // Add a small delay between messages to avoid rate limiting
+        if (totalSent > 0 || totalFailed > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
+        const success = await sendWhatsAppMessage(phone, message);
 
         if (success) {
           totalSent++;
