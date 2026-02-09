@@ -316,7 +316,7 @@ export function PerplexityChatbot() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-10rem)] md:h-[calc(100vh-12rem)] bg-gradient-to-b from-background to-muted/20 rounded-2xl border shadow-xl overflow-hidden relative">
+    <div className="flex h-[calc(100dvh-12rem)] md:h-[calc(100vh-12rem)] bg-gradient-to-b from-background to-muted/20 rounded-2xl border shadow-xl overflow-hidden relative">
       {/* Sessions Sidebar - overlay on mobile */}
       {showSidebar && (
         <div className="absolute md:relative z-20 w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">

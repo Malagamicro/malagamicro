@@ -276,7 +276,7 @@ const IndexContent = () => {
         );
       case 'chat-ai':
         return (
-          <div className="p-8 space-y-6 animate-fade-in max-w-4xl mx-auto">
+          <div className="p-4 md:p-8 space-y-6 animate-fade-in w-full max-w-none md:max-w-4xl md:mx-auto">
             <div>
               <h1 className="text-3xl font-bold text-foreground">Chat IA</h1>
               <p className="text-muted-foreground mt-1">
@@ -374,11 +374,7 @@ const IndexContent = () => {
 };
 
 const Index = () => {
-  return (
-    <NotificationProvider>
-      <IndexContent />
-    </NotificationProvider>
-  );
+  return <IndexContent />;
 };
 
 export default Index;

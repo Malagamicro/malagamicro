@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, ReactNode, useState } from 'react';
+import { createContext, useContext, useEffect, ReactNode, useState, useRef } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,6 +26,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [showPermissionBanner, setShowPermissionBanner] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
   
   const {
     permission,
@@ -40,14 +41,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // Show permission banner if not granted and not dismissed
   useEffect(() => {
-    if (typeof Notification !== 'undefined' && 
-        Notification.permission !== 'granted' && 
-        !bannerDismissed) {
+    // Only prompt after login
+    if (!user?.id) {
+      setShowPermissionBanner(false);
+      return;
+    }
+
+    if (
+      typeof Notification !== 'undefined' &&
+      Notification.permission !== 'granted' &&
+      !bannerDismissed
+    ) {
       setShowPermissionBanner(true);
     } else {
       setShowPermissionBanner(false);
     }
-  }, [permission, bannerDismissed]);
+  }, [user?.id, permission, bannerDismissed]);
 
   const handleRequestPermission = async () => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
@@ -182,6 +191,41 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id, handleNewMessage, queryClient]);
 
+  // Subscribe to osTicket tickets for notifications
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`osticket-notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'osticket_tickets',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const ticket = payload.new as {
+            subject: string;
+            message: string | null;
+            ticket_number: string | null;
+          };
+
+          const title = '🎫 Nuevo ticket';
+          const body = ticket.subject || ticket.message || 'Ticket recibido';
+          handleNewMessage(title, body);
+
+          queryClient.invalidateQueries({ queryKey: ['osticket-tickets'] });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, handleNewMessage, queryClient]);
+
   // Subscribe to reminders that are due
   useEffect(() => {
     if (!user?.id) return;
@@ -190,7 +234,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const checkReminders = async () => {
       const now = new Date();
       const fiveMinutesLater = new Date(now.getTime() + 5 * 60 * 1000);
-      
+
+      // 1) Lead follow-ups
       const { data: dueReminders } = await supabase
         .from('follow_up_reminders')
         .select('id, message, reminder_date, leads(company_name)')
@@ -201,9 +246,34 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       if (dueReminders && dueReminders.length > 0) {
         for (const reminder of dueReminders) {
+          const key = `follow:${reminder.id}`;
+          if (notifiedIdsRef.current.has(key)) continue;
+          notifiedIdsRef.current.add(key);
+
           const lead = reminder.leads as { company_name?: string } | null;
-          const title = `⏰ Recordatorio`;
+          const title = '⏰ Recordatorio';
           const body = reminder.message || `Seguimiento: ${lead?.company_name || 'Lead'}`;
+          handleNewMessage(title, body);
+        }
+      }
+
+      // 2) General/company reminders (por usuario creador)
+      const { data: dueGeneral } = await supabase
+        .from('general_reminders')
+        .select('id, title, description, reminder_date, priority')
+        .eq('user_id', user.id)
+        .eq('is_completed', false)
+        .gte('reminder_date', now.toISOString())
+        .lte('reminder_date', fiveMinutesLater.toISOString());
+
+      if (dueGeneral && dueGeneral.length > 0) {
+        for (const reminder of dueGeneral) {
+          const key = `general:${reminder.id}`;
+          if (notifiedIdsRef.current.has(key)) continue;
+          notifiedIdsRef.current.add(key);
+
+          const title = '📌 Recordatorio';
+          const body = reminder.title || reminder.description || 'Tarea pendiente';
           handleNewMessage(title, body);
         }
       }

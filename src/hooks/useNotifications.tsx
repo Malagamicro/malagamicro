@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
-
+import { useIsMobile } from '@/hooks/use-mobile';
 interface NotificationState {
   permission: NotificationPermission;
   unreadCount: number;
@@ -86,9 +86,11 @@ function createMp3PopSound(): () => boolean {
 export function useNotifications() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const playSoundRef = useRef<(() => void) | null>(null);
   const lastDeniedToastAtRef = useRef<number>(0);
   const lastNotificationErrorToastAtRef = useRef<number>(0);
+  const lastForegroundToastAtRef = useRef<number>(0);
   const originalTitleRef = useRef(document.title);
   const [state, setState] = useState<NotificationState>({
     permission: getRuntimePermission(),
@@ -363,13 +365,25 @@ export function useNotifications() {
         if (!result.ok) playSound();
       });
     } else {
-      // Foreground -> only play subtle sound
+      // Foreground (mobile): show an in-app toast so it"s not "silent"
+      if (isMobile) {
+        const now = Date.now();
+        if (now - lastForegroundToastAtRef.current > 1500) {
+          lastForegroundToastAtRef.current = now;
+          toast({
+            title: senderName,
+            description: preview,
+          });
+        }
+      }
+
+      // Foreground -> play subtle sound
       playSound();
     }
 
     // Invalidate unread count
     queryClient.invalidateQueries({ queryKey: ['unread-messages-count'] });
-  }, [playSound, queryClient, showNotificationSmart]);
+  }, [isMobile, playSound, queryClient, showNotificationSmart]);
 
   const sendTestNotification = useCallback(async (): Promise<NotificationAttemptResult> => {
     const result = await showNotificationSmart('Prueba', 'Si lees esto, funcionan ✅', undefined, {
