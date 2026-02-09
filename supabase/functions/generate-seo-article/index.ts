@@ -64,111 +64,80 @@ serve(async (req) => {
       }
       recordId = newRecord.id;
     } else {
-      // Actualizar estado a processing
       await supabase
         .from('seo_articles')
         .update({ status: 'processing' })
         .eq('id', recordId);
     }
 
-    // Llamar al webhook de n8n
-    console.log('Calling n8n webhook...');
-    const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
+    // Construir callback URL para que n8n llame cuando termine
+    const callbackUrl = `${supabaseUrl}/functions/v1/seo-article-callback`;
+
+    // Llamar al webhook de n8n de forma asíncrona (fire-and-forget con timeout corto)
+    console.log('Calling n8n webhook asynchronously...');
+    
+    // Usamos EdgeRuntime.waitUntil pattern o simplemente iniciamos sin esperar
+    const n8nPayload = {
+      topic,
+      imageCount,
+      articleId: recordId,
+      userId: user.id,
+      callbackUrl,
+    };
+
+    // Iniciar la llamada sin esperar la respuesta completa
+    fetch(N8N_WEBHOOK_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        topic,
-        imageCount,
-        articleId: recordId,
-        userId: user.id,
-        supabaseUrl,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(n8nPayload),
+    }).then(async (response) => {
+      if (response.ok) {
+        console.log('n8n webhook accepted the request');
+        // Intentar parsear la respuesta si viene rápido
+        try {
+          const text = await response.text();
+          if (text && text.trim()) {
+            const data = JSON.parse(text);
+            console.log('n8n returned immediate response:', JSON.stringify(data).substring(0, 200));
+            // Si n8n devuelve respuesta inmediata, actualizamos
+            if (data.success && data.article) {
+              await processN8nResponse(supabase, recordId, data);
+            }
+          }
+        } catch (e) {
+          console.log('n8n did not return immediate JSON response (async processing)');
+        }
+      } else {
+        console.error('n8n webhook error:', response.status);
+        await supabase
+          .from('seo_articles')
+          .update({
+            status: 'error',
+            error_message: `n8n error: ${response.status}`
+          })
+          .eq('id', recordId);
+      }
+    }).catch((error) => {
+      console.error('n8n webhook call failed:', error.message);
+      supabase
+        .from('seo_articles')
+        .update({
+          status: 'error',
+          error_message: `Failed to call n8n: ${error.message}`
+        })
+        .eq('id', recordId);
     });
 
-    if (!n8nResponse.ok) {
-      const errorText = await n8nResponse.text();
-      console.error('n8n error:', errorText);
-      
-      // Actualizar estado a error
-      await supabase
-        .from('seo_articles')
-        .update({
-          status: 'error',
-          error_message: `n8n error: ${n8nResponse.status}`,
-          error_details: { response: errorText }
-        })
-        .eq('id', recordId);
-
-      throw new Error(`n8n webhook failed: ${n8nResponse.status}`);
-    }
-
-    const n8nData = await n8nResponse.json();
-    console.log('n8n response received:', JSON.stringify(n8nData).substring(0, 500));
-
-    // Procesar respuesta exitosa
-    if (n8nData.success) {
-      const article = n8nData.article || {};
-      const research = n8nData.research || {};
-      const images = n8nData.images || {};
-      const metrics = n8nData.metrics || {};
-      const optimizations = n8nData.optimizations || {};
-
-      await supabase
-        .from('seo_articles')
-        .update({
-          status: 'completed',
-          workflow_id: n8nData.workflowId,
-          title: article.title,
-          slug: article.slug,
-          meta_description: article.metaDescription,
-          keywords: article.keywords || [],
-          html_content: article.htmlContent,
-          structured_data: article.structuredData,
-          meta_tags: article.metaTags,
-          research_summary: research.summary,
-          seo_score: metrics.seoScore,
-          word_count: metrics.wordCount,
-          security_score: metrics.securityScore,
-          images: images.urls || [],
-          images_success_count: images.successful || 0,
-          images_failed_count: images.failed || 0,
-          optimizations: optimizations.applied || [],
-          suggested_links: optimizations.suggestedLinks || [],
-        })
-        .eq('id', recordId);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          articleId: recordId,
-          data: n8nData
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } else {
-      // Error en n8n pero respuesta válida
-      const errorInfo = n8nData.error || n8nData;
-      
-      await supabase
-        .from('seo_articles')
-        .update({
-          status: 'error',
-          error_message: errorInfo.message || 'Unknown error from n8n',
-          error_details: n8nData
-        })
-        .eq('id', recordId);
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          articleId: recordId,
-          error: errorInfo.message || 'Article generation failed'
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Responder inmediatamente al cliente
+    return new Response(
+      JSON.stringify({
+        success: true,
+        articleId: recordId,
+        status: 'processing',
+        message: 'El artículo se está generando. Verás la actualización en tiempo real cuando esté listo.'
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
     console.error('Error:', error);
@@ -178,3 +147,36 @@ serve(async (req) => {
     );
   }
 });
+
+// Función para procesar respuesta de n8n
+async function processN8nResponse(supabase: any, recordId: string, n8nData: any) {
+  const article = n8nData.article || {};
+  const research = n8nData.research || {};
+  const images = n8nData.images || {};
+  const metrics = n8nData.metrics || {};
+  const optimizations = n8nData.optimizations || {};
+
+  await supabase
+    .from('seo_articles')
+    .update({
+      status: 'completed',
+      workflow_id: n8nData.workflowId,
+      title: article.title,
+      slug: article.slug,
+      meta_description: article.metaDescription,
+      keywords: article.keywords || [],
+      html_content: article.htmlContent,
+      structured_data: article.structuredData,
+      meta_tags: article.metaTags,
+      research_summary: research.summary,
+      seo_score: metrics.seoScore,
+      word_count: metrics.wordCount,
+      security_score: metrics.securityScore,
+      images: images.urls || [],
+      images_success_count: images.successful || 0,
+      images_failed_count: images.failed || 0,
+      optimizations: optimizations.applied || [],
+      suggested_links: optimizations.suggestedLinks || [],
+    })
+    .eq('id', recordId);
+}
