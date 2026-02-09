@@ -9,7 +9,6 @@ import {
   MessagesSquare,
   MapPin, 
   Settings,
-  Building2,
   LogOut,
   Kanban,
   BarChart3,
@@ -43,6 +42,8 @@ import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import logoFull from '@/assets/logo-full.png';
+import logoIcon from '@/assets/logo-icon.png';
 
 interface SidebarProps {
   activeTab: string;
@@ -376,8 +377,8 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
-                <Building2 className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white">
+                <img src={logoIcon} alt="MalagaMicro" className="w-9 h-9 object-contain" />
               </div>
             </TooltipTrigger>
             <TooltipContent side="right">
@@ -450,12 +451,8 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div className="animate-fade-in">
-              <h1 className="font-bold text-lg leading-tight">MalagaMicro</h1>
-              <p className="text-xs opacity-70">CRM</p>
+            <div className="h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white px-2">
+              <img src={logoFull} alt="MalagaMicro CRM" className="h-8 object-contain" />
             </div>
           </div>
           <Button
@@ -514,12 +511,8 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="font-bold text-lg leading-tight">MalagaMicro</h1>
-              <p className="text-xs opacity-70">CRM</p>
+            <div className="h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white px-2">
+              <img src={logoFull} alt="MalagaMicro CRM" className="h-8 object-contain" />
             </div>
           </div>
           <div className="flex items-center gap-1">
