@@ -9,9 +9,6 @@ import {
   MessagesSquare,
   MapPin, 
   Settings,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
   Building2,
   LogOut,
   Kanban,
@@ -33,10 +30,14 @@ import {
   Briefcase,
   Wrench,
   MessageCircle,
+  ChevronDown,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
@@ -65,7 +66,6 @@ interface MenuCategory {
   items: MenuItem[];
 }
 
-// Categorías del menú
 const menuCategories: MenuCategory[] = [
   {
     id: 'main',
@@ -135,6 +135,79 @@ const menuCategories: MenuCategory[] = [
   },
 ];
 
+// Custom Toggle Switch Component
+function SidebarToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={cn(
+        "group relative flex items-center justify-center w-full h-10 rounded-xl",
+        "bg-sidebar-accent/50 hover:bg-sidebar-accent transition-all duration-300",
+        "border border-sidebar-border/50"
+      )}
+      aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+    >
+      <div className="relative flex items-center gap-2">
+        {collapsed ? (
+          <PanelLeft className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+        ) : (
+          <>
+            <PanelLeftClose className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+            <span className="text-xs font-medium opacity-70">Colapsar</span>
+          </>
+        )}
+      </div>
+      {/* Animated indicator bar */}
+      <div 
+        className={cn(
+          "absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 bg-primary rounded-full transition-all duration-300",
+          collapsed ? "w-4" : "w-12"
+        )}
+      />
+    </button>
+  );
+}
+
+// Collapsed Icon Button with Tooltip
+function CollapsedIconButton({ 
+  item, 
+  isActive, 
+  onClick, 
+  unreadCount 
+}: { 
+  item: MenuItem; 
+  isActive: boolean; 
+  onClick: () => void;
+  unreadCount?: number;
+}) {
+  return (
+    <TooltipProvider delayDuration={0}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={onClick}
+            className={cn(
+              "relative w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200",
+              "hover:bg-sidebar-accent hover:scale-105",
+              isActive && "bg-sidebar-accent shadow-sm ring-1 ring-primary/20"
+            )}
+          >
+            <item.icon className={cn("w-5 h-5", item.color)} />
+            {item.showBadge && unreadCount && unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1 animate-pulse">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="font-medium">
+          {item.label}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -145,7 +218,6 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const { unreadCount } = useNotificationContext();
   const isMobile = useIsMobile();
 
-  // Find which category contains the active tab and open it
   useEffect(() => {
     const categoryWithActiveTab = menuCategories.find(cat => 
       cat.items.some(item => item.id === activeTab)
@@ -155,14 +227,12 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     }
   }, [activeTab]);
 
-  // Close mobile sidebar when tab changes
   useEffect(() => {
     if (isMobile) {
       setMobileOpen(false);
     }
   }, [activeTab, isMobile]);
 
-  // Close mobile sidebar when clicking outside
   useEffect(() => {
     if (!mobileOpen) return;
     
@@ -200,20 +270,22 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     );
   };
 
+  const handleItemClick = (item: MenuItem) => {
+    if (item.route) {
+      navigate(item.route);
+      if (isMobile) setMobileOpen(false);
+    } else {
+      handleTabChange(item.id);
+    }
+  };
+
   const renderMenuItem = (item: MenuItem) => {
     const isActive = activeTab === item.id;
     
     return (
       <button
         key={item.id}
-        onClick={() => {
-          if (item.route) {
-            navigate(item.route);
-            if (isMobile) setMobileOpen(false);
-          } else {
-            handleTabChange(item.id);
-          }
-        }}
+        onClick={() => handleItemClick(item)}
         className={cn(
           "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 relative min-h-[40px]",
           "hover:bg-sidebar-accent",
@@ -222,69 +294,48 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       >
         <div className="relative">
           <item.icon className={cn("w-4 h-4 flex-shrink-0", item.color)} />
-          {item.showBadge && unreadCount > 0 && collapsed && !isMobile && (
-            <span className="absolute -top-1 -right-1 h-3 min-w-[12px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold px-0.5">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
         </div>
-        {(!collapsed || isMobile) && (
-          <>
-            <span className="text-sm font-medium animate-fade-in flex-1 text-left">
-              {item.label}
-            </span>
-            {item.showBadge && unreadCount > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="h-5 min-w-[20px] flex items-center justify-center text-xs px-1.5"
-              >
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Badge>
-            )}
-          </>
+        <span className="text-sm font-medium animate-fade-in flex-1 text-left">
+          {item.label}
+        </span>
+        {item.showBadge && unreadCount > 0 && (
+          <Badge 
+            variant="destructive" 
+            className="h-5 min-w-[20px] flex items-center justify-center text-xs px-1.5"
+          >
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </Badge>
         )}
       </button>
     );
   };
 
-  const renderCategory = (category: MenuCategory) => {
-    const isOpen = openCategories.includes(category.id);
-    const hasActiveItem = category.items.some(item => item.id === activeTab);
-    
-    // In collapsed mode, show only icons
-    if (collapsed && !isMobile) {
-      return (
-        <div key={category.id} className="space-y-0.5">
+  const renderCollapsedCategory = (category: MenuCategory) => {
+    return (
+      <div key={category.id} className="space-y-1">
+        {/* Category indicator dot */}
+        <div className="flex justify-center py-1">
+          <div className={cn("w-1.5 h-1.5 rounded-full", category.color.replace('text-', 'bg-'))} />
+        </div>
+        {/* Category items */}
+        <div className="space-y-1 px-1">
           {category.items.map(item => (
-            <button
+            <CollapsedIconButton
               key={item.id}
-              onClick={() => {
-                if (item.route) {
-                  navigate(item.route);
-                } else {
-                  handleTabChange(item.id);
-                }
-              }}
-              className={cn(
-                "w-full flex items-center justify-center py-2.5 rounded-lg transition-all duration-200 relative",
-                "hover:bg-sidebar-accent",
-                activeTab === item.id && "bg-sidebar-accent"
-              )}
-              title={item.label}
-            >
-              <div className="relative">
-                <item.icon className={cn("w-5 h-5", item.color)} />
-                {item.showBadge && unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </div>
-            </button>
+              item={item}
+              isActive={activeTab === item.id}
+              onClick={() => handleItemClick(item)}
+              unreadCount={item.showBadge ? unreadCount : undefined}
+            />
           ))}
         </div>
-      );
-    }
+      </div>
+    );
+  };
+
+  const renderExpandedCategory = (category: MenuCategory) => {
+    const isOpen = openCategories.includes(category.id);
+    const hasActiveItem = category.items.some(item => item.id === activeTab);
 
     return (
       <Collapsible
@@ -310,67 +361,122 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
             />
           </button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="pl-3 space-y-0.5 mt-1">
+        <CollapsibleContent className="pl-3 space-y-0.5 mt-1 animate-accordion-down">
           {category.items.map(renderMenuItem)}
         </CollapsibleContent>
       </Collapsible>
     );
   };
 
-  const sidebarContent = (
+  // Collapsed sidebar content
+  const collapsedContent = (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="p-3 border-b border-sidebar-border flex justify-center">
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
+                <Building2 className="w-5 h-5" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p className="font-bold">MalagaMicro CRM</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Navigation with custom scrollbar */}
+      <nav className="flex-1 py-3 overflow-y-auto custom-scrollbar">
+        <div className="space-y-3 flex flex-col items-center">
+          {menuCategories.map(renderCollapsedCategory)}
+        </div>
+      </nav>
+
+      {/* Bottom actions */}
+      <div className="p-2 border-t border-sidebar-border space-y-1">
+        {/* Theme toggle */}
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={toggleTheme}
+                className="w-10 h-10 mx-auto flex items-center justify-center rounded-xl hover:bg-sidebar-accent transition-all duration-200 hover:scale-105"
+              >
+                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {/* Settings */}
+        <CollapsedIconButton
+          item={{ id: 'settings', label: 'Ajustes', icon: Settings, color: '' }}
+          isActive={activeTab === 'settings'}
+          onClick={() => handleTabChange('settings')}
+        />
+
+        {/* Logout */}
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleSignOut}
+                className="w-10 h-10 mx-auto flex items-center justify-center rounded-xl hover:bg-sidebar-accent transition-all duration-200 text-destructive hover:scale-105"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Cerrar sesión</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {/* Toggle */}
+        <div className="pt-2">
+          <SidebarToggle collapsed={collapsed} onToggle={() => setCollapsed(false)} />
+        </div>
+      </div>
+    </div>
+  );
+
+  // Expanded sidebar content
+  const expandedContent = (
     <>
       {/* Logo */}
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-sidebar-accent flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
               <Building2 className="w-6 h-6" />
             </div>
-            {(!collapsed || isMobile) && (
-              <div className="animate-fade-in">
-                <h1 className="font-bold text-lg leading-tight">MalagaMicro</h1>
-                <p className="text-xs opacity-70">CRM</p>
-              </div>
-            )}
+            <div className="animate-fade-in">
+              <h1 className="font-bold text-lg leading-tight">MalagaMicro</h1>
+              <p className="text-xs opacity-70">CRM</p>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            {(!collapsed || isMobile) && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
-              >
-                {theme === 'dark' ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-            {isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setMobileOpen(false)}
-                className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            )}
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
-        {menuCategories.map(renderCategory)}
+        {menuCategories.map(renderExpandedCategory)}
       </nav>
 
-      {/* User info & Settings & Logout & Collapse */}
+      {/* User info & Settings & Logout */}
       <div className="p-3 border-t border-sidebar-border space-y-1">
-        {/* User email */}
-        {(!collapsed || isMobile) && user && (
+        {user && (
           <div className="px-3 py-2 text-xs text-sidebar-foreground/70 truncate">
             {user.email}
           </div>
@@ -381,36 +487,94 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           className={cn(
             "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all min-h-[44px]",
             "hover:bg-sidebar-accent",
-            activeTab === 'settings' && "bg-sidebar-accent",
-            collapsed && !isMobile && "justify-center"
+            activeTab === 'settings' && "bg-sidebar-accent"
           )}
         >
           <Settings className="w-5 h-5 flex-shrink-0" />
-          {(!collapsed || isMobile) && <span className="text-sm font-medium">Ajustes</span>}
+          <span className="text-sm font-medium">Ajustes</span>
         </button>
 
         <button
           onClick={handleSignOut}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all min-h-[44px]",
-            "hover:bg-sidebar-accent text-destructive hover:text-destructive/80",
-            collapsed && !isMobile && "justify-center"
-          )}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all min-h-[44px] hover:bg-sidebar-accent text-destructive hover:text-destructive/80"
         >
           <LogOut className="w-5 h-5 flex-shrink-0" />
-          {(!collapsed || isMobile) && <span className="text-sm font-medium">Cerrar sesión</span>}
+          <span className="text-sm font-medium">Cerrar sesión</span>
         </button>
         
-        {!isMobile && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCollapsed(!collapsed)}
-            className="w-full justify-center text-sidebar-foreground hover:bg-sidebar-accent min-h-[44px]"
-          >
-            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </Button>
+        <SidebarToggle collapsed={collapsed} onToggle={() => setCollapsed(true)} />
+      </div>
+    </>
+  );
+
+  // Mobile sidebar content (always expanded)
+  const mobileContent = (
+    <>
+      {/* Logo */}
+      <div className="p-4 border-b border-sidebar-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
+              <Building2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="font-bold text-lg leading-tight">MalagaMicro</h1>
+              <p className="text-xs opacity-70">CRM</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileOpen(false)}
+              className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+        {menuCategories.map(renderExpandedCategory)}
+      </nav>
+
+      {/* User info & Settings & Logout */}
+      <div className="p-3 border-t border-sidebar-border space-y-1">
+        {user && (
+          <div className="px-3 py-2 text-xs text-sidebar-foreground/70 truncate">
+            {user.email}
+          </div>
         )}
+        
+        <button
+          onClick={() => handleTabChange('settings')}
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all min-h-[44px]",
+            "hover:bg-sidebar-accent",
+            activeTab === 'settings' && "bg-sidebar-accent"
+          )}
+        >
+          <Settings className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">Ajustes</span>
+        </button>
+
+        <button
+          onClick={handleSignOut}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all min-h-[44px] hover:bg-sidebar-accent text-destructive hover:text-destructive/80"
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">Cerrar sesión</span>
+        </button>
       </div>
     </>
   );
@@ -443,16 +607,31 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         data-sidebar
         className={cn(
           "bg-sidebar text-sidebar-foreground transition-all duration-300 flex flex-col",
-          // Desktop styles
           !isMobile && "h-screen",
-          !isMobile && (collapsed ? "w-16" : "w-64"),
-          // Mobile styles
+          !isMobile && (collapsed ? "w-[60px]" : "w-64"),
           isMobile && "fixed inset-y-0 left-0 z-50 w-72",
           isMobile && (mobileOpen ? "translate-x-0" : "-translate-x-full")
         )}
       >
-        {sidebarContent}
+        {isMobile ? mobileContent : (collapsed ? collapsedContent : expandedContent)}
       </aside>
+
+      {/* Custom scrollbar styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: hsl(var(--sidebar-border));
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: hsl(var(--sidebar-foreground) / 0.3);
+        }
+      `}</style>
     </>
   );
 }
