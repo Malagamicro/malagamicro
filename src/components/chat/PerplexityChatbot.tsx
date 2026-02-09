@@ -16,13 +16,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  Send, 
-  Bot, 
-  User, 
-  Loader2, 
+import {
+  Send,
+  Bot,
+  User,
+  Loader2,
   Sparkles,
-  Zap,
   Brain,
   RotateCcw,
   BarChart3,
@@ -36,12 +35,14 @@ import {
   PanelLeft,
   Pencil,
   FileIcon,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAIChatHistory, AIChatSession, AIChatMessage } from '@/hooks/useAIChatHistory';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -78,7 +79,8 @@ export function PerplexityChatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gpt-oss-120b');
-  // Hide sidebar by default on mobile
+  const isMobile = useIsMobile();
+  // Sessions sidebar: default visible on desktop, closed on mobile
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 768);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string | null>(null);
@@ -125,6 +127,11 @@ export function PerplexityChatbot() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  // If user switches to mobile viewport, ensure the sessions sidebar doesn't get "stuck" open
+  useEffect(() => {
+    if (isMobile) setShowSidebar(false);
+  }, [isMobile]);
 
   const getAuthToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -316,23 +323,35 @@ export function PerplexityChatbot() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-12rem)] md:h-[calc(100vh-12rem)] bg-gradient-to-b from-background to-muted/20 rounded-2xl border shadow-xl overflow-hidden relative">
+    <div className="relative flex w-full min-h-[70vh] md:h-[calc(100vh-12rem)] overflow-hidden">
       {/* Sessions Sidebar - overlay on mobile */}
       {showSidebar && (
-        <div className="absolute md:relative z-20 w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
-          <div className="p-3 border-b flex items-center justify-between">
-            <h3 className="font-medium text-sm flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Conversaciones
+        <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
+          <div className="p-3 border-b flex items-center justify-between gap-2">
+            <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
+              <MessageSquare className="h-4 w-4 shrink-0" />
+              <span className="truncate">Conversaciones</span>
             </h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={handleNewChat}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleNewChat}
+                aria-label="Nueva conversación"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 md:hidden"
+                onClick={() => setShowSidebar(false)}
+                aria-label="Cerrar conversaciones"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           
           <ScrollArea className="flex-1">
@@ -416,7 +435,7 @@ export function PerplexityChatbot() {
       {/* Overlay backdrop on mobile when sidebar is open */}
       {showSidebar && (
         <div 
-          className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 md:hidden"
+          className="absolute inset-0 bg-background/40 backdrop-blur-sm z-10 md:hidden"
           onClick={() => setShowSidebar(false)}
         />
       )}
