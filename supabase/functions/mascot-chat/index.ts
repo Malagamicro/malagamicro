@@ -42,7 +42,7 @@ No tienes acceso a los datos del CRM, así que si preguntan por leads o datos es
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "liquid/lfm2-8b-a1b",
         messages: [
           { role: "system", content: systemPrompt },
           ...messages,

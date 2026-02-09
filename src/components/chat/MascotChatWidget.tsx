@@ -141,8 +141,7 @@ export function MascotChatWidget() {
           "w-16 h-16 rounded-full shadow-2xl",
           "bg-white border-2 border-primary/20",
           "flex items-center justify-center",
-          "hover:scale-110 transition-all duration-300",
-          "animate-bounce hover:animate-none"
+          "hover:scale-110 transition-all duration-300"
         )}
         aria-label="Abrir chat con Micro"
       >
