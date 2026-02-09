@@ -21,17 +21,19 @@ export function MascotChatWidget() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const scrollRootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
   const scrollToBottom = useCallback(() => {
-    if (scrollAreaRef.current) {
-      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight;
-      }
-    }
+    const root = scrollRootRef.current;
+    if (!root) return;
+
+    const viewport = root.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null;
+    if (!viewport) return;
+
+    viewport.scrollTop = viewport.scrollHeight;
   }, []);
 
   useEffect(() => {
@@ -39,8 +41,8 @@ export function MascotChatWidget() {
   }, [messages, scrollToBottom]);
 
   useEffect(() => {
-    if (isOpen && !isMinimized && inputRef.current) {
-      inputRef.current.focus();
+    if (isOpen && !isMinimized) {
+      inputRef.current?.focus();
     }
   }, [isOpen, isMinimized]);
 
@@ -48,7 +50,9 @@ export function MascotChatWidget() {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: input.trim() };
-    setMessages(prev => [...prev, userMessage]);
+    const requestMessages = [...messages, userMessage];
+
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
@@ -59,15 +63,26 @@ export function MascotChatWidget() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-        }),
+        body: JSON.stringify({ messages: requestMessages }),
       });
 
       if (!response.ok || !response.body) {
-        throw new Error('Error al conectar con Micro');
+        const errorText = await response.text().catch(() => '');
+        let friendly = 'Error al conectar con Micro';
+        try {
+          const parsed = JSON.parse(errorText);
+          if (typeof parsed?.error === 'string') friendly = parsed.error;
+          else if (typeof parsed?.message === 'string') friendly = parsed.message;
+        } catch {
+          // ignore
+        }
+
+        setMessages((prev) => [...prev, { role: 'assistant', content: friendly }]);
+        setIsLoading(false);
+        return;
       }
 
       const reader = response.body.getReader();
@@ -75,7 +90,7 @@ export function MascotChatWidget() {
       let buffer = '';
 
       // Add assistant message placeholder
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -100,23 +115,36 @@ export function MascotChatWidget() {
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               assistantContent += content;
-              setMessages(prev => {
+              setMessages((prev) => {
                 const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
-                return updated;
+                // Update the last assistant message
+                const last = updated[updated.length - 1];
+                if (last?.role === 'assistant') {
+                  updated[updated.length - 1] = { role: 'assistant', content: assistantContent };
+                  return updated;
+                }
+                return [...updated, { role: 'assistant', content: assistantContent }];
               });
             }
           } catch {
-            // Partial JSON, continue
+            // Partial JSON; ignore until next chunk
           }
         }
       }
     } catch (error) {
       console.error('Mascot chat error:', error);
-      setMessages(prev => [
-        ...prev.slice(0, -1),
-        { role: 'assistant', content: '¡Ups! Parece que tuve un pequeño cortocircuito 🤖⚡ Intenta de nuevo en un momento.' },
-      ]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        const fallback =
+          '¡Ups! Parece que tuve un pequeño cortocircuito 🤖⚡ Intenta de nuevo en un momento.';
+
+        if (updated[updated.length - 1]?.role === 'assistant') {
+          updated[updated.length - 1] = { role: 'assistant', content: fallback };
+          return updated;
+        }
+
+        return [...updated, { role: 'assistant', content: fallback }];
+      });
     } finally {
       setIsLoading(false);
     }
@@ -137,11 +165,10 @@ export function MascotChatWidget() {
       <button
         onClick={() => setIsOpen(true)}
         className={cn(
-          "fixed bottom-6 right-6 z-50 group",
-          "w-16 h-16 rounded-full shadow-2xl",
-          "bg-white border-2 border-primary/20",
-          "flex items-center justify-center",
-          "hover:scale-110 transition-all duration-300"
+          'fixed bottom-6 right-6 z-50 group',
+          'w-16 h-16 rounded-full shadow-2xl',
+          'bg-card border border-primary/20',
+          'flex items-center justify-center'
         )}
         aria-label="Abrir chat con Micro"
       >
@@ -159,11 +186,10 @@ export function MascotChatWidget() {
       <button
         onClick={() => setIsMinimized(false)}
         className={cn(
-          "fixed bottom-6 right-6 z-50",
-          "w-14 h-14 rounded-full shadow-xl",
-          "bg-primary text-primary-foreground",
-          "flex items-center justify-center",
-          "hover:scale-105 transition-all duration-200"
+          'fixed bottom-6 right-6 z-50',
+          'w-14 h-14 rounded-full shadow-xl',
+          'bg-primary text-primary-foreground',
+          'flex items-center justify-center'
         )}
       >
         <img src={mascotImage} alt="Micro" className="w-12 h-12 object-contain" />
@@ -175,16 +201,15 @@ export function MascotChatWidget() {
   return (
     <div
       className={cn(
-        "fixed bottom-6 right-6 z-50",
-        "w-[360px] max-w-[calc(100vw-2rem)] h-[500px] max-h-[calc(100vh-6rem)]",
-        "bg-background rounded-2xl shadow-2xl border",
-        "flex flex-col overflow-hidden",
-        "animate-in slide-in-from-bottom-4 duration-300"
+        'fixed bottom-6 right-6 z-50',
+        'w-[360px] max-w-[calc(100vw-2rem)] h-[500px] max-h-[calc(100vh-6rem)]',
+        'bg-background rounded-2xl shadow-2xl border',
+        'flex flex-col overflow-hidden'
       )}
     >
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b bg-gradient-to-r from-primary/10 to-primary/5">
-        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center border shadow-sm">
+        <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center border shadow-sm">
           <img src={mascotImage} alt="Micro" className="w-9 h-9 object-contain" />
         </div>
         <div className="flex-1">
@@ -213,79 +238,81 @@ export function MascotChatWidget() {
       </div>
 
       {/* Messages */}
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
-        {messages.length === 0 ? (
-          <div className="text-center py-8 space-y-4">
-            <div className="w-20 h-20 mx-auto">
-              <img src={mascotImage} alt="Micro" className="w-full h-full object-contain" />
+      <div ref={scrollRootRef} className="flex-1">
+        <ScrollArea className="h-full p-4">
+          {messages.length === 0 ? (
+            <div className="text-center py-8 space-y-4">
+              <div className="w-20 h-20 mx-auto">
+                <img src={mascotImage} alt="Micro" className="w-full h-full object-contain" />
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-semibold">¡Hola! Soy Micro 🤖</h4>
+                <p className="text-sm text-muted-foreground max-w-[250px] mx-auto">
+                  Tu asistente de MalagaMicro. ¿En qué puedo ayudarte hoy?
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center pt-2">
+                {['Tips de ventas', 'Productividad', 'Motivación'].map((tip) => (
+                  <button
+                    key={tip}
+                    onClick={() => {
+                      setInput(`Dame consejos de ${tip.toLowerCase()}`);
+                      inputRef.current?.focus();
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20"
+                  >
+                    {tip}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              <h4 className="font-semibold">¡Hola! Soy Micro 🤖</h4>
-              <p className="text-sm text-muted-foreground max-w-[250px] mx-auto">
-                Tu asistente de MalagaMicro. ¿En qué puedo ayudarte hoy?
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center pt-2">
-              {['Tips de ventas', 'Productividad', 'Motivación'].map((tip) => (
-                <button
-                  key={tip}
-                  onClick={() => {
-                    setInput(`Dame consejos de ${tip.toLowerCase()}`);
-                    inputRef.current?.focus();
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+          ) : (
+            <div className="space-y-4">
+              {messages.map((message, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'flex gap-2',
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  )}
                 >
-                  {tip}
-                </button>
+                  {message.role === 'assistant' && (
+                    <div className="w-7 h-7 rounded-full bg-card border flex items-center justify-center flex-shrink-0">
+                      <img src={mascotImage} alt="Micro" className="w-6 h-6 object-contain" />
+                    </div>
+                  )}
+                  <div
+                    className={cn(
+                      'max-w-[80%] rounded-2xl px-4 py-2 text-sm',
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground rounded-br-md'
+                        : 'bg-muted rounded-bl-md'
+                    )}
+                  >
+                    {message.role === 'assistant' ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0">
+                        <ReactMarkdown>{message.content || '...'}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      message.content
+                    )}
+                  </div>
+                </div>
               ))}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {messages.map((message, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "flex gap-2",
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                )}
-              >
-                {message.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-full bg-white border flex items-center justify-center flex-shrink-0">
+              {isLoading && messages[messages.length - 1]?.role === 'user' && (
+                <div className="flex gap-2">
+                  <div className="w-7 h-7 rounded-full bg-card border flex items-center justify-center">
                     <img src={mascotImage} alt="Micro" className="w-6 h-6 object-contain" />
                   </div>
-                )}
-                <div
-                  className={cn(
-                    "max-w-[80%] rounded-2xl px-4 py-2 text-sm",
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-br-md'
-                      : 'bg-muted rounded-bl-md'
-                  )}
-                >
-                  {message.role === 'assistant' ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0">
-                      <ReactMarkdown>{message.content || '...'}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    message.content
-                  )}
+                  <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-2">
+                    <Loader2 className="h-4 w-4" />
+                  </div>
                 </div>
-              </div>
-            ))}
-            {isLoading && messages[messages.length - 1]?.role === 'user' && (
-              <div className="flex gap-2">
-                <div className="w-7 h-7 rounded-full bg-white border flex items-center justify-center">
-                  <img src={mascotImage} alt="Micro" className="w-6 h-6 object-contain animate-pulse" />
-                </div>
-                <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </ScrollArea>
+              )}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
 
       {/* Input */}
       <div className="p-3 border-t bg-muted/30">
@@ -305,7 +332,11 @@ export function MascotChatWidget() {
             disabled={!input.trim() || isLoading}
             className="rounded-full"
           >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {isLoading ? (
+              <Loader2 className="h-4 w-4" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
