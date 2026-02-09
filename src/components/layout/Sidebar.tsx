@@ -32,6 +32,7 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeft,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -130,6 +131,7 @@ const menuCategories: MenuCategory[] = [
     color: 'text-lime-500',
     items: [
       { id: 'chat-ai', label: 'Chat IA', icon: Bot, color: 'text-violet-500' },
+      { id: 'seo-generator', label: 'Generador SEO', icon: Sparkles, route: '/tools/seo', color: 'text-amber-500' },
       { id: 'scraper', label: 'Scraper', icon: Globe, route: '/tools/scraper', color: 'text-lime-500' },
       { id: 'files', label: 'Gestor Archivos', icon: FolderOpen, route: '/tools/files', color: 'text-rose-500' },
     ]

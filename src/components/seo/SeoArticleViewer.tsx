@@ -1,0 +1,271 @@
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { 
+  FileText, 
+  Code, 
+  ImageIcon, 
+  BarChart3, 
+  Link2, 
+  Copy,
+  Download,
+  ExternalLink
+} from 'lucide-react';
+import { toast } from 'sonner';
+import type { SeoArticle } from '@/hooks/useSeoArticles';
+
+interface SeoArticleViewerProps {
+  article: SeoArticle | null;
+  open: boolean;
+  onClose: () => void;
+}
+
+export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerProps) => {
+  const [activeTab, setActiveTab] = useState('preview');
+
+  if (!article) return null;
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado al portapapeles`);
+  };
+
+  const downloadHtml = () => {
+    if (!article.html_content) return;
+    
+    const blob = new Blob([article.html_content], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${article.slug || 'article'}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('HTML descargado');
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            {article.title || article.topic}
+          </DialogTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            {article.seo_score && (
+              <Badge variant="secondary">
+                <BarChart3 className="h-3 w-3 mr-1" />
+                SEO: {article.seo_score}/100
+              </Badge>
+            )}
+            {article.word_count && (
+              <Badge variant="outline">{article.word_count} palabras</Badge>
+            )}
+            {article.images_success_count !== undefined && (
+              <Badge variant="outline">
+                <ImageIcon className="h-3 w-3 mr-1" />
+                {article.images_success_count} imágenes
+              </Badge>
+            )}
+          </div>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="preview">Vista Previa</TabsTrigger>
+            <TabsTrigger value="html">HTML</TabsTrigger>
+            <TabsTrigger value="images">Imágenes</TabsTrigger>
+            <TabsTrigger value="seo">SEO</TabsTrigger>
+            <TabsTrigger value="meta">Meta</TabsTrigger>
+          </TabsList>
+
+          <div className="flex-1 min-h-0 mt-4">
+            <TabsContent value="preview" className="h-full m-0">
+              <ScrollArea className="h-[60vh] border rounded-lg p-4">
+                {article.html_content ? (
+                  <div 
+                    className="prose prose-sm max-w-none dark:prose-invert"
+                    dangerouslySetInnerHTML={{ __html: article.html_content }}
+                  />
+                ) : (
+                  <p className="text-muted-foreground">No hay contenido disponible</p>
+                )}
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="html" className="h-full m-0">
+              <div className="flex gap-2 mb-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => copyToClipboard(article.html_content || '', 'HTML')}
+                >
+                  <Copy className="h-4 w-4 mr-1" />
+                  Copiar
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={downloadHtml}
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Descargar
+                </Button>
+              </div>
+              <ScrollArea className="h-[55vh] border rounded-lg">
+                <pre className="p-4 text-xs font-mono whitespace-pre-wrap break-all">
+                  {article.html_content || 'No hay contenido HTML'}
+                </pre>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="images" className="h-full m-0">
+              <ScrollArea className="h-[60vh]">
+                {article.images && article.images.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {article.images.map((img, i) => (
+                      <div key={i} className="border rounded-lg overflow-hidden">
+                        <img 
+                          src={img.url} 
+                          alt={img.altText || `Imagen ${i + 1}`}
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="p-2 bg-muted/50">
+                          <p className="text-xs text-muted-foreground truncate">
+                            {img.altText || `Imagen ${i + 1}`}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-1 h-7 text-xs"
+                            onClick={() => window.open(img.url, '_blank')}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Abrir
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">
+                    No hay imágenes disponibles
+                  </p>
+                )}
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="seo" className="h-full m-0">
+              <ScrollArea className="h-[60vh]">
+                <div className="space-y-4">
+                  {article.research_summary && (
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-2">Resumen de Investigación</h4>
+                      <p className="text-sm text-muted-foreground">{article.research_summary}</p>
+                    </div>
+                  )}
+
+                  {article.keywords && article.keywords.length > 0 && (
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-2">Keywords</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {article.keywords.map((kw, i) => (
+                          <Badge key={i} variant="secondary">
+                            {typeof kw === 'string' ? kw : (kw as { keyword?: string })?.keyword || ''}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {article.optimizations && article.optimizations.length > 0 && (
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-2">Optimizaciones Aplicadas</h4>
+                      <ul className="text-sm space-y-1">
+                        {article.optimizations.map((opt, i) => (
+                          <li key={i} className="flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                            {opt}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {article.suggested_links && article.suggested_links.length > 0 && (
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Link2 className="h-4 w-4" />
+                        Enlaces Sugeridos
+                      </h4>
+                      <ul className="text-sm space-y-2">
+                        {article.suggested_links.map((link, i) => (
+                          <li key={i} className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded">
+                            <span>{link.anchor}</span>
+                            <Badge variant="outline">{link.targetUrl}</Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="meta" className="h-full m-0">
+              <ScrollArea className="h-[60vh]">
+                <div className="space-y-4">
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-2">Meta Tags</h4>
+                    <dl className="text-sm space-y-2">
+                      <div>
+                        <dt className="text-muted-foreground">Title</dt>
+                        <dd className="font-medium">{article.title || '-'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Slug</dt>
+                        <dd className="font-mono text-xs">{article.slug || '-'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Meta Description</dt>
+                        <dd>{article.meta_description || '-'}</dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  {article.meta_tags && Object.keys(article.meta_tags).length > 0 && (
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-2">Open Graph / Social</h4>
+                      <dl className="text-sm space-y-2">
+                        {Object.entries(article.meta_tags).map(([key, value]) => (
+                          <div key={key}>
+                            <dt className="text-muted-foreground font-mono text-xs">{key}</dt>
+                            <dd className="truncate">{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  )}
+
+                  {article.structured_data && (
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-2">Datos Estructurados (JSON-LD)</h4>
+                      <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-48">
+                        {JSON.stringify(article.structured_data, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </div>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+};
