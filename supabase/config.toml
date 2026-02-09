@@ -71,3 +71,9 @@ verify_jwt = false
 
 [functions.imap-check]
 verify_jwt = false
+
+[functions.log-workflow-error]
+verify_jwt = false
+
+[functions.circuit-breaker-check]
+verify_jwt = false
