@@ -57,9 +57,16 @@ const MODELS = [
   { 
     id: 'openai/gpt-5-nano', 
     name: 'GPT-5 Nano', 
-    description: 'IA rápida con acceso total al CRM y STEL Order',
+    description: 'Rápido y eficiente, ideal para tareas diarias',
     icon: Brain,
     color: 'text-emerald-500',
+  },
+  { 
+    id: 'openai/gpt-oss-120b', 
+    name: 'GPT-OSS 120B', 
+    description: 'Open source potente, mejor razonamiento',
+    icon: Sparkles,
+    color: 'text-violet-500',
   },
 ];
 
