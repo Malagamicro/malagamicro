@@ -55,9 +55,9 @@ interface Message {
 
 const MODELS = [
   { 
-    id: 'gpt-oss-120b', 
-    name: 'GPT-OSS 120B', 
-    description: 'IA avanzada con acceso total',
+    id: 'openai/gpt-5-nano', 
+    name: 'GPT-5 Nano', 
+    description: 'IA rápida con acceso total al CRM y STEL Order',
     icon: Brain,
     color: 'text-emerald-500',
   },
@@ -69,7 +69,7 @@ const QUICK_ACTIONS = [
   { icon: Plus, label: 'Crear lead', prompt: 'Quiero crear un nuevo lead' },
   { icon: Bell, label: 'Recordatorios', prompt: '¿Qué recordatorios tengo pendientes?' },
   { icon: MessageSquare, label: 'WhatsApp', prompt: 'Muéstrame mis chats de WhatsApp recientes' },
-  { icon: FileIcon, label: 'Archivos', prompt: '¿Qué archivos tengo guardados?' },
+  { icon: FileIcon, label: 'Presupuestos STEL', prompt: 'Lista mis presupuestos de STEL Order' },
 ];
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/perplexity-chat`;
@@ -78,7 +78,7 @@ export function PerplexityChatbot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gpt-oss-120b');
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-5-nano');
   const isMobile = useIsMobile();
   // Sessions sidebar: default visible on desktop, closed on mobile
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 768);
