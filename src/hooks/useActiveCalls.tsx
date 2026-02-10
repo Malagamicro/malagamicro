@@ -73,6 +73,12 @@ export function useActiveCalls() {
 
     if (data) {
       setIncomingCall(call);
+
+      // Request notification permission on first call (for future calls on mobile)
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
       // Auto-dismiss after 30 seconds
       setTimeout(() => {
         setIncomingCall(prev => prev?.id === call.id ? null : prev);
