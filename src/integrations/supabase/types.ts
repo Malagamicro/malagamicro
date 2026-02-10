@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_calls: {
+        Row: {
+          caller_id: string
+          caller_name: string
+          conversation_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          is_video: boolean
+          room_name: string
+          status: string
+        }
+        Insert: {
+          caller_id: string
+          caller_name: string
+          conversation_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          is_video?: boolean
+          room_name: string
+          status?: string
+        }
+        Update: {
+          caller_id?: string
+          caller_name?: string
+          conversation_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          is_video?: boolean
+          room_name?: string
+          status?: string
+        }
+        Relationships: []
+      }
       ai_chat_messages: {
         Row: {
           content: string
