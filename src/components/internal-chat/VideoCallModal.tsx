@@ -16,6 +16,7 @@ interface VideoCallModalProps {
   displayName: string;
   isVideoCall: boolean;
   isReceiver?: boolean;
+  initialStream?: MediaStream | null;
 }
 
 const ICE_SERVERS = [
@@ -25,7 +26,7 @@ const ICE_SERVERS = [
 ];
 
 export function VideoCallModal({ 
-  open, onClose, roomName, displayName, isVideoCall, isReceiver = false 
+  open, onClose, roomName, displayName, isVideoCall, isReceiver = false, initialStream = null 
 }: VideoCallModalProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(!isVideoCall);
@@ -48,11 +49,16 @@ export function VideoCallModal({
 
     const setup = async () => {
       try {
-        // 1. Get local media
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: isVideoCall,
-        });
+        // 1. Get local media — reuse initialStream if provided (critical for mobile)
+        let stream: MediaStream;
+        if (initialStream && initialStream.getTracks().length > 0) {
+          stream = initialStream;
+        } else {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: isVideoCall,
+          });
+        }
         if (destroyed) { stream.getTracks().forEach(t => t.stop()); return; }
 
         localStreamRef.current = stream;
