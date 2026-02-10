@@ -116,7 +116,27 @@ export function useSidebarConfig() {
       if (data?.categories) {
         const saved = data.categories as unknown as SidebarCategory[];
         if (saved.length > 0) {
-          setCategories(saved);
+          // Merge any new default items that don't exist in saved config
+          const allSavedItemIds = new Set(saved.flatMap(c => c.items.map(i => i.id)));
+          let hasNewItems = false;
+          const merged = saved.map(savedCat => {
+            const defaultCat = DEFAULT_CATEGORIES.find(dc => dc.id === savedCat.id);
+            if (!defaultCat) return savedCat;
+            const newItems = defaultCat.items.filter(di => !allSavedItemIds.has(di.id));
+            if (newItems.length > 0) {
+              hasNewItems = true;
+              return { ...savedCat, items: [...savedCat.items, ...newItems] };
+            }
+            return savedCat;
+          });
+          // Also add entirely new default categories
+          const savedCatIds = new Set(saved.map(c => c.id));
+          const newCats = DEFAULT_CATEGORIES.filter(dc => !savedCatIds.has(dc.id) && dc.items.some(i => !allSavedItemIds.has(i.id)));
+          if (newCats.length > 0) hasNewItems = true;
+          const final = [...merged, ...newCats];
+          setCategories(final);
+          if (hasNewItems) saveConfig(final);
+          else setCategories(saved);
         }
       }
     } catch (err) {
