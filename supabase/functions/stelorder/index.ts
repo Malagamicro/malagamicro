@@ -13,27 +13,29 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('STELORDER_API_KEY');
+    const apiKey = (Deno.env.get('STELORDER_API_KEY') || '').trim();
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: 'STELORDER_API_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    console.log(`STEL API Key starts with: ${apiKey.substring(0, 8)}... length: ${apiKey.length}`);
+    console.log(`STEL API Key: "${apiKey}" (length: ${apiKey.length})`);
 
     const url = new URL(req.url);
     const action = url.searchParams.get('action');
     const body = req.method === 'POST' || req.method === 'PUT' ? await req.json().catch(() => null) : null;
 
     const callStel = async (endpoint: string, method = 'GET', payload?: any) => {
-      // Add APIKEY as query parameter (most reliable per STEL docs)
+      // Try both methods: header AND query parameter
       const separator = endpoint.includes('?') ? '&' : '?';
-      const fullUrl = `${STEL_API_BASE}/${endpoint}${separator}APIKEY=${apiKey}`;
+      const fullUrl = `${STEL_API_BASE}/${endpoint}${separator}APIKEY=${encodeURIComponent(apiKey)}`;
+      console.log(`STEL full URL: ${fullUrl}`);
       
       const opts: RequestInit = { 
         method, 
         headers: {
+          'APIKEY': apiKey,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }
