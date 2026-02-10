@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Phone, PhoneOff, Video } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface IncomingCallDialogProps {
   open: boolean;
@@ -12,82 +13,116 @@ interface IncomingCallDialogProps {
 }
 
 export function IncomingCallDialog({ open, callerName, isVideo, onAccept, onReject }: IncomingCallDialogProps) {
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const stoppedRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const toastIdRef = useRef<string | number | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    stoppedRef.current = false;
 
-    // 1. Vibrate on mobile (pattern: ring-pause-ring)
+    // 1. Vibrate on mobile
     if ('vibrate' in navigator) {
-      const vibratePattern = () => {
-        if (stoppedRef.current) return;
+      const vibrateLoop = () => {
+        if (!open) return;
         navigator.vibrate([400, 200, 400, 200, 400, 1000]);
-        setTimeout(vibratePattern, 2600);
       };
-      vibratePattern();
-    }
-
-    // 2. Play ringtone sound
-    const ctx = new AudioContext();
-    audioCtxRef.current = ctx;
-
-    const playRing = async () => {
-      for (let i = 0; i < 30 && !stoppedRef.current; i++) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = i % 2 === 0 ? 440 : 520;
-        gain.gain.value = 0.2;
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.4);
-        await new Promise(r => setTimeout(r, 600));
-      }
-    };
-    playRing();
-
-    // 3. Send system notification (works on mobile if permission granted)
-    if ('Notification' in window && Notification.permission === 'granted') {
+      vibrateLoop();
+      const vibrateInterval = setInterval(vibrateLoop, 2600);
+      
+      // 2. Play ringtone using Audio element (works better on mobile than AudioContext)
+      const audio = new Audio();
+      // Generate a simple ringtone as data URI using an oscillator via OfflineAudioContext
       try {
-        const notif = new Notification(
-          isVideo ? '📹 Videollamada entrante' : '📞 Llamada entrante',
-          {
-            body: `${callerName} te está llamando`,
-            tag: 'incoming-call',
-            requireInteraction: true,
-            vibrate: [400, 200, 400, 200, 400],
-          } as NotificationOptions
-        );
-        notif.onclick = () => {
-          window.focus();
-          notif.close();
-        };
-        // Clean up notification when call dialog closes
-        return () => {
-          stoppedRef.current = true;
-          navigator.vibrate?.(0);
-          ctx.close();
-          notif.close();
-        };
+        const offCtx = new OfflineAudioContext(1, 44100 * 4, 44100);
+        // Ring pattern: two tones alternating
+        for (let i = 0; i < 4; i++) {
+          const osc = offCtx.createOscillator();
+          const gain = offCtx.createGain();
+          osc.connect(gain);
+          gain.connect(offCtx.destination);
+          osc.frequency.value = i % 2 === 0 ? 440 : 520;
+          gain.gain.value = 0.3;
+          osc.start(i * 0.8);
+          osc.stop(i * 0.8 + 0.4);
+        }
+        offCtx.startRendering().then(buffer => {
+          const audioCtx = new AudioContext();
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.loop = true;
+          source.connect(audioCtx.destination);
+          source.start();
+          audioRef.current = { pause: () => { source.stop(); audioCtx.close(); } } as any;
+        }).catch(() => {});
       } catch {
-        // Notification not supported in this context
+        // Fallback: simple beep
       }
+
+      // 3. Show persistent toast for mobile (in case dialog is obscured)
+      toastIdRef.current = toast(
+        isVideo ? '📹 Videollamada entrante' : '📞 Llamada entrante',
+        {
+          description: `${callerName} te está llamando`,
+          duration: 30000,
+          action: {
+            label: 'Contestar',
+            onClick: onAccept,
+          },
+          cancel: {
+            label: 'Rechazar',
+            onClick: onReject,
+          },
+        }
+      );
+
+      // 4. System notification for background
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          const notif = new Notification(
+            isVideo ? '📹 Videollamada entrante' : '📞 Llamada entrante',
+            {
+              body: `${callerName} te está llamando`,
+              tag: 'incoming-call',
+              requireInteraction: true,
+              vibrate: [400, 200, 400, 200, 400],
+            } as NotificationOptions
+          );
+          notif.onclick = () => {
+            window.focus();
+            notif.close();
+          };
+
+          return () => {
+            clearInterval(vibrateInterval);
+            navigator.vibrate?.(0);
+            audioRef.current?.pause();
+            audioRef.current = null;
+            notif.close();
+            if (toastIdRef.current) toast.dismiss(toastIdRef.current);
+          };
+        } catch { /* not supported */ }
+      }
+
+      return () => {
+        clearInterval(vibrateInterval);
+        navigator.vibrate?.(0);
+        audioRef.current?.pause();
+        audioRef.current = null;
+        if (toastIdRef.current) toast.dismiss(toastIdRef.current);
+      };
     }
 
     return () => {
-      stoppedRef.current = true;
-      navigator.vibrate?.(0);
-      ctx.close();
+      audioRef.current?.pause();
+      audioRef.current = null;
+      if (toastIdRef.current) toast.dismiss(toastIdRef.current);
     };
-  }, [open, callerName, isVideo]);
+  }, [open, callerName, isVideo, onAccept, onReject]);
 
   const initials = callerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onReject()}>
-      <DialogContent className="max-w-sm mx-auto p-0 overflow-hidden border-0 rounded-2xl">
+      <DialogContent className="max-w-sm mx-auto p-0 overflow-hidden border-0 rounded-2xl z-[9999]">
         <DialogTitle className="sr-only">Llamada entrante de {callerName}</DialogTitle>
         <div className="bg-gradient-to-b from-primary/90 to-primary flex flex-col items-center py-10 px-6 text-primary-foreground">
           {/* Pulsing avatar */}
