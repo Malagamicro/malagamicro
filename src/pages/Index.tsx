@@ -239,14 +239,16 @@ const IndexContent = () => {
         return <Templates />;
       case 'mensajes':
         return (
-          <div className="p-8 space-y-6 animate-fade-in">
-            <div>
+          <div className="p-2 sm:p-8 space-y-2 sm:space-y-6 animate-fade-in h-full flex flex-col">
+            <div className="hidden sm:block">
               <h1 className="text-3xl font-bold text-foreground">Mensajes Internos</h1>
               <p className="text-muted-foreground mt-1">
                 Comunícate con tu equipo en tiempo real
               </p>
             </div>
-            <InternalChatPage />
+            <div className="flex-1 min-h-0">
+              <InternalChatPage />
+            </div>
           </div>
         );
       case 'shared-files':
