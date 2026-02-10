@@ -10,6 +10,7 @@ export function GlobalCallListener() {
   const [activeCall, setActiveCall] = useState<{
     roomName: string;
     isVideo: boolean;
+    conversationId: string;
   } | null>(null);
 
   const handleAccept = async () => {
@@ -18,6 +19,7 @@ export function GlobalCallListener() {
       setActiveCall({
         roomName: call.room_name,
         isVideo: call.is_video,
+        conversationId: call.conversation_id,
       });
     }
   };
@@ -39,6 +41,7 @@ export function GlobalCallListener() {
           roomName={activeCall.roomName}
           displayName={user?.email?.split('@')[0] || 'Usuario'}
           isVideoCall={activeCall.isVideo}
+          isReceiver={true}
         />
       )}
     </>
