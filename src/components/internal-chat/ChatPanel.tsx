@@ -187,6 +187,20 @@ export function ChatPanel({
   };
 
   const startCall = async (video: boolean) => {
+    // Pre-check media permissions
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: video 
+      });
+      stream.getTracks().forEach(t => t.stop()); // Release immediately, VideoCallModal will re-acquire
+    } catch {
+      toast.error(video 
+        ? 'No se pudo acceder a cámara y micrófono. Revisa los permisos.' 
+        : 'No se pudo acceder al micrófono. Revisa los permisos.');
+      return;
+    }
+    
     setIsVideoCall(video);
     setCallModalOpen(true);
     // Signal the call to other participants
