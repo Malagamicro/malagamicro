@@ -339,6 +339,56 @@ export type Database = {
           },
         ]
       }
+      email_attachments: {
+        Row: {
+          content_id: string | null
+          created_at: string
+          file_name: string
+          file_path: string | null
+          file_size: number
+          file_type: string | null
+          id: string
+          is_inline: boolean
+          message_id: string
+          storage_path: string | null
+          user_id: string
+        }
+        Insert: {
+          content_id?: string | null
+          created_at?: string
+          file_name: string
+          file_path?: string | null
+          file_size?: number
+          file_type?: string | null
+          id?: string
+          is_inline?: boolean
+          message_id: string
+          storage_path?: string | null
+          user_id: string
+        }
+        Update: {
+          content_id?: string | null
+          created_at?: string
+          file_name?: string
+          file_path?: string | null
+          file_size?: number
+          file_type?: string | null
+          id?: string
+          is_inline?: boolean
+          message_id?: string
+          storage_path?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "email_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_campaigns: {
         Row: {
           created_at: string
@@ -388,6 +438,181 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_messages: {
+        Row: {
+          body_html: string | null
+          body_text: string | null
+          budget_request_id: string | null
+          cc_addresses: Json | null
+          created_at: string
+          date: string
+          folder: string
+          from_address: string
+          from_name: string | null
+          has_attachments: boolean
+          id: string
+          is_deleted: boolean
+          is_read: boolean
+          is_starred: boolean
+          labels: string[] | null
+          message_id_header: string | null
+          message_uid: string | null
+          profile_id: string
+          provider_id: string | null
+          subject: string | null
+          to_addresses: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body_html?: string | null
+          body_text?: string | null
+          budget_request_id?: string | null
+          cc_addresses?: Json | null
+          created_at?: string
+          date?: string
+          folder?: string
+          from_address: string
+          from_name?: string | null
+          has_attachments?: boolean
+          id?: string
+          is_deleted?: boolean
+          is_read?: boolean
+          is_starred?: boolean
+          labels?: string[] | null
+          message_id_header?: string | null
+          message_uid?: string | null
+          profile_id: string
+          provider_id?: string | null
+          subject?: string | null
+          to_addresses?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body_html?: string | null
+          body_text?: string | null
+          budget_request_id?: string | null
+          cc_addresses?: Json | null
+          created_at?: string
+          date?: string
+          folder?: string
+          from_address?: string
+          from_name?: string | null
+          has_attachments?: boolean
+          id?: string
+          is_deleted?: boolean
+          is_read?: boolean
+          is_starred?: boolean
+          labels?: string[] | null
+          message_id_header?: string | null
+          message_uid?: string | null
+          profile_id?: string
+          provider_id?: string | null
+          subject?: string | null
+          to_addresses?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_messages_budget_request_id_fkey"
+            columns: ["budget_request_id"]
+            isOneToOne: false
+            referencedRelation: "budget_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_messages_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "email_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_messages_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_profiles: {
+        Row: {
+          auto_sync_enabled: boolean
+          auto_sync_interval: number
+          connection_status: string
+          created_at: string
+          from_email: string
+          from_name: string | null
+          id: string
+          imap_host: string | null
+          imap_password: string | null
+          imap_port: number | null
+          imap_secure: boolean | null
+          imap_user: string | null
+          is_default: boolean
+          last_sync_at: string | null
+          profile_name: string
+          smtp_host: string
+          smtp_password: string
+          smtp_port: number
+          smtp_secure: string
+          smtp_user: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_sync_enabled?: boolean
+          auto_sync_interval?: number
+          connection_status?: string
+          created_at?: string
+          from_email: string
+          from_name?: string | null
+          id?: string
+          imap_host?: string | null
+          imap_password?: string | null
+          imap_port?: number | null
+          imap_secure?: boolean | null
+          imap_user?: string | null
+          is_default?: boolean
+          last_sync_at?: string | null
+          profile_name: string
+          smtp_host: string
+          smtp_password: string
+          smtp_port?: number
+          smtp_secure?: string
+          smtp_user: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_sync_enabled?: boolean
+          auto_sync_interval?: number
+          connection_status?: string
+          created_at?: string
+          from_email?: string
+          from_name?: string | null
+          id?: string
+          imap_host?: string | null
+          imap_password?: string | null
+          imap_port?: number | null
+          imap_secure?: boolean | null
+          imap_user?: string | null
+          is_default?: boolean
+          last_sync_at?: string | null
+          profile_name?: string
+          smtp_host?: string
+          smtp_password?: string
+          smtp_port?: number
+          smtp_secure?: string
+          smtp_user?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       email_templates: {
         Row: {
@@ -980,42 +1205,63 @@ export type Database = {
       providers: {
         Row: {
           activo: boolean | null
+          categoria: string | null
+          cif_nif: string | null
+          condiciones_pago: string | null
+          contacto_principal: string | null
           created_at: string | null
+          direccion_fiscal: string | null
           email: string
           especialidad: string[] | null
           id: string
           metadata: Json | null
           nombre: string
           notas: string | null
+          razon_social: string | null
           telefono: string | null
           updated_at: string | null
           user_id: string
+          web: string | null
         }
         Insert: {
           activo?: boolean | null
+          categoria?: string | null
+          cif_nif?: string | null
+          condiciones_pago?: string | null
+          contacto_principal?: string | null
           created_at?: string | null
+          direccion_fiscal?: string | null
           email: string
           especialidad?: string[] | null
           id?: string
           metadata?: Json | null
           nombre: string
           notas?: string | null
+          razon_social?: string | null
           telefono?: string | null
           updated_at?: string | null
           user_id: string
+          web?: string | null
         }
         Update: {
           activo?: boolean | null
+          categoria?: string | null
+          cif_nif?: string | null
+          condiciones_pago?: string | null
+          contacto_principal?: string | null
           created_at?: string | null
+          direccion_fiscal?: string | null
           email?: string
           especialidad?: string[] | null
           id?: string
           metadata?: Json | null
           nombre?: string
           notas?: string | null
+          razon_social?: string | null
           telefono?: string | null
           updated_at?: string | null
           user_id?: string
+          web?: string | null
         }
         Relationships: []
       }

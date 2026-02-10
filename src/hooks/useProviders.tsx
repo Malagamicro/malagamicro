@@ -14,6 +14,13 @@ export interface Provider {
   notas?: string;
   activo: boolean;
   user_id: string;
+  razon_social?: string;
+  cif_nif?: string;
+  direccion_fiscal?: string;
+  contacto_principal?: string;
+  web?: string;
+  categoria?: string;
+  condiciones_pago?: string;
 }
 
 export const useProviders = () => {
