@@ -1,53 +1,27 @@
+import { useRef, useState, useEffect } from 'react';
+import { Responsive, WidthProvider, Layout } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 import { StatCard } from './StatCard';
 import { LeadsByStatusChart } from './LeadsByStatusChart';
 import { RecentLeads } from './RecentLeads';
 import { UpcomingReminders } from './UpcomingReminders';
 import { CompanyReminders } from './CompanyReminders';
 import { RecentTickets } from './RecentTickets';
+import { ActivityStats } from '@/components/reports/ActivityStats';
 import { useLeads, useDashboardStats } from '@/hooks/useLeads';
 import { useDashboardConfig, DashboardWidget } from '@/hooks/useDashboardConfig';
-import { Users, UserPlus, TrendingUp, Target, Loader2, Pencil, X, Plus, RotateCcw, GripVertical, Eye, EyeOff, Maximize2, Minimize2 } from 'lucide-react';
+import { Users, UserPlus, TrendingUp, Target, Loader2, Pencil, X, RotateCcw, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { ConversionFunnel } from '@/components/reports/ConversionFunnel';
-import { ActivityStats } from '@/components/reports/ActivityStats';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
 interface DashboardProps {
   onViewLead: (id: string) => void;
-}
-
-function WidgetWrapper({ widget, editMode, onResize, children }: {
-  widget: DashboardWidget;
-  editMode: boolean;
-  onResize: (id: string, width: 1 | 2 | 3) => void;
-  children: React.ReactNode;
-}) {
-  const colSpan = widget.width === 3 ? 'lg:col-span-3' : widget.width === 2 ? 'lg:col-span-2' : 'lg:col-span-1';
-
-  return (
-    <div className={cn('col-span-1', colSpan, editMode && 'ring-2 ring-dashed ring-primary/30 rounded-xl relative')}>
-      {editMode && (
-        <div className="absolute top-2 right-2 z-10 flex gap-1">
-          {widget.width > 1 && (
-            <Button size="icon" variant="secondary" className="h-6 w-6" onClick={() => onResize(widget.id, (widget.width - 1) as 1 | 2)}>
-              <Minimize2 className="h-3 w-3" />
-            </Button>
-          )}
-          {widget.width < 3 && (
-            <Button size="icon" variant="secondary" className="h-6 w-6" onClick={() => onResize(widget.id, (widget.width + 1) as 2 | 3)}>
-              <Maximize2 className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-      )}
-      {children}
-    </div>
-  );
 }
 
 function WidgetContent({ widget, stats, leads, onViewLead }: {
@@ -59,7 +33,7 @@ function WidgetContent({ widget, stats, leads, onViewLead }: {
   switch (widget.type) {
     case 'stats':
       return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 col-span-full">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 h-full">
           <StatCard title="Total Leads" value={stats.totalLeads} subtitle="En tu base de datos" icon={Users} variant="primary" />
           <StatCard title="Nuevos esta semana" value={stats.thisWeekLeads} icon={UserPlus} trend={{ value: 15, isPositive: true }} />
           <StatCard title="Tasa de conversión" value={`${stats.conversionRate}%`} subtitle="Leads → Clientes" icon={TrendingUp} variant="accent" />
@@ -78,30 +52,28 @@ function WidgetContent({ widget, stats, leads, onViewLead }: {
       return <RecentTickets />;
     case 'inbox-preview':
       return (
-        <Card><CardHeader><CardTitle className="text-sm">📬 Inbox</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground">Acceso rápido a tu bandeja de entrada. Haz click en "Inbox" en el sidebar.</p></CardContent>
+        <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">📬 Inbox</CardTitle></CardHeader>
+          <CardContent><p className="text-sm text-muted-foreground">Acceso rápido a tu bandeja de entrada.</p></CardContent>
         </Card>
       );
     case 'whatsapp-preview':
       return (
-        <Card><CardHeader><CardTitle className="text-sm">💬 WhatsApp</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground">Vista rápida de tus conversaciones de WhatsApp.</p></CardContent>
+        <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">💬 WhatsApp</CardTitle></CardHeader>
+          <CardContent><p className="text-sm text-muted-foreground">Vista rápida de tus conversaciones.</p></CardContent>
         </Card>
       );
     case 'ai-chat-quick':
       return (
-        <Card><CardHeader><CardTitle className="text-sm">🤖 Chat IA</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground">Acceso directo al asistente de IA para consultas rápidas.</p></CardContent>
+        <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">🤖 Chat IA</CardTitle></CardHeader>
+          <CardContent><p className="text-sm text-muted-foreground">Asistente IA para consultas rápidas.</p></CardContent>
         </Card>
       );
     case 'map-preview':
       return (
-        <Card><CardHeader><CardTitle className="text-sm">🗺️ Mapa de Leads</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground">Visualiza la distribución geográfica de tus leads.</p></CardContent>
+        <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">🗺️ Mapa</CardTitle></CardHeader>
+          <CardContent><p className="text-sm text-muted-foreground">Distribución geográfica de leads.</p></CardContent>
         </Card>
       );
-    case 'conversion-funnel':
-      return null; // Needs stats context from reports page
     case 'activity-stats':
       return <ActivityStats />;
     default:
@@ -112,7 +84,11 @@ function WidgetContent({ widget, stats, leads, onViewLead }: {
 export function Dashboard({ onViewLead }: DashboardProps) {
   const { leads, isLoading: leadsLoading } = useLeads();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { widgets, isLoading: configLoading, editMode, setEditMode, toggleWidget, reorderWidgets, resizeWidget, resetToDefault } = useDashboardConfig();
+  const {
+    widgets, layouts, isLoading: configLoading,
+    editMode, setEditMode, toggleWidget,
+    onLayoutChange, resetToDefault, cols,
+  } = useDashboardConfig();
 
   const isLoading = leadsLoading || statsLoading;
 
@@ -129,20 +105,16 @@ export function Dashboard({ onViewLead }: DashboardProps) {
     clients: 0, thisWeekLeads: 0, conversionRate: 0,
   };
 
-  const visibleWidgets = widgets.filter(w => w.visible).sort((a, b) => a.order - b.order);
-
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-    reorderWidgets(result.source.index, result.destination.index);
-  };
+  const visibleWidgets = widgets.filter(w => w.visible);
+  const visibleLayouts = layouts.filter(l => visibleWidgets.some(w => w.id === l.i));
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 lg:space-y-8 animate-fade-in">
+    <div className="p-4 md:p-6 lg:p-8 space-y-4 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-0.5 md:mt-1">
+          <p className="text-sm md:text-base text-muted-foreground mt-0.5">
             Resumen de actividad y prospección
           </p>
         </div>
@@ -153,18 +125,20 @@ export function Dashboard({ onViewLead }: DashboardProps) {
               <span className="hidden sm:inline">Restaurar</span>
             </Button>
           )}
+
+          {/* Widget panel */}
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant={editMode ? "default" : "outline"} size="sm" className="gap-1.5" onClick={() => setEditMode(true)}>
-                {editMode ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">{editMode ? 'Cerrar Panel' : 'Editar'}</span>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Pencil className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Bloques</span>
               </Button>
             </SheetTrigger>
-            <SheetContent className="w-80 bg-background">
+            <SheetContent className="w-80 bg-background z-[60]">
               <SheetHeader>
                 <SheetTitle>Bloques del Dashboard</SheetTitle>
               </SheetHeader>
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 space-y-2">
                 {widgets.map(w => (
                   <div key={w.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -177,80 +151,75 @@ export function Dashboard({ onViewLead }: DashboardProps) {
               </div>
               <div className="mt-6">
                 <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={resetToDefault}>
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Restaurar por defecto
+                  <RotateCcw className="h-3.5 w-3.5" /> Restaurar por defecto
                 </Button>
               </div>
             </SheetContent>
           </Sheet>
-          {editMode && (
-            <Button variant="ghost" size="sm" onClick={() => setEditMode(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          )}
+
+          {/* Edit mode toggle */}
+          <Button
+            variant={editMode ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setEditMode(!editMode)}
+          >
+            {editMode ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{editMode ? 'Bloquear' : 'Editar'}</span>
+          </Button>
         </div>
       </div>
 
-      {/* Widgets Grid */}
-      {editMode ? (
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="dashboard-widgets">
-            {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps} className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-                {visibleWidgets.map((widget, index) => (
-                  <Draggable key={widget.id} draggableId={widget.id} index={index}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        className={cn(
-                          'col-span-1',
-                          widget.type === 'stats' ? 'lg:col-span-3' : widget.width === 3 ? 'lg:col-span-3' : widget.width === 2 ? 'lg:col-span-2' : 'lg:col-span-1',
-                          snapshot.isDragging && 'opacity-80 shadow-2xl'
-                        )}
-                      >
-                        <div className="ring-2 ring-dashed ring-primary/30 rounded-xl relative">
-                          <div {...provided.dragHandleProps} className="absolute top-2 left-2 z-10 cursor-grab active:cursor-grabbing p-1 rounded bg-background/80 backdrop-blur-sm">
-                            <GripVertical className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div className="absolute top-2 right-2 z-10 flex gap-1">
-                            {widget.type !== 'stats' && widget.width > 1 && (
-                              <Button size="icon" variant="secondary" className="h-6 w-6" onClick={() => resizeWidget(widget.id, (widget.width - 1) as 1 | 2)}>
-                                <Minimize2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                            {widget.type !== 'stats' && widget.width < 3 && (
-                              <Button size="icon" variant="secondary" className="h-6 w-6" onClick={() => resizeWidget(widget.id, (widget.width + 1) as 2 | 3)}>
-                                <Maximize2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                          <WidgetContent widget={widget} stats={dashboardStats} leads={leads} onViewLead={onViewLead} />
-                        </div>
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          {visibleWidgets.map(widget => (
-            <div
-              key={widget.id}
-              className={cn(
-                'col-span-1',
-                widget.type === 'stats' ? 'lg:col-span-3' : widget.width === 3 ? 'lg:col-span-3' : widget.width === 2 ? 'lg:col-span-2' : 'lg:col-span-1',
-              )}
-            >
-              <WidgetContent widget={widget} stats={dashboardStats} leads={leads} onViewLead={onViewLead} />
-            </div>
-          ))}
+      {/* Info banner in edit mode */}
+      {editMode && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 text-sm text-primary flex items-center gap-2">
+          <Pencil className="h-4 w-4 flex-shrink-0" />
+          <span>Arrastra y redimensiona los bloques libremente. Haz click en <strong>"Bloquear"</strong> para guardar.</span>
         </div>
       )}
+
+      {/* Grid Layout */}
+      <ResponsiveGridLayout
+        className="layout"
+        layouts={{ lg: visibleLayouts, md: visibleLayouts, sm: visibleLayouts }}
+        breakpoints={{ lg: 1200, md: 768, sm: 0 }}
+        cols={{ lg: cols, md: 8, sm: 4 }}
+        rowHeight={60}
+        isDraggable={editMode}
+        isResizable={editMode}
+        onLayoutChange={(layout) => {
+          if (editMode) onLayoutChange(layout);
+        }}
+        draggableHandle=".widget-drag-handle"
+        compactType="vertical"
+        margin={[16, 16]}
+      >
+        {visibleWidgets.map(widget => (
+          <div
+            key={widget.id}
+            className={cn(
+              "rounded-xl overflow-hidden",
+              editMode && "ring-2 ring-dashed ring-primary/30 bg-card/50"
+            )}
+          >
+            {editMode && (
+              <div className="widget-drag-handle absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-background/80 to-transparent z-10 flex items-center justify-center cursor-grab active:cursor-grabbing">
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <div className="w-8 h-1 rounded-full bg-muted-foreground/40" />
+                </div>
+              </div>
+            )}
+            <div className={cn("h-full overflow-auto", editMode && "pt-4")}>
+              <WidgetContent
+                widget={widget}
+                stats={dashboardStats}
+                leads={leads}
+                onViewLead={onViewLead}
+              />
+            </div>
+          </div>
+        ))}
+      </ResponsiveGridLayout>
     </div>
   );
 }
