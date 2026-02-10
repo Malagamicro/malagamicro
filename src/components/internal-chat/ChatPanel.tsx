@@ -9,6 +9,11 @@ import {
   Download,
   MoreVertical,
   Users,
+  Mic,
+  MicOff,
+  Square,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -26,6 +31,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { BudgetApprovalMessage } from './BudgetApprovalMessage';
 import { EmojiStickerPicker } from './EmojiStickerPicker';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 
 interface ChatPanelProps {
   conversation: Conversation | null;
@@ -49,8 +55,62 @@ export function ChatPanel({
   const { user } = useAuth();
   const [input, setInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const handleStopAndSendAudio = useCallback(async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecordingAudio(false);
+  }, []);
+
+  const handleStartAudioRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        
+        setIsUploading(true);
+        try {
+          // Upload audio as file
+          const file = new File([blob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
+          const uploaded = await onUploadFile(file);
+          onSendMessage(undefined, { ...uploaded, messageType: 'audio' } as any);
+        } catch (error) {
+          toast.error('Error al enviar audio');
+          console.error(error);
+        } finally {
+          setIsUploading(false);
+        }
+      };
+
+      recorder.start(250);
+      setIsRecordingAudio(true);
+
+      // Auto-stop after 60s
+      setTimeout(() => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          handleStopAndSendAudio();
+        }
+      }, 60000);
+    } catch (err) {
+      console.error('Mic error:', err);
+      toast.error('No se pudo acceder al micrófono');
+    }
+  }, [onUploadFile, onSendMessage, handleStopAndSendAudio]);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -254,6 +314,15 @@ export function ChatPanel({
                               className="max-w-full max-h-64 rounded-lg"
                             />
                           </a>
+                        ) : message.message_type === 'audio' ? (
+                          <div className="flex items-center gap-2 py-1">
+                            <audio 
+                              controls 
+                              src={message.file_url!} 
+                              className="max-w-[200px] h-8"
+                              preload="metadata"
+                            />
+                          </div>
                         ) : message.message_type === 'file' ? (
                           <button
                             onClick={() => window.open(message.file_url!, '_blank')}
@@ -312,20 +381,34 @@ export function ChatPanel({
             )}
           </Button>
 
+          <Button
+            variant={isRecordingAudio ? "destructive" : "ghost"}
+            size="icon"
+            onClick={isRecordingAudio ? handleStopAndSendAudio : handleStartAudioRecording}
+            disabled={isUploading}
+            title={isRecordingAudio ? "Detener y enviar audio" : "Grabar audio"}
+          >
+            {isRecordingAudio ? (
+              <Square className="h-5 w-5" />
+            ) : (
+              <Mic className="h-5 w-5" />
+            )}
+          </Button>
+
           <EmojiStickerPicker onSelect={(emoji) => setInput(prev => prev + emoji)} />
 
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Escribe un mensaje..."
-            disabled={isSending}
+            placeholder={isRecordingAudio ? "🎙️ Grabando audio..." : "Escribe un mensaje..."}
+            disabled={isSending || isRecordingAudio}
             className="flex-1"
           />
 
           <Button
             onClick={handleSend}
-            disabled={!input.trim() || isSending}
+            disabled={!input.trim() || isSending || isRecordingAudio}
             size="icon"
           >
             {isSending ? (

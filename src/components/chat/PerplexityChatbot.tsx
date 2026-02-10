@@ -32,6 +32,8 @@ import {
   Trash2,
   MoreVertical,
   PanelLeftClose,
+  Mic,
+  MicOff,
   PanelLeft,
   Pencil,
   FileIcon,
@@ -42,6 +44,7 @@ import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAIChatHistory, AIChatSession, AIChatMessage } from '@/hooks/useAIChatHistory';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -96,6 +99,13 @@ export function PerplexityChatbot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  
+  const { isRecording, isTranscribing, startRecording, stopRecording } = useAudioRecorder({
+    onTranscription: (text) => {
+      setInput(prev => prev ? prev + ' ' + text : text);
+      inputRef.current?.focus();
+    },
+  });
   
   const {
     sessions,
@@ -589,14 +599,30 @@ export function PerplexityChatbot() {
         {/* Input */}
         <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
           <div className="flex gap-3 items-center">
+            <Button
+              variant={isRecording ? "destructive" : "ghost"}
+              size="icon"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isLoading || isTranscribing}
+              className="h-12 w-12 rounded-xl shrink-0"
+              title={isRecording ? "Detener grabación" : "Grabar audio para transcribir"}
+            >
+              {isTranscribing ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : isRecording ? (
+                <MicOff className="h-5 w-5" />
+              ) : (
+                <Mic className="h-5 w-5" />
+              )}
+            </Button>
             <div className="flex-1 relative">
               <Input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Escribe tu mensaje..."
-                disabled={isLoading}
+                placeholder={isRecording ? "🎙️ Grabando..." : isTranscribing ? "Transcribiendo..." : "Escribe tu mensaje..."}
+                disabled={isLoading || isRecording}
                 className="pr-12 h-12 rounded-xl bg-muted/50 border-0 focus-visible:ring-1"
               />
             </div>
@@ -614,7 +640,7 @@ export function PerplexityChatbot() {
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground text-center mt-2">
-            Powered by Perplexity • Modelo: {selectedModelInfo.name}
+            Powered by Perplexity • Modelo: {selectedModelInfo.name} • 🎙️ Voxtral STT
           </p>
         </div>
       </div>
