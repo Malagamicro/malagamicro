@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
+
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sparkles, Loader2, FileText, ImageIcon, Settings, ChevronDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,7 +18,7 @@ interface SeoArticleGeneratorProps {
 
 export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGeneratorProps) => {
   const [topic, setTopic] = useState('');
-  const [imageCount, setImageCount] = useState(3);
+  const [imageCount] = useState(1);
   const [webhookUrl, setWebhookUrl] = useState(DEFAULT_WEBHOOK_URL);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -69,24 +69,9 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
             />
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" />
-                Número de imágenes: {imageCount}
-              </Label>
-            </div>
-            <Slider
-              value={[imageCount]}
-              onValueChange={(v) => setImageCount(v[0])}
-              min={1}
-              max={5}
-              step={1}
-              disabled={generating}
-            />
-            <p className="text-xs text-muted-foreground">
-              Las imágenes serán generadas por IA y optimizadas para el artículo
-            </p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <ImageIcon className="h-4 w-4" />
+            Se generará 1 imagen por IA optimizada para el artículo
           </div>
 
           <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -136,7 +121,7 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
               <li>• Investigación SEO y análisis de competencia</li>
               <li>• Estructura optimizada con H1, H2, H3...</li>
               <li>• Contenido HTML listo para publicar</li>
-              <li>• {imageCount} imagen{imageCount !== 1 ? 'es' : ''} generada{imageCount !== 1 ? 's' : ''} por IA</li>
+              <li>• 1 imagen generada por IA</li>
               <li>• Meta tags y datos estructurados</li>
               <li>• Puntuación SEO y métricas</li>
             </ul>
