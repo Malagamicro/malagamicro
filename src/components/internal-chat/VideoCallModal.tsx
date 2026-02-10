@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { 
@@ -20,6 +20,9 @@ interface VideoCallModalProps {
 export function VideoCallModal({ open, onClose, roomName, displayName, isVideoCall }: VideoCallModalProps) {
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(!isVideoCall);
@@ -31,12 +34,11 @@ export function VideoCallModal({ open, onClose, roomName, displayName, isVideoCa
   useEffect(() => {
     if (!open || !jitsiContainerRef.current) return;
 
-    setIsLoading(true);
-    const script = document.createElement('script');
-    script.src = 'https://meet.jit.si/external_api.js';
-    script.async = true;
-    script.onload = () => {
-      if (!jitsiContainerRef.current) return;
+    // If script already loaded, reuse it
+    const existingScript = document.querySelector('script[src="https://meet.jit.si/external_api.js"]');
+    
+    const initJitsi = () => {
+      if (!jitsiContainerRef.current || apiRef.current) return;
       
       const api = new (window as any).JitsiMeetExternalAPI('meet.jit.si', {
         roomName: fullRoomName,
@@ -70,7 +72,7 @@ export function VideoCallModal({ open, onClose, roomName, displayName, isVideoCa
         },
       });
 
-      api.addEventListener('readyToClose', () => onClose());
+      api.addEventListener('readyToClose', () => onCloseRef.current());
       api.addEventListener('videoConferenceJoined', () => setIsLoading(false));
       api.addEventListener('participantJoined', () => {
         setParticipantCount(prev => prev + 1);
@@ -84,16 +86,25 @@ export function VideoCallModal({ open, onClose, roomName, displayName, isVideoCa
       apiRef.current = api;
     };
 
-    document.body.appendChild(script);
+    setIsLoading(true);
+
+    if (existingScript && (window as any).JitsiMeetExternalAPI) {
+      initJitsi();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://meet.jit.si/external_api.js';
+      script.async = true;
+      script.onload = initJitsi;
+      document.body.appendChild(script);
+    }
 
     return () => {
       apiRef.current?.dispose();
       apiRef.current = null;
-      script.remove();
       setIsLoading(true);
       setParticipantCount(1);
     };
-  }, [open, fullRoomName, displayName, isVideoCall, onClose]);
+  }, [open, fullRoomName, displayName, isVideoCall]);
 
   const toggleMute = () => apiRef.current?.executeCommand('toggleAudio');
   const toggleVideo = () => apiRef.current?.executeCommand('toggleVideo');
