@@ -83,11 +83,11 @@ function buildHtmlWithImage(title: string, htmlBody: string, imageUrl: string, a
 
 // Normalize the n8n payload into a common structure
 function normalizePayload(payload: any, urlArticleId: string | null) {
-  // Format A (new n8n format): { seo: { title, description, slug, keywords }, images: [{ url }], html }
+  // Format A (new n8n format): { seo, images, html, articleid/articleId }
   if (payload.seo) {
     console.log('Detected n8n format: seo/images/html');
     return {
-      articleId: payload.articleId || urlArticleId,
+      articleId: payload.articleId || payload.articleid || urlArticleId,
       success: true,
       title: payload.seo.title,
       metaDescription: payload.seo.description,
