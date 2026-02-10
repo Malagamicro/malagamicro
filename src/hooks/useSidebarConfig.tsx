@@ -61,6 +61,7 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
     color: 'text-teal-500',
     items: [
       { id: 'inbox', label: 'Inbox', icon: 'Inbox', color: 'text-teal-500', showBadge: true },
+      { id: 'correo', label: 'Correo', icon: 'Mail', color: 'text-blue-500' },
       { id: 'mensajes', label: 'Chat Interno', icon: 'MessagesSquare', color: 'text-sky-500' },
       { id: 'osticket', label: 'Tickets', icon: 'Ticket', color: 'text-yellow-500' },
     ]

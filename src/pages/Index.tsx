@@ -19,8 +19,6 @@ import { PasswordChangeCard } from '@/components/settings/PasswordChangeCard';
 import { NotificationPreferencesCard } from '@/components/settings/NotificationPreferencesCard';
 import { TwoFactorAuthCard } from '@/components/settings/TwoFactorAuthCard';
 import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
-import { SmtpTestCard } from '@/components/settings/SmtpTestCard';
-import { SmtpConfigCard } from '@/components/settings/SmtpConfigCard';
 import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
 import { WhatsAppPanel } from '@/components/whatsapp/WhatsAppPanel';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -34,6 +32,7 @@ import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
 import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
 import { BudgetChatbot } from '@/components/budget/BudgetChatbot';
 import BudgetModule from '@/components/budget/BudgetModule';
+import { EmailModule } from '@/components/email/EmailModule';
 import { OsTicketHistory } from '@/components/osticket/OsTicketHistory';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
@@ -262,6 +261,8 @@ const IndexContent = () => {
             <BudgetModule />
           </div>
         );
+      case 'correo':
+        return <EmailModule />;
       case 'osticket':
         return (
           <div className="p-8 space-y-6 animate-fade-in">
@@ -304,15 +305,6 @@ const IndexContent = () => {
               <div className="space-y-4">
                 <GoogleSheetsCard />
                 <OsTicketConfigCard />
-              </div>
-            </div>
-            
-            {/* Email SMTP Section */}
-            <div className="pt-4">
-              <h2 className="text-xl font-semibold text-foreground mb-4">Configuración de Email</h2>
-              <div className="space-y-4">
-                <SmtpConfigCard />
-                <SmtpTestCard />
               </div>
             </div>
             
