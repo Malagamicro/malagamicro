@@ -150,7 +150,7 @@ export default function AdminUsers() {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=delete`,
         {
-          method: 'DELETE',
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
             'Content-Type': 'application/json',
