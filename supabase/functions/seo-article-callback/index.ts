@@ -21,7 +21,6 @@ async function uploadBase64Image(
   articleId: string
 ): Promise<string | null> {
   try {
-    // Extract mime type and base64 data
     const match = base64DataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
     if (!match) {
       console.error('Invalid base64 data URL format');
@@ -35,7 +34,7 @@ async function uploadBase64Image(
 
     const bytes = base64ToUint8Array(base64Data);
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('seo-images')
       .upload(fileName, bytes, {
         contentType: mimeType,
@@ -59,20 +58,65 @@ async function uploadBase64Image(
   }
 }
 
-function embedImageInHtml(htmlContent: string, imageUrl: string, altText: string): string {
-  if (!htmlContent) return htmlContent;
-  
-  const imgTag = `<figure class="seo-hero-image" style="margin:2rem 0;text-align:center;"><img src="${imageUrl}" alt="${altText}" style="max-width:100%;height:auto;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.12);" /><figcaption style="margin-top:0.5rem;font-size:0.875rem;color:#666;">${altText}</figcaption></figure>`;
-  
-  // Insert after first heading (h1 or h2)
-  const headingMatch = htmlContent.match(/<\/h[12]>/i);
-  if (headingMatch && headingMatch.index !== undefined) {
-    const insertPos = headingMatch.index + headingMatch[0].length;
-    return htmlContent.slice(0, insertPos) + imgTag + htmlContent.slice(insertPos);
+function buildHtmlWithImage(title: string, htmlBody: string, imageUrl: string, altText: string): string {
+  const imgTag = `<figure class="seo-hero-image" style="margin:2rem 0;text-align:center;">
+    <img src="${imageUrl}" alt="${altText}" style="max-width:100%;height:auto;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.12);" />
+    <figcaption style="margin-top:0.5rem;font-size:0.875rem;color:#666;">${altText}</figcaption>
+  </figure>`;
+
+  // If there's existing HTML, embed image after first heading
+  if (htmlBody && htmlBody.trim()) {
+    const headingMatch = htmlBody.match(/<\/h[12]>/i);
+    if (headingMatch && headingMatch.index !== undefined) {
+      const insertPos = headingMatch.index + headingMatch[0].length;
+      return htmlBody.slice(0, insertPos) + imgTag + htmlBody.slice(insertPos);
+    }
+    return imgTag + htmlBody;
   }
-  
-  // Fallback: prepend
-  return imgTag + htmlContent;
+
+  // If no HTML body, create a minimal article wrapper with just the title and image
+  return `<article>
+    <h1>${title || 'Artículo SEO'}</h1>
+    ${imgTag}
+  </article>`;
+}
+
+// Normalize the n8n payload into a common structure
+function normalizePayload(payload: any, urlArticleId: string | null) {
+  // Format A (new n8n format): { seo: { title, description, slug, keywords }, images: [{ url }], html }
+  if (payload.seo) {
+    console.log('Detected n8n format: seo/images/html');
+    return {
+      articleId: payload.articleId || urlArticleId,
+      success: true,
+      title: payload.seo.title,
+      metaDescription: payload.seo.description,
+      slug: payload.seo.slug,
+      keywords: typeof payload.seo.keywords === 'string'
+        ? payload.seo.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
+        : payload.seo.keywords || [],
+      htmlContent: payload.html || '',
+      images: payload.images || [],
+    };
+  }
+
+  // Format B (legacy): { articleId, success, article, images, metrics, ... }
+  console.log('Detected legacy callback format');
+  return {
+    articleId: payload.articleId || urlArticleId,
+    success: payload.success !== false,
+    title: payload.article?.title,
+    metaDescription: payload.article?.metaDescription,
+    slug: payload.article?.slug,
+    keywords: payload.article?.keywords || [],
+    htmlContent: payload.article?.htmlContent || payload.html || '',
+    images: payload.images || [],
+    research: payload.research,
+    metrics: payload.metrics,
+    optimizations: payload.optimizations,
+    workflowId: payload.workflowId,
+    error: payload.error,
+  };
 }
 
 serve(async (req) => {
@@ -85,125 +129,29 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Accept articleId from query params as fallback
+    const url = new URL(req.url);
+    const urlArticleId = url.searchParams.get('articleId');
+
     const payload = await req.json();
-    console.log('Received callback from n8n:', JSON.stringify(payload).substring(0, 500));
+    console.log('Received callback payload:', JSON.stringify(payload).substring(0, 500));
 
-    const { articleId, success, workflowId, article, research, images, metrics, optimizations, error: n8nError } = payload;
+    const normalized = normalizePayload(payload, urlArticleId);
 
-    if (!articleId) {
-      throw new Error('articleId is required');
+    if (!normalized.articleId) {
+      throw new Error('articleId is required (send in body or as ?articleId= query param)');
     }
 
-    if (success) {
-      console.log(`Updating article ${articleId} with success data`);
-      
-      const updateData: Record<string, unknown> = {
-        status: 'completed',
-        workflow_id: workflowId,
-      };
+    const articleId = normalized.articleId;
 
-      let htmlContent = article?.htmlContent || '';
-
-      if (article) {
-        updateData.title = article.title;
-        updateData.slug = article.slug;
-        updateData.meta_description = article.metaDescription;
-        updateData.keywords = article.keywords || [];
-        updateData.structured_data = article.structuredData;
-        updateData.meta_tags = article.metaTags;
-      }
-
-      if (research) {
-        updateData.research_summary = research.summary;
-      }
-
-      if (metrics) {
-        updateData.seo_score = metrics.seoScore;
-        updateData.word_count = metrics.wordCount;
-        updateData.security_score = metrics.securityScore;
-      }
-
-      // Handle images - check for base64 data URLs and upload to storage
-      let finalImageUrl: string | null = null;
-      
-      if (images) {
-        // images can be: a base64 string, an object with url/urls, or an array
-        let rawImage: string | null = null;
-
-        if (typeof images === 'string' && images.startsWith('data:image')) {
-          rawImage = images;
-        } else if (images.url && typeof images.url === 'string' && images.url.startsWith('data:image')) {
-          rawImage = images.url;
-        } else if (Array.isArray(images.urls) && images.urls.length > 0) {
-          const first = images.urls[0];
-          const firstUrl = typeof first === 'string' ? first : first?.url;
-          if (firstUrl && firstUrl.startsWith('data:image')) {
-            rawImage = firstUrl;
-          } else {
-            finalImageUrl = firstUrl || null;
-          }
-        } else if (Array.isArray(images) && images.length > 0) {
-          const first = images[0];
-          const firstUrl = typeof first === 'string' ? first : first?.url;
-          if (firstUrl && firstUrl.startsWith('data:image')) {
-            rawImage = firstUrl;
-          } else {
-            finalImageUrl = firstUrl || null;
-          }
-        }
-
-        // Upload base64 to storage
-        if (rawImage) {
-          finalImageUrl = await uploadBase64Image(supabase, rawImage, articleId);
-        }
-
-        if (finalImageUrl) {
-          const altText = article?.title || 'Imagen del artículo SEO';
-          updateData.images = [{ url: finalImageUrl, altText }];
-          updateData.images_success_count = 1;
-          updateData.images_failed_count = 0;
-
-          // Embed image into HTML content
-          htmlContent = embedImageInHtml(htmlContent, finalImageUrl, altText);
-        } else {
-          updateData.images = images.urls || images;
-          updateData.images_success_count = images.successful || (Array.isArray(images.urls) ? images.urls.length : 0);
-          updateData.images_failed_count = images.failed || 0;
-        }
-      }
-
-      updateData.html_content = htmlContent;
-
-      if (optimizations) {
-        updateData.optimizations = optimizations.applied || [];
-        updateData.suggested_links = optimizations.suggestedLinks || [];
-      }
-
-      const { error: updateError } = await supabase
-        .from('seo_articles')
-        .update(updateData)
-        .eq('id', articleId);
-
-      if (updateError) {
-        console.error('Error updating article:', updateError);
-        throw new Error('Failed to update article');
-      }
-
-      console.log(`Article ${articleId} updated successfully`);
-      
-      return new Response(
-        JSON.stringify({ success: true, message: 'Article updated', imageUrl: finalImageUrl }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } else {
-      console.log(`Updating article ${articleId} with error status`);
-      
+    if (!normalized.success) {
+      console.log(`Recording error for article ${articleId}`);
       await supabase
         .from('seo_articles')
         .update({
           status: 'error',
-          error_message: n8nError?.message || n8nError?.userMessage || 'Error generating article',
-          error_details: n8nError || payload
+          error_message: normalized.error?.message || normalized.error?.userMessage || 'Error generating article',
+          error_details: normalized.error || payload,
         })
         .eq('id', articleId);
 
@@ -212,6 +160,82 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Process images - find base64 or regular URLs
+    let finalImageUrl: string | null = null;
+    const images = normalized.images;
+
+    if (Array.isArray(images) && images.length > 0) {
+      const firstImage = images[0];
+      const imageUrl = typeof firstImage === 'string' ? firstImage : firstImage?.url;
+
+      if (imageUrl) {
+        if (imageUrl.startsWith('data:image')) {
+          finalImageUrl = await uploadBase64Image(supabase, imageUrl, articleId);
+        } else {
+          finalImageUrl = imageUrl;
+        }
+      }
+    } else if (typeof images === 'string' && images.startsWith('data:image')) {
+      finalImageUrl = await uploadBase64Image(supabase, images, articleId);
+    }
+
+    // Build final HTML with embedded image
+    const altText = normalized.title || 'Imagen del artículo SEO';
+    let finalHtml = normalized.htmlContent;
+
+    if (finalImageUrl) {
+      finalHtml = buildHtmlWithImage(normalized.title || '', finalHtml, finalImageUrl, altText);
+    }
+
+    // Build update object
+    const updateData: Record<string, unknown> = {
+      status: 'completed',
+      title: normalized.title,
+      slug: normalized.slug,
+      meta_description: normalized.metaDescription,
+      keywords: normalized.keywords,
+      html_content: finalHtml,
+      workflow_id: normalized.workflowId || null,
+    };
+
+    if (finalImageUrl) {
+      updateData.images = [{ url: finalImageUrl, altText }];
+      updateData.images_success_count = 1;
+      updateData.images_failed_count = 0;
+    }
+
+    if (normalized.research) {
+      updateData.research_summary = normalized.research.summary;
+    }
+
+    if (normalized.metrics) {
+      updateData.seo_score = normalized.metrics.seoScore;
+      updateData.word_count = normalized.metrics.wordCount;
+      updateData.security_score = normalized.metrics.securityScore;
+    }
+
+    if (normalized.optimizations) {
+      updateData.optimizations = normalized.optimizations.applied || [];
+      updateData.suggested_links = normalized.optimizations.suggestedLinks || [];
+    }
+
+    const { error: updateError } = await supabase
+      .from('seo_articles')
+      .update(updateData)
+      .eq('id', articleId);
+
+    if (updateError) {
+      console.error('Error updating article:', updateError);
+      throw new Error('Failed to update article');
+    }
+
+    console.log(`Article ${articleId} updated successfully with image: ${finalImageUrl}`);
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Article updated', imageUrl: finalImageUrl }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
     console.error('Callback error:', error);
