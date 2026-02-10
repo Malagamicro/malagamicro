@@ -83,11 +83,13 @@ function buildHtmlWithImage(title: string, htmlBody: string, imageUrl: string, a
 
 // Normalize the n8n payload into a common structure
 function normalizePayload(payload: any, urlArticleId: string | null) {
-  // Format A (new n8n format): { seo, images, html, articleid/articleId }
+  const resolveArticleId = () => payload.articleId || payload.articleid || urlArticleId;
+
+  // Format A: { seo: { title, description, slug, keywords }, images, html }
   if (payload.seo) {
     console.log('Detected n8n format: seo/images/html');
     return {
-      articleId: payload.articleId || payload.articleid || urlArticleId,
+      articleId: resolveArticleId(),
       success: true,
       title: payload.seo.title,
       metaDescription: payload.seo.description,
@@ -100,10 +102,27 @@ function normalizePayload(payload: any, urlArticleId: string | null) {
     };
   }
 
-  // Format B (legacy): { articleId, success, article, images, metrics, ... }
+  // Format B (flat): { title, description, slug, keywords, images, html, articleid }
+  if (payload.title && !payload.article) {
+    console.log('Detected flat format: title/description/slug at root');
+    return {
+      articleId: resolveArticleId(),
+      success: true,
+      title: payload.title,
+      metaDescription: payload.description,
+      slug: payload.slug,
+      keywords: typeof payload.keywords === 'string'
+        ? payload.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
+        : payload.keywords || [],
+      htmlContent: typeof payload.html === 'string' ? payload.html : '',
+      images: payload.images || [],
+    };
+  }
+
+  // Format C (legacy): { articleId, success, article: { title, ... }, metrics, ... }
   console.log('Detected legacy callback format');
   return {
-    articleId: payload.articleId || urlArticleId,
+    articleId: resolveArticleId(),
     success: payload.success !== false,
     title: payload.article?.title,
     metaDescription: payload.article?.metaDescription,
