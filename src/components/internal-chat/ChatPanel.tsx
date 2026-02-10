@@ -63,6 +63,7 @@ export function ChatPanel({
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
   const [isVideoCall, setIsVideoCall] = useState(false);
+  const [callStream, setCallStream] = useState<MediaStream | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -187,13 +188,13 @@ export function ChatPanel({
   };
 
   const startCall = async (video: boolean) => {
-    // Pre-check media permissions
+    // Get media in the user gesture context (critical for mobile Safari)
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      stream = await navigator.mediaDevices.getUserMedia({ 
         audio: true, 
         video: video 
       });
-      stream.getTracks().forEach(t => t.stop()); // Release immediately, VideoCallModal will re-acquire
     } catch {
       toast.error(video 
         ? 'No se pudo acceder a cámara y micrófono. Revisa los permisos.' 
@@ -202,6 +203,7 @@ export function ChatPanel({
     }
     
     setIsVideoCall(video);
+    setCallStream(stream);
     setCallModalOpen(true);
     // Signal the call to other participants
     if (conversation) {
@@ -480,11 +482,12 @@ export function ChatPanel({
 
       <VideoCallModal
         open={callModalOpen}
-        onClose={() => setCallModalOpen(false)}
+        onClose={() => { setCallModalOpen(false); setCallStream(null); }}
         roomName={callRoomName}
         displayName={user?.email?.split('@')[0] || 'Usuario'}
         isVideoCall={isVideoCall}
         isReceiver={false}
+        initialStream={callStream}
       />
     </div>
   );
