@@ -394,6 +394,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          profile_id: string | null
           scheduled_at: string | null
           sent_at: string | null
           status: string
@@ -407,6 +408,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          profile_id?: string | null
           scheduled_at?: string | null
           sent_at?: string | null
           status?: string
@@ -420,6 +422,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          profile_id?: string | null
           scheduled_at?: string | null
           sent_at?: string | null
           status?: string
@@ -430,6 +433,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "email_campaigns_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "email_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "email_campaigns_template_id_fkey"
             columns: ["template_id"]

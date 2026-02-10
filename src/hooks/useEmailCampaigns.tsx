@@ -168,9 +168,9 @@ export function useEmailCampaigns() {
   });
 
   const createCampaign = useMutation({
-    mutationFn: async ({ name, templateId, leadIds }: { name: string; templateId: string; leadIds: string[] }) => {
+    mutationFn: async ({ name, templateId, leadIds, profileId }: { name: string; templateId: string; leadIds: string[]; profileId?: string }) => {
       // Create campaign
-      const { data: campaign, error: campaignError } = await supabase
+      const { data: campaign, error: campaignError } = await (supabase as any)
         .from('email_campaigns')
         .insert({
           name,
@@ -178,6 +178,7 @@ export function useEmailCampaigns() {
           user_id: user?.id,
           status: 'draft',
           total_recipients: leadIds.length,
+          profile_id: profileId || null,
         })
         .select()
         .single();
@@ -219,7 +220,7 @@ export function useEmailCampaigns() {
       
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
       toast({ 
         title: data.completed ? 'Campaña completada' : 'Emails enviados',
