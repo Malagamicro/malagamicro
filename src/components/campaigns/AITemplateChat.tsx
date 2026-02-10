@@ -14,6 +14,7 @@ interface Message {
 
 interface AITemplateChatProps {
   onApplyTemplate: (html: string, subject?: string) => void;
+  initialHtml?: string;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-email-template`;
@@ -23,11 +24,12 @@ function extractHtmlFromResponse(text: string): string | null {
   return match ? match[1].trim() : null;
 }
 
-export function AITemplateChat({ onApplyTemplate }: AITemplateChatProps) {
+export function AITemplateChat({ onApplyTemplate, initialHtml }: AITemplateChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [initialized, setInitialized] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -36,6 +38,17 @@ export function AITemplateChat({ onApplyTemplate }: AITemplateChatProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Load initial HTML as context when editing existing template
+  useEffect(() => {
+    if (initialHtml && !initialized) {
+      setInitialized(true);
+      setMessages([
+        { role: 'user', content: `Aquí tienes la plantilla actual que quiero editar:\n\n\`\`\`html\n${initialHtml}\n\`\`\`` },
+        { role: 'assistant', content: 'He recibido tu plantilla actual. ¿Qué cambios quieres hacer? Puedo modificar colores, textos, estructura, añadir secciones, etc.' },
+      ]);
+    }
+  }, [initialHtml, initialized]);
 
   const sendMessage = async () => {
     const trimmed = input.trim();

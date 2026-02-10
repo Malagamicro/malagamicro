@@ -77,6 +77,7 @@ export function EmailCampaigns() {
   const [showCampaignDialog, setShowCampaignDialog] = useState(false);
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
   const [templateMode, setTemplateMode] = useState<'editor' | 'ai'>('editor');
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   
   // Template form state
   const [templateName, setTemplateName] = useState('');
@@ -108,14 +109,28 @@ export function EmailCampaigns() {
       {
         onSuccess: () => {
           setShowTemplateDialog(false);
-          setTemplateName('');
-          setTemplateSubject('');
-          setTemplateBlocks([]);
-          setTemplateHtml('');
-          setTemplateMode('editor');
+          resetTemplateForm();
         },
       }
     );
+  };
+
+  const resetTemplateForm = () => {
+    setTemplateName('');
+    setTemplateSubject('');
+    setTemplateBlocks([]);
+    setTemplateHtml('');
+    setTemplateMode('editor');
+    setEditingTemplateId(null);
+  };
+
+  const handleEditTemplate = (template: { id: string; name: string; subject: string; body: string }) => {
+    setEditingTemplateId(template.id);
+    setTemplateName(template.name);
+    setTemplateSubject(template.subject);
+    setTemplateHtml(template.body);
+    setTemplateMode('ai');
+    setShowTemplateDialog(true);
   };
 
   const handleAIApplyTemplate = (html: string) => {
@@ -318,9 +333,18 @@ export function EmailCampaigns() {
               {templates.map((template) => (
                 <Card key={template.id} className="group hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between">
                       <CardTitle className="text-lg">{template.name}</CardTitle>
                       <div className="flex gap-1">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8"
+                          onClick={() => handleEditTemplate(template)}
+                          title="Editar con IA"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
                         <Button 
                           size="icon" 
                           variant="ghost" 
@@ -375,13 +399,13 @@ export function EmailCampaigns() {
       {/* Template Dialog - Editor + AI */}
       <Dialog open={showTemplateDialog} onOpenChange={(open) => {
         setShowTemplateDialog(open);
-        if (!open) setTemplateMode('editor');
+        if (!open) resetTemplateForm();
       }}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] w-full">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
-                <DialogTitle>Nueva Plantilla de Email</DialogTitle>
+                <DialogTitle>{editingTemplateId ? 'Editar Plantilla' : 'Nueva Plantilla de Email'}</DialogTitle>
                 <DialogDescription>
                   Usa variables como {`{{nombre}}`}, {`{{empresa}}`}, {`{{ciudad}}`} para personalizar.
                 </DialogDescription>
@@ -443,7 +467,11 @@ export function EmailCampaigns() {
               </>
             ) : (
               <div className="border rounded-lg h-[500px] overflow-hidden">
-                <AITemplateChat onApplyTemplate={handleAIApplyTemplate} />
+                <AITemplateChat 
+                  key={editingTemplateId || 'new'}
+                  onApplyTemplate={handleAIApplyTemplate} 
+                  initialHtml={editingTemplateId ? templateHtml : undefined}
+                />
               </div>
             )}
 

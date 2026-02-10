@@ -55,7 +55,7 @@ export function InternalChatPage() {
   // Mobile: show either list or chat, not both
   if (isMobile) {
     return (
-      <div className="h-[calc(100vh-8rem)] flex flex-col border rounded-xl overflow-hidden bg-card shadow-lg">
+      <div className="h-[calc(100dvh-5rem)] flex flex-col border rounded-xl overflow-hidden bg-card shadow-lg">
         {activeConversationId ? (
           // Show chat panel with back button
           <div className="flex-1 flex flex-col">
