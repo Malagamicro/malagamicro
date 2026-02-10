@@ -35,6 +35,7 @@ import { BudgetApprovalMessage } from './BudgetApprovalMessage';
 import { EmojiStickerPicker } from './EmojiStickerPicker';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { VideoCallModal } from './VideoCallModal';
+import { useActiveCalls } from '@/hooks/useActiveCalls';
 
 interface ChatPanelProps {
   conversation: Conversation | null;
@@ -56,6 +57,7 @@ export function ChatPanel({
   hideHeader = false,
 }: ChatPanelProps) {
   const { user } = useAuth();
+  const { initiateCall } = useActiveCalls();
   const [input, setInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
@@ -184,9 +186,14 @@ export function ChatPanel({
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const startCall = (video: boolean) => {
+  const startCall = async (video: boolean) => {
     setIsVideoCall(video);
     setCallModalOpen(true);
+    // Signal the call to other participants
+    if (conversation) {
+      const callerName = user?.email?.split('@')[0] || 'Usuario';
+      await initiateCall(conversation.id, callerName, callRoomName, video);
+    }
   };
 
   const callRoomName = conversation?.id?.replace(/-/g, '') || 'room';

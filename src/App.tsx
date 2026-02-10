@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeSyncProvider } from "@/components/ThemeSyncProvider";
 import { MascotChatWidget } from "@/components/chat/MascotChatWidget";
+import { GlobalCallListener } from "@/components/internal-chat/GlobalCallListener";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -114,6 +115,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             <MascotChatWidget />
+            <GlobalCallListener />
           </BrowserRouter>
           </TooltipProvider>
         </NotificationProvider>
