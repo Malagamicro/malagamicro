@@ -27,8 +27,8 @@ serve(async (req) => {
       });
     }
 
-    // Build data URL for audio
-    const dataUrl = `data:${mimeType || "audio/webm"};base64,${audio}`;
+    // Send raw base64 audio (must be wav or mp3 for Voxtral)
+    const audioFormat = mimeType === "audio/wav" ? "wav" : "mp3";
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -45,8 +45,8 @@ serve(async (req) => {
               {
                 type: "input_audio",
                 input_audio: {
-                  data: dataUrl,
-                  format: mimeType === "audio/wav" ? "wav" : "mp3",
+                  data: audio,
+                  format: audioFormat,
                 },
               },
               {
