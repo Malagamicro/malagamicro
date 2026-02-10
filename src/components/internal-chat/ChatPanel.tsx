@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -6,7 +6,6 @@ import {
   Paperclip, 
   Loader2, 
   FileText, 
-  Image as ImageIcon,
   Download,
   MoreVertical,
   Users,
@@ -26,6 +25,7 @@ import { Conversation, InternalMessage } from '@/hooks/useInternalChat';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { BudgetApprovalMessage } from './BudgetApprovalMessage';
+import { EmojiStickerPicker } from './EmojiStickerPicker';
 
 interface ChatPanelProps {
   conversation: Conversation | null;
@@ -49,14 +49,18 @@ export function ChatPanel({
   const { user } = useAuth();
   const [input, setInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
+  }, []);
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
   const handleSend = () => {
     if (!input.trim() || isSending) return;
@@ -167,7 +171,7 @@ export function ChatPanel({
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 px-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -280,6 +284,7 @@ export function ChatPanel({
                 </div>
               );
             })}
+            <div ref={messagesEndRef} />
           </div>
         )}
       </ScrollArea>
@@ -306,6 +311,8 @@ export function ChatPanel({
               <Paperclip className="h-5 w-5" />
             )}
           </Button>
+
+          <EmojiStickerPicker onSelect={(emoji) => setInput(prev => prev + emoji)} />
 
           <Input
             value={input}
