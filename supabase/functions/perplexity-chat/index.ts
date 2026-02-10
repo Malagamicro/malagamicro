@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 interface ChatMessage {
@@ -21,13 +21,15 @@ interface ToolCall {
   };
 }
 
+const STEL_API_BASE = 'https://app.stelorder.com/app';
+
 const tools = [
   // Lead Management
   {
     type: "function",
     function: {
       name: "search_leads",
-      description: "Buscar leads por nombre de empresa, contacto, teléfono, email o ciudad. Usa esto cuando el usuario pregunte sobre leads específicos o quiera encontrar información.",
+      description: "Buscar leads por nombre de empresa, contacto, teléfono, email o ciudad.",
       parameters: {
         type: "object",
         properties: {
@@ -43,7 +45,7 @@ const tools = [
     type: "function",
     function: {
       name: "get_all_leads",
-      description: "Obtener todos los leads del usuario con filtros opcionales. Usa esto para ver la lista completa de leads o filtrar por estado.",
+      description: "Obtener todos los leads del usuario con filtros opcionales.",
       parameters: {
         type: "object",
         properties: {
@@ -59,19 +61,15 @@ const tools = [
     type: "function",
     function: {
       name: "get_lead_stats",
-      description: "Obtener estadísticas generales de leads: total, por estado, tasa de conversión, leads recientes. Usa esto cuando el usuario pregunte por métricas, reportes o estadísticas.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      description: "Obtener estadísticas generales de leads: total, por estado, tasa de conversión.",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
     type: "function",
     function: {
       name: "create_lead",
-      description: "Crear un nuevo lead. Usa esto cuando el usuario quiera añadir un nuevo lead o prospecto.",
+      description: "Crear un nuevo lead.",
       parameters: {
         type: "object",
         properties: {
@@ -92,7 +90,7 @@ const tools = [
     type: "function",
     function: {
       name: "update_lead",
-      description: "Actualizar un lead existente. Usa esto cuando el usuario quiera modificar información de un lead.",
+      description: "Actualizar un lead existente.",
       parameters: {
         type: "object",
         properties: {
@@ -113,7 +111,7 @@ const tools = [
     type: "function",
     function: {
       name: "delete_lead",
-      description: "Eliminar un lead. Usa esto cuando el usuario quiera borrar un lead del sistema.",
+      description: "Eliminar un lead.",
       parameters: {
         type: "object",
         properties: {
@@ -128,7 +126,7 @@ const tools = [
     type: "function",
     function: {
       name: "get_recent_activities",
-      description: "Obtener actividades recientes del CRM: últimos leads creados, últimas interacciones. Usa esto para mostrar actividad reciente.",
+      description: "Obtener actividades recientes del CRM.",
       parameters: {
         type: "object",
         properties: {
@@ -142,19 +140,15 @@ const tools = [
     type: "function",
     function: {
       name: "get_pending_reminders",
-      description: "Obtener recordatorios pendientes de leads. Usa esto cuando el usuario pregunte por tareas o seguimientos pendientes.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      description: "Obtener recordatorios pendientes de leads.",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
     type: "function",
     function: {
       name: "get_general_reminders",
-      description: "Obtener recordatorios generales (no asociados a leads). Usa esto para ver todas las tareas y recordatorios generales.",
+      description: "Obtener recordatorios generales.",
       parameters: {
         type: "object",
         properties: {
@@ -168,7 +162,7 @@ const tools = [
     type: "function",
     function: {
       name: "create_reminder",
-      description: "Crear un nuevo recordatorio general. Usa esto cuando el usuario quiera añadir una tarea o recordatorio.",
+      description: "Crear un nuevo recordatorio general.",
       parameters: {
         type: "object",
         properties: {
@@ -201,7 +195,7 @@ const tools = [
     type: "function",
     function: {
       name: "send_internal_message",
-      description: "Enviar un mensaje interno a otro usuario del sistema. Usa esto cuando el usuario te pida enviar un mensaje a un compañero o miembro del equipo.",
+      description: "Enviar un mensaje interno a otro usuario del sistema.",
       parameters: {
         type: "object",
         properties: {
@@ -216,12 +210,8 @@ const tools = [
     type: "function",
     function: {
       name: "get_team_users",
-      description: "Obtener lista de usuarios del equipo disponibles para mensajería. Usa esto cuando necesites saber a quién se puede enviar mensajes.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      description: "Obtener lista de usuarios del equipo disponibles para mensajería.",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
@@ -229,11 +219,7 @@ const tools = [
     function: {
       name: "get_unread_messages",
       description: "Obtener mensajes internos no leídos del usuario.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   // Templates
@@ -241,7 +227,7 @@ const tools = [
     type: "function",
     function: {
       name: "get_message_templates",
-      description: "Obtener plantillas de mensajes guardadas. Usa esto para ver las plantillas disponibles para WhatsApp u otros mensajes.",
+      description: "Obtener plantillas de mensajes guardadas.",
       parameters: {
         type: "object",
         properties: {
@@ -261,7 +247,7 @@ const tools = [
         properties: {
           name: { type: "string", description: "Nombre de la plantilla" },
           content: { type: "string", description: "Contenido del mensaje" },
-          category: { type: "string", description: "Categoría (ventas, soporte, bienvenida, seguimiento, otros)" },
+          category: { type: "string", description: "Categoría" },
         },
         required: ["name", "content"],
       },
@@ -272,7 +258,7 @@ const tools = [
     type: "function",
     function: {
       name: "get_shared_files",
-      description: "Obtener archivos compartidos del usuario. Usa esto para ver documentos, imágenes u otros archivos subidos.",
+      description: "Obtener archivos compartidos del usuario.",
       parameters: {
         type: "object",
         properties: {
@@ -288,11 +274,7 @@ const tools = [
     function: {
       name: "get_shared_folders",
       description: "Obtener carpetas de archivos compartidos.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   // Email Campaigns
@@ -315,11 +297,7 @@ const tools = [
     function: {
       name: "get_email_templates",
       description: "Obtener plantillas de email disponibles.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   // WhatsApp
@@ -358,11 +336,7 @@ const tools = [
     function: {
       name: "get_lead_folders",
       description: "Obtener carpetas de leads para organización.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   // Audit & Analytics
@@ -375,7 +349,7 @@ const tools = [
         type: "object",
         properties: {
           limit: { type: "number", description: "Número máximo de registros" },
-          entity_type: { type: "string", description: "Filtrar por tipo de entidad (lead, template, etc)" },
+          entity_type: { type: "string", description: "Filtrar por tipo de entidad" },
         },
         required: [],
       },
@@ -396,7 +370,179 @@ const tools = [
       },
     },
   },
+  // ===== STEL ORDER BUDGETS =====
+  {
+    type: "function",
+    function: {
+      name: "stel_list_budgets",
+      description: "Listar presupuestos de STEL Order. Muestra presupuestos existentes con su número, cliente, total y estado.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "Texto de búsqueda para filtrar presupuestos" },
+          page: { type: "string", description: "Página (default 1)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stel_get_budget",
+      description: "Obtener detalle completo de un presupuesto de STEL Order por su ID, incluyendo líneas de productos, cliente y totales.",
+      parameters: {
+        type: "object",
+        properties: {
+          budget_id: { type: "string", description: "ID del presupuesto en STEL Order" },
+        },
+        required: ["budget_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stel_create_budget",
+      description: "Crear un nuevo presupuesto en STEL Order. Necesitas al menos un cliente (nombre o ID) y las líneas de productos.",
+      parameters: {
+        type: "object",
+        properties: {
+          client_name: { type: "string", description: "Nombre del cliente (se buscará o creará en STEL)" },
+          client_id: { type: "number", description: "ID del cliente si ya se conoce" },
+          client_email: { type: "string", description: "Email del cliente (para crear nuevo)" },
+          subject: { type: "string", description: "Asunto/título del presupuesto" },
+          notes: { type: "string", description: "Notas del presupuesto" },
+          valid_until: { type: "string", description: "Fecha de validez (formato ISO)" },
+          items: {
+            type: "array",
+            description: "Líneas del presupuesto",
+            items: {
+              type: "object",
+              properties: {
+                concept: { type: "string", description: "Concepto/nombre del producto" },
+                quantity: { type: "number", description: "Cantidad (default 1)" },
+                price: { type: "number", description: "Precio unitario" },
+                taxPercentage: { type: "number", description: "% IVA (default 21)" },
+                discount: { type: "number", description: "% descuento (default 0)" },
+              },
+              required: ["concept", "price"],
+            },
+          },
+        },
+        required: ["items"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stel_update_budget",
+      description: "Actualizar un presupuesto existente en STEL Order.",
+      parameters: {
+        type: "object",
+        properties: {
+          budget_id: { type: "string", description: "ID del presupuesto" },
+          subject: { type: "string", description: "Nuevo asunto" },
+          notes: { type: "string", description: "Nuevas notas" },
+          lines: {
+            type: "array",
+            description: "Nuevas líneas del presupuesto",
+            items: {
+              type: "object",
+              properties: {
+                concept: { type: "string" },
+                quantity: { type: "number" },
+                price: { type: "number" },
+                taxPercentage: { type: "number" },
+                discount: { type: "number" },
+              },
+              required: ["concept", "price"],
+            },
+          },
+        },
+        required: ["budget_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stel_delete_budget",
+      description: "Eliminar un presupuesto de STEL Order.",
+      parameters: {
+        type: "object",
+        properties: {
+          budget_id: { type: "string", description: "ID del presupuesto a eliminar" },
+        },
+        required: ["budget_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stel_convert_to_invoice",
+      description: "Convertir un presupuesto de STEL Order en factura.",
+      parameters: {
+        type: "object",
+        properties: {
+          budget_id: { type: "string", description: "ID del presupuesto a convertir en factura" },
+        },
+        required: ["budget_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stel_convert_to_order",
+      description: "Convertir un presupuesto de STEL Order en pedido.",
+      parameters: {
+        type: "object",
+        properties: {
+          budget_id: { type: "string", description: "ID del presupuesto a convertir en pedido" },
+        },
+        required: ["budget_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stel_list_clients",
+      description: "Listar clientes de STEL Order. Usa esto para buscar clientes existentes antes de crear un presupuesto.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "Texto de búsqueda para filtrar clientes" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
+
+// Helper to call STEL Order API
+async function callStelApi(endpoint: string, method = 'GET', payload?: any): Promise<any> {
+  const apiKey = Deno.env.get('STELORDER_API_KEY');
+  if (!apiKey) throw new Error('STELORDER_API_KEY not configured');
+
+  const headers: Record<string, string> = {
+    'APIKEY': apiKey,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
+  const opts: RequestInit = { method, headers };
+  if (payload && (method === 'POST' || method === 'PUT')) {
+    opts.body = JSON.stringify(payload);
+  }
+
+  const res = await fetch(`${STEL_API_BASE}/${endpoint}`, opts);
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
 
 async function executeToolCall(
   supabase: any,
@@ -406,6 +552,211 @@ async function executeToolCall(
 ): Promise<string> {
   try {
     switch (toolName) {
+      // ===== STEL ORDER TOOLS =====
+      case "stel_list_budgets": {
+        const search = args.search || '';
+        const page = args.page || '1';
+        let endpoint = `budgets?limit=20&page=${page}`;
+        if (search && search.trim()) endpoint += `&search=${encodeURIComponent(search)}`;
+        
+        const result = await callStelApi(endpoint);
+        if (!result.ok) return JSON.stringify({ error: 'Error al listar presupuestos STEL', details: result.data });
+        
+        const budgets = Array.isArray(result.data) ? result.data : [];
+        return JSON.stringify({
+          message: `Encontrados ${budgets.length} presupuestos en STEL Order`,
+          presupuestos: budgets.map((b: any) => ({
+            id: b.id,
+            numero: b.number || b.serialNumber,
+            cliente: b.client?.name || b.clientName || 'Sin cliente',
+            asunto: b.subject || '',
+            total: b.total || b.totalWithTax || 0,
+            fecha: b.date || b.createdAt,
+            estado: b.status || 'draft',
+          })),
+        });
+      }
+
+      case "stel_get_budget": {
+        const result = await callStelApi(`budgets/${args.budget_id}`);
+        if (!result.ok) return JSON.stringify({ error: 'Presupuesto no encontrado', details: result.data });
+        
+        const b = result.data;
+        return JSON.stringify({
+          presupuesto: {
+            id: b.id,
+            numero: b.number || b.serialNumber,
+            cliente: b.client?.name || b.clientName,
+            cliente_email: b.client?.email,
+            asunto: b.subject,
+            notas: b.notes,
+            lineas: (b.lines || []).map((l: any) => ({
+              concepto: l.concept || l.description,
+              cantidad: l.quantity,
+              precio: l.price || l.unitPrice,
+              iva: l.taxPercentage,
+              descuento: l.discount,
+              total: l.total || (l.quantity * (l.price || l.unitPrice || 0)),
+            })),
+            subtotal: b.subtotal || b.total,
+            total_con_iva: b.totalWithTax || b.total,
+            fecha: b.date || b.createdAt,
+            validez: b.validUntil,
+          },
+        });
+      }
+
+      case "stel_create_budget": {
+        let clientId = args.client_id;
+        
+        // Search or create client if name provided
+        if (!clientId && args.client_name) {
+          const searchResult = await callStelApi(`clients?search=${encodeURIComponent(args.client_name)}`);
+          if (searchResult.ok && Array.isArray(searchResult.data) && searchResult.data.length > 0) {
+            clientId = searchResult.data[0].id;
+          } else {
+            const createResult = await callStelApi('clients', 'POST', {
+              name: args.client_name,
+              email: args.client_email || '',
+              commercialName: args.client_name,
+            });
+            if (createResult.ok) clientId = createResult.data.id;
+          }
+        }
+
+        const budgetPayload: any = {
+          clientId: clientId,
+          lines: (args.items || []).map((item: any) => ({
+            concept: item.concept || 'Producto',
+            quantity: item.quantity || 1,
+            price: item.price || 0,
+            taxPercentage: item.taxPercentage || 21,
+            discount: item.discount || 0,
+          })),
+          notes: args.notes || '',
+        };
+
+        if (args.subject) budgetPayload.subject = args.subject;
+        if (args.valid_until) budgetPayload.validUntil = args.valid_until;
+
+        console.log('AI creating STEL budget:', JSON.stringify(budgetPayload));
+        const result = await callStelApi('budgets', 'POST', budgetPayload);
+
+        if (!result.ok) {
+          return JSON.stringify({ error: 'Error al crear presupuesto en STEL', details: result.data });
+        }
+
+        return JSON.stringify({
+          success: true,
+          message: `Presupuesto creado en STEL Order con ID ${result.data.id}`,
+          presupuesto_id: result.data.id,
+          numero: result.data.number || result.data.serialNumber,
+        });
+      }
+
+      case "stel_update_budget": {
+        const payload: any = {};
+        if (args.subject) payload.subject = args.subject;
+        if (args.notes) payload.notes = args.notes;
+        if (args.lines) {
+          payload.lines = args.lines.map((l: any) => ({
+            concept: l.concept,
+            quantity: l.quantity || 1,
+            price: l.price || 0,
+            taxPercentage: l.taxPercentage || 21,
+            discount: l.discount || 0,
+          }));
+        }
+
+        const result = await callStelApi(`budgets/${args.budget_id}`, 'PUT', payload);
+        if (!result.ok) return JSON.stringify({ error: 'Error al actualizar presupuesto', details: result.data });
+
+        return JSON.stringify({
+          success: true,
+          message: `Presupuesto ${args.budget_id} actualizado en STEL Order`,
+        });
+      }
+
+      case "stel_delete_budget": {
+        const result = await callStelApi(`budgets/${args.budget_id}`, 'DELETE');
+        if (!result.ok) return JSON.stringify({ error: 'Error al eliminar presupuesto', details: result.data });
+        return JSON.stringify({ success: true, message: `Presupuesto ${args.budget_id} eliminado` });
+      }
+
+      case "stel_convert_to_invoice": {
+        const budgetResult = await callStelApi(`budgets/${args.budget_id}`);
+        if (!budgetResult.ok) return JSON.stringify({ error: 'Presupuesto no encontrado' });
+
+        const budget = budgetResult.data;
+        const invoicePayload = {
+          clientId: budget.clientId || budget.client?.id,
+          lines: (budget.lines || []).map((line: any) => ({
+            concept: line.concept || line.description,
+            quantity: line.quantity || 1,
+            price: line.price || line.unitPrice || 0,
+            taxPercentage: line.taxPercentage || 21,
+            discount: line.discount || 0,
+          })),
+          notes: `Generado desde presupuesto #${budget.number || args.budget_id}`,
+        };
+
+        const invoiceResult = await callStelApi('invoices', 'POST', invoicePayload);
+        if (!invoiceResult.ok) return JSON.stringify({ error: 'Error al crear factura', details: invoiceResult.data });
+
+        return JSON.stringify({
+          success: true,
+          message: `Factura creada desde presupuesto #${budget.number || args.budget_id}`,
+          factura_id: invoiceResult.data.id,
+        });
+      }
+
+      case "stel_convert_to_order": {
+        const budgetResult = await callStelApi(`budgets/${args.budget_id}`);
+        if (!budgetResult.ok) return JSON.stringify({ error: 'Presupuesto no encontrado' });
+
+        const budget = budgetResult.data;
+        const orderPayload = {
+          clientId: budget.clientId || budget.client?.id,
+          lines: (budget.lines || []).map((line: any) => ({
+            concept: line.concept || line.description,
+            quantity: line.quantity || 1,
+            price: line.price || line.unitPrice || 0,
+            taxPercentage: line.taxPercentage || 21,
+            discount: line.discount || 0,
+          })),
+          notes: `Generado desde presupuesto #${budget.number || args.budget_id}`,
+        };
+
+        const orderResult = await callStelApi('orders', 'POST', orderPayload);
+        if (!orderResult.ok) return JSON.stringify({ error: 'Error al crear pedido', details: orderResult.data });
+
+        return JSON.stringify({
+          success: true,
+          message: `Pedido creado desde presupuesto #${budget.number || args.budget_id}`,
+          pedido_id: orderResult.data.id,
+        });
+      }
+
+      case "stel_list_clients": {
+        const search = args.search || '';
+        let endpoint = `clients?page=1&limit=20`;
+        if (search && search.trim()) endpoint += `&search=${encodeURIComponent(search)}`;
+
+        const result = await callStelApi(endpoint);
+        if (!result.ok) return JSON.stringify({ error: 'Error al listar clientes STEL', details: result.data });
+
+        const clients = Array.isArray(result.data) ? result.data : [];
+        return JSON.stringify({
+          clientes: clients.map((c: any) => ({
+            id: c.id,
+            nombre: c.name || c.commercialName,
+            email: c.email,
+            telefono: c.phone,
+          })),
+        });
+      }
+
+      // ===== CRM TOOLS =====
       case "search_leads": {
         const query = args.query?.toLowerCase() || "";
         const limit = args.limit || 10;
@@ -417,28 +768,19 @@ async function executeToolCall(
           .or(`company_name.ilike.%${query}%,contact_name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%,city.ilike.%${query}%`)
           .limit(limit);
         
-        if (args.status) {
-          queryBuilder = queryBuilder.eq("status", args.status);
-        }
+        if (args.status) queryBuilder = queryBuilder.eq("status", args.status);
         
         const { data, error } = await queryBuilder;
         if (error) throw error;
         
-        if (!data || data.length === 0) {
-          return JSON.stringify({ message: "No se encontraron leads con ese criterio", results: [] });
-        }
+        if (!data || data.length === 0) return JSON.stringify({ message: "No se encontraron leads", results: [] });
         
         return JSON.stringify({
           message: `Encontrados ${data.length} leads`,
           results: data.map((l: any) => ({
-            id: l.id,
-            empresa: l.company_name,
-            contacto: l.contact_name,
-            telefono: l.phone,
-            email: l.email,
-            ciudad: l.city,
-            estado: l.status,
-            score: l.score,
+            id: l.id, empresa: l.company_name, contacto: l.contact_name,
+            telefono: l.phone, email: l.email, ciudad: l.city,
+            estado: l.status, score: l.score,
             notas: l.notes?.substring(0, 100),
             creado: new Date(l.created_at).toLocaleDateString("es-ES"),
           })),
@@ -456,9 +798,7 @@ async function executeToolCall(
           .order(orderBy, { ascending: false })
           .limit(limit);
         
-        if (args.status) {
-          queryBuilder = queryBuilder.eq("status", args.status);
-        }
+        if (args.status) queryBuilder = queryBuilder.eq("status", args.status);
         
         const { data, error } = await queryBuilder;
         if (error) throw error;
@@ -466,16 +806,9 @@ async function executeToolCall(
         return JSON.stringify({
           total: data?.length || 0,
           leads: data?.map((l: any) => ({
-            id: l.id,
-            empresa: l.company_name,
-            contacto: l.contact_name,
-            telefono: l.phone,
-            email: l.email,
-            ciudad: l.city,
-            estado: l.status,
-            score: l.score,
-            segmento: l.segment,
-            fuente: l.source,
+            id: l.id, empresa: l.company_name, contacto: l.contact_name,
+            telefono: l.phone, email: l.email, ciudad: l.city,
+            estado: l.status, score: l.score, segmento: l.segment, fuente: l.source,
             creado: new Date(l.created_at).toLocaleDateString("es-ES"),
           })) || [],
         });
@@ -500,13 +833,11 @@ async function executeToolCall(
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
         const recentLeads = leads?.filter((l: any) => new Date(l.created_at) > weekAgo).length || 0;
-        
         const avgScore = total > 0 ? Math.round(leads?.reduce((acc: number, l: any) => acc + (l.score || 0), 0) / total) : 0;
         const conversionRate = total > 0 ? ((byStatus.cliente / total) * 100).toFixed(1) : 0;
         
         return JSON.stringify({
-          total_leads: total,
-          por_estado: byStatus,
+          total_leads: total, por_estado: byStatus,
           leads_esta_semana: recentLeads,
           tasa_conversion: `${conversionRate}%`,
           score_promedio: avgScore,
@@ -517,33 +848,22 @@ async function executeToolCall(
         const { data, error } = await supabase
           .from("leads")
           .insert({
-            user_id: userId,
-            company_name: args.company_name,
-            contact_name: args.contact_name || null,
-            phone: args.phone || null,
-            email: args.email || null,
-            city: args.city || "Málaga",
-            notes: args.notes || null,
-            status: "nuevo",
-            segment: args.segment || "pyme",
-            source: args.source || "ia-assistant",
+            user_id: userId, company_name: args.company_name,
+            contact_name: args.contact_name || null, phone: args.phone || null,
+            email: args.email || null, city: args.city || "Málaga",
+            notes: args.notes || null, status: "nuevo",
+            segment: args.segment || "pyme", source: args.source || "ia-assistant",
           })
           .select("id, company_name")
           .single();
         
         if (error) throw error;
-        
-        return JSON.stringify({
-          success: true,
-          message: `Lead "${data.company_name}" creado exitosamente`,
-          lead_id: data.id,
-        });
+        return JSON.stringify({ success: true, message: `Lead "${data.company_name}" creado`, lead_id: data.id });
       }
       
       case "update_lead": {
         const { lead_id, ...updateData } = args;
         const updateFields: Record<string, any> = {};
-        
         if (updateData.company_name) updateFields.company_name = updateData.company_name;
         if (updateData.contact_name) updateFields.contact_name = updateData.contact_name;
         if (updateData.phone) updateFields.phone = updateData.phone;
@@ -553,54 +873,36 @@ async function executeToolCall(
         if (updateData.score !== undefined) updateFields.score = updateData.score;
         
         const { data, error } = await supabase
-          .from("leads")
-          .update(updateFields)
-          .eq("id", lead_id)
-          .eq("user_id", userId)
-          .select("id, company_name")
-          .single();
+          .from("leads").update(updateFields)
+          .eq("id", lead_id).eq("user_id", userId)
+          .select("id, company_name").single();
         
         if (error) throw error;
-        
-        return JSON.stringify({
-          success: true,
-          message: `Lead "${data.company_name}" actualizado`,
-        });
+        return JSON.stringify({ success: true, message: `Lead "${data.company_name}" actualizado` });
       }
 
       case "delete_lead": {
         const { data, error } = await supabase
-          .from("leads")
-          .delete()
-          .eq("id", args.lead_id)
-          .eq("user_id", userId)
-          .select("company_name")
-          .single();
+          .from("leads").delete()
+          .eq("id", args.lead_id).eq("user_id", userId)
+          .select("company_name").single();
         
         if (error) throw error;
-        
-        return JSON.stringify({
-          success: true,
-          message: `Lead "${data.company_name}" eliminado`,
-        });
+        return JSON.stringify({ success: true, message: `Lead "${data.company_name}" eliminado` });
       }
       
       case "get_recent_activities": {
-        const limit = args.limit || 10;
-        
         const { data: activities, error } = await supabase
           .from("lead_activities")
           .select("id, type, description, created_at, lead_id")
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
-          .limit(limit);
+          .limit(args.limit || 10);
         
         if (error) throw error;
-        
         return JSON.stringify({
           actividades: activities?.map((a: any) => ({
-            tipo: a.type,
-            descripcion: a.description,
+            tipo: a.type, descripcion: a.description,
             fecha: new Date(a.created_at).toLocaleDateString("es-ES"),
           })) || [],
         });
@@ -610,18 +912,14 @@ async function executeToolCall(
         const { data: reminders, error } = await supabase
           .from("follow_up_reminders")
           .select("id, message, reminder_date, lead_id, leads(company_name)")
-          .eq("user_id", userId)
-          .eq("is_completed", false)
+          .eq("user_id", userId).eq("is_completed", false)
           .gte("reminder_date", new Date().toISOString())
-          .order("reminder_date", { ascending: true })
-          .limit(10);
+          .order("reminder_date", { ascending: true }).limit(10);
         
         if (error) throw error;
-        
         return JSON.stringify({
           recordatorios_pendientes: reminders?.map((r: any) => ({
-            id: r.id,
-            mensaje: r.message,
+            id: r.id, mensaje: r.message,
             fecha: new Date(r.reminder_date).toLocaleString("es-ES"),
             empresa: r.leads?.company_name,
           })) || [],
@@ -630,27 +928,18 @@ async function executeToolCall(
 
       case "get_general_reminders": {
         let queryBuilder = supabase
-          .from("general_reminders")
-          .select("*")
-          .eq("user_id", userId)
-          .order("reminder_date", { ascending: true });
-        
-        if (!args.include_completed) {
-          queryBuilder = queryBuilder.eq("is_completed", false);
-        }
+          .from("general_reminders").select("*")
+          .eq("user_id", userId).order("reminder_date", { ascending: true });
+        if (!args.include_completed) queryBuilder = queryBuilder.eq("is_completed", false);
         
         const { data, error } = await queryBuilder.limit(20);
         if (error) throw error;
         
         return JSON.stringify({
           recordatorios: data?.map((r: any) => ({
-            id: r.id,
-            titulo: r.title,
-            descripcion: r.description,
+            id: r.id, titulo: r.title, descripcion: r.description,
             fecha: new Date(r.reminder_date).toLocaleString("es-ES"),
-            prioridad: r.priority,
-            categoria: r.category,
-            completado: r.is_completed,
+            prioridad: r.priority, categoria: r.category, completado: r.is_completed,
           })) || [],
         });
       }
@@ -659,55 +948,35 @@ async function executeToolCall(
         const { data, error } = await supabase
           .from("general_reminders")
           .insert({
-            user_id: userId,
-            title: args.title,
-            description: args.description || null,
-            reminder_date: args.reminder_date,
-            priority: args.priority || "medium",
-            category: args.category || null,
+            user_id: userId, title: args.title,
+            description: args.description || null, reminder_date: args.reminder_date,
+            priority: args.priority || "medium", category: args.category || null,
           })
-          .select("id, title")
-          .single();
+          .select("id, title").single();
         
         if (error) throw error;
-        
-        return JSON.stringify({
-          success: true,
-          message: `Recordatorio "${data.title}" creado`,
-          reminder_id: data.id,
-        });
+        return JSON.stringify({ success: true, message: `Recordatorio "${data.title}" creado`, reminder_id: data.id });
       }
 
       case "complete_reminder": {
         const { data, error } = await supabase
-          .from("general_reminders")
-          .update({ is_completed: true })
-          .eq("id", args.reminder_id)
-          .eq("user_id", userId)
-          .select("title")
-          .single();
+          .from("general_reminders").update({ is_completed: true })
+          .eq("id", args.reminder_id).eq("user_id", userId)
+          .select("title").single();
         
         if (error) throw error;
-        
-        return JSON.stringify({
-          success: true,
-          message: `Recordatorio "${data.title}" completado`,
-        });
+        return JSON.stringify({ success: true, message: `Recordatorio "${data.title}" completado` });
       }
       
       case "get_team_users": {
         const { data: users, error } = await supabase
-          .from("profiles")
-          .select("user_id, full_name, avatar_url")
+          .from("profiles").select("user_id, full_name, avatar_url")
           .neq("user_id", userId);
         
         if (error) throw error;
-        
         return JSON.stringify({
           usuarios: users?.map((u: any) => ({
-            id: u.user_id,
-            nombre: u.full_name || "Usuario sin nombre",
-            avatar: u.avatar_url,
+            id: u.user_id, nombre: u.full_name || "Usuario sin nombre", avatar: u.avatar_url,
           })) || [],
         });
       }
@@ -716,47 +985,32 @@ async function executeToolCall(
         const { recipient_name, message } = args;
         
         const { data: recipients, error: recipientError } = await supabase
-          .from("profiles")
-          .select("user_id, full_name")
-          .ilike("full_name", `%${recipient_name}%`)
-          .limit(1);
+          .from("profiles").select("user_id, full_name")
+          .ilike("full_name", `%${recipient_name}%`).limit(1);
         
         if (recipientError) throw recipientError;
-        
         if (!recipients || recipients.length === 0) {
-          return JSON.stringify({
-            success: false,
-            error: `No se encontró usuario con nombre "${recipient_name}"`,
-          });
+          return JSON.stringify({ success: false, error: `No se encontró usuario "${recipient_name}"` });
         }
         
         const recipientId = recipients[0].user_id;
         const recipientFullName = recipients[0].full_name;
         
         const { data: existingParticipations } = await supabase
-          .from("conversation_participants")
-          .select("conversation_id")
-          .eq("user_id", userId);
+          .from("conversation_participants").select("conversation_id").eq("user_id", userId);
         
         let conversationId: string | null = null;
         
         if (existingParticipations && existingParticipations.length > 0) {
-          const convIds = existingParticipations.map((p: { conversation_id: string }) => p.conversation_id);
-          
+          const convIds = existingParticipations.map((p: any) => p.conversation_id);
           const { data: conversations } = await supabase
-            .from("internal_conversations")
-            .select("id")
-            .in("id", convIds)
-            .eq("is_group", false);
+            .from("internal_conversations").select("id").in("id", convIds).eq("is_group", false);
           
           if (conversations) {
             for (const conv of conversations) {
               const { data: participants } = await supabase
-                .from("conversation_participants")
-                .select("user_id")
-                .eq("conversation_id", conv.id);
-              
-              const participantIds = participants?.map((p: { user_id: string }) => p.user_id) || [];
+                .from("conversation_participants").select("user_id").eq("conversation_id", conv.id);
+              const participantIds = participants?.map((p: any) => p.user_id) || [];
               if (participantIds.includes(recipientId) && participantIds.length === 2) {
                 conversationId = conv.id;
                 break;
@@ -767,14 +1021,8 @@ async function executeToolCall(
         
         if (!conversationId) {
           const { data: newConv, error: convError } = await supabase
-            .from("internal_conversations")
-            .insert({
-              is_group: false,
-              created_by: userId,
-            })
-            .select("id")
-            .single();
-          
+            .from("internal_conversations").insert({ is_group: false, created_by: userId })
+            .select("id").single();
           if (convError) throw convError;
           conversationId = newConv.id;
           
@@ -785,20 +1033,14 @@ async function executeToolCall(
         }
         
         const { error: msgError } = await supabase
-          .from("internal_messages")
-          .insert({
-            conversation_id: conversationId,
-            sender_id: userId,
-            content: message,
-            message_type: "text",
+          .from("internal_messages").insert({
+            conversation_id: conversationId, sender_id: userId,
+            content: message, message_type: "text",
           });
-        
         if (msgError) throw msgError;
         
-        await supabase
-          .from("internal_conversations")
-          .update({ updated_at: new Date().toISOString() })
-          .eq("id", conversationId);
+        await supabase.from("internal_conversations")
+          .update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
         
         return JSON.stringify({
           success: true,
@@ -808,10 +1050,7 @@ async function executeToolCall(
 
       case "get_unread_messages": {
         const { data: participations, error: partError } = await supabase
-          .from("conversation_participants")
-          .select("conversation_id, last_read_at")
-          .eq("user_id", userId);
-        
+          .from("conversation_participants").select("conversation_id, last_read_at").eq("user_id", userId);
         if (partError) throw partError;
         
         let unreadCount = 0;
@@ -819,13 +1058,10 @@ async function executeToolCall(
         
         for (const part of participations || []) {
           const { data: messages } = await supabase
-            .from("internal_messages")
-            .select("id, content, sender_id, created_at")
-            .eq("conversation_id", part.conversation_id)
-            .neq("sender_id", userId)
+            .from("internal_messages").select("id, content, sender_id, created_at")
+            .eq("conversation_id", part.conversation_id).neq("sender_id", userId)
             .gt("created_at", part.last_read_at || "1970-01-01")
-            .order("created_at", { ascending: false })
-            .limit(5);
+            .order("created_at", { ascending: false }).limit(5);
           
           if (messages && messages.length > 0) {
             unreadCount += messages.length;
@@ -837,32 +1073,21 @@ async function executeToolCall(
           }
         }
         
-        return JSON.stringify({
-          total_sin_leer: unreadCount,
-          conversaciones: unreadChats,
-        });
+        return JSON.stringify({ total_sin_leer: unreadCount, conversaciones: unreadChats });
       }
 
       case "get_message_templates": {
         let queryBuilder = supabase
-          .from("message_templates")
-          .select("id, name, content, category, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false });
-        
-        if (args.category) {
-          queryBuilder = queryBuilder.eq("category", args.category);
-        }
+          .from("message_templates").select("id, name, content, category, created_at")
+          .eq("user_id", userId).order("created_at", { ascending: false });
+        if (args.category) queryBuilder = queryBuilder.eq("category", args.category);
         
         const { data, error } = await queryBuilder.limit(20);
         if (error) throw error;
         
         return JSON.stringify({
           plantillas: data?.map((t: any) => ({
-            id: t.id,
-            nombre: t.name,
-            contenido: t.content.substring(0, 100),
-            categoria: t.category,
+            id: t.id, nombre: t.name, contenido: t.content.substring(0, 100), categoria: t.category,
           })) || [],
         });
       }
@@ -870,45 +1095,25 @@ async function executeToolCall(
       case "create_message_template": {
         const { data, error } = await supabase
           .from("message_templates")
-          .insert({
-            user_id: userId,
-            name: args.name,
-            content: args.content,
-            category: args.category || "general",
-          })
-          .select("id, name")
-          .single();
-        
+          .insert({ user_id: userId, name: args.name, content: args.content, category: args.category || "general" })
+          .select("id, name").single();
         if (error) throw error;
-        
-        return JSON.stringify({
-          success: true,
-          message: `Plantilla "${data.name}" creada`,
-          template_id: data.id,
-        });
+        return JSON.stringify({ success: true, message: `Plantilla "${data.name}" creada`, template_id: data.id });
       }
 
       case "get_shared_files": {
         let queryBuilder = supabase
-          .from("shared_files")
-          .select("id, file_name, file_type, file_size, description, created_at, folder_id")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false });
-        
-        if (args.folder_id) {
-          queryBuilder = queryBuilder.eq("folder_id", args.folder_id);
-        }
+          .from("shared_files").select("id, file_name, file_type, file_size, description, created_at, folder_id")
+          .eq("user_id", userId).order("created_at", { ascending: false });
+        if (args.folder_id) queryBuilder = queryBuilder.eq("folder_id", args.folder_id);
         
         const { data, error } = await queryBuilder.limit(args.limit || 20);
         if (error) throw error;
         
         return JSON.stringify({
           archivos: data?.map((f: any) => ({
-            id: f.id,
-            nombre: f.file_name,
-            tipo: f.file_type,
-            tamaño: `${(f.file_size / 1024).toFixed(1)} KB`,
-            descripcion: f.description,
+            id: f.id, nombre: f.file_name, tipo: f.file_type,
+            tamaño: `${(f.file_size / 1024).toFixed(1)} KB`, descripcion: f.description,
             fecha: new Date(f.created_at).toLocaleDateString("es-ES"),
           })) || [],
         });
@@ -916,19 +1121,11 @@ async function executeToolCall(
 
       case "get_shared_folders": {
         const { data, error } = await supabase
-          .from("shared_folders")
-          .select("id, name, color, parent_id, created_at")
-          .eq("user_id", userId)
-          .order("name");
-        
+          .from("shared_folders").select("id, name, color, parent_id, created_at")
+          .eq("user_id", userId).order("name");
         if (error) throw error;
-        
         return JSON.stringify({
-          carpetas: data?.map((f: any) => ({
-            id: f.id,
-            nombre: f.name,
-            color: f.color,
-          })) || [],
+          carpetas: data?.map((f: any) => ({ id: f.id, nombre: f.name, color: f.color })) || [],
         });
       }
 
@@ -936,24 +1133,16 @@ async function executeToolCall(
         let queryBuilder = supabase
           .from("email_campaigns")
           .select("id, name, status, total_recipients, total_sent, total_opened, sent_at, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false });
-        
-        if (args.status) {
-          queryBuilder = queryBuilder.eq("status", args.status);
-        }
+          .eq("user_id", userId).order("created_at", { ascending: false });
+        if (args.status) queryBuilder = queryBuilder.eq("status", args.status);
         
         const { data, error } = await queryBuilder.limit(10);
         if (error) throw error;
         
         return JSON.stringify({
           campañas: data?.map((c: any) => ({
-            id: c.id,
-            nombre: c.name,
-            estado: c.status,
-            destinatarios: c.total_recipients,
-            enviados: c.total_sent,
-            abiertos: c.total_opened,
+            id: c.id, nombre: c.name, estado: c.status,
+            destinatarios: c.total_recipients, enviados: c.total_sent, abiertos: c.total_opened,
             fecha_envio: c.sent_at ? new Date(c.sent_at).toLocaleDateString("es-ES") : null,
           })) || [],
         });
@@ -961,41 +1150,25 @@ async function executeToolCall(
 
       case "get_email_templates": {
         const { data, error } = await supabase
-          .from("email_templates")
-          .select("id, name, subject, is_active, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(20);
-        
+          .from("email_templates").select("id, name, subject, is_active, created_at")
+          .eq("user_id", userId).order("created_at", { ascending: false }).limit(20);
         if (error) throw error;
-        
         return JSON.stringify({
           plantillas_email: data?.map((t: any) => ({
-            id: t.id,
-            nombre: t.name,
-            asunto: t.subject,
-            activa: t.is_active,
+            id: t.id, nombre: t.name, asunto: t.subject, activa: t.is_active,
           })) || [],
         });
       }
 
       case "get_whatsapp_chats": {
         const { data, error } = await supabase
-          .from("whatsapp_chats")
-          .select("id, chat_id, phone, custom_name, unread_count, last_message_at")
-          .eq("user_id", userId)
-          .eq("is_archived", false)
-          .order("last_message_at", { ascending: false })
-          .limit(args.limit || 20);
-        
+          .from("whatsapp_chats").select("id, chat_id, phone, custom_name, unread_count, last_message_at")
+          .eq("user_id", userId).eq("is_archived", false)
+          .order("last_message_at", { ascending: false }).limit(args.limit || 20);
         if (error) throw error;
-        
         return JSON.stringify({
           chats_whatsapp: data?.map((c: any) => ({
-            id: c.id,
-            chat_id: c.chat_id,
-            telefono: c.phone,
-            nombre: c.custom_name,
+            id: c.id, chat_id: c.chat_id, telefono: c.phone, nombre: c.custom_name,
             sin_leer: c.unread_count,
             ultimo_mensaje: c.last_message_at ? new Date(c.last_message_at).toLocaleString("es-ES") : null,
           })) || [],
@@ -1004,63 +1177,38 @@ async function executeToolCall(
 
       case "get_whatsapp_messages": {
         const { data, error } = await supabase
-          .from("waha_messages")
-          .select("id, content, from_me, timestamp, message_type")
-          .eq("user_id", userId)
-          .eq("chat_id", args.chat_id)
-          .order("timestamp", { ascending: false })
-          .limit(args.limit || 20);
-        
+          .from("waha_messages").select("id, content, from_me, timestamp, message_type")
+          .eq("user_id", userId).eq("chat_id", args.chat_id)
+          .order("timestamp", { ascending: false }).limit(args.limit || 20);
         if (error) throw error;
-        
         return JSON.stringify({
           mensajes: data?.map((m: any) => ({
-            id: m.id,
-            contenido: m.content?.substring(0, 200),
-            enviado: m.from_me,
-            fecha: new Date(m.timestamp).toLocaleString("es-ES"),
-            tipo: m.message_type,
+            id: m.id, contenido: m.content?.substring(0, 200), enviado: m.from_me,
+            fecha: new Date(m.timestamp).toLocaleString("es-ES"), tipo: m.message_type,
           })) || [],
         });
       }
 
       case "get_lead_folders": {
         const { data, error } = await supabase
-          .from("lead_folders")
-          .select("id, name, color")
-          .eq("user_id", userId)
-          .order("name");
-        
+          .from("lead_folders").select("id, name, color").eq("user_id", userId).order("name");
         if (error) throw error;
-        
         return JSON.stringify({
-          carpetas_leads: data?.map((f: any) => ({
-            id: f.id,
-            nombre: f.name,
-            color: f.color,
-          })) || [],
+          carpetas_leads: data?.map((f: any) => ({ id: f.id, nombre: f.name, color: f.color })) || [],
         });
       }
 
       case "get_audit_logs": {
         let queryBuilder = supabase
-          .from("audit_logs")
-          .select("id, action, entity_type, entity_id, details, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false });
-        
-        if (args.entity_type) {
-          queryBuilder = queryBuilder.eq("entity_type", args.entity_type);
-        }
+          .from("audit_logs").select("id, action, entity_type, entity_id, details, created_at")
+          .eq("user_id", userId).order("created_at", { ascending: false });
+        if (args.entity_type) queryBuilder = queryBuilder.eq("entity_type", args.entity_type);
         
         const { data, error } = await queryBuilder.limit(args.limit || 20);
         if (error) throw error;
-        
         return JSON.stringify({
           registros: data?.map((l: any) => ({
-            accion: l.action,
-            tipo: l.entity_type,
-            detalles: l.details,
+            accion: l.action, tipo: l.entity_type, detalles: l.details,
             fecha: new Date(l.created_at).toLocaleString("es-ES"),
           })) || [],
         });
@@ -1070,19 +1218,12 @@ async function executeToolCall(
         const { data, error } = await supabase
           .from("osticket_tickets")
           .select("id, ticket_number, subject, customer_name, priority, department, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(args.limit || 20);
-        
+          .eq("user_id", userId).order("created_at", { ascending: false }).limit(args.limit || 20);
         if (error) throw error;
-        
         return JSON.stringify({
           tickets: data?.map((t: any) => ({
-            numero: t.ticket_number,
-            asunto: t.subject,
-            cliente: t.customer_name,
-            prioridad: t.priority,
-            departamento: t.department,
+            numero: t.ticket_number, asunto: t.subject, cliente: t.customer_name,
+            prioridad: t.priority, departamento: t.department,
             fecha: new Date(t.created_at).toLocaleDateString("es-ES"),
           })) || [],
         });
@@ -1133,6 +1274,16 @@ serve(async (req) => {
 - Ver estadísticas y métricas de leads
 - Organizar leads por carpetas
 
+**PRESUPUESTOS STEL ORDER:**
+- Listar todos los presupuestos de STEL Order
+- Ver detalle completo de un presupuesto (líneas, cliente, totales)
+- Crear nuevos presupuestos con cliente y líneas de productos
+- Actualizar presupuestos existentes
+- Eliminar presupuestos
+- Convertir presupuestos en facturas
+- Convertir presupuestos en pedidos
+- Buscar clientes de STEL Order
+
 **RECORDATORIOS Y TAREAS:**
 - Ver y crear recordatorios generales
 - Ver recordatorios de seguimiento de leads
@@ -1145,8 +1296,7 @@ serve(async (req) => {
 - Gestionar plantillas de mensajes
 
 **ARCHIVOS Y DOCUMENTOS:**
-- Ver archivos compartidos
-- Organizar por carpetas
+- Ver archivos compartidos y carpetas
 - Ver plantillas de email
 
 **CAMPAÑAS:**
@@ -1159,18 +1309,18 @@ serve(async (req) => {
 - Ver registro de acciones del sistema
 
 Responde siempre en español de forma concisa y útil. Cuando el usuario pregunte algo, usa las herramientas apropiadas para obtener la información real del sistema.
-Si necesitas buscar un lead o información específica, siempre usa las herramientas disponibles en lugar de inventar datos.`;
+Si necesitas buscar un lead o información específica, siempre usa las herramientas disponibles en lugar de inventar datos.
+Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`;
 
     const conversationMessages: ChatMessage[] = [
       { role: "system", content: systemPrompt },
       ...messages.map((m: any) => ({ role: m.role, content: m.content })),
     ];
 
-    // Use tools only if user is authenticated
     const canUseTools = Boolean(userId);
 
     const requestBody: any = {
-      model: "openai/gpt-oss-120b",
+      model: "openai/gpt-5-nano",
       messages: conversationMessages,
       stream: true,
     };
@@ -1196,7 +1346,7 @@ Si necesitas buscar un lead o información específica, siempre usa las herramie
       console.error("OpenRouter API error:", response.status, errorText);
       
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Límite de uso excedido. Por favor, intenta más tarde." }), {
+        return new Response(JSON.stringify({ error: "Límite de uso excedido. Intenta más tarde." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -1205,14 +1355,12 @@ Si necesitas buscar un lead o información específica, siempre usa las herramie
       throw new Error(`OpenRouter API error: ${response.status}`);
     }
 
-    // Handle tool calls - need to process the stream first
+    // Handle tool calls
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let fullContent = "";
     let toolCalls: ToolCall[] = [];
-    let currentToolCall: Partial<ToolCall> | null = null;
 
-    // First pass: collect all content and tool calls
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -1227,19 +1375,13 @@ Si necesitas buscar un lead o información específica, siempre usa las herramie
           const json = JSON.parse(line.slice(6));
           const delta = json.choices?.[0]?.delta;
 
-          if (delta?.content) {
-            fullContent += delta.content;
-          }
+          if (delta?.content) fullContent += delta.content;
 
           if (delta?.tool_calls) {
             for (const tc of delta.tool_calls) {
               if (tc.index !== undefined) {
                 if (!toolCalls[tc.index]) {
-                  toolCalls[tc.index] = {
-                    id: tc.id || "",
-                    type: "function",
-                    function: { name: "", arguments: "" },
-                  };
+                  toolCalls[tc.index] = { id: tc.id || "", type: "function", function: { name: "", arguments: "" } };
                 }
                 if (tc.id) toolCalls[tc.index].id = tc.id;
                 if (tc.function?.name) toolCalls[tc.index].function.name = tc.function.name;
@@ -1251,34 +1393,22 @@ Si necesitas buscar un lead o información específica, siempre usa las herramie
       }
     }
 
-    // If there are tool calls, execute them and get a new response
+    // Execute tool calls if any
     if (toolCalls.length > 0 && userId) {
       const toolResults: ChatMessage[] = [];
 
       for (const tc of toolCalls) {
         if (!tc.function.name) continue;
-        
         let args = {};
-        try {
-          args = JSON.parse(tc.function.arguments);
-        } catch {}
+        try { args = JSON.parse(tc.function.arguments); } catch {}
 
         const result = await executeToolCall(supabase, userId, tc.function.name, args);
-        toolResults.push({
-          role: "tool",
-          content: result,
-          tool_call_id: tc.id,
-        });
+        toolResults.push({ role: "tool", content: result, tool_call_id: tc.id });
       }
 
-      // Make a follow-up request with tool results
       const followUpMessages = [
         ...conversationMessages,
-        {
-          role: "assistant" as const,
-          content: fullContent || null,
-          tool_calls: toolCalls,
-        },
+        { role: "assistant" as const, content: fullContent || null, tool_calls: toolCalls },
         ...toolResults,
       ];
 
@@ -1290,29 +1420,17 @@ Si necesitas buscar un lead o información específica, siempre usa las herramie
           "HTTP-Referer": supabaseUrl,
           "X-Title": "Malaga Micro CRM",
         },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          messages: followUpMessages,
-          stream: true,
-        }),
+        body: JSON.stringify({ model: "openai/gpt-5-nano", messages: followUpMessages, stream: true }),
       });
 
-      if (!followUpResponse.ok) {
-        throw new Error("Follow-up request failed");
-      }
+      if (!followUpResponse.ok) throw new Error("Follow-up request failed");
 
       return new Response(followUpResponse.body, {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
-        },
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
       });
     }
 
-    // If no tool calls, stream the original response
-    // We need to recreate the stream since we consumed it
+    // No tool calls - recreate stream
     const newResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -1321,20 +1439,11 @@ Si necesitas buscar un lead o información específica, siempre usa las herramie
         "HTTP-Referer": supabaseUrl,
         "X-Title": "Malaga Micro CRM",
       },
-      body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
-        messages: conversationMessages,
-        stream: true,
-      }),
+      body: JSON.stringify({ model: "openai/gpt-5-nano", messages: conversationMessages, stream: true }),
     });
 
     return new Response(newResponse.body, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-      },
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
     });
 
   } catch (err: any) {
