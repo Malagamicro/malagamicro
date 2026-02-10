@@ -468,9 +468,9 @@ export function EmailCampaigns() {
             ) : (
               <div className="border rounded-lg h-[600px] overflow-hidden">
                 <AITemplateChat 
-                  key={editingTemplateId || 'new'}
+                  key={editingTemplateId || templateHtml || 'new'}
                   onApplyTemplate={handleAIApplyTemplate} 
-                  initialHtml={editingTemplateId ? templateHtml : undefined}
+                  initialHtml={templateHtml || undefined}
                 />
               </div>
             )}

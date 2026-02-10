@@ -13,20 +13,23 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `Eres un experto diseñador de plantillas de email HTML profesionales. Tu trabajo es ayudar al usuario a crear plantillas de email atractivas y responsivas.
+    const systemPrompt = `Eres un experto diseñador de plantillas de email HTML profesionales. Tu trabajo es ayudar al usuario a crear y editar plantillas de email atractivas y responsivas.
 
 REGLAS IMPORTANTES:
 - Siempre responde en español
-- Cuando el usuario pida crear o editar una plantilla, genera el HTML completo
+- Cuando el usuario pida crear o editar una plantilla, genera el HTML completo modificado
+- SIEMPRE devuelve el HTML COMPLETO de la plantilla, no solo los cambios parciales
 - El HTML debe ser responsive y compatible con clientes de email (usa tablas para layout, inline CSS)
 - Usa un diseño profesional con colores atractivos
 - Incluye variables como {{nombre}}, {{empresa}}, {{ciudad}}, {{email}} donde sea apropiado
 - El ancho máximo del email debe ser 600px
 - Usa fuentes seguras: Arial, Helvetica, sans-serif
 - Cuando generes HTML, envuélvelo entre las etiquetas \`\`\`html y \`\`\` para que sea fácil de extraer
-- Si el usuario pide cambios, modifica el HTML anterior
+- Si el usuario pide cambios sobre una plantilla existente, modifica ESA plantilla y devuelve el HTML completo actualizado
 - Puedes sugerir mejoras de diseño, copy, estructura
-- Si no se pide un email específico, ayuda con ideas y sugerencias`;
+- Si no se pide un email específico, ayuda con ideas y sugerencias
+- Sé conciso en tus explicaciones, lo importante es el HTML resultante
+- El usuario ve los cambios en tiempo real en una vista previa al lado del chat`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
