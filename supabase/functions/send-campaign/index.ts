@@ -1,15 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { Resend } from "https://esm.sh/resend@2.0.0";
 import { encode as hexEncode } from "https://deno.land/std@0.208.0/encoding/hex.ts";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+import nodemailer from "npm:nodemailer@6.9.8";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// HTML sanitization to prevent XSS attacks
 function escapeHtml(unsafe: string): string {
   if (!unsafe) return '';
   return unsafe
@@ -20,74 +17,45 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, "&#039;");
 }
 
-// Sanitize HTML content - escape dangerous patterns while preserving safe HTML
 function sanitizeHtmlContent(html: string): string {
   if (!html) return '';
-  
-  // Remove script tags and their content
   let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  
-  // Remove event handlers (onclick, onerror, onload, etc.)
   sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
   sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]+/gi, '');
-  
-  // Remove javascript: and data: URLs from href and src attributes
   sanitized = sanitized.replace(/href\s*=\s*["']?\s*javascript:[^"'>]*/gi, 'href="#"');
   sanitized = sanitized.replace(/src\s*=\s*["']?\s*javascript:[^"'>]*/gi, 'src=""');
   sanitized = sanitized.replace(/href\s*=\s*["']?\s*data:[^"'>]*/gi, 'href="#"');
   sanitized = sanitized.replace(/src\s*=\s*["']?\s*data:[^"'>]*/gi, 'src=""');
-  
-  // Remove style expressions and behavior
   sanitized = sanitized.replace(/expression\s*\([^)]*\)/gi, '');
   sanitized = sanitized.replace(/behavior\s*:/gi, '');
-  
   return sanitized;
 }
 
-// Generate HMAC-SHA256 signature
 async function generateHmacSignature(payload: string, secret: string): Promise<string> {
   const encoder = new TextEncoder();
   const keyData = encoder.encode(secret);
   const messageData = encoder.encode(payload);
-  
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  
+  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
   return new TextDecoder().decode(hexEncode(new Uint8Array(signature)));
 }
 
-// Generate secure unsubscribe token with HMAC signature and expiration
 async function generateUnsubscribeToken(leadId: string, email: string, secret: string): Promise<string> {
-  // Token expires in 90 days
   const expiresAt = Date.now() + (90 * 24 * 60 * 60 * 1000);
   const payload = `${leadId}:${email}:${expiresAt}`;
   const signature = await generateHmacSignature(payload, secret);
   return btoa(`${payload}:${signature}`);
 }
 
-// Anti-spam settings
 const MAX_EMAILS_PER_BATCH = 10;
-const DELAY_BETWEEN_EMAILS_MS = 6000; // 6 seconds between emails (10 per minute max)
+const DELAY_BETWEEN_EMAILS_MS = 6000;
 const MAX_DAILY_EMAILS = 50;
 
-interface CampaignRequest {
-  campaignId: string;
-}
-
-// Helper to replace template variables with sanitized values
 function personalizeEmail(template: string, lead: any): string {
-  // Escape lead data to prevent XSS when inserting into HTML
   const safeName = escapeHtml(lead.contact_name || 'Estimado/a');
   const safeCompany = escapeHtml(lead.company_name || '');
   const safeCity = escapeHtml(lead.city || '');
   const safeEmail = escapeHtml(lead.email || '');
-  
   return template
     .replace(/\{\{nombre\}\}/gi, safeName)
     .replace(/\{\{empresa\}\}/gi, safeCompany)
@@ -95,7 +63,6 @@ function personalizeEmail(template: string, lead: any): string {
     .replace(/\{\{email\}\}/gi, safeEmail);
 }
 
-// Sleep helper for rate limiting
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 Deno.serve(async (req) => {
@@ -104,7 +71,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -123,7 +89,6 @@ Deno.serve(async (req) => {
     });
 
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-    
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -132,14 +97,13 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { campaignId }: CampaignRequest = await req.json();
+    const { campaignId } = await req.json();
 
     console.log(`Starting campaign ${campaignId} for user ${user.id}`);
 
     // Check daily sending limit
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
     const { count: sentToday } = await supabase
       .from('campaign_emails')
       .select('*', { count: 'exact', head: true })
@@ -148,10 +112,7 @@ Deno.serve(async (req) => {
 
     if ((sentToday || 0) >= MAX_DAILY_EMAILS) {
       return new Response(
-        JSON.stringify({ 
-          error: `Límite diario alcanzado (${MAX_DAILY_EMAILS} emails). Intenta mañana.`,
-          limitReached: true 
-        }),
+        JSON.stringify({ error: `Límite diario alcanzado (${MAX_DAILY_EMAILS} emails). Intenta mañana.`, limitReached: true }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -166,17 +127,64 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id)
       .single();
 
-    if (campaignError || !campaign) {
-      throw new Error('Campaign not found');
+    if (campaignError || !campaign) throw new Error('Campaign not found');
+    if (!campaign.email_templates) throw new Error('No template associated with campaign');
+
+    // Get email profile for sending
+    let emailProfile: any = null;
+    if (campaign.profile_id) {
+      const { data: profile } = await supabase
+        .from('email_profiles')
+        .select('*')
+        .eq('id', campaign.profile_id)
+        .single();
+      emailProfile = profile;
     }
 
-    if (!campaign.email_templates) {
-      throw new Error('No template associated with campaign');
+    if (!emailProfile) {
+      // Fallback: try to get default profile
+      const { data: defaultProfile } = await supabase
+        .from('email_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_default', true)
+        .maybeSingle();
+      emailProfile = defaultProfile;
     }
 
-    // Get pending emails for this campaign (limit to batch size and daily remaining)
+    if (!emailProfile) {
+      // Last fallback: get any profile
+      const { data: anyProfile } = await supabase
+        .from('email_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      emailProfile = anyProfile;
+    }
+
+    if (!emailProfile) {
+      throw new Error('No hay perfiles de correo configurados. Configura uno en Ajustes > Perfiles de correo.');
+    }
+
+    console.log(`Using email profile: ${emailProfile.profile_name} (${emailProfile.from_email})`);
+
+    // Create nodemailer transporter with the user's SMTP profile
+    const transporter = nodemailer.createTransport({
+      host: emailProfile.smtp_host,
+      port: emailProfile.smtp_port || 587,
+      secure: emailProfile.smtp_secure === 'ssl',
+      auth: {
+        user: emailProfile.smtp_user,
+        pass: emailProfile.smtp_password,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
+
+    // Get pending emails
     const batchSize = Math.min(MAX_EMAILS_PER_BATCH, remainingToday);
-    
     const { data: pendingEmails, error: pendingError } = await supabase
       .from('campaign_emails')
       .select('*, leads(*)')
@@ -184,12 +192,9 @@ Deno.serve(async (req) => {
       .eq('status', 'pending')
       .limit(batchSize);
 
-    if (pendingError) {
-      throw pendingError;
-    }
+    if (pendingError) throw pendingError;
 
     if (!pendingEmails || pendingEmails.length === 0) {
-      // Update campaign status if all done
       await supabase
         .from('email_campaigns')
         .update({ status: 'completed', sent_at: new Date().toISOString() })
@@ -201,7 +206,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update campaign status to sending
     await supabase
       .from('email_campaigns')
       .update({ status: 'sending' })
@@ -210,58 +214,48 @@ Deno.serve(async (req) => {
     const template = campaign.email_templates;
     const results = { sent: 0, failed: 0, errors: [] as string[] };
     const unsubscribeBaseUrl = `${supabaseUrl}/functions/v1/unsubscribe`;
+    const fromName = emailProfile.from_name || emailProfile.profile_name || 'CRM';
+    const fromEmail = emailProfile.from_email;
 
-    // Send emails with rate limiting
     for (const emailRecord of pendingEmails) {
       const lead = emailRecord.leads;
       
       if (!lead || !lead.email || lead.email_unsubscribed) {
         await supabase
           .from('campaign_emails')
-          .update({ 
-            status: 'failed', 
-            error_message: lead?.email_unsubscribed ? 'Lead unsubscribed' : 'No valid email' 
-          })
+          .update({ status: 'failed', error_message: lead?.email_unsubscribed ? 'Lead unsubscribed' : 'No valid email' })
           .eq('id', emailRecord.id);
         results.failed++;
         continue;
       }
 
       try {
-        // Personalize email content (personalizeEmail already escapes lead data)
         const personalizedSubject = personalizeEmail(template.subject, lead);
         const personalizedBody = personalizeEmail(template.body, lead);
-        
-        // Sanitize the template body to remove any malicious HTML
         const sanitizedBody = sanitizeHtmlContent(personalizedBody);
         
-        // Generate secure unsubscribe token with HMAC signature
         const secureToken = await generateUnsubscribeToken(lead.id, lead.email, unsubscribeSecret);
         const unsubscribeUrl = `${unsubscribeBaseUrl}?lead=${lead.id}&token=${encodeURIComponent(secureToken)}`;
         
-        // Add unsubscribe footer
         const htmlWithUnsubscribe = `
           ${sanitizedBody}
           <br/><br/>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;"/>
           <p style="font-size: 12px; color: #666; text-align: center;">
             Si no deseas recibir más emails, 
-            <a href="${unsubscribeUrl}" style="color: #666;">
-              haz clic aquí para desuscribirte
-            </a>
+            <a href="${unsubscribeUrl}" style="color: #666;">haz clic aquí para desuscribirte</a>
           </p>
         `;
 
-        console.log(`Sending email to ${lead.email}`);
+        console.log(`Sending email to ${lead.email} via ${fromEmail}`);
 
-        await resend.emails.send({
-          from: "MalagaMicro CRM <onboarding@resend.dev>",
-          to: [lead.email],
+        await transporter.sendMail({
+          from: `"${fromName}" <${fromEmail}>`,
+          to: lead.email,
           subject: personalizedSubject,
           html: htmlWithUnsubscribe,
         });
 
-        // Update email record as sent
         await supabase
           .from('campaign_emails')
           .update({ status: 'sent', sent_at: new Date().toISOString() })
@@ -270,25 +264,21 @@ Deno.serve(async (req) => {
         results.sent++;
         console.log(`Email sent successfully to ${lead.email}`);
 
-        // Rate limiting delay between emails
         if (pendingEmails.indexOf(emailRecord) < pendingEmails.length - 1) {
           await sleep(DELAY_BETWEEN_EMAILS_MS);
         }
 
       } catch (error: any) {
         console.error(`Failed to send to ${lead.email}:`, error);
-        
         await supabase
           .from('campaign_emails')
           .update({ status: 'failed', error_message: error.message })
           .eq('id', emailRecord.id);
-
         results.failed++;
         results.errors.push(`${lead.email}: ${error.message}`);
       }
     }
 
-    // Update campaign totals
     const { count: totalSent } = await supabase
       .from('campaign_emails')
       .select('*', { count: 'exact', head: true })
@@ -315,7 +305,7 @@ Deno.serve(async (req) => {
         ...results,
         remaining: totalPending,
         message: (totalPending || 0) > 0 
-          ? `Enviados ${results.sent} emails. Quedan ${totalPending} pendientes. Continúa enviando para completar.`
+          ? `Enviados ${results.sent} emails. Quedan ${totalPending} pendientes.`
           : 'Campaña completada'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

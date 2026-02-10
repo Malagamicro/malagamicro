@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEmailTemplates, useEmailCampaigns } from '@/hooks/useEmailCampaigns';
+import { useEmailProfiles } from '@/hooks/useEmailProfiles';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { useLeads } from '@/hooks/useLeads';
 import { Button } from '@/components/ui/button';
@@ -58,19 +59,24 @@ import {
   Info,
   Pencil,
   Eye,
+  Sparkles,
+  Bot,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { EmailTemplateEditor, EmailBlock, generateEmailHtml } from './EmailTemplateEditor';
+import { AITemplateChat } from './AITemplateChat';
 
 export function EmailCampaigns() {
   const { templates, addTemplate, deleteTemplate, isAddingTemplate } = useEmailTemplates();
   const { campaigns, createCampaign, sendCampaign, deleteCampaign, isCreatingCampaign, isSendingCampaign } = useEmailCampaigns();
+  const { profiles, loading: profilesLoading } = useEmailProfiles();
   const { leads } = useLeads();
   
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showCampaignDialog, setShowCampaignDialog] = useState(false);
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
+  const [templateMode, setTemplateMode] = useState<'editor' | 'ai'>('editor');
   
   // Template form state
   const [templateName, setTemplateName] = useState('');
@@ -81,6 +87,7 @@ export function EmailCampaigns() {
   // Campaign form state
   const [campaignName, setCampaignName] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [selectedProfileId, setSelectedProfileId] = useState('');
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
 
   // Filter leads with valid email and not unsubscribed
@@ -105,21 +112,33 @@ export function EmailCampaigns() {
           setTemplateSubject('');
           setTemplateBlocks([]);
           setTemplateHtml('');
+          setTemplateMode('editor');
         },
       }
     );
+  };
+
+  const handleAIApplyTemplate = (html: string) => {
+    setTemplateHtml(html);
+    // Switch to editor tab to show preview
   };
 
   const handleCreateCampaign = () => {
     if (!campaignName || !selectedTemplateId || selectedLeadIds.length === 0) return;
     
     createCampaign(
-      { name: campaignName, templateId: selectedTemplateId, leadIds: selectedLeadIds },
+      { 
+        name: campaignName, 
+        templateId: selectedTemplateId, 
+        leadIds: selectedLeadIds,
+        profileId: selectedProfileId || undefined,
+      },
       {
         onSuccess: () => {
           setShowCampaignDialog(false);
           setCampaignName('');
           setSelectedTemplateId('');
+          setSelectedProfileId('');
           setSelectedLeadIds([]);
         },
       }
@@ -353,14 +372,41 @@ export function EmailCampaigns() {
         </TabsContent>
       </Tabs>
 
-      {/* Template Dialog - Full Editor */}
-      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+      {/* Template Dialog - Editor + AI */}
+      <Dialog open={showTemplateDialog} onOpenChange={(open) => {
+        setShowTemplateDialog(open);
+        if (!open) setTemplateMode('editor');
+      }}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] w-full">
           <DialogHeader>
-            <DialogTitle>Nueva Plantilla de Email</DialogTitle>
-            <DialogDescription>
-              Usa variables como {`{{nombre}}`}, {`{{empresa}}`}, {`{{ciudad}}`} para personalizar el contenido.
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>Nueva Plantilla de Email</DialogTitle>
+                <DialogDescription>
+                  Usa variables como {`{{nombre}}`}, {`{{empresa}}`}, {`{{ciudad}}`} para personalizar.
+                </DialogDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={templateMode === 'editor' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTemplateMode('editor')}
+                  className="gap-1.5"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Editor
+                </Button>
+                <Button
+                  variant={templateMode === 'ai' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTemplateMode('ai')}
+                  className="gap-1.5"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  Crear con IA
+                </Button>
+              </div>
+            </div>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -382,7 +428,39 @@ export function EmailCampaigns() {
               </div>
             </div>
             
-            <EmailTemplateEditor onChange={handleEditorChange} />
+            {templateMode === 'editor' ? (
+              <>
+                <EmailTemplateEditor onChange={handleEditorChange} />
+                {templateHtml && (
+                  <div className="border rounded-lg p-3 bg-muted/30">
+                    <p className="text-xs text-muted-foreground mb-2">Vista previa del HTML generado:</p>
+                    <div 
+                      className="border rounded bg-white p-2 max-h-[200px] overflow-auto"
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(templateHtml) }}
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="border rounded-lg h-[500px] overflow-hidden">
+                <AITemplateChat onApplyTemplate={handleAIApplyTemplate} />
+              </div>
+            )}
+
+            {templateMode === 'ai' && templateHtml && (
+              <Card className="border-green-500/50 bg-green-500/5">
+                <CardContent className="flex items-center gap-3 pt-4">
+                  <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-700">Plantilla HTML aplicada</p>
+                    <p className="text-xs text-muted-foreground">El HTML generado por IA está listo para guardar.</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setTemplateHtml('')}>
+                    Borrar
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>
@@ -422,7 +500,7 @@ export function EmailCampaigns() {
           <DialogHeader>
             <DialogTitle>Nueva Campaña</DialogTitle>
             <DialogDescription>
-              Selecciona una plantilla y los leads que recibirán el email.
+              Selecciona una plantilla, perfil de correo y los leads que recibirán el email.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -434,6 +512,37 @@ export function EmailCampaigns() {
                 onChange={(e) => setCampaignName(e.target.value)}
               />
             </div>
+
+            {/* Email Profile Selector */}
+            <div className="grid gap-2">
+              <Label className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Perfil de correo
+              </Label>
+              {profiles.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay perfiles de correo configurados. Configura uno en Ajustes.
+                </p>
+              ) : (
+                <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un perfil de correo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {profiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{p.profile_name}</span>
+                          <span className="text-muted-foreground text-xs">({p.from_email})</span>
+                          {p.is_default && <Badge variant="secondary" className="text-[10px] px-1">Default</Badge>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
             <div className="grid gap-2">
               <Label>Plantilla</Label>
               <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
@@ -484,7 +593,7 @@ export function EmailCampaigns() {
             </Button>
             <Button 
               onClick={handleCreateCampaign} 
-              disabled={isCreatingCampaign || !campaignName || !selectedTemplateId || selectedLeadIds.length === 0}
+              disabled={isCreatingCampaign || !campaignName || !selectedTemplateId || selectedLeadIds.length === 0 || !selectedProfileId}
             >
               {isCreatingCampaign ? 'Creando...' : 'Crear Campaña'}
             </Button>
