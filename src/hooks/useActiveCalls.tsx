@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
@@ -16,10 +16,23 @@ interface ActiveCall {
 export function useActiveCalls() {
   const { user } = useAuth();
   const [incomingCall, setIncomingCall] = useState<ActiveCall | null>(null);
+  const incomingCallRef = useRef<ActiveCall | null>(null);
+  const userIdRef = useRef<string | null>(null);
 
-  // Listen for incoming calls via realtime
+  // Keep refs in sync
+  useEffect(() => {
+    incomingCallRef.current = incomingCall;
+  }, [incomingCall]);
+
+  useEffect(() => {
+    userIdRef.current = user?.id || null;
+  }, [user?.id]);
+
+  // Single stable realtime subscription — NO dependency on incomingCall
   useEffect(() => {
     if (!user?.id) return;
+
+    console.log('[useActiveCalls] Subscribing to active_calls realtime');
 
     const channel = supabase
       .channel('active-calls-realtime')
@@ -30,12 +43,38 @@ export function useActiveCalls() {
           schema: 'public',
           table: 'active_calls',
         },
-        (payload) => {
+        async (payload) => {
           const call = payload.new as ActiveCall;
+          const uid = userIdRef.current;
+          if (!uid) return;
+
+          console.log('[useActiveCalls] INSERT received:', call.id, 'caller:', call.caller_id, 'me:', uid);
+
           // Don't notify the caller themselves
-          if (call.caller_id !== user.id && call.status === 'ringing') {
-            // Check if user is a participant of this conversation
-            checkParticipation(call);
+          if (call.caller_id === uid) return;
+          if (call.status !== 'ringing') return;
+
+          // Check if user is a participant of this conversation
+          const { data } = await supabase
+            .from('conversation_participants')
+            .select('id')
+            .eq('conversation_id', call.conversation_id)
+            .eq('user_id', uid)
+            .maybeSingle();
+
+          if (data) {
+            console.log('[useActiveCalls] I am a participant, showing incoming call');
+            setIncomingCall(call);
+
+            // Request notification permission
+            if ('Notification' in window && Notification.permission === 'default') {
+              Notification.requestPermission();
+            }
+
+            // Auto-dismiss after 30 seconds
+            setTimeout(() => {
+              setIncomingCall(prev => prev?.id === call.id ? null : prev);
+            }, 30000);
           }
         }
       )
@@ -48,46 +87,26 @@ export function useActiveCalls() {
         },
         (payload) => {
           const call = payload.new as ActiveCall;
-          // If the call was ended or accepted, dismiss the dialog
-          if (call.status === 'ended' && incomingCall?.id === call.id) {
+          const current = incomingCallRef.current;
+          if (call.status === 'ended' && current?.id === call.id) {
             setIncomingCall(null);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[useActiveCalls] Channel status:', status);
+      });
 
     return () => {
+      console.log('[useActiveCalls] Unsubscribing');
       supabase.removeChannel(channel);
     };
-  }, [user?.id, incomingCall?.id]);
-
-  const checkParticipation = async (call: ActiveCall) => {
-    if (!user?.id) return;
-    
-    const { data } = await supabase
-      .from('conversation_participants')
-      .select('id')
-      .eq('conversation_id', call.conversation_id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (data) {
-      setIncomingCall(call);
-
-      // Request notification permission on first call (for future calls on mobile)
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
-
-      // Auto-dismiss after 30 seconds
-      setTimeout(() => {
-        setIncomingCall(prev => prev?.id === call.id ? null : prev);
-      }, 30000);
-    }
-  };
+  }, [user?.id]); // Only depends on user.id — stable subscription
 
   const initiateCall = useCallback(async (conversationId: string, callerName: string, roomName: string, isVideo: boolean) => {
     if (!user?.id) return;
+
+    console.log('[useActiveCalls] Initiating call for conversation:', conversationId);
 
     const { error } = await supabase
       .from('active_calls')
