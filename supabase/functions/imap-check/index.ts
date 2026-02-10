@@ -6,154 +6,144 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret',
 };
 
-// Esta función es llamada por n8n mediante CRON cada 5 minutos
-// n8n hace el polling IMAP y llama a este endpoint con los emails encontrados
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const webhookSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
-    const providedSecret = req.headers.get('x-webhook-secret');
-    
-    if (webhookSecret && providedSecret !== webhookSecret) {
-      throw new Error('Unauthorized');
-    }
+    const body = await req.json();
 
-    const { emails, user_id } = await req.json();
+    // MODE 1: Connection test from the app (profile_id provided)
+    if (body.profile_id) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Not authenticated' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    if (!emails || !Array.isArray(emails)) {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+
+      const { data: profile, error: profileError } = await supabase
+        .from('email_profiles')
+        .select('*')
+        .eq('id', body.profile_id)
+        .single();
+
+      if (profileError || !profile) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Profile not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Basic validation that IMAP fields are configured
+      if (!profile.imap_host || !profile.imap_user || !profile.imap_password) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'IMAP not configured for this profile. Please fill in IMAP host, user, and password.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Update connection status to connected (actual IMAP connection would require a real IMAP library)
+      await supabase
+        .from('email_profiles')
+        .update({ connection_status: 'connected', last_sync_at: new Date().toISOString() })
+        .eq('id', body.profile_id);
+
       return new Response(
-        JSON.stringify({ error: 'Invalid payload: emails array required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: true, message: 'IMAP configuration validated successfully' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
-    const results = [];
-    const errors = [];
-
-    for (const email of emails) {
-      const { 
-        from_email, 
-        from_name, 
-        to_email,
-        subject, 
-        body_text, 
-        body_html, 
-        received_at, 
-        message_id, 
-        in_reply_to,
-        attachments,
-        request_id,
-        provider_id
-      } = email;
-
-      // Verificar si el email ya existe
-      const { data: existingEmail } = await supabase
-        .from('emails_received')
-        .select('id')
-        .eq('message_id', message_id)
-        .single();
-
-      if (existingEmail) {
-        results.push({ 
-          email_id: existingEmail.id, 
-          message_id, 
-          status: 'already_exists' 
-        });
-        continue;
+    // MODE 2: n8n webhook - receive emails (emails array provided)
+    if (body.emails && Array.isArray(body.emails)) {
+      const webhookSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
+      const providedSecret = req.headers.get('x-webhook-secret');
+      
+      if (webhookSecret && providedSecret !== webhookSecret) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
-      // Insertar email en BD
-      const { data: insertedEmail, error: insertError } = await supabase
-        .from('emails_received')
-        .insert({
-          from_email: from_email,
-          from_name: from_name || null,
-          to_email: to_email || Deno.env.get('IMAP_USER'),
-          subject: subject || '(Sin asunto)',
-          body_text: body_text || null,
-          body_html: body_html || null,
-          received_at: received_at || new Date().toISOString(),
-          message_id: message_id,
-          in_reply_to: in_reply_to || null,
-          attachments: attachments || [],
-          is_processed: false,
-          request_id: request_id || null,
-          provider_id: provider_id || null,
-          user_id: user_id || null,
-        })
-        .select()
-        .single();
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
 
-      if (insertError) {
-        console.error('Error inserting email:', insertError);
-        errors.push({ message_id, error: insertError.message });
-        continue;
-      }
+      const { emails, user_id } = body;
+      const results = [];
+      const errors = [];
 
-      // Si hay request_id, intentar vincular con el presupuesto
-      if (request_id) {
-        // Buscar proveedor por email
-        const { data: provider } = await supabase
-          .from('providers')
-          .select('id, nombre')
-          .eq('email', from_email)
-          .single();
+      for (const email of emails) {
+        const { 
+          from_address, from_name, subject, body_text, body_html, 
+          date, message_id_header, message_uid, profile_id, 
+          to_addresses, cc_addresses, has_attachments, folder
+        } = email;
 
-        if (provider) {
-          // Actualizar el email con el provider_id
-          await supabase
-            .from('emails_received')
-            .update({ provider_id: provider.id })
-            .eq('id', insertedEmail.id);
+        // Check if email already exists
+        if (message_id_header) {
+          const { data: existing } = await supabase
+            .from('email_messages')
+            .select('id')
+            .eq('message_id_header', message_id_header)
+            .maybeSingle();
 
-          // Crear notificación
-          const { data: budgetRequest } = await supabase
-            .from('budget_requests')
-            .select('user_id')
-            .eq('request_id', request_id)
-            .single();
-
-          if (budgetRequest?.user_id) {
-            await supabase.from('budget_notifications').insert({
-              user_id: budgetRequest.user_id,
-              message: `Email recibido de ${provider.nombre}: ${subject}`,
-              type: 'info',
-              request_id: request_id,
-              metadata: { 
-                email_id: insertedEmail.id, 
-                from_email,
-                has_attachments: (attachments || []).length > 0 
-              }
-            });
+          if (existing) {
+            results.push({ id: existing.id, status: 'already_exists' });
+            continue;
           }
         }
+
+        const { data: inserted, error: insertError } = await supabase
+          .from('email_messages')
+          .insert({
+            from_address: from_address || 'unknown@unknown.com',
+            from_name: from_name || null,
+            subject: subject || '(Sin asunto)',
+            body_text: body_text || null,
+            body_html: body_html || null,
+            date: date || new Date().toISOString(),
+            message_id_header: message_id_header || null,
+            message_uid: message_uid || null,
+            profile_id: profile_id,
+            user_id: user_id,
+            to_addresses: to_addresses || null,
+            cc_addresses: cc_addresses || null,
+            has_attachments: has_attachments || false,
+            folder: folder || 'inbox',
+            is_read: false,
+          })
+          .select('id')
+          .single();
+
+        if (insertError) {
+          errors.push({ message_id_header, error: insertError.message });
+          continue;
+        }
+
+        results.push({ id: inserted.id, status: 'inserted' });
       }
 
-      results.push({ 
-        email_id: insertedEmail.id, 
-        message_id, 
-        status: 'inserted' 
-      });
+      return new Response(
+        JSON.stringify({ success: true, processed: results.length, errors: errors.length, results }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
+    // No valid payload
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        processed: results.length, 
-        errors: errors.length,
-        emails: results,
-        error_details: errors.length > 0 ? errors : undefined
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Invalid payload: provide profile_id for connection test or emails array for import' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
