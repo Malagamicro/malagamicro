@@ -2,35 +2,52 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import type { Layout } from 'react-grid-layout';
 
 export interface DashboardWidget {
   id: string;
   type: string;
   title: string;
   icon: string;
-  width: 1 | 2 | 3; // grid columns
   visible: boolean;
-  order: number;
+  minW?: number;
+  minH?: number;
 }
 
-const AVAILABLE_WIDGETS: DashboardWidget[] = [
-  { id: 'stats', type: 'stats', title: 'Estadísticas', icon: 'BarChart3', width: 3, visible: true, order: 0 },
-  { id: 'leads-chart', type: 'leads-chart', title: 'Leads por Estado', icon: 'PieChart', width: 1, visible: true, order: 1 },
-  { id: 'recent-leads', type: 'recent-leads', title: 'Leads Recientes', icon: 'Users', width: 1, visible: true, order: 2 },
-  { id: 'reminders', type: 'reminders', title: 'Recordatorios', icon: 'Bell', width: 1, visible: true, order: 3 },
-  { id: 'company-reminders', type: 'company-reminders', title: 'Recordatorios Empresa', icon: 'Building', width: 1, visible: true, order: 4 },
-  { id: 'tickets', type: 'tickets', title: 'Tickets Recientes', icon: 'Ticket', width: 1, visible: true, order: 5 },
-  { id: 'inbox-preview', type: 'inbox-preview', title: 'Inbox Preview', icon: 'Inbox', width: 1, visible: false, order: 6 },
-  { id: 'whatsapp-preview', type: 'whatsapp-preview', title: 'WhatsApp Preview', icon: 'MessageSquare', width: 1, visible: false, order: 7 },
-  { id: 'ai-chat-quick', type: 'ai-chat-quick', title: 'Chat IA Rápido', icon: 'Bot', width: 1, visible: false, order: 8 },
-  { id: 'map-preview', type: 'map-preview', title: 'Mapa de Leads', icon: 'MapPin', width: 2, visible: false, order: 9 },
-  { id: 'conversion-funnel', type: 'conversion-funnel', title: 'Embudo de Conversión', icon: 'TrendingUp', width: 1, visible: false, order: 10 },
-  { id: 'activity-stats', type: 'activity-stats', title: 'Actividad Reciente', icon: 'Activity', width: 1, visible: false, order: 11 },
+export interface DashboardConfig {
+  widgets: DashboardWidget[];
+  layouts: Layout[];
+}
+
+const COLS = 12;
+
+const DEFAULT_WIDGETS: DashboardWidget[] = [
+  { id: 'stats', type: 'stats', title: 'Estadísticas', icon: 'BarChart3', visible: true, minW: 4, minH: 2 },
+  { id: 'leads-chart', type: 'leads-chart', title: 'Leads por Estado', icon: 'PieChart', visible: true, minW: 3, minH: 4 },
+  { id: 'recent-leads', type: 'recent-leads', title: 'Leads Recientes', icon: 'Users', visible: true, minW: 3, minH: 4 },
+  { id: 'reminders', type: 'reminders', title: 'Recordatorios', icon: 'Bell', visible: true, minW: 3, minH: 4 },
+  { id: 'company-reminders', type: 'company-reminders', title: 'Recordatorios Empresa', icon: 'Building', visible: true, minW: 3, minH: 3 },
+  { id: 'tickets', type: 'tickets', title: 'Tickets Recientes', icon: 'Ticket', visible: true, minW: 3, minH: 4 },
+  { id: 'inbox-preview', type: 'inbox-preview', title: 'Inbox Preview', icon: 'Inbox', visible: false, minW: 3, minH: 3 },
+  { id: 'whatsapp-preview', type: 'whatsapp-preview', title: 'WhatsApp Preview', icon: 'MessageSquare', visible: false, minW: 3, minH: 3 },
+  { id: 'ai-chat-quick', type: 'ai-chat-quick', title: 'Chat IA Rápido', icon: 'Bot', visible: false, minW: 3, minH: 3 },
+  { id: 'map-preview', type: 'map-preview', title: 'Mapa de Leads', icon: 'MapPin', visible: false, minW: 4, minH: 4 },
+  { id: 'activity-stats', type: 'activity-stats', title: 'Actividad Reciente', icon: 'Activity', visible: false, minW: 3, minH: 4 },
+];
+
+const DEFAULT_LAYOUTS: Layout[] = [
+  { i: 'stats', x: 0, y: 0, w: 12, h: 2, minW: 4, minH: 2 },
+  { i: 'leads-chart', x: 0, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
+  { i: 'recent-leads', x: 4, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
+  { i: 'reminders', x: 8, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
+  { i: 'company-reminders', x: 0, y: 7, w: 6, h: 5, minW: 3, minH: 3 },
+  { i: 'tickets', x: 6, y: 7, w: 6, h: 5, minW: 3, minH: 4 },
 ];
 
 export function useDashboardConfig() {
   const { user } = useAuth();
-  const [widgets, setWidgets] = useState<DashboardWidget[]>(AVAILABLE_WIDGETS);
+  const [widgets, setWidgets] = useState<DashboardWidget[]>(DEFAULT_WIDGETS);
+  const [layouts, setLayouts] = useState<Layout[]>(DEFAULT_LAYOUTS);
   const [isLoading, setIsLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
 
@@ -51,14 +68,16 @@ export function useDashboardConfig() {
       if (error) throw error;
 
       if (data?.widgets) {
-        const saved = data.widgets as unknown as DashboardWidget[];
-        // Merge saved with available (in case new widgets were added)
-        const merged = AVAILABLE_WIDGETS.map(aw => {
-          const found = saved.find(s => s.id === aw.id);
-          return found ? { ...aw, ...found } : aw;
-        });
-        merged.sort((a, b) => a.order - b.order);
-        setWidgets(merged);
+        const saved = data.widgets as unknown as DashboardConfig;
+        if (saved.widgets && saved.layouts) {
+          // Merge with defaults for any new widgets
+          const merged = DEFAULT_WIDGETS.map(dw => {
+            const found = saved.widgets.find(sw => sw.id === dw.id);
+            return found ? { ...dw, ...found } : dw;
+          });
+          setWidgets(merged);
+          setLayouts(saved.layouts);
+        }
       }
     } catch (err) {
       console.error('Error loading dashboard config:', err);
@@ -67,14 +86,15 @@ export function useDashboardConfig() {
     }
   };
 
-  const saveConfig = useCallback(async (newWidgets: DashboardWidget[]) => {
+  const saveConfig = useCallback(async (newWidgets: DashboardWidget[], newLayouts: Layout[]) => {
     if (!user) return;
     try {
+      const config: DashboardConfig = { widgets: newWidgets, layouts: newLayouts };
       const { error } = await supabase
         .from('user_dashboard_config')
         .upsert({
           user_id: user.id,
-          widgets: newWidgets as any,
+          widgets: config as any,
         }, { onConflict: 'user_id' });
 
       if (error) throw error;
@@ -84,51 +104,58 @@ export function useDashboardConfig() {
     }
   }, [user]);
 
+  const onLayoutChange = (newLayout: Layout[]) => {
+    setLayouts(newLayout);
+    saveConfig(widgets, newLayout);
+  };
+
   const toggleWidget = (widgetId: string) => {
-    const updated = widgets.map(w =>
-      w.id === widgetId ? { ...w, visible: !w.visible } : w
-    );
-    setWidgets(updated);
-    saveConfig(updated);
-  };
+    const widget = widgets.find(w => w.id === widgetId);
+    if (!widget) return;
 
-  const reorderWidgets = (fromIndex: number, toIndex: number) => {
-    const visibleWidgets = widgets.filter(w => w.visible).sort((a, b) => a.order - b.order);
-    const [moved] = visibleWidgets.splice(fromIndex, 1);
-    visibleWidgets.splice(toIndex, 0, moved);
-    
-    const reordered = widgets.map(w => {
-      const idx = visibleWidgets.findIndex(vw => vw.id === w.id);
-      return idx >= 0 ? { ...w, order: idx } : w;
-    });
-    
-    setWidgets(reordered);
-    saveConfig(reordered);
-  };
-
-  const resizeWidget = (widgetId: string, width: 1 | 2 | 3) => {
-    const updated = widgets.map(w =>
-      w.id === widgetId ? { ...w, width } : w
+    const newVisible = !widget.visible;
+    const updatedWidgets = widgets.map(w =>
+      w.id === widgetId ? { ...w, visible: newVisible } : w
     );
-    setWidgets(updated);
-    saveConfig(updated);
+
+    let updatedLayouts = [...layouts];
+    if (newVisible) {
+      // Add layout entry for newly visible widget
+      const maxY = layouts.reduce((max, l) => Math.max(max, l.y + l.h), 0);
+      updatedLayouts.push({
+        i: widgetId,
+        x: 0,
+        y: maxY,
+        w: widget.minW || 4,
+        h: widget.minH || 4,
+        minW: widget.minW || 3,
+        minH: widget.minH || 3,
+      });
+    } else {
+      updatedLayouts = updatedLayouts.filter(l => l.i !== widgetId);
+    }
+
+    setWidgets(updatedWidgets);
+    setLayouts(updatedLayouts);
+    saveConfig(updatedWidgets, updatedLayouts);
   };
 
   const resetToDefault = () => {
-    setWidgets(AVAILABLE_WIDGETS);
-    saveConfig(AVAILABLE_WIDGETS);
+    setWidgets(DEFAULT_WIDGETS);
+    setLayouts(DEFAULT_LAYOUTS);
+    saveConfig(DEFAULT_WIDGETS, DEFAULT_LAYOUTS);
     toast.success('Dashboard restaurado a valores por defecto');
   };
 
   return {
     widgets,
+    layouts,
     isLoading,
     editMode,
     setEditMode,
     toggleWidget,
-    reorderWidgets,
-    resizeWidget,
+    onLayoutChange,
     resetToDefault,
-    availableWidgets: AVAILABLE_WIDGETS,
+    cols: COLS,
   };
 }

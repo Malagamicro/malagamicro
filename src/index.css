@@ -200,3 +200,42 @@
     transform: scale(1);
   }
 }
+
+/* React Grid Layout custom styles */
+.react-grid-item {
+  transition: all 200ms ease;
+}
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+.react-grid-item.resizing {
+  z-index: 10;
+  opacity: 0.9;
+}
+.react-grid-item.react-draggable-dragging {
+  z-index: 20;
+  opacity: 0.85;
+  box-shadow: 0 20px 40px -12px hsl(var(--primary) / 0.25);
+}
+.react-grid-item > .react-resizable-handle {
+  background: none;
+  width: 16px;
+  height: 16px;
+}
+.react-grid-item > .react-resizable-handle::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid hsl(var(--primary) / 0.5);
+  border-bottom: 2px solid hsl(var(--primary) / 0.5);
+  border-radius: 0 0 2px 0;
+}
+.react-grid-placeholder {
+  background: hsl(var(--primary) / 0.15) !important;
+  border: 2px dashed hsl(var(--primary) / 0.4) !important;
+  border-radius: 0.75rem;
+  opacity: 1 !important;
+}
