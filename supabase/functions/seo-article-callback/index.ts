@@ -167,14 +167,29 @@ serve(async (req) => {
 
     if (Array.isArray(images) && images.length > 0) {
       const firstImage = images[0];
-      const imageUrl = typeof firstImage === 'string' ? firstImage : firstImage?.url;
+      // Handle nested objects: image_url could be string, {url: "..."}, or the value itself
+      let imageUrl: string | null = null;
+      if (typeof firstImage === 'string') {
+        imageUrl = firstImage;
+      } else if (firstImage?.url) {
+        // url might be a string or another object like {url: "data:..."}
+        imageUrl = typeof firstImage.url === 'string' ? firstImage.url : firstImage.url?.url || null;
+      } else if (firstImage?.image_url) {
+        imageUrl = typeof firstImage.image_url === 'string' ? firstImage.image_url : firstImage.image_url?.url || null;
+      }
 
-      if (imageUrl) {
+      console.log('Resolved image URL type:', typeof imageUrl, 'starts with:', imageUrl?.substring(0, 30));
+
+      if (imageUrl && typeof imageUrl === 'string' && imageUrl !== '[object Object]') {
         if (imageUrl.startsWith('data:image')) {
           finalImageUrl = await uploadBase64Image(supabase, imageUrl, articleId);
-        } else {
+        } else if (imageUrl.startsWith('http')) {
           finalImageUrl = imageUrl;
+        } else {
+          console.warn('Unrecognized image URL format:', imageUrl.substring(0, 50));
         }
+      } else {
+        console.warn('Image URL resolved to invalid value:', imageUrl);
       }
     } else if (typeof images === 'string' && images.startsWith('data:image')) {
       finalImageUrl = await uploadBase64Image(supabase, images, articleId);

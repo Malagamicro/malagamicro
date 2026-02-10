@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
@@ -37,9 +37,10 @@ export const useSeoArticles = () => {
   const [articles, setArticles] = useState<SeoArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const generatingRef = useRef(false);
 
   // Cargar artículos
-  const fetchArticles = async () => {
+  const fetchArticles = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -50,7 +51,6 @@ export const useSeoArticles = () => {
 
       if (error) throw error;
       
-      // Cast the data to our interface
       setArticles((data || []) as unknown as SeoArticle[]);
     } catch (error) {
       console.error('Error fetching articles:', error);
@@ -58,15 +58,22 @@ export const useSeoArticles = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  // Generar nuevo artículo
-  const generateArticle = async (topic: string, imageCount: number = 3, webhookUrl?: string) => {
+  // Generar nuevo artículo — con protección contra clicks múltiples
+  const generateArticle = useCallback(async (topic: string, imageCount: number = 1, webhookUrl?: string) => {
     if (!user) {
       toast.error('Debes iniciar sesión');
       return null;
     }
 
+    // Double-check with ref to prevent race conditions
+    if (generatingRef.current) {
+      toast.warning('Ya hay un artículo generándose, espera a que termine');
+      return null;
+    }
+
+    generatingRef.current = true;
     setGenerating(true);
     
     try {
@@ -90,20 +97,21 @@ export const useSeoArticles = () => {
         throw new Error(result.error || 'Error al generar artículo');
       }
 
-      toast.success('Artículo generado correctamente');
-      await fetchArticles();
+      toast.success('Artículo en proceso de generación');
+      // Don't call fetchArticles here — realtime subscription handles it
       return result;
     } catch (error) {
       console.error('Error generating article:', error);
       toast.error(error instanceof Error ? error.message : 'Error al generar artículo');
       return null;
     } finally {
+      generatingRef.current = false;
       setGenerating(false);
     }
-  };
+  }, [user]);
 
   // Eliminar artículo
-  const deleteArticle = async (id: string) => {
+  const deleteArticle = useCallback(async (id: string) => {
     try {
       const { error } = await supabase
         .from('seo_articles')
@@ -118,7 +126,7 @@ export const useSeoArticles = () => {
       console.error('Error deleting article:', error);
       toast.error('Error al eliminar artículo');
     }
-  };
+  }, []);
 
   // Suscripción a cambios en tiempo real
   useEffect(() => {
@@ -137,16 +145,20 @@ export const useSeoArticles = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Realtime update:', payload);
+          console.log('Realtime update:', payload.eventType);
           
           if (payload.eventType === 'INSERT') {
-            setArticles(prev => [payload.new as unknown as SeoArticle, ...prev]);
+            setArticles(prev => {
+              // Deduplicate: don't add if already present
+              if (prev.some(a => a.id === (payload.new as any).id)) return prev;
+              return [payload.new as unknown as SeoArticle, ...prev];
+            });
           } else if (payload.eventType === 'UPDATE') {
             setArticles(prev => 
-              prev.map(a => a.id === payload.new.id ? payload.new as unknown as SeoArticle : a)
+              prev.map(a => a.id === (payload.new as any).id ? payload.new as unknown as SeoArticle : a)
             );
           } else if (payload.eventType === 'DELETE') {
-            setArticles(prev => prev.filter(a => a.id !== payload.old.id));
+            setArticles(prev => prev.filter(a => a.id !== (payload.old as any).id));
           }
         }
       )
@@ -155,7 +167,7 @@ export const useSeoArticles = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, fetchArticles]);
 
   return {
     articles,
