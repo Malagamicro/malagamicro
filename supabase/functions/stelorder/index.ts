@@ -31,36 +31,35 @@ serve(async (req) => {
       'Accept': 'application/json'
     };
 
-    // Helper to call STEL API
     const callStel = async (endpoint: string, method = 'GET', payload?: any) => {
       const opts: RequestInit = { method, headers: stelHeaders };
       if (payload && (method === 'POST' || method === 'PUT')) {
         opts.body = JSON.stringify(payload);
       }
+      console.log(`STEL API call: ${method} ${STEL_API_BASE}/${endpoint}`);
       const res = await fetch(`${STEL_API_BASE}/${endpoint}`, opts);
       const data = await res.json().catch(() => ({}));
+      if (!res.ok) console.error(`STEL API error ${res.status}:`, JSON.stringify(data));
       return { ok: res.ok, status: res.status, data };
     };
 
-    // ===== BUDGETS =====
+    // ===== BUDGETS (salesEstimates) =====
 
-    // LIST BUDGETS
     if (action === 'list-budgets') {
       const page = url.searchParams.get('page') || '1';
       const limit = url.searchParams.get('limit') || '50';
       const search = url.searchParams.get('search') || '';
       
-      let endpoint = `budgets?limit=${limit}&page=${page}`;
-      if (search) endpoint += `&search=${encodeURIComponent(search)}`;
+      let endpoint = `salesEstimates?limit=${limit}&page=${page}`;
+      if (search && search.trim().length > 0) endpoint += `&search=${encodeURIComponent(search)}`;
       
       const result = await callStel(endpoint);
       return new Response(JSON.stringify(result.data), {
-        status: result.status,
+        status: result.ok ? 200 : result.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // GET SINGLE BUDGET
     if (action === 'get-budget') {
       const id = url.searchParams.get('id');
       if (!id) {
@@ -68,14 +67,13 @@ serve(async (req) => {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      const result = await callStel(`budgets/${id}`);
+      const result = await callStel(`salesEstimates/${id}`);
       return new Response(JSON.stringify(result.data), {
-        status: result.status,
+        status: result.ok ? 200 : result.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // CREATE BUDGET
     if (action === 'create-budget') {
       if (!body) {
         return new Response(JSON.stringify({ error: 'Body requerido' }), {
@@ -83,8 +81,7 @@ serve(async (req) => {
         });
       }
 
-      // If no client_id, try to find/create client
-      let clientId = body.client_id;
+      let clientId = body.client_id || body.clientId;
       if (!clientId && body.client_name) {
         const searchResult = await callStel(`clients?search=${encodeURIComponent(body.client_name)}`);
         if (searchResult.ok && Array.isArray(searchResult.data) && searchResult.data.length > 0) {
@@ -114,11 +111,10 @@ serve(async (req) => {
 
       if (body.subject) budgetPayload.subject = body.subject;
 
-      console.log('Creating STEL budget:', JSON.stringify(budgetPayload));
-      const result = await callStel('budgets', 'POST', budgetPayload);
+      console.log('Creating STEL salesEstimate:', JSON.stringify(budgetPayload));
+      const result = await callStel('salesEstimates', 'POST', budgetPayload);
 
       if (!result.ok) {
-        console.error('STEL create budget error:', result.data);
         return new Response(JSON.stringify({ error: 'Error al crear presupuesto', details: result.data }), {
           status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -129,7 +125,6 @@ serve(async (req) => {
       });
     }
 
-    // UPDATE BUDGET
     if (action === 'update-budget') {
       const id = url.searchParams.get('id');
       if (!id || !body) {
@@ -138,7 +133,7 @@ serve(async (req) => {
         });
       }
 
-      const result = await callStel(`budgets/${id}`, 'PUT', body);
+      const result = await callStel(`salesEstimates/${id}`, 'PUT', body);
       if (!result.ok) {
         return new Response(JSON.stringify({ error: 'Error al actualizar', details: result.data }), {
           status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -150,7 +145,35 @@ serve(async (req) => {
       });
     }
 
-    // CONVERT BUDGET TO INVOICE
+    if (action === 'delete-budget') {
+      const id = url.searchParams.get('id');
+      if (!id) {
+        return new Response(JSON.stringify({ error: 'id requerido' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      const result = await callStel(`salesEstimates/${id}`, 'DELETE' as any);
+      return new Response(JSON.stringify(result.ok ? { success: true } : { error: 'Error al eliminar', details: result.data }), {
+        status: result.ok ? 200 : result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (action === 'get-budget-pdf') {
+      const id = url.searchParams.get('id');
+      if (!id) {
+        return new Response(JSON.stringify({ error: 'id requerido' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      const result = await callStel(`salesEstimates/${id}/pdf`);
+      return new Response(JSON.stringify(result.data), {
+        status: result.ok ? 200 : result.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // ===== CONVERT =====
+
     if (action === 'convert-to-invoice') {
       const id = url.searchParams.get('id');
       if (!id) {
@@ -159,8 +182,7 @@ serve(async (req) => {
         });
       }
 
-      // First get the budget
-      const budgetResult = await callStel(`budgets/${id}`);
+      const budgetResult = await callStel(`salesEstimates/${id}`);
       if (!budgetResult.ok) {
         return new Response(JSON.stringify({ error: 'Presupuesto no encontrado', details: budgetResult.data }), {
           status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -168,8 +190,6 @@ serve(async (req) => {
       }
 
       const budget = budgetResult.data;
-
-      // Create invoice from budget data
       const invoicePayload: any = {
         clientId: budget.clientId || budget.client?.id,
         lines: (budget.lines || []).map((line: any) => ({
@@ -182,8 +202,7 @@ serve(async (req) => {
         notes: budget.notes || `Generado desde presupuesto #${budget.number || id}`,
       };
 
-      console.log('Converting budget to invoice:', JSON.stringify(invoicePayload));
-      const invoiceResult = await callStel('invoices', 'POST', invoicePayload);
+      const invoiceResult = await callStel('ordinaryInvoices', 'POST', invoicePayload);
 
       if (!invoiceResult.ok) {
         return new Response(JSON.stringify({ error: 'Error al crear factura', details: invoiceResult.data }), {
@@ -200,7 +219,6 @@ serve(async (req) => {
       });
     }
 
-    // CONVERT BUDGET TO ORDER
     if (action === 'convert-to-order') {
       const id = url.searchParams.get('id');
       if (!id) {
@@ -209,7 +227,7 @@ serve(async (req) => {
         });
       }
 
-      const budgetResult = await callStel(`budgets/${id}`);
+      const budgetResult = await callStel(`salesEstimates/${id}`);
       if (!budgetResult.ok) {
         return new Response(JSON.stringify({ error: 'Presupuesto no encontrado' }), {
           status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -217,7 +235,6 @@ serve(async (req) => {
       }
 
       const budget = budgetResult.data;
-
       const orderPayload: any = {
         clientId: budget.clientId || budget.client?.id,
         lines: (budget.lines || []).map((line: any) => ({
@@ -230,7 +247,7 @@ serve(async (req) => {
         notes: budget.notes || `Generado desde presupuesto #${budget.number || id}`,
       };
 
-      const orderResult = await callStel('orders', 'POST', orderPayload);
+      const orderResult = await callStel('salesOrders', 'POST', orderPayload);
 
       if (!orderResult.ok) {
         return new Response(JSON.stringify({ error: 'Error al crear pedido', details: orderResult.data }), {
@@ -249,7 +266,6 @@ serve(async (req) => {
 
     // ===== CLIENTS =====
 
-    // LIST CLIENTS
     if (action === 'list-clients') {
       const search = url.searchParams.get('search') || '';
       const page = url.searchParams.get('page') || '1';
@@ -258,24 +274,22 @@ serve(async (req) => {
 
       const result = await callStel(endpoint);
       return new Response(JSON.stringify(result.data), {
-        status: result.status,
+        status: result.ok ? 200 : result.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // ===== INVOICES =====
+    // ===== INVOICES (ordinaryInvoices) =====
 
-    // LIST INVOICES
     if (action === 'list-invoices') {
       const page = url.searchParams.get('page') || '1';
-      const result = await callStel(`invoices?page=${page}&limit=50`);
+      const result = await callStel(`ordinaryInvoices?page=${page}&limit=50`);
       return new Response(JSON.stringify(result.data), {
-        status: result.status,
+        status: result.ok ? 200 : result.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // CREATE INVOICE
     if (action === 'create-invoice') {
       if (!body) {
         return new Response(JSON.stringify({ error: 'Body requerido' }), {
@@ -303,7 +317,7 @@ serve(async (req) => {
         notes: body.notes || '',
       };
 
-      const result = await callStel('invoices', 'POST', invoicePayload);
+      const result = await callStel('ordinaryInvoices', 'POST', invoicePayload);
       if (!result.ok) {
         return new Response(JSON.stringify({ error: 'Error al crear factura', details: result.data }), {
           status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -311,35 +325,6 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ success: true, invoice: result.data }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // DELETE BUDGET
-    if (action === 'delete-budget') {
-      const id = url.searchParams.get('id');
-      if (!id) {
-        return new Response(JSON.stringify({ error: 'id requerido' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      const result = await callStel(`budgets/${id}`, 'DELETE' as any);
-      return new Response(JSON.stringify(result.ok ? { success: true } : { error: 'Error al eliminar', details: result.data }), {
-        status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // GET PDF
-    if (action === 'get-budget-pdf') {
-      const id = url.searchParams.get('id');
-      if (!id) {
-        return new Response(JSON.stringify({ error: 'id requerido' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      const result = await callStel(`budgets/${id}/pdf`);
-      return new Response(JSON.stringify(result.data), {
-        status: result.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }

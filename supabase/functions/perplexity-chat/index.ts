@@ -556,7 +556,7 @@ async function executeToolCall(
       case "stel_list_budgets": {
         const search = args.search || '';
         const page = args.page || '1';
-        let endpoint = `budgets?limit=20&page=${page}`;
+        let endpoint = `salesEstimates?limit=20&page=${page}`;
         if (search && search.trim()) endpoint += `&search=${encodeURIComponent(search)}`;
         
         const result = await callStelApi(endpoint);
@@ -578,7 +578,7 @@ async function executeToolCall(
       }
 
       case "stel_get_budget": {
-        const result = await callStelApi(`budgets/${args.budget_id}`);
+        const result = await callStelApi(`salesEstimates/${args.budget_id}`);
         if (!result.ok) return JSON.stringify({ error: 'Presupuesto no encontrado', details: result.data });
         
         const b = result.data;
@@ -639,8 +639,8 @@ async function executeToolCall(
         if (args.subject) budgetPayload.subject = args.subject;
         if (args.valid_until) budgetPayload.validUntil = args.valid_until;
 
-        console.log('AI creating STEL budget:', JSON.stringify(budgetPayload));
-        const result = await callStelApi('budgets', 'POST', budgetPayload);
+        console.log('AI creating STEL salesEstimate:', JSON.stringify(budgetPayload));
+        const result = await callStelApi('salesEstimates', 'POST', budgetPayload);
 
         if (!result.ok) {
           return JSON.stringify({ error: 'Error al crear presupuesto en STEL', details: result.data });
@@ -668,7 +668,7 @@ async function executeToolCall(
           }));
         }
 
-        const result = await callStelApi(`budgets/${args.budget_id}`, 'PUT', payload);
+        const result = await callStelApi(`salesEstimates/${args.budget_id}`, 'PUT', payload);
         if (!result.ok) return JSON.stringify({ error: 'Error al actualizar presupuesto', details: result.data });
 
         return JSON.stringify({
@@ -678,13 +678,13 @@ async function executeToolCall(
       }
 
       case "stel_delete_budget": {
-        const result = await callStelApi(`budgets/${args.budget_id}`, 'DELETE');
+        const result = await callStelApi(`salesEstimates/${args.budget_id}`, 'DELETE');
         if (!result.ok) return JSON.stringify({ error: 'Error al eliminar presupuesto', details: result.data });
         return JSON.stringify({ success: true, message: `Presupuesto ${args.budget_id} eliminado` });
       }
 
       case "stel_convert_to_invoice": {
-        const budgetResult = await callStelApi(`budgets/${args.budget_id}`);
+        const budgetResult = await callStelApi(`salesEstimates/${args.budget_id}`);
         if (!budgetResult.ok) return JSON.stringify({ error: 'Presupuesto no encontrado' });
 
         const budget = budgetResult.data;
@@ -700,7 +700,7 @@ async function executeToolCall(
           notes: `Generado desde presupuesto #${budget.number || args.budget_id}`,
         };
 
-        const invoiceResult = await callStelApi('invoices', 'POST', invoicePayload);
+        const invoiceResult = await callStelApi('ordinaryInvoices', 'POST', invoicePayload);
         if (!invoiceResult.ok) return JSON.stringify({ error: 'Error al crear factura', details: invoiceResult.data });
 
         return JSON.stringify({
@@ -711,7 +711,7 @@ async function executeToolCall(
       }
 
       case "stel_convert_to_order": {
-        const budgetResult = await callStelApi(`budgets/${args.budget_id}`);
+        const budgetResult = await callStelApi(`salesEstimates/${args.budget_id}`);
         if (!budgetResult.ok) return JSON.stringify({ error: 'Presupuesto no encontrado' });
 
         const budget = budgetResult.data;
@@ -727,7 +727,7 @@ async function executeToolCall(
           notes: `Generado desde presupuesto #${budget.number || args.budget_id}`,
         };
 
-        const orderResult = await callStelApi('orders', 'POST', orderPayload);
+        const orderResult = await callStelApi('salesOrders', 'POST', orderPayload);
         if (!orderResult.ok) return JSON.stringify({ error: 'Error al crear pedido', details: orderResult.data });
 
         return JSON.stringify({
@@ -1261,13 +1261,25 @@ serve(async (req) => {
       userId = user?.id || null;
     }
 
-    const { messages } = await req.json();
+    const { messages, model: requestedModel } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       throw new Error("Messages array is required");
     }
 
-    const systemPrompt = `Eres un asistente de CRM inteligente con acceso COMPLETO a toda la aplicación. Puedes:
+    const allowedModels = ['openai/gpt-5-nano', 'openai/gpt-oss-120b'];
+    const selectedModel = allowedModels.includes(requestedModel) ? requestedModel : 'openai/gpt-5-nano';
+
+    const modelDescriptions: Record<string, string> = {
+      'openai/gpt-5-nano': 'GPT-5 Nano: modelo rápido y eficiente, ideal para tareas sencillas, respuestas rápidas y alto volumen de consultas. Menor coste.',
+      'openai/gpt-oss-120b': 'GPT-OSS 120B: modelo open source de 120 mil millones de parámetros, excelente razonamiento y precisión. Más potente pero más lento.',
+    };
+
+    const systemPrompt = `Eres un asistente de CRM inteligente con acceso COMPLETO a toda la aplicación. 
+
+**MODELO ACTUAL:** ${modelDescriptions[selectedModel]}
+
+Puedes:
 
 **GESTIÓN DE LEADS:**
 - Buscar, crear, actualizar y eliminar leads
@@ -1308,6 +1320,10 @@ serve(async (req) => {
 **AUDITORÍA:**
 - Ver registro de acciones del sistema
 
+Si el usuario pregunta qué modelo estás usando o qué hace cada modelo, explícale las diferencias:
+- **GPT-5 Nano**: Rápido, eficiente, bueno para tareas sencillas y alto volumen. Menor coste por consulta.
+- **GPT-OSS 120B**: Modelo open source grande (120B parámetros), mejor razonamiento y precisión en tareas complejas. Más lento pero más capaz.
+
 Responde siempre en español de forma concisa y útil. Cuando el usuario pregunte algo, usa las herramientas apropiadas para obtener la información real del sistema.
 Si necesitas buscar un lead o información específica, siempre usa las herramientas disponibles en lugar de inventar datos.
 Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`;
@@ -1320,7 +1336,7 @@ Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`
     const canUseTools = Boolean(userId);
 
     const requestBody: any = {
-      model: "openai/gpt-5-nano",
+      model: selectedModel,
       messages: conversationMessages,
       stream: true,
     };
@@ -1420,7 +1436,7 @@ Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`
           "HTTP-Referer": supabaseUrl,
           "X-Title": "Malaga Micro CRM",
         },
-        body: JSON.stringify({ model: "openai/gpt-5-nano", messages: followUpMessages, stream: true }),
+        body: JSON.stringify({ model: selectedModel, messages: followUpMessages, stream: true }),
       });
 
       if (!followUpResponse.ok) throw new Error("Follow-up request failed");
@@ -1439,7 +1455,7 @@ Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`
         "HTTP-Referer": supabaseUrl,
         "X-Title": "Malaga Micro CRM",
       },
-      body: JSON.stringify({ model: "openai/gpt-5-nano", messages: conversationMessages, stream: true }),
+      body: JSON.stringify({ model: selectedModel, messages: conversationMessages, stream: true }),
     });
 
     return new Response(newResponse.body, {
