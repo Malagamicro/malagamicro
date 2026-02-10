@@ -3,9 +3,11 @@ import { useInternalChat } from '@/hooks/useInternalChat';
 import { ConversationList } from './ConversationList';
 import { ChatPanel } from './ChatPanel';
 import { NewConversationModal } from './NewConversationModal';
+import { VideoCallModal } from './VideoCallModal';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Phone, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function InternalChatPage() {
@@ -22,7 +24,10 @@ export function InternalChatPage() {
   } = useInternalChat();
 
   const [showNewConversation, setShowNewConversation] = useState(false);
+  const [mobileCallOpen, setMobileCallOpen] = useState(false);
+  const [mobileIsVideo, setMobileIsVideo] = useState(false);
   const isMobile = useIsMobile();
+  const { user } = useAuth();
 
   const activeConversation = conversations.find(c => c.id === activeConversationId) || null;
 
@@ -64,15 +69,31 @@ export function InternalChatPage() {
                 variant="ghost"
                 size="icon"
                 onClick={handleBack}
-                className="h-10 w-10"
+                className="h-10 w-10 shrink-0"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <span className="font-medium truncate">
+              <span className="font-medium truncate flex-1">
                 {activeConversation?.name || 
                   activeConversation?.participants?.find(p => p.user_id !== activeConversation.created_by)?.profile?.full_name ||
                   'Conversación'}
               </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                onClick={() => { setMobileIsVideo(false); setMobileCallOpen(true); }}
+              >
+                <Phone className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                onClick={() => { setMobileIsVideo(true); setMobileCallOpen(true); }}
+              >
+                <Video className="h-4 w-4" />
+              </Button>
             </div>
             <div className="flex-1">
               <ChatPanel
@@ -103,6 +124,16 @@ export function InternalChatPage() {
           onCreateConversation={handleCreateConversation}
           isCreating={createConversation.isPending}
         />
+
+        {activeConversationId && (
+          <VideoCallModal
+            open={mobileCallOpen}
+            onClose={() => setMobileCallOpen(false)}
+            roomName={activeConversationId.replace(/-/g, '')}
+            displayName={user?.email?.split('@')[0] || 'Usuario'}
+            isVideoCall={mobileIsVideo}
+          />
+        )}
       </div>
     );
   }

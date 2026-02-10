@@ -14,6 +14,8 @@ import {
   Square,
   Play,
   Pause,
+  Phone,
+  Video,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,7 @@ import { toast } from 'sonner';
 import { BudgetApprovalMessage } from './BudgetApprovalMessage';
 import { EmojiStickerPicker } from './EmojiStickerPicker';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { VideoCallModal } from './VideoCallModal';
 
 interface ChatPanelProps {
   conversation: Conversation | null;
@@ -56,6 +59,8 @@ export function ChatPanel({
   const [input, setInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [callModalOpen, setCallModalOpen] = useState(false);
+  const [isVideoCall, setIsVideoCall] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -179,6 +184,13 @@ export function ChatPanel({
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  const startCall = (video: boolean) => {
+    setIsVideoCall(video);
+    setCallModalOpen(true);
+  };
+
+  const callRoomName = conversation?.id?.replace(/-/g, '') || 'room';
+
   if (!conversation) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-muted/20 text-muted-foreground">
@@ -215,18 +227,38 @@ export function ChatPanel({
             </div>
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-11 w-11">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>Ver participantes</DropdownMenuItem>
-              {conversation.is_group && <DropdownMenuItem>Añadir participante</DropdownMenuItem>}
-              <DropdownMenuItem className="text-destructive">Salir de la conversación</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10"
+              onClick={() => startCall(false)}
+              title="Llamada de voz"
+            >
+              <Phone className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10"
+              onClick={() => startCall(true)}
+              title="Videollamada"
+            >
+              <Video className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>Ver participantes</DropdownMenuItem>
+                {conversation.is_group && <DropdownMenuItem>Añadir participante</DropdownMenuItem>}
+                <DropdownMenuItem className="text-destructive">Salir de la conversación</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       )}
 
@@ -424,6 +456,14 @@ export function ChatPanel({
           </Button>
         </div>
       </div>
+
+      <VideoCallModal
+        open={callModalOpen}
+        onClose={() => setCallModalOpen(false)}
+        roomName={callRoomName}
+        displayName={user?.email?.split('@')[0] || 'Usuario'}
+        isVideoCall={isVideoCall}
+      />
     </div>
   );
 }
