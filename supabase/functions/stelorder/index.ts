@@ -254,7 +254,7 @@ serve(async (req) => {
       const search = url.searchParams.get('search') || '';
       const page = url.searchParams.get('page') || '1';
       let endpoint = `clients?page=${page}&limit=50`;
-      if (search) endpoint += `&search=${encodeURIComponent(search)}`;
+      if (search && search.trim().length > 0) endpoint += `&search=${encodeURIComponent(search)}`;
 
       const result = await callStel(endpoint);
       return new Response(JSON.stringify(result.data), {

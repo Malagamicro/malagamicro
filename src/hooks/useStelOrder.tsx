@@ -41,16 +41,6 @@ export interface StelClient {
 const callStelAction = async (action: string, params?: Record<string, string>, body?: any) => {
   const queryParams = new URLSearchParams({ action, ...params });
   
-  const { data, error } = await supabase.functions.invoke('stelorder', {
-    method: body ? 'POST' : 'GET',
-    body: body || undefined,
-    headers: { 'Content-Type': 'application/json' },
-    ...(body ? {} : {}),
-  });
-
-  // For GET requests, we need to use query params in the URL
-  // supabase.functions.invoke doesn't support query params directly
-  // So we use fetch directly
   const session = (await supabase.auth.getSession()).data.session;
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -71,7 +61,7 @@ const callStelAction = async (action: string, params?: Record<string, string>, b
   const result = await response.json();
   
   if (!response.ok) {
-    throw new Error(result.error || `Error ${response.status}`);
+    throw new Error(result.error || result?.description || `Error ${response.status}`);
   }
   
   return result;
