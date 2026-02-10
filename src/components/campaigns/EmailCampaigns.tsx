@@ -466,28 +466,13 @@ export function EmailCampaigns() {
                 )}
               </>
             ) : (
-              <div className="border rounded-lg h-[500px] overflow-hidden">
+              <div className="border rounded-lg h-[600px] overflow-hidden">
                 <AITemplateChat 
                   key={editingTemplateId || 'new'}
                   onApplyTemplate={handleAIApplyTemplate} 
                   initialHtml={editingTemplateId ? templateHtml : undefined}
                 />
               </div>
-            )}
-
-            {templateMode === 'ai' && templateHtml && (
-              <Card className="border-green-500/50 bg-green-500/5">
-                <CardContent className="flex items-center gap-3 pt-4">
-                  <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-green-700">Plantilla HTML aplicada</p>
-                    <p className="text-xs text-muted-foreground">El HTML generado por IA está listo para guardar.</p>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={() => setTemplateHtml('')}>
-                    Borrar
-                  </Button>
-                </CardContent>
-              </Card>
             )}
           </div>
           <DialogFooter>
