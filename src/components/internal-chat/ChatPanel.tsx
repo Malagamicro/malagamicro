@@ -470,6 +470,7 @@ export function ChatPanel({
         roomName={callRoomName}
         displayName={user?.email?.split('@')[0] || 'Usuario'}
         isVideoCall={isVideoCall}
+        isReceiver={false}
       />
     </div>
   );
