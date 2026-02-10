@@ -3,11 +3,12 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Send, Loader2, Minimize2 } from 'lucide-react';
+import { X, Send, Loader2, Minimize2, Mic, MicOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import mascotImage from '@/assets/mascot.png';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -29,6 +30,13 @@ export function MascotChatWidget() {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+
+  const { isRecording, isTranscribing, startRecording, stopRecording } = useAudioRecorder({
+    onTranscription: (text) => {
+      setInput(prev => prev ? prev + ' ' + text : text);
+      inputRef.current?.focus();
+    },
+  });
 
   // Initialize position to bottom-right on mount
   useLayoutEffect(() => {
@@ -299,13 +307,29 @@ export function MascotChatWidget() {
       {/* Input */}
       <div className="p-3 border-t bg-muted/30">
         <div className="flex gap-2">
+          <Button
+            variant={isRecording ? "destructive" : "ghost"}
+            size="icon"
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={isLoading || isTranscribing}
+            className="rounded-full shrink-0"
+            title={isRecording ? "Detener" : "Grabar audio"}
+          >
+            {isTranscribing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isRecording ? (
+              <MicOff className="h-4 w-4" />
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
+          </Button>
           <Input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Escribe un mensaje..."
-            disabled={isLoading}
+            placeholder={isRecording ? "🎙️ Grabando..." : isTranscribing ? "Transcribiendo..." : "Escribe un mensaje..."}
+            disabled={isLoading || isRecording}
             className="flex-1 rounded-full bg-background"
           />
           <Button

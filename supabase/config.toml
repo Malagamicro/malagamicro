@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.seo-article-callback]
 verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = false
