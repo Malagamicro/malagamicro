@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Sparkles, Loader2, FileText, ImageIcon, Settings, ChevronDown, Check } from 'lucide-react';
+import { Sparkles, Loader2, ImageIcon, Settings, ChevronDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 const DEFAULT_WEBHOOK_URL = 'https://n8n.srv1304274.hstgr.cloud/webhook/generate-seo-article';
 const STORAGE_KEY = 'seo-generator-webhook-url';
@@ -46,96 +46,82 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Card className="border-primary/20 shadow-sm">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <Sparkles className="h-5 w-5 text-primary" />
-          Generador de Artículos SEO
+          Nuevo Artículo
         </CardTitle>
-        <CardDescription>
-          Genera artículos optimizados para SEO con investigación web en tiempo real e imágenes generadas por IA
+        <CardDescription className="text-xs">
+          Introduce un tema y el sistema generará un artículo SEO completo con imagen
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="topic">Tema del artículo</Label>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="topic" className="text-sm">Tema del artículo</Label>
             <Input
               id="topic"
-              placeholder="Ej: Mejores prácticas de inteligencia artificial en 2026"
+              placeholder="Ej: Mejores prácticas de IA en 2026"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               disabled={generating}
+              className="h-10"
             />
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <ImageIcon className="h-4 w-4" />
-            Se generará 1 imagen por IA optimizada para el artículo
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+            <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+            Se generará 1 imagen por IA optimizada e incrustada en el artículo
           </div>
 
           <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground hover:text-foreground h-8 text-xs">
                 <span className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
+                  <Settings className="h-3.5 w-3.5" />
                   Configuración avanzada
                 </span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="pt-4 space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="webhook" className="text-sm">URL del Webhook n8n</Label>
+            <CollapsibleContent className="pt-3 space-y-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="webhook" className="text-xs">URL del Webhook n8n</Label>
                 <div className="flex gap-2">
                   <Input
                     id="webhook"
                     placeholder="https://n8n.example.com/webhook/..."
                     value={webhookUrl}
                     onChange={(e) => setWebhookUrl(e.target.value)}
-                    className="text-xs"
+                    className="text-xs h-8"
                   />
                   <Button 
                     type="button" 
                     variant="outline" 
                     size="sm"
                     onClick={handleSaveWebhook}
-                    className="shrink-0"
+                    className="shrink-0 h-8 text-xs"
                   >
-                    {saved ? <Check className="h-4 w-4" /> : 'Guardar'}
+                    {saved ? <Check className="h-3.5 w-3.5" /> : 'Guardar'}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Usa <code className="bg-muted px-1 rounded">webhook-test</code> para pruebas o <code className="bg-muted px-1 rounded">webhook</code> para producción
+                <p className="text-[10px] text-muted-foreground">
+                  Usa <code className="bg-muted px-1 rounded">webhook-test</code> para pruebas
                 </p>
               </div>
             </CollapsibleContent>
           </Collapsible>
 
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-            <h4 className="font-medium text-sm flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              El sistema generará:
-            </h4>
-            <ul className="text-sm text-muted-foreground space-y-1 ml-6">
-              <li>• Investigación SEO y análisis de competencia</li>
-              <li>• Estructura optimizada con H1, H2, H3...</li>
-              <li>• Contenido HTML listo para publicar</li>
-              <li>• 1 imagen generada por IA</li>
-              <li>• Meta tags y datos estructurados</li>
-              <li>• Puntuación SEO y métricas</li>
-            </ul>
-          </div>
-
           <Button 
             type="submit" 
-            className="w-full" 
+            className="w-full h-10" 
             disabled={!topic.trim() || generating}
           >
             {generating ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generando artículo... (puede tardar 1-2 minutos)
+                Generando... (1-2 min)
               </>
             ) : (
               <>

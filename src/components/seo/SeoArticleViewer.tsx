@@ -76,10 +76,9 @@ export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerPro
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="preview">Vista Previa</TabsTrigger>
             <TabsTrigger value="html">HTML</TabsTrigger>
-            <TabsTrigger value="images">Imágenes</TabsTrigger>
             <TabsTrigger value="seo">SEO</TabsTrigger>
             <TabsTrigger value="meta">Meta</TabsTrigger>
           </TabsList>
@@ -124,41 +123,8 @@ export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerPro
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="images" className="h-full m-0">
-              <ScrollArea className="h-[60vh]">
-                {article.images && article.images.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {article.images.map((img, i) => (
-                      <div key={i} className="border rounded-lg overflow-hidden">
-                        <img 
-                          src={img.url} 
-                          alt={img.altText || `Imagen ${i + 1}`}
-                          className="w-full h-48 object-cover"
-                        />
-                        <div className="p-2 bg-muted/50">
-                          <p className="text-xs text-muted-foreground truncate">
-                            {img.altText || `Imagen ${i + 1}`}
-                          </p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="mt-1 h-7 text-xs"
-                            onClick={() => window.open(img.url, '_blank')}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Abrir
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-8">
-                    No hay imágenes disponibles
-                  </p>
-                )}
-              </ScrollArea>
-            </TabsContent>
+
+
 
             <TabsContent value="seo" className="h-full m-0">
               <ScrollArea className="h-[60vh]">
