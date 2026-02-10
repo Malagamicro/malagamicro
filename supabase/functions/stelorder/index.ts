@@ -24,6 +24,11 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const action = url.searchParams.get('action');
+    
+    // Sanitize search param - filter out path artifacts like "/index.ts"
+    const rawSearch = url.searchParams.get('search') || '';
+    const sanitizedSearch = (rawSearch && !rawSearch.includes('/') && !rawSearch.includes('.ts')) ? rawSearch.trim() : '';
+    console.log(`STEL action=${action}, rawSearch="${rawSearch}", sanitizedSearch="${sanitizedSearch}"`);
     const body = req.method === 'POST' || req.method === 'PUT' ? await req.json().catch(() => null) : null;
 
     const callStel = async (endpoint: string, method = 'GET', payload?: any) => {
@@ -57,10 +62,9 @@ serve(async (req) => {
     if (action === 'list-budgets') {
       const page = url.searchParams.get('page') || '1';
       const limit = url.searchParams.get('limit') || '50';
-      const search = url.searchParams.get('search') || '';
       
       let endpoint = `salesEstimates?limit=${limit}&page=${page}`;
-      if (search && search.trim().length > 0) endpoint += `&search=${encodeURIComponent(search)}`;
+      if (sanitizedSearch.length > 0) endpoint += `&search=${encodeURIComponent(sanitizedSearch)}`;
       
       const result = await callStel(endpoint);
       return new Response(JSON.stringify(result.data), {
@@ -276,10 +280,9 @@ serve(async (req) => {
     // ===== CLIENTS =====
 
     if (action === 'list-clients') {
-      const search = url.searchParams.get('search') || '';
       const page = url.searchParams.get('page') || '1';
       let endpoint = `clients?page=${page}&limit=50`;
-      if (search && search.trim().length > 0) endpoint += `&search=${encodeURIComponent(search)}`;
+      if (sanitizedSearch.length > 0) endpoint += `&search=${encodeURIComponent(sanitizedSearch)}`;
 
       const result = await callStel(endpoint);
       return new Response(JSON.stringify(result.data), {
