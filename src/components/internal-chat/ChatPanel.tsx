@@ -270,7 +270,7 @@ export function ChatPanel({
                     </div>
                   )}
 
-                  <div className={cn('max-w-[70%]', isMe && 'text-right')}>
+                  <div className={cn('max-w-[85%] sm:max-w-[70%]', isMe && 'text-right')}>
                     {showAvatar && !isMe && (
                       <p className="text-xs text-muted-foreground mb-1 ml-1">
                         {message.sender?.full_name}
@@ -359,8 +359,8 @@ export function ChatPanel({
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-4 border-t bg-card">
-        <div className="flex items-center gap-2">
+      <div className="p-3 sm:p-4 border-t bg-card">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -371,50 +371,55 @@ export function ChatPanel({
           <Button
             variant="ghost"
             size="icon"
+            className="h-9 w-9 shrink-0"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
           >
             {isUploading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Paperclip className="h-5 w-5" />
+              <Paperclip className="h-4 w-4" />
             )}
           </Button>
 
           <Button
             variant={isRecordingAudio ? "destructive" : "ghost"}
             size="icon"
+            className="h-9 w-9 shrink-0 hidden sm:inline-flex"
             onClick={isRecordingAudio ? handleStopAndSendAudio : handleStartAudioRecording}
             disabled={isUploading}
             title={isRecordingAudio ? "Detener y enviar audio" : "Grabar audio"}
           >
             {isRecordingAudio ? (
-              <Square className="h-5 w-5" />
+              <Square className="h-4 w-4" />
             ) : (
-              <Mic className="h-5 w-5" />
+              <Mic className="h-4 w-4" />
             )}
           </Button>
 
-          <EmojiStickerPicker onSelect={(emoji) => setInput(prev => prev + emoji)} />
+          <div className="hidden sm:block">
+            <EmojiStickerPicker onSelect={(emoji) => setInput(prev => prev + emoji)} />
+          </div>
 
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isRecordingAudio ? "🎙️ Grabando audio..." : "Escribe un mensaje..."}
+            placeholder={isRecordingAudio ? "🎙️ Grabando..." : "Mensaje..."}
             disabled={isSending || isRecordingAudio}
-            className="flex-1"
+            className="flex-1 min-w-0 h-9 text-sm"
           />
 
           <Button
             onClick={handleSend}
             disabled={!input.trim() || isSending || isRecordingAudio}
             size="icon"
+            className="h-9 w-9 shrink-0"
           >
             {isSending ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Send className="h-5 w-5" />
+              <Send className="h-4 w-4" />
             )}
           </Button>
         </div>
