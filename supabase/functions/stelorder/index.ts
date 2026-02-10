@@ -20,25 +20,32 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    console.log(`STEL API Key starts with: ${apiKey.substring(0, 8)}... length: ${apiKey.length}`);
 
     const url = new URL(req.url);
     const action = url.searchParams.get('action');
     const body = req.method === 'POST' || req.method === 'PUT' ? await req.json().catch(() => null) : null;
 
-    const stelHeaders: Record<string, string> = {
-      'APIKEY': apiKey,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    };
-
     const callStel = async (endpoint: string, method = 'GET', payload?: any) => {
-      const opts: RequestInit = { method, headers: stelHeaders };
+      // Add APIKEY as query parameter (most reliable per STEL docs)
+      const separator = endpoint.includes('?') ? '&' : '?';
+      const fullUrl = `${STEL_API_BASE}/${endpoint}${separator}APIKEY=${apiKey}`;
+      
+      const opts: RequestInit = { 
+        method, 
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      };
       if (payload && (method === 'POST' || method === 'PUT')) {
         opts.body = JSON.stringify(payload);
       }
       console.log(`STEL API call: ${method} ${STEL_API_BASE}/${endpoint}`);
-      const res = await fetch(`${STEL_API_BASE}/${endpoint}`, opts);
-      const data = await res.json().catch(() => ({}));
+      const res = await fetch(fullUrl, opts);
+      const text = await res.text();
+      let data: any;
+      try { data = JSON.parse(text); } catch { data = { raw: text }; }
       if (!res.ok) console.error(`STEL API error ${res.status}:`, JSON.stringify(data));
       return { ok: res.ok, status: res.status, data };
     };
