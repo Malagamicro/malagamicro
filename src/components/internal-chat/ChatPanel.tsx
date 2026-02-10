@@ -263,7 +263,7 @@ export function ChatPanel({
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4">
+      <ScrollArea className="flex-1 px-2 sm:px-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -274,7 +274,7 @@ export function ChatPanel({
             <p className="text-xs">Envía el primero 👋</p>
           </div>
         ) : (
-          <div className="py-4 space-y-4">
+          <div className="py-3 sm:py-4 space-y-3 sm:space-y-4">
             {messages.map((message, idx) => {
               const isMe = message.sender_id === user?.id;
               const showAvatar = !isMe && (
@@ -288,13 +288,13 @@ export function ChatPanel({
                   className={cn('flex gap-2', isMe && 'flex-row-reverse')}
                 >
                   {!isMe && (
-                    <div className="w-8">
+                    <div className="w-6 sm:w-8 shrink-0">
                       {showAvatar && (
-                        <Avatar className="h-8 w-8">
+                        <Avatar className="h-6 w-6 sm:h-8 sm:w-8">
                           {message.sender?.avatar_url && (
                             <AvatarImage src={message.sender.avatar_url} />
                           )}
-                          <AvatarFallback className="text-xs">
+                          <AvatarFallback className="text-[10px] sm:text-xs">
                             {getInitials(message.sender?.full_name || 'U')}
                           </AvatarFallback>
                         </Avatar>
@@ -302,7 +302,7 @@ export function ChatPanel({
                     </div>
                   )}
 
-                  <div className={cn('max-w-[85%] sm:max-w-[70%]', isMe && 'text-right')}>
+                  <div className={cn('max-w-[88%] sm:max-w-[70%]', isMe && 'text-right')}>
                     {showAvatar && !isMe && (
                       <p className="text-xs text-muted-foreground mb-1 ml-1">
                         {message.sender?.full_name}
@@ -325,7 +325,7 @@ export function ChatPanel({
                     ) : (
                       <div
                         className={cn(
-                          'inline-block rounded-2xl px-4 py-2',
+                          'inline-block rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2',
                           isMe
                             ? 'bg-primary text-primary-foreground rounded-tr-md'
                             : 'bg-muted rounded-tl-md'
