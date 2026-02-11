@@ -58,7 +58,7 @@ export function useEmailProfiles() {
     if (!user) return;
     const channel = supabase
       .channel('email_profiles_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'email_profiles', filter: `user_id=eq.${user.id}` }, () => fetchProfiles())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'email_profiles' }, () => fetchProfiles())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user, fetchProfiles]);

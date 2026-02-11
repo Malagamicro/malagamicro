@@ -92,11 +92,38 @@ export function useEmailMessages(profileId?: string) {
   const syncInbox = async (pId?: string) => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('imap-check', {
-        body: { profile_id: pId || profileId, action: 'sync' }
-      });
-      if (error) throw error;
-      toast.success(`${data?.count || 0} correos sincronizados`);
+      const targetProfileId = pId || profileId;
+      if (!targetProfileId) {
+        // Sync all profiles one by one
+        const { data: allProfiles } = await supabase
+          .from('email_profiles')
+          .select('id, profile_name')
+          .not('imap_host', 'is', null);
+        
+        if (!allProfiles || allProfiles.length === 0) {
+          toast.error('No hay perfiles con IMAP configurado');
+          return;
+        }
+
+        let totalCount = 0;
+        let errors = 0;
+        for (const p of allProfiles) {
+          try {
+            const { data, error } = await supabase.functions.invoke('imap-check', {
+              body: { profile_id: p.id, action: 'sync' }
+            });
+            if (error) { errors++; continue; }
+            totalCount += data?.count || 0;
+          } catch { errors++; }
+        }
+        toast.success(`${totalCount} correos sincronizados de ${allProfiles.length - errors} perfil(es)`);
+      } else {
+        const { data, error } = await supabase.functions.invoke('imap-check', {
+          body: { profile_id: targetProfileId, action: 'sync' }
+        });
+        if (error) throw error;
+        toast.success(`${data?.count || 0} correos sincronizados`);
+      }
       await fetchMessages();
     } catch (err: any) {
       toast.error('Error al sincronizar: ' + err.message);

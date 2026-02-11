@@ -8,13 +8,21 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+interface EmailAttachment {
+  filename: string;
+  content: string; // base64
+  contentType: string;
+}
+
 interface EmailRequest {
   to: string | string[];
+  cc?: string;
   subject: string;
   html?: string;
   text?: string;
   replyTo?: string;
-  profileId?: string; // Use a specific email profile
+  profileId?: string;
+  attachments?: EmailAttachment[];
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -23,7 +31,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { to, subject, html, text, replyTo, profileId }: EmailRequest = await req.json();
+    const { to, cc, subject, html, text, replyTo, profileId, attachments }: EmailRequest = await req.json();
 
     if (!to || !subject || (!html && !text)) {
       return new Response(
@@ -96,13 +104,23 @@ const handler = async (req: Request): Promise<Response> => {
 
     const recipients = Array.isArray(to) ? to.join(", ") : to;
 
+    // Build nodemailer attachments from base64
+    const mailAttachments = (attachments || []).map((att: EmailAttachment) => ({
+      filename: att.filename,
+      content: att.content,
+      encoding: 'base64',
+      contentType: att.contentType,
+    }));
+
     const info = await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to: recipients,
+      cc: cc || undefined,
       subject,
       text: text || undefined,
       html: html || undefined,
       replyTo: replyTo || undefined,
+      attachments: mailAttachments.length > 0 ? mailAttachments : undefined,
     });
 
     console.log("Email sent:", info.messageId);
