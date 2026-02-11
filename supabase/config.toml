@@ -54,6 +54,9 @@ verify_jwt = false
 [functions.stelorder]
 verify_jwt = false
 
+[functions.stel-api]
+verify_jwt = false
+
 [functions.receive-budget-from-n8n]
 verify_jwt = false
 

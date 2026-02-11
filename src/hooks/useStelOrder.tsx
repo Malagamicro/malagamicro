@@ -46,7 +46,7 @@ const callStelAction = async (action: string, params?: Record<string, string>, b
   const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   
   const response = await fetch(
-    `${supabaseUrl}/functions/v1/stelorder?${queryParams.toString()}`,
+    `${supabaseUrl}/functions/v1/stel-api?${queryParams.toString()}`,
     {
       method: body ? 'POST' : 'GET',
       headers: {
