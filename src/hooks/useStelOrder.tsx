@@ -4,11 +4,17 @@ import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export interface StelBudgetLine {
-  concept: string;
-  quantity: number;
-  price: number;
-  taxPercentage: number;
-  discount: number;
+  reference?: string;
+  name: string;
+  description?: string;
+  'base-price': number;
+  units: number;
+  'discount-percentage': number;
+  concept?: string; // backward compat
+  quantity?: number;
+  price?: number;
+  taxPercentage?: number;
+  discount?: number;
   total?: number;
 }
 

@@ -10,7 +10,6 @@ const STEL_API_BASE = 'https://app.stelorder.com/app';
 
 // Map endpoint paths to their required root JSON key for POST/PUT
 const ROOT_KEY_MAP: Record<string, string> = {
-  'salesEstimates': 'est_quote',
   'ordinaryInvoices': 'est_ordinary_invoice',
   'salesOrders': 'est_sales_order',
   'clients': 'client',
@@ -85,7 +84,7 @@ serve(async (req) => {
         // Wrap payload in root key as required by STEL Order API
         const rootKey = getRootKey(endpoint);
         const wrappedPayload = rootKey ? { [rootKey]: payload } : payload;
-        console.log('[STEL] Payload:', JSON.stringify(wrappedPayload));
+        console.log('[STEL] Sending body:', JSON.stringify(wrappedPayload));
         opts.body = JSON.stringify(wrappedPayload);
       }
       
@@ -119,11 +118,13 @@ serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     function mapLine(item: any) {
       return {
-        concept: item.concept || item.description || item.nombre || 'Producto',
-        quantity: item.quantity || item.cantidad || 1,
-        price: item.price || item.unit_price || item.precio || 0,
-        taxPercentage: item.taxPercentage || item.tax_rate || 21,
-        discount: item.discount || 0,
+        'line-type': item['line-type'] || item.lineType || 'ITEM',
+        reference: item.reference || item.referencia || '',
+        name: item.name || item.nombre || item.concept || 'Producto',
+        description: item.description || item.descripcion || '',
+        'base-price': item['base-price'] || item.base_price || item.price || item.precio || 0,
+        units: item.units || item.quantity || item.cantidad || 1,
+        'discount-percentage': item['discount-percentage'] || item.discount || item.descuento || 0,
       };
     }
 
@@ -151,7 +152,7 @@ serve(async (req) => {
     if (action === 'create-budget') {
       if (!body) return respond({ error: 'Body requerido' }, 400);
 
-      let clientId = body.client_id || body.clientId;
+      let clientId = body.client_id || body.clientId || body['client-id'];
       if (!clientId && body.client_name) {
         const sr = await stelFetch('clients?search=' + encodeURIComponent(body.client_name));
         if (sr.ok && Array.isArray(sr.data) && sr.data.length > 0) {
@@ -162,16 +163,45 @@ serve(async (req) => {
         }
       }
 
+      // Map lines to STEL Order salesEstimates format (kebab-case fields)
+      // deno-lint-ignore no-explicit-any
+      const stelLines = (body.items || body.lines || []).map((i: any) => {
+        const hasItemId = i['item-id'] || i.item_id || i.itemId;
+        const lineType = hasItemId ? 'ITEM' : 'SECTION';
+        // deno-lint-ignore no-explicit-any
+        const line: any = {
+          'line-type': i['line-type'] || lineType,
+          name: i.name || i.nombre || i.concept || i.concepto || '',
+          description: i.description || i.descripcion || '',
+          'base-price': i['base-price'] || i.base_price || i.price || i.precio || 0,
+          units: i.units || i.quantity || i.cantidad || i.uds || 1,
+          'discount-percentage': i['discount-percentage'] || i.discount || i.descuento || 0,
+        };
+        if (hasItemId) line['item-id'] = hasItemId;
+        if (i.reference || i.referencia) line.reference = i.reference || i.referencia;
+        return line;
+      });
+
       // deno-lint-ignore no-explicit-any
       const payload: any = {
-        clientId: clientId,
-        // deno-lint-ignore no-explicit-any
-        lines: (body.items || body.lines || []).map((i: any) => mapLine(i)),
-        notes: body.notes || '',
-        validUntil: body.valid_until || body.validUntil || undefined,
+        'account-id': clientId,
+        lines: stelLines,
+        title: body.title || body.subject || body.titulo || '',
+        notes: body.notes || body.notas || '',
       };
-      if (body.subject) payload.subject = body.subject;
+      
+      // Optional fields matching STEL Order form
+      if (body.date || body.fecha) payload.date = body.date || body.fecha;
+      if (body.agent_id || body['agent-id']) payload['agent-id'] = body.agent_id || body['agent-id'];
+      if (body.payment_method || body['payment-method'] || body.forma_pago) {
+        payload['payment-method'] = body.payment_method || body['payment-method'] || body.forma_pago;
+      }
+      if (body.valid_until || body.validUntil || body.validez) {
+        payload['valid-until'] = body.valid_until || body.validUntil || body.validez;
+      }
+      if (body.tarifa || body.rate) payload.rate = body.tarifa || body.rate;
 
+      console.log('[STEL] Creating salesEstimate with payload:', JSON.stringify(payload));
       const r = await stelFetch('salesEstimates', 'POST', payload);
       if (!r.ok) return respond({ error: 'Error al crear presupuesto', details: r.data }, r.status);
       return respond({ success: true, budget: r.data });
