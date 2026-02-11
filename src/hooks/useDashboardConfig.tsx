@@ -28,6 +28,7 @@ const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: 'reminders', type: 'reminders', title: 'Recordatorios', icon: 'Bell', visible: true, minW: 3, minH: 4 },
   { id: 'company-reminders', type: 'company-reminders', title: 'Recordatorios Empresa', icon: 'Building', visible: true, minW: 3, minH: 3 },
   { id: 'tickets', type: 'tickets', title: 'Tickets Recientes', icon: 'Ticket', visible: true, minW: 3, minH: 4 },
+  { id: 'online-users', type: 'online-users', title: 'Usuarios Online', icon: 'Wifi', visible: true, minW: 3, minH: 3 },
   { id: 'inbox-preview', type: 'inbox-preview', title: 'Inbox Preview', icon: 'Inbox', visible: false, minW: 3, minH: 3 },
   { id: 'whatsapp-preview', type: 'whatsapp-preview', title: 'WhatsApp Preview', icon: 'MessageSquare', visible: false, minW: 3, minH: 3 },
   { id: 'ai-chat-quick', type: 'ai-chat-quick', title: 'Chat IA Rápido', icon: 'Bot', visible: false, minW: 3, minH: 3 },
@@ -40,8 +41,9 @@ const DEFAULT_LAYOUTS: Layout[] = [
   { i: 'leads-chart', x: 0, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
   { i: 'recent-leads', x: 4, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
   { i: 'reminders', x: 8, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
-  { i: 'company-reminders', x: 0, y: 7, w: 6, h: 5, minW: 3, minH: 3 },
-  { i: 'tickets', x: 6, y: 7, w: 6, h: 5, minW: 3, minH: 4 },
+  { i: 'company-reminders', x: 0, y: 7, w: 4, h: 5, minW: 3, minH: 3 },
+  { i: 'tickets', x: 4, y: 7, w: 5, h: 5, minW: 3, minH: 4 },
+  { i: 'online-users', x: 9, y: 7, w: 3, h: 5, minW: 3, minH: 3 },
 ];
 
 export function useDashboardConfig() {

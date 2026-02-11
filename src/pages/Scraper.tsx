@@ -5,23 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { 
-  Search, Mail, Phone, MessageCircle, Loader2, FolderOpen, Globe, 
-  AlertCircle, ArrowLeft, Save, Plus, Link2, Share2, Zap
+  Search, Mail, Phone, MessageCircle, Loader2, Globe, 
+  AlertCircle, ArrowLeft, Save, Link2, Share2, Zap
 } from "lucide-react";
-import { useFileManager } from "@/hooks/useFileManager";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ScrapeResult {
   emails: string[];
@@ -49,33 +39,27 @@ const LOADING_MESSAGES = [
 
 export default function Scraper() {
   const navigate = useNavigate();
-  const { folders, addFile, addFolder } = useFileManager();
+  const { user } = useAuth();
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [result, setResult] = useState<ScrapeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedItems, setSelectedItems] = useState<SelectedItems>({
     emails: new Set(),
     phones: new Set(),
     whatsapp: new Set(),
   });
-  const [folder, setFolder] = useState("none");
-  const [newFolderName, setNewFolderName] = useState("");
-  const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false);
 
   const handleScan = async () => {
-    if (!url.trim()) {
-      toast.error("Introduce una URL válida");
-      return;
-    }
+    if (!url.trim()) { toast.error("Introduce una URL válida"); return; }
 
     setIsLoading(true);
     setError(null);
     setResult(null);
     setSelectedItems({ emails: new Set(), phones: new Set(), whatsapp: new Set() });
 
-    // Animate loading messages
     let messageIndex = 0;
     setLoadingMessage(LOADING_MESSAGES[0]);
     const messageInterval = setInterval(() => {
@@ -89,18 +73,10 @@ export default function Scraper() {
       });
 
       clearInterval(messageInterval);
-
-      if (fnError) {
-        throw new Error(fnError.message);
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || "Error al escanear la URL");
-      }
+      if (fnError) throw new Error(fnError.message);
+      if (!data.success) throw new Error(data.error || "Error al escanear la URL");
 
       setResult(data.data);
-      
-      // Auto-select all found items
       setSelectedItems({
         emails: new Set(data.data.emails),
         phones: new Set(data.data.phones),
@@ -110,11 +86,8 @@ export default function Scraper() {
       const total = data.data.emails.length + data.data.phones.length + data.data.whatsapp.length;
       const pagesScanned = data.data.source_urls_scanned?.length || 1;
       
-      if (total > 0) {
-        toast.success(`Encontrados ${total} contactos en ${pagesScanned} páginas`);
-      } else {
-        toast.info("No se encontraron contactos en este sitio");
-      }
+      if (total > 0) toast.success(`Encontrados ${total} contactos en ${pagesScanned} páginas`);
+      else toast.info("No se encontraron contactos en este sitio");
     } catch (err) {
       clearInterval(messageInterval);
       const message = err instanceof Error ? err.message : "Error desconocido";
@@ -129,11 +102,7 @@ export default function Scraper() {
   const toggleItem = (type: keyof SelectedItems, item: string) => {
     setSelectedItems((prev) => {
       const newSet = new Set(prev[type]);
-      if (newSet.has(item)) {
-        newSet.delete(item);
-      } else {
-        newSet.add(item);
-      }
+      if (newSet.has(item)) newSet.delete(item); else newSet.add(item);
       return { ...prev, [type]: newSet };
     });
   };
@@ -141,12 +110,13 @@ export default function Scraper() {
   const toggleAll = (type: keyof SelectedItems, items: string[]) => {
     setSelectedItems((prev) => {
       const allSelected = items.every((item) => prev[type].has(item));
-      const newSet = allSelected ? new Set<string>() : new Set(items);
-      return { ...prev, [type]: newSet };
+      return { ...prev, [type]: allSelected ? new Set<string>() : new Set(items) };
     });
   };
 
-  const handleSaveToFileManager = () => {
+  const handleSaveToSharedFiles = async () => {
+    if (!user?.id) { toast.error("Debes iniciar sesión"); return; }
+
     const lines: string[] = [];
     const date = new Date().toISOString().split("T")[0];
     
@@ -160,19 +130,16 @@ export default function Scraper() {
       lines.push(...Array.from(selectedItems.emails));
       lines.push("");
     }
-
     if (selectedItems.phones.size > 0) {
       lines.push("## TELÉFONOS");
       lines.push(...Array.from(selectedItems.phones));
       lines.push("");
     }
-
     if (selectedItems.whatsapp.size > 0) {
       lines.push("## WHATSAPP");
       lines.push(...Array.from(selectedItems.whatsapp));
       lines.push("");
     }
-
     if (result?.socials && result.socials.length > 0) {
       lines.push("## REDES SOCIALES");
       lines.push(...result.socials);
@@ -181,41 +148,47 @@ export default function Scraper() {
 
     const content = lines.join("\n");
     const filename = `contactos_${date}_${Date.now()}.txt`;
-    const folderName = folder === "none" ? "" : folder;
 
-    addFile({
-      name: filename,
-      folder: folderName,
-      content,
-      itemCount: totalSelected,
-    });
+    setIsSaving(true);
+    try {
+      // Upload to shared-files storage
+      const blob = new Blob([content], { type: 'text/plain' });
+      const file = new File([blob], filename, { type: 'text/plain' });
+      const storagePath = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.txt`;
 
-    toast.success(
-      folderName 
-        ? `Guardado en carpeta "${folderName}"` 
-        : "Guardado en Administrador de Archivos",
-      {
-        action: {
-          label: "Ver archivos",
-          onClick: () => navigate("/tools/files"),
-        },
-      }
-    );
-  };
+      const { error: uploadError } = await supabase.storage
+        .from('shared-files')
+        .upload(storagePath, file);
 
-  const handleCreateFolder = () => {
-    if (!newFolderName.trim()) {
-      toast.error("Introduce un nombre para la carpeta");
-      return;
-    }
-    const created = addFolder(newFolderName.trim());
-    if (created) {
-      setFolder(created.name);
-      setNewFolderName("");
-      setIsNewFolderDialogOpen(false);
-      toast.success(`Carpeta "${created.name}" creada`);
-    } else {
-      toast.error("Ya existe una carpeta con ese nombre");
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('shared-files')
+        .getPublicUrl(storagePath);
+
+      // Save metadata to shared_files table
+      const { error: dbError } = await supabase
+        .from('shared_files')
+        .insert({
+          user_id: user.id,
+          file_name: filename,
+          file_path: publicUrl,
+          file_size: blob.size,
+          file_type: 'text/plain',
+          description: `Contactos extraídos de ${url}`,
+          folder_path: '/',
+        });
+
+      if (dbError) throw dbError;
+
+      toast.success("Guardado en Archivos Compartidos", {
+        action: { label: "Ver archivos", onClick: () => navigate("/cloud") },
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al guardar archivo");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -236,8 +209,7 @@ export default function Scraper() {
             </p>
           </div>
           <Button variant="outline" onClick={() => navigate("/")} className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Volver al CRM
+            <ArrowLeft className="h-4 w-4" /> Volver al CRM
           </Button>
         </div>
 
@@ -249,29 +221,15 @@ export default function Scraper() {
                 <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="https://ejemplo.com"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
+                  value={url} onChange={(e) => setUrl(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleScan()}
-                  className="pl-10"
-                  disabled={isLoading}
+                  className="pl-10" disabled={isLoading}
                 />
               </div>
               <Button onClick={handleScan} disabled={isLoading} className="min-w-[140px]">
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Analizando...
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-4 w-4 mr-2" />
-                    Escanear Sitio
-                  </>
-                )}
+                {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Analizando...</> : <><Search className="h-4 w-4 mr-2" />Escanear Sitio</>}
               </Button>
             </div>
-            
-            {/* Loading State */}
             {isLoading && (
               <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
                 <div className="flex items-center gap-3">
@@ -281,9 +239,7 @@ export default function Scraper() {
                   </div>
                   <div>
                     <p className="font-medium text-foreground">{loadingMessage}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Analizando Home y secciones de contacto automáticamente...
-                    </p>
+                    <p className="text-sm text-muted-foreground">Analizando Home y secciones de contacto automáticamente...</p>
                   </div>
                 </div>
               </div>
@@ -296,8 +252,7 @@ export default function Scraper() {
           <Card className="border-destructive">
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-5 w-5" />
-                <span>{error}</span>
+                <AlertCircle className="h-5 w-5" /><span>{error}</span>
               </div>
             </CardContent>
           </Card>
@@ -306,13 +261,11 @@ export default function Scraper() {
         {/* Results */}
         {result && (
           <>
-            {/* Scanned Pages Summary */}
             {result.source_urls_scanned && result.source_urls_scanned.length > 1 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
-                    <Link2 className="h-4 w-4" />
-                    Páginas analizadas ({result.source_urls_scanned.length})
+                    <Link2 className="h-4 w-4" /> Páginas analizadas ({result.source_urls_scanned.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -327,44 +280,25 @@ export default function Scraper() {
               </Card>
             )}
 
-            {/* Results Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Emails */}
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Mail className="h-5 w-5 text-primary" />
-                      Emails ({result.emails.length})
-                    </CardTitle>
-                    {result.emails.length > 0 && (
-                      <Checkbox
-                        checked={result.emails.every((e) => selectedItems.emails.has(e))}
-                        onCheckedChange={() => toggleAll("emails", result.emails)}
-                      />
-                    )}
+                    <CardTitle className="text-lg flex items-center gap-2"><Mail className="h-5 w-5 text-primary" /> Emails ({result.emails.length})</CardTitle>
+                    {result.emails.length > 0 && <Checkbox checked={result.emails.every(e => selectedItems.emails.has(e))} onCheckedChange={() => toggleAll("emails", result.emails)} />}
                   </div>
                 </CardHeader>
                 <CardContent>
                   {result.emails.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No se encontraron emails
-                    </p>
+                    <p className="text-sm text-muted-foreground text-center py-4">No se encontraron emails</p>
                   ) : (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
                       {result.emails.map((email, idx) => (
-                        <label
-                          key={email}
-                          className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm"
-                        >
-                          <Checkbox
-                            checked={selectedItems.emails.has(email)}
-                            onCheckedChange={() => toggleItem("emails", email)}
-                          />
+                        <label key={email} className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm">
+                          <Checkbox checked={selectedItems.emails.has(email)} onCheckedChange={() => toggleItem("emails", email)} />
                           <span className="truncate flex-1">{email}</span>
-                          {idx === 0 && result.emails.length > 1 && (
-                            <Badge variant="outline" className="text-xs">Principal</Badge>
-                          )}
+                          {idx === 0 && result.emails.length > 1 && <Badge variant="outline" className="text-xs">Principal</Badge>}
                         </label>
                       ))}
                     </div>
@@ -376,38 +310,20 @@ export default function Scraper() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Phone className="h-5 w-5 text-primary" />
-                      Teléfonos ({result.phones.length})
-                    </CardTitle>
-                    {result.phones.length > 0 && (
-                      <Checkbox
-                        checked={result.phones.every((p) => selectedItems.phones.has(p))}
-                        onCheckedChange={() => toggleAll("phones", result.phones)}
-                      />
-                    )}
+                    <CardTitle className="text-lg flex items-center gap-2"><Phone className="h-5 w-5 text-primary" /> Teléfonos ({result.phones.length})</CardTitle>
+                    {result.phones.length > 0 && <Checkbox checked={result.phones.every(p => selectedItems.phones.has(p))} onCheckedChange={() => toggleAll("phones", result.phones)} />}
                   </div>
                 </CardHeader>
                 <CardContent>
                   {result.phones.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No se encontraron teléfonos
-                    </p>
+                    <p className="text-sm text-muted-foreground text-center py-4">No se encontraron teléfonos</p>
                   ) : (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
                       {result.phones.map((phone, idx) => (
-                        <label
-                          key={phone}
-                          className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm"
-                        >
-                          <Checkbox
-                            checked={selectedItems.phones.has(phone)}
-                            onCheckedChange={() => toggleItem("phones", phone)}
-                          />
+                        <label key={phone} className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm">
+                          <Checkbox checked={selectedItems.phones.has(phone)} onCheckedChange={() => toggleItem("phones", phone)} />
                           <span className="font-mono flex-1">{phone}</span>
-                          {idx === 0 && result.phones.length > 1 && (
-                            <Badge variant="outline" className="text-xs">Móvil</Badge>
-                          )}
+                          {idx === 0 && result.phones.length > 1 && <Badge variant="outline" className="text-xs">Móvil</Badge>}
                         </label>
                       ))}
                     </div>
@@ -419,34 +335,18 @@ export default function Scraper() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <MessageCircle className="h-5 w-5 text-primary" />
-                      WhatsApp ({result.whatsapp.length})
-                    </CardTitle>
-                    {result.whatsapp.length > 0 && (
-                      <Checkbox
-                        checked={result.whatsapp.every((w) => selectedItems.whatsapp.has(w))}
-                        onCheckedChange={() => toggleAll("whatsapp", result.whatsapp)}
-                      />
-                    )}
+                    <CardTitle className="text-lg flex items-center gap-2"><MessageCircle className="h-5 w-5 text-primary" /> WhatsApp ({result.whatsapp.length})</CardTitle>
+                    {result.whatsapp.length > 0 && <Checkbox checked={result.whatsapp.every(w => selectedItems.whatsapp.has(w))} onCheckedChange={() => toggleAll("whatsapp", result.whatsapp)} />}
                   </div>
                 </CardHeader>
                 <CardContent>
                   {result.whatsapp.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No se encontraron enlaces WhatsApp
-                    </p>
+                    <p className="text-sm text-muted-foreground text-center py-4">No se encontraron enlaces WhatsApp</p>
                   ) : (
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
                       {result.whatsapp.map((wa) => (
-                        <label
-                          key={wa}
-                          className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm"
-                        >
-                          <Checkbox
-                            checked={selectedItems.whatsapp.has(wa)}
-                            onCheckedChange={() => toggleItem("whatsapp", wa)}
-                          />
+                        <label key={wa} className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm">
+                          <Checkbox checked={selectedItems.whatsapp.has(wa)} onCheckedChange={() => toggleItem("whatsapp", wa)} />
                           <span className="font-mono">{wa}</span>
                         </label>
                       ))}
@@ -461,20 +361,14 @@ export default function Scraper() {
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Share2 className="h-5 w-5 text-primary" />
-                    Redes Sociales ({result.socials.length})
+                    <Share2 className="h-5 w-5 text-primary" /> Redes Sociales ({result.socials.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
                     {result.socials.map((social, idx) => (
-                      <a
-                        key={idx}
-                        href={social.startsWith('http') ? social : `https://${social}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 text-sm transition-colors"
-                      >
+                      <a key={idx} href={social.startsWith('http') ? social : `https://${social}`} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 text-sm transition-colors">
                         <Share2 className="h-3 w-3" />
                         {social.replace(/^https?:\/\//, '').split('/').slice(0, 2).join('/')}
                       </a>
@@ -484,69 +378,17 @@ export default function Scraper() {
               </Card>
             )}
 
-            {/* Save Section */}
+            {/* Save Section — directly to shared files */}
             {(result.emails.length > 0 || result.phones.length > 0 || result.whatsapp.length > 0) && (
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                        <Select value={folder} onValueChange={setFolder}>
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Sin carpeta" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sin carpeta</SelectItem>
-                            {folders.map((f) => (
-                              <SelectItem key={f.id} value={f.name}>
-                                {f.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Dialog open={isNewFolderDialogOpen} onOpenChange={setIsNewFolderDialogOpen}>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-9 w-9">
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Nueva Carpeta</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="newFolderName">Nombre</Label>
-                                <Input
-                                  id="newFolderName"
-                                  value={newFolderName}
-                                  onChange={(e) => setNewFolderName(e.target.value)}
-                                  placeholder="Ej: Proveedores 2024"
-                                  onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button variant="outline" onClick={() => setIsNewFolderDialogOpen(false)}>
-                                Cancelar
-                              </Button>
-                              <Button onClick={handleCreateFolder}>Crear</Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                      <span className="text-sm text-muted-foreground">
-                        {totalSelected} items seleccionados
-                      </span>
-                    </div>
-                    <Button
-                      onClick={handleSaveToFileManager}
-                      disabled={totalSelected === 0}
-                      className="w-full sm:w-auto"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Guardar en Archivos
+                    <span className="text-sm text-muted-foreground">
+                      {totalSelected} items seleccionados
+                    </span>
+                    <Button onClick={handleSaveToSharedFiles} disabled={totalSelected === 0 || isSaving} className="w-full sm:w-auto">
+                      {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                      Guardar en Archivos Compartidos
                     </Button>
                   </div>
                 </CardContent>
