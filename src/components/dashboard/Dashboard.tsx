@@ -9,9 +9,10 @@ import { UpcomingReminders } from './UpcomingReminders';
 import { CompanyReminders } from './CompanyReminders';
 import { RecentTickets } from './RecentTickets';
 import { ActivityStats } from '@/components/reports/ActivityStats';
+import { OnlineUsersWidget } from './OnlineUsersWidget';
 import { useLeads, useDashboardStats } from '@/hooks/useLeads';
 import { useDashboardConfig, DashboardWidget } from '@/hooks/useDashboardConfig';
-import { Users, UserPlus, TrendingUp, Target, Loader2, Pencil, X, RotateCcw, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
+import { Users, UserPlus, TrendingUp, Target, Loader2, Pencil, RotateCcw, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
@@ -25,10 +26,7 @@ interface DashboardProps {
 }
 
 function WidgetContent({ widget, stats, leads, onViewLead }: {
-  widget: DashboardWidget;
-  stats: any;
-  leads: any[];
-  onViewLead: (id: string) => void;
+  widget: DashboardWidget; stats: any; leads: any[]; onViewLead: (id: string) => void;
 }) {
   switch (widget.type) {
     case 'stats':
@@ -40,44 +38,22 @@ function WidgetContent({ widget, stats, leads, onViewLead }: {
           <StatCard title="Clientes activos" value={stats.clients} icon={Target} />
         </div>
       );
-    case 'leads-chart':
-      return <LeadsByStatusChart stats={stats} />;
-    case 'recent-leads':
-      return <RecentLeads leads={leads} onViewLead={onViewLead} />;
-    case 'reminders':
-      return <UpcomingReminders onLeadClick={onViewLead} />;
-    case 'company-reminders':
-      return <CompanyReminders />;
-    case 'tickets':
-      return <RecentTickets />;
+    case 'leads-chart': return <LeadsByStatusChart stats={stats} />;
+    case 'recent-leads': return <RecentLeads leads={leads} onViewLead={onViewLead} />;
+    case 'reminders': return <UpcomingReminders onLeadClick={onViewLead} />;
+    case 'company-reminders': return <CompanyReminders />;
+    case 'tickets': return <RecentTickets />;
+    case 'online-users': return <OnlineUsersWidget />;
     case 'inbox-preview':
-      return (
-        <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">📬 Inbox</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground">Acceso rápido a tu bandeja de entrada.</p></CardContent>
-        </Card>
-      );
+      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">📬 Inbox</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Acceso rápido a tu bandeja de entrada.</p></CardContent></Card>;
     case 'whatsapp-preview':
-      return (
-        <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">💬 WhatsApp</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground">Vista rápida de tus conversaciones.</p></CardContent>
-        </Card>
-      );
+      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">💬 WhatsApp</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Vista rápida de tus conversaciones.</p></CardContent></Card>;
     case 'ai-chat-quick':
-      return (
-        <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">🤖 Chat IA</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground">Asistente IA para consultas rápidas.</p></CardContent>
-        </Card>
-      );
+      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">🤖 Chat IA</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Asistente IA para consultas rápidas.</p></CardContent></Card>;
     case 'map-preview':
-      return (
-        <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">🗺️ Mapa</CardTitle></CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground">Distribución geográfica de leads.</p></CardContent>
-        </Card>
-      );
-    case 'activity-stats':
-      return <ActivityStats />;
-    default:
-      return null;
+      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">🗺️ Mapa</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Distribución geográfica de leads.</p></CardContent></Card>;
+    case 'activity-stats': return <ActivityStats />;
+    default: return null;
   }
 }
 
@@ -125,8 +101,6 @@ export function Dashboard({ onViewLead }: DashboardProps) {
               <span className="hidden sm:inline">Restaurar</span>
             </Button>
           )}
-
-          {/* Widget panel */}
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5">
@@ -135,9 +109,7 @@ export function Dashboard({ onViewLead }: DashboardProps) {
               </Button>
             </SheetTrigger>
             <SheetContent className="w-80 bg-background z-[60]">
-              <SheetHeader>
-                <SheetTitle>Bloques del Dashboard</SheetTitle>
-              </SheetHeader>
+              <SheetHeader><SheetTitle>Bloques del Dashboard</SheetTitle></SheetHeader>
               <div className="mt-4 space-y-2">
                 {widgets.map(w => (
                   <div key={w.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
@@ -156,21 +128,13 @@ export function Dashboard({ onViewLead }: DashboardProps) {
               </div>
             </SheetContent>
           </Sheet>
-
-          {/* Edit mode toggle */}
-          <Button
-            variant={editMode ? "default" : "outline"}
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setEditMode(!editMode)}
-          >
+          <Button variant={editMode ? "default" : "outline"} size="sm" className="gap-1.5" onClick={() => setEditMode(!editMode)}>
             {editMode ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
             <span className="hidden sm:inline">{editMode ? 'Bloquear' : 'Editar'}</span>
           </Button>
         </div>
       </div>
 
-      {/* Info banner in edit mode */}
       {editMode && (
         <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 text-sm text-primary flex items-center gap-2">
           <Pencil className="h-4 w-4 flex-shrink-0" />
@@ -178,44 +142,36 @@ export function Dashboard({ onViewLead }: DashboardProps) {
         </div>
       )}
 
-      {/* Grid Layout */}
+      {/* Grid Layout — responsive breakpoints with adapted layouts */}
       <ResponsiveGridLayout
         className="layout"
-        layouts={{ lg: visibleLayouts, md: visibleLayouts, sm: visibleLayouts }}
+        layouts={{
+          lg: visibleLayouts,
+          md: visibleLayouts.map(l => ({ ...l, w: Math.min(l.w, 8) })),
+          sm: visibleLayouts.map(l => ({ ...l, x: 0, w: 4 })),
+        }}
         breakpoints={{ lg: 1200, md: 768, sm: 0 }}
         cols={{ lg: cols, md: 8, sm: 4 }}
-        rowHeight={60}
+        rowHeight={65}
         isDraggable={editMode}
         isResizable={editMode}
-        onLayoutChange={(layout) => {
-          if (editMode) onLayoutChange(layout);
-        }}
+        onLayoutChange={(layout) => { if (editMode) onLayoutChange(layout); }}
         draggableHandle=".widget-drag-handle"
         compactType="vertical"
         margin={[16, 16]}
       >
         {visibleWidgets.map(widget => (
-          <div
-            key={widget.id}
-            className={cn(
-              "rounded-xl overflow-hidden",
-              editMode && "ring-2 ring-dashed ring-primary/30 bg-card/50"
-            )}
-          >
+          <div key={widget.id} className={cn(
+            "rounded-xl overflow-hidden bg-card shadow-sm border",
+            editMode && "ring-2 ring-dashed ring-primary/30 bg-card/50"
+          )}>
             {editMode && (
               <div className="widget-drag-handle absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-background/80 to-transparent z-10 flex items-center justify-center cursor-grab active:cursor-grabbing">
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <div className="w-8 h-1 rounded-full bg-muted-foreground/40" />
-                </div>
+                <div className="w-8 h-1 rounded-full bg-muted-foreground/40" />
               </div>
             )}
             <div className={cn("h-full overflow-auto", editMode && "pt-4")}>
-              <WidgetContent
-                widget={widget}
-                stats={dashboardStats}
-                leads={leads}
-                onViewLead={onViewLead}
-              />
+              <WidgetContent widget={widget} stats={dashboardStats} leads={leads} onViewLead={onViewLead} />
             </div>
           </div>
         ))}
