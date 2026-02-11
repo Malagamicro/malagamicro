@@ -34,7 +34,10 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = (Deno.env.get('STELORDER_API_KEY') || '').trim();
+    // Clean APIKEY: remove braces, quotes, whitespace (STEL docs say "Do not include {}")
+    const rawKey = Deno.env.get('STELORDER_API_KEY') || '';
+    const apiKey = rawKey.replace(/[{}"'\s]/g, '');
+    console.log(`[STEL] APIKEY length: ${apiKey.length}, first4: ${apiKey.substring(0, 4)}..., raw length: ${rawKey.length}`);
     if (!apiKey) {
       return new Response(JSON.stringify({ error: 'STELORDER_API_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
