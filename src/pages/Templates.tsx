@@ -38,6 +38,8 @@ import {
   MessageSquare,
   Search,
   Tag,
+  Sparkles,
+  Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -82,6 +84,9 @@ export default function Templates() {
   const [formData, setFormData] = useState<TemplateFormData>(defaultFormData);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [showAiInModal, setShowAiInModal] = useState(false);
 
   const filteredTemplates = useMemo(() => {
     return templates.filter(template => {
@@ -155,6 +160,63 @@ export default function Templates() {
   const handleCopyContent = (content: string) => {
     navigator.clipboard.writeText(content);
     toast.success('Contenido copiado al portapapeles');
+  };
+
+  const generateWithAi = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsGeneratingAi(true);
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/document-ai`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'write',
+          messages: [{ 
+            role: 'user', 
+            content: `Genera una plantilla de mensaje de WhatsApp profesional para: ${aiPrompt.trim()}. 
+Solo devuelve el contenido del mensaje, sin explicaciones. Usa variables como {{companyName}}, {{contactName}} donde sea apropiado. 
+El mensaje debe ser breve (máximo 3-4 párrafos), directo y profesional. Incluye emojis apropiados.` 
+          }],
+        }),
+      });
+      if (!resp.ok) throw new Error('Error de IA');
+      
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let result = '';
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf('\n')) !== -1) {
+          let line = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 1);
+          if (line.endsWith('\r')) line = line.slice(0, -1);
+          if (!line.startsWith('data: ')) continue;
+          const json = line.slice(6).trim();
+          if (json === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(json);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) result += delta;
+          } catch {}
+        }
+      }
+      
+      setFormData(prev => ({ ...prev, content: result.trim() }));
+      setShowAiInModal(false);
+      toast.success('Plantilla generada con IA');
+    } catch {
+      toast.error('Error al generar con IA');
+    } finally {
+      setIsGeneratingAi(false);
+    }
   };
 
   const isSaving = isCreating || isUpdating;
@@ -347,13 +409,41 @@ export default function Templates() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="content" className="text-sm">Contenido *</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="content" className="text-sm">Contenido *</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => setShowAiInModal(!showAiInModal)}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {showAiInModal ? 'Ocultar IA' : 'Escribir con IA'}
+                </Button>
+              </div>
+              
+              {showAiInModal && (
+                <div className="flex gap-2 p-2 bg-muted rounded-lg">
+                  <Input
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && generateWithAi()}
+                    placeholder="Ej: saludo de bienvenida para nuevo cliente..."
+                    className="h-8 text-xs"
+                    disabled={isGeneratingAi}
+                  />
+                  <Button size="sm" className="h-8 text-xs shrink-0" onClick={generateWithAi} disabled={isGeneratingAi || !aiPrompt.trim()}>
+                    {isGeneratingAi ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+              )}
+              
               <Textarea
                 id="content"
                 value={formData.content}
                 onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
                 placeholder="Escribe el contenido de tu plantilla...&#10;&#10;Puedes usar variables como {{companyName}}, {{contactName}}, etc."
-                rows={5}
+                rows={6}
                 disabled={isSaving}
                 className="text-sm"
               />

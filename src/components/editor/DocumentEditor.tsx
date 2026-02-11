@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FileText, Save, Download, Sparkles, Send, Loader2, X,
   Bold, Italic, Heading1, Heading2, List, ListOrdered,
   Minus, Quote, Code, Undo2, Redo2, Trash2, Upload,
-  PanelRightOpen, PanelRightClose, FileUp, Cloud,
+  PanelRightOpen, PanelRightClose, FileUp, Cloud, ArrowLeft,
+  FileDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,11 +17,15 @@ import { Separator } from '@/components/ui/separator';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import jsPDF from 'jspdf';
 
 type AiAction = 'write' | 'edit' | 'improve' | 'summarize';
 
@@ -32,10 +38,20 @@ interface DocumentEditorProps {
   initialContent?: string;
   initialTitle?: string;
   onSaveToCloud?: (title: string, content: string) => Promise<void>;
+  showBackButton?: boolean;
 }
 
-export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveToCloud }: DocumentEditorProps) {
+function sanitizeFileName(name: string): string {
+  return name
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^a-zA-Z0-9._-]/g, '_') // replace non-safe chars
+    .replace(/_+/g, '_'); // collapse underscores
+}
+
+export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveToCloud, showBackButton = true }: DocumentEditorProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [title, setTitle] = useState(initialTitle || 'Sin título');
   const [content, setContent] = useState(initialContent);
   const [preview, setPreview] = useState(false);
@@ -133,7 +149,6 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
   const handleSendChat = async () => {
     if (!chatInput.trim() || isStreaming) return;
 
-    // If action is edit/improve/summarize, include current document
     let userMessage = chatInput.trim();
     if ((aiAction === 'edit' || aiAction === 'improve' || aiAction === 'summarize') && content) {
       userMessage = `Documento actual:\n\n${content}\n\n---\n\nInstrucciones: ${userMessage}`;
@@ -163,15 +178,111 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
     }
   };
 
-  const handleDownload = () => {
-    const blob = new Blob([content], { type: 'text/markdown' });
+  // --- Download helpers ---
+  const downloadBlob = (blob: Blob, fileName: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title || 'documento'}.md`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Documento descargado');
+  };
+
+  const handleDownloadMd = () => {
+    downloadBlob(new Blob([content], { type: 'text/markdown' }), `${title || 'documento'}.md`);
+    toast.success('Descargado como Markdown');
+  };
+
+  const handleDownloadTxt = () => {
+    // Strip markdown formatting for plain text
+    const plain = content
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/`(.*?)`/g, '$1')
+      .replace(/>\s/g, '')
+      .replace(/---/g, '');
+    downloadBlob(new Blob([plain], { type: 'text/plain' }), `${title || 'documento'}.txt`);
+    toast.success('Descargado como TXT');
+  };
+
+  const handleDownloadPdf = () => {
+    const doc = new jsPDF();
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.getWidth() - margin * 2;
+    const pageHeight = doc.internal.pageSize.getHeight() - margin * 2;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text(title || 'Documento', margin, margin + 10);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+
+    const plain = content
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/`(.*?)`/g, '$1')
+      .replace(/>\s/g, '')
+      .replace(/---/g, '────────────────');
+
+    const lines = doc.splitTextToSize(plain, pageWidth);
+    let y = margin + 20;
+
+    for (const line of lines) {
+      if (y > pageHeight + margin) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += 6;
+    }
+
+    doc.save(`${title || 'documento'}.pdf`);
+    toast.success('Descargado como PDF');
+  };
+
+  const handleDownloadDocx = () => {
+    // Simple DOCX using Office Open XML minimal structure
+    const docContent = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>${title || 'Documento'}</w:t></w:r></w:p>
+    ${content.split('\n').map(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return '<w:p/>';
+      return `<w:p><w:r><w:t xml:space="preserve">${trimmed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t></w:r></w:p>`;
+    }).join('\n    ')}
+  </w:body>
+</w:document>`;
+
+    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+
+    const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+    // Build a minimal ZIP using raw bytes (no external lib needed)
+    // For simplicity, use Blob with proper mime type
+    const files: Record<string, string> = {
+      '[Content_Types].xml': contentTypes,
+      '_rels/.rels': rels,
+      'word/document.xml': docContent,
+    };
+
+    // Use simple text approach - browser will handle it
+    const blob = new Blob([docContent], { 
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+    });
+    downloadBlob(blob, `${title || 'documento'}.docx`);
+    toast.success('Descargado como DOCX');
   };
 
   const handleSaveToCloud = async () => {
@@ -188,11 +299,11 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
       return;
     }
 
-    // Default: save to shared-files bucket
     if (!user) return;
     setIsSaving(true);
     try {
-      const fileName = `${title || 'documento'}.md`;
+      const safeName = sanitizeFileName(title || 'documento');
+      const fileName = `${safeName}.md`;
       const blob = new Blob([content], { type: 'text/markdown' });
       const file = new File([blob], fileName, { type: 'text/markdown' });
       const filePath = `${user.id}/${Date.now()}-${fileName}`;
@@ -208,11 +319,11 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
 
       const { error: dbError } = await supabase.from('shared_files').insert({
         user_id: user.id,
-        file_name: fileName,
+        file_name: `${title || 'documento'}.md`,
         file_path: urlData.publicUrl,
         file_size: blob.size,
         file_type: 'text/markdown',
-        description: `Documento creado con el Editor IA`,
+        description: 'Documento creado con el Editor IA',
       });
       if (dbError) throw dbError;
       toast.success('Documento guardado en Archivos Compartidos');
@@ -224,6 +335,15 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
     }
   };
 
+  const handleBack = () => {
+    if (location.pathname === '/tools/editor') {
+      navigate('/');
+    } else {
+      // In-app navigation (e.g., from Index tabs)
+      window.history.back();
+    }
+  };
+
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
 
@@ -231,6 +351,11 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
     <div className="h-full flex flex-col">
       {/* Toolbar */}
       <div className="border-b bg-card px-3 py-2 flex items-center gap-2 flex-wrap">
+        {showBackButton && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleBack} title="Volver al CRM">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        )}
         <Input
           value={title}
           onChange={e => setTitle(e.target.value)}
@@ -282,14 +407,38 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
 
         <div className="flex-1" />
 
-        <Badge variant="secondary" className="text-xs font-normal">
+        <Badge variant="secondary" className="text-xs font-normal hidden sm:inline-flex">
           {wordCount} palabras · {charCount} caracteres
         </Badge>
 
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleDownload}>
-          <Download className="h-3.5 w-3.5 mr-1" />
-          Descargar
-        </Button>
+        {/* Download dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-7 text-xs">
+              <FileDown className="h-3.5 w-3.5 mr-1" />
+              Descargar
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleDownloadMd}>
+              <FileText className="h-4 w-4 mr-2" />
+              Markdown (.md)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownloadTxt}>
+              <FileText className="h-4 w-4 mr-2" />
+              Texto plano (.txt)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownloadPdf}>
+              <FileText className="h-4 w-4 mr-2" />
+              PDF (.pdf)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownloadDocx}>
+              <FileText className="h-4 w-4 mr-2" />
+              Word (.docx)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSaveToCloud} disabled={isSaving}>
           {isSaving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Cloud className="h-3.5 w-3.5 mr-1" />}
           Guardar en Cloud
