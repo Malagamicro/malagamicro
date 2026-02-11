@@ -7,6 +7,27 @@ const corsHeaders = {
 
 const STEL_API_BASE = 'https://app.stelorder.com/app';
 
+// Map endpoint paths to their required root JSON key for POST/PUT
+// deno-lint-ignore no-explicit-any
+const ROOT_KEY_MAP: Record<string, string> = {
+  'salesEstimates': 'est_quote',
+  'ordinaryInvoices': 'est_ordinary_invoice',
+  'salesOrders': 'est_sales_order',
+  'clients': 'client',
+  'contacts': 'contact',
+  'products': 'product',
+  'services': 'service',
+  'suppliers': 'supplier',
+  'potentialClients': 'potential_client',
+};
+
+function getRootKey(endpoint: string): string | null {
+  for (const [path, key] of Object.entries(ROOT_KEY_MAP)) {
+    if (endpoint.startsWith(path)) return key;
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -49,7 +70,11 @@ serve(async (req) => {
       // deno-lint-ignore no-explicit-any
       const opts: any = { method, headers: { 'APIKEY': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' } };
       if (payload && (method === 'POST' || method === 'PUT')) {
-        opts.body = JSON.stringify(payload);
+        // Wrap payload in root key if required by STEL Order API
+        const rootKey = getRootKey(endpoint);
+        const wrappedPayload = rootKey ? { [rootKey]: payload } : payload;
+        console.log('[STEL] Payload:', JSON.stringify(wrappedPayload));
+        opts.body = JSON.stringify(wrappedPayload);
       }
       
       const res = await fetch(fullUrl, opts);
