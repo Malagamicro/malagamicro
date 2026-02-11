@@ -97,17 +97,24 @@ export function useEmailMessages(profileId?: string) {
         // Sync all profiles one by one
         const { data: allProfiles } = await supabase
           .from('email_profiles')
-          .select('id, profile_name')
-          .not('imap_host', 'is', null);
+          .select('id, profile_name, imap_host, imap_user, imap_password')
+          .not('imap_host', 'is', null)
+          .not('imap_user', 'is', null)
+          .not('imap_password', 'is', null);
         
-        if (!allProfiles || allProfiles.length === 0) {
+        // Filter out profiles with empty strings
+        const validProfiles = (allProfiles || []).filter(
+          p => p.imap_host?.trim() && p.imap_user?.trim() && p.imap_password?.trim()
+        );
+
+        if (validProfiles.length === 0) {
           toast.error('No hay perfiles con IMAP configurado');
           return;
         }
 
         let totalCount = 0;
         let errors = 0;
-        for (const p of allProfiles) {
+        for (const p of validProfiles) {
           try {
             const { data, error } = await supabase.functions.invoke('imap-check', {
               body: { profile_id: p.id, action: 'sync' }
@@ -116,7 +123,7 @@ export function useEmailMessages(profileId?: string) {
             totalCount += data?.count || 0;
           } catch { errors++; }
         }
-        toast.success(`${totalCount} correos sincronizados de ${allProfiles.length - errors} perfil(es)`);
+        toast.success(`${totalCount} correos sincronizados de ${validProfiles.length - errors} perfil(es)`);
       } else {
         const { data, error } = await supabase.functions.invoke('imap-check', {
           body: { profile_id: targetProfileId, action: 'sync' }
