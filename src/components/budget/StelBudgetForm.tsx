@@ -16,11 +16,12 @@ interface StelBudgetFormProps {
 }
 
 const emptyLine: StelBudgetLine = {
-  concept: '',
-  quantity: 1,
-  price: 0,
-  taxPercentage: 21,
-  discount: 0,
+  reference: '',
+  name: '',
+  description: '',
+  'base-price': 0,
+  units: 1,
+  'discount-percentage': 0,
 };
 
 export default function StelBudgetForm({ budget, onBack }: StelBudgetFormProps) {
@@ -38,11 +39,12 @@ export default function StelBudgetForm({ budget, onBack }: StelBudgetFormProps) 
   const [validUntil, setValidUntil] = useState(budget?.validUntil || '');
   const [lines, setLines] = useState<StelBudgetLine[]>(
     budget?.lines?.length ? budget.lines.map(l => ({
-      concept: l.concept || '',
-      quantity: l.quantity || 1,
-      price: l.price || 0,
-      taxPercentage: l.taxPercentage || 21,
-      discount: l.discount || 0,
+      reference: l.reference || '',
+      name: l.name || l.concept || '',
+      description: l.description || '',
+      'base-price': l['base-price'] || l.price || 0,
+      units: l.units || l.quantity || 1,
+      'discount-percentage': l['discount-percentage'] || l.discount || 0,
     })) : [{ ...emptyLine }]
   );
   const [showClientSearch, setShowClientSearch] = useState(false);
@@ -63,28 +65,24 @@ export default function StelBudgetForm({ budget, onBack }: StelBudgetFormProps) 
   };
 
   const lineTotal = (line: StelBudgetLine) => {
-    const subtotal = line.quantity * line.price;
-    const discounted = subtotal * (1 - (line.discount || 0) / 100);
-    return discounted * (1 + (line.taxPercentage || 0) / 100);
+    const price = line['base-price'] || 0;
+    const units = line.units || 1;
+    const discount = line['discount-percentage'] || 0;
+    const subtotal = units * price;
+    return subtotal * (1 - discount / 100);
   };
 
-  const subtotal = lines.reduce((sum, l) => sum + (l.quantity * l.price * (1 - (l.discount || 0) / 100)), 0);
-  const totalTax = lines.reduce((sum, l) => {
-    const base = l.quantity * l.price * (1 - (l.discount || 0) / 100);
-    return sum + base * ((l.taxPercentage || 0) / 100);
-  }, 0);
-  const grandTotal = subtotal + totalTax;
+  const subtotal = lines.reduce((sum, l) => sum + ((l.units || 1) * (l['base-price'] || 0) * (1 - (l['discount-percentage'] || 0) / 100)), 0);
+  const grandTotal = subtotal;
 
   const handleSubmit = () => {
-    if (!selectedClient && !clientName) {
-      return;
-    }
-    if (lines.every(l => !l.concept)) return;
+    if (!selectedClient && !clientName) return;
+    if (lines.every(l => !l.name)) return;
 
     const payload: any = {
-      items: lines.filter(l => l.concept),
+      items: lines.filter(l => l.name),
       notes,
-      subject,
+      title: subject,
       valid_until: validUntil || undefined,
     };
 
@@ -229,53 +227,62 @@ export default function StelBudgetForm({ budget, onBack }: StelBudgetFormProps) 
 
               {lines.map((line, idx) => (
                 <div key={idx} className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/30 rounded-lg">
-                  <div className="col-span-12 md:col-span-4">
-                    <Label className="text-xs">Concepto</Label>
+                  <div className="col-span-6 md:col-span-2">
+                    <Label className="text-xs">Referencia</Label>
                     <Input 
-                      value={line.concept} 
-                      onChange={(e) => updateLine(idx, 'concept', e.target.value)} 
-                      placeholder="Descripción del producto/servicio"
+                      value={line.reference || ''} 
+                      onChange={(e) => updateLine(idx, 'reference' as any, e.target.value)} 
+                      placeholder="REF"
                       className="mt-0.5"
                     />
                   </div>
-                  <div className="col-span-3 md:col-span-2">
-                    <Label className="text-xs">Cantidad</Label>
+                  <div className="col-span-6 md:col-span-3">
+                    <Label className="text-xs">Nombre</Label>
                     <Input 
-                      type="number" min={1} step={1}
-                      value={line.quantity} 
-                      onChange={(e) => updateLine(idx, 'quantity', Number(e.target.value))} 
+                      value={line.name} 
+                      onChange={(e) => updateLine(idx, 'name' as any, e.target.value)} 
+                      placeholder="Nombre del producto/servicio"
                       className="mt-0.5"
                     />
                   </div>
-                  <div className="col-span-3 md:col-span-2">
-                    <Label className="text-xs">Precio (€)</Label>
+                  <div className="col-span-12 md:col-span-2">
+                    <Label className="text-xs">Descripción</Label>
                     <Input 
-                      type="number" min={0} step={0.01}
-                      value={line.price} 
-                      onChange={(e) => updateLine(idx, 'price', Number(e.target.value))} 
+                      value={line.description || ''} 
+                      onChange={(e) => updateLine(idx, 'description' as any, e.target.value)} 
+                      placeholder="Descripción"
                       className="mt-0.5"
                     />
                   </div>
                   <div className="col-span-3 md:col-span-1">
-                    <Label className="text-xs">IVA %</Label>
+                    <Label className="text-xs">Precio base (€)</Label>
                     <Input 
-                      type="number" min={0} max={100}
-                      value={line.taxPercentage} 
-                      onChange={(e) => updateLine(idx, 'taxPercentage', Number(e.target.value))} 
+                      type="number" min={0} step={0.01}
+                      value={line['base-price']} 
+                      onChange={(e) => updateLine(idx, 'base-price' as any, Number(e.target.value))} 
+                      className="mt-0.5"
+                    />
+                  </div>
+                  <div className="col-span-3 md:col-span-1">
+                    <Label className="text-xs">Uds.</Label>
+                    <Input 
+                      type="number" min={1} step={1}
+                      value={line.units} 
+                      onChange={(e) => updateLine(idx, 'units' as any, Number(e.target.value))} 
                       className="mt-0.5"
                     />
                   </div>
                   <div className="col-span-2 md:col-span-1">
-                    <Label className="text-xs">Dto %</Label>
+                    <Label className="text-xs">% Dto</Label>
                     <Input 
                       type="number" min={0} max={100}
-                      value={line.discount} 
-                      onChange={(e) => updateLine(idx, 'discount', Number(e.target.value))} 
+                      value={line['discount-percentage']} 
+                      onChange={(e) => updateLine(idx, 'discount-percentage' as any, Number(e.target.value))} 
                       className="mt-0.5"
                     />
                   </div>
-                  <div className="col-span-1 md:col-span-1 text-right">
-                    <Label className="text-xs">Total</Label>
+                  <div className="col-span-2 md:col-span-1 text-right">
+                    <Label className="text-xs">Subtotal</Label>
                     <p className="text-sm font-medium mt-2">{lineTotal(line).toFixed(2)}€</p>
                   </div>
                   <div className="col-span-1 flex justify-end">
@@ -290,16 +297,12 @@ export default function StelBudgetForm({ budget, onBack }: StelBudgetFormProps) 
               <div className="flex justify-end">
                 <div className="w-64 space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal:</span>
+                    <span className="text-muted-foreground">Total base (€):</span>
                     <span>{subtotal.toFixed(2)} €</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">IVA:</span>
-                    <span>{totalTax.toFixed(2)} €</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold text-base">
-                    <span>Total:</span>
+                    <span>Total (€):</span>
                     <span>{grandTotal.toFixed(2)} €</span>
                   </div>
                 </div>
@@ -313,7 +316,7 @@ export default function StelBudgetForm({ budget, onBack }: StelBudgetFormProps) 
           <Button variant="outline" onClick={onBack}>Cancelar</Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={isPending || (!selectedClient && !clientName) || lines.every(l => !l.concept)}
+            disabled={isPending || (!selectedClient && !clientName) || lines.every(l => !l.name)}
           >
             {isPending ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</>
