@@ -786,8 +786,10 @@ async function executeToolCall(
 
       // ===== CRM TOOLS =====
       case "search_leads": {
-        const query = args.query?.toLowerCase() || "";
-        const limit = args.limit || 10;
+        const rawQuery = args.query?.toLowerCase() || "";
+        // Escape SQL wildcards to prevent injection
+        const query = rawQuery.replace(/[%_\\]/g, '\\$&').substring(0, 100);
+        const limit = Math.min(args.limit || 10, 50);
         
         let queryBuilder = supabase
           .from("leads")
