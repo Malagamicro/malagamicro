@@ -12,9 +12,13 @@ import {
   Link2, 
   Copy,
   Download,
-  ExternalLink
+  ExternalLink,
+  FolderUp,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import type { SeoArticle } from '@/hooks/useSeoArticles';
 
 interface SeoArticleViewerProps {
@@ -25,6 +29,8 @@ interface SeoArticleViewerProps {
 
 export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerProps) => {
   const [activeTab, setActiveTab] = useState('preview');
+  const [isSavingToCloud, setIsSavingToCloud] = useState(false);
+  const { user } = useAuth();
 
   if (!article) return null;
 
@@ -46,6 +52,66 @@ export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerPro
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast.success('HTML descargado');
+  };
+
+  const saveToSharedFiles = async () => {
+    if (!user?.id || !article.html_content) return;
+    setIsSavingToCloud(true);
+    try {
+      const slug = article.slug || 'articulo';
+      const folderName = `SEO - ${article.title || article.topic}`;
+
+      // Create folder
+      const { data: folder, error: folderError } = await supabase
+        .from('shared_folders')
+        .insert({ name: folderName, user_id: user.id })
+        .select()
+        .single();
+
+      if (folderError) throw folderError;
+
+      // Upload HTML file
+      const htmlBlob = new Blob([article.html_content], { type: 'text/html' });
+      const htmlPath = `${user.id}/${Date.now()}-${slug}.html`;
+      const { error: htmlUpErr } = await supabase.storage
+        .from('shared-files')
+        .upload(htmlPath, htmlBlob);
+      if (htmlUpErr) throw htmlUpErr;
+      const { data: { publicUrl: htmlUrl } } = supabase.storage.from('shared-files').getPublicUrl(htmlPath);
+
+      await supabase.from('shared_files').insert({
+        user_id: user.id, file_name: `${slug}.html`, file_path: htmlUrl,
+        file_size: htmlBlob.size, file_type: 'text/html', folder_id: folder.id,
+        description: `Artículo SEO: ${article.title || article.topic}`,
+      });
+
+      // Upload images if any
+      if (article.images && Array.isArray(article.images)) {
+        for (const img of article.images as { url?: string; alt?: string }[]) {
+          if (!img.url) continue;
+          try {
+            const resp = await fetch(img.url);
+            const imgBlob = await resp.blob();
+            const ext = img.url.split('.').pop()?.split('?')[0] || 'jpg';
+            const imgPath = `${user.id}/${Date.now()}-${slug}-img.${ext}`;
+            const { error: imgUpErr } = await supabase.storage.from('shared-files').upload(imgPath, imgBlob);
+            if (imgUpErr) continue;
+            const { data: { publicUrl: imgUrl } } = supabase.storage.from('shared-files').getPublicUrl(imgPath);
+            await supabase.from('shared_files').insert({
+              user_id: user.id, file_name: `${slug}-imagen.${ext}`, file_path: imgUrl,
+              file_size: imgBlob.size, file_type: imgBlob.type, folder_id: folder.id,
+            });
+          } catch { /* skip failed image */ }
+        }
+      }
+
+      toast.success('Artículo guardado en Archivos Compartidos');
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al guardar en archivos compartidos');
+    } finally {
+      setIsSavingToCloud(false);
+    }
   };
 
   return (
@@ -114,6 +180,15 @@ export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerPro
                 >
                   <Download className="h-4 w-4 mr-1" />
                   Descargar
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={saveToSharedFiles}
+                  disabled={isSavingToCloud}
+                >
+                  {isSavingToCloud ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FolderUp className="h-4 w-4 mr-1" />}
+                  Guardar en Cloud
                 </Button>
               </div>
               <ScrollArea className="h-[55vh] border rounded-lg">

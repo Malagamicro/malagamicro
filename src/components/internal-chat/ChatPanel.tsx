@@ -58,6 +58,7 @@ export function ChatPanel({
   const [editingContent, setEditingContent] = useState('');
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
   const [groupName, setGroupName] = useState('');
+  const [participantsOpen, setParticipantsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -257,7 +258,7 @@ export function ChatPanel({
                     <Settings className="h-4 w-4 mr-2" /> Configurar grupo
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setParticipantsOpen(true)}>
                   <Users className="h-4 w-4 mr-2" /> Ver participantes
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -460,6 +461,48 @@ export function ChatPanel({
             <Button variant="outline" onClick={() => setGroupSettingsOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveGroupSettings}>Guardar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Participants Dialog */}
+      <Dialog open={participantsOpen} onOpenChange={setParticipantsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" /> Participantes ({conversation?.participants?.length || 0})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1 max-h-60 overflow-auto">
+            {conversation?.participants?.map(p => (
+              <div key={p.user_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    {p.profile?.avatar_url && <AvatarImage src={p.profile.avatar_url} />}
+                    <AvatarFallback className="text-xs">
+                      {(p.profile?.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <span className="text-sm font-medium">{p.profile?.full_name || 'Usuario'}</span>
+                    {p.user_id === conversation?.created_by && (
+                      <Badge variant="secondary" className="ml-2 text-[10px] h-4">Creador</Badge>
+                    )}
+                    {p.is_admin && p.user_id !== conversation?.created_by && (
+                      <Badge variant="outline" className="ml-2 text-[10px] h-4">Admin</Badge>
+                    )}
+                  </div>
+                </div>
+                {isAdmin && p.user_id !== user?.id && onRemoveParticipant && (
+                  <Button
+                    variant="ghost" size="sm" className="h-7 text-destructive text-xs"
+                    onClick={() => { onRemoveParticipant(conversation!.id, p.user_id); }}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" /> Eliminar
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
 
