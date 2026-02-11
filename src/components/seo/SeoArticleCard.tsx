@@ -12,12 +12,15 @@ import {
   Trash2, 
   ImageIcon,
   BarChart3,
-  Copy
+  Copy,
+  FolderUp
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { SeoArticle } from '@/hooks/useSeoArticles';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SeoArticleCardProps {
   article: SeoArticle;
@@ -28,6 +31,8 @@ interface SeoArticleCardProps {
 
 export const SeoArticleCard = ({ article, onDelete, onView, compact = false }: SeoArticleCardProps) => {
   const [deleting, setDeleting] = useState(false);
+  const [savingToCloud, setSavingToCloud] = useState(false);
+  const { user } = useAuth();
 
   const getStatusBadge = () => {
     switch (article.status) {
@@ -54,6 +59,55 @@ export const SeoArticleCard = ({ article, onDelete, onView, compact = false }: S
     if (article.html_content) {
       navigator.clipboard.writeText(article.html_content);
       toast.success('HTML copiado al portapapeles');
+    }
+  };
+
+  const saveToSharedFiles = async () => {
+    if (!user?.id || !article.html_content) return;
+    setSavingToCloud(true);
+    try {
+      const slug = article.slug || 'articulo';
+      const folderName = `SEO - ${article.title || article.topic}`;
+      const { data: folder, error: folderError } = await supabase
+        .from('shared_folders')
+        .insert({ name: folderName, user_id: user.id })
+        .select().single();
+      if (folderError) throw folderError;
+
+      const htmlBlob = new Blob([article.html_content], { type: 'text/html' });
+      const htmlPath = `${user.id}/${Date.now()}-${slug}.html`;
+      const { error: htmlUpErr } = await supabase.storage.from('shared-files').upload(htmlPath, htmlBlob);
+      if (htmlUpErr) throw htmlUpErr;
+      const { data: { publicUrl: htmlUrl } } = supabase.storage.from('shared-files').getPublicUrl(htmlPath);
+      await supabase.from('shared_files').insert({
+        user_id: user.id, file_name: `${slug}.html`, file_path: htmlUrl,
+        file_size: htmlBlob.size, file_type: 'text/html', folder_id: folder.id,
+        description: `Artículo SEO: ${article.title || article.topic}`,
+      });
+
+      if (article.images && Array.isArray(article.images)) {
+        for (const img of article.images as { url?: string }[]) {
+          if (!img.url) continue;
+          try {
+            const resp = await fetch(img.url);
+            const imgBlob = await resp.blob();
+            const ext = img.url.split('.').pop()?.split('?')[0] || 'jpg';
+            const imgPath = `${user.id}/${Date.now()}-${slug}-img.${ext}`;
+            await supabase.storage.from('shared-files').upload(imgPath, imgBlob);
+            const { data: { publicUrl: imgUrl } } = supabase.storage.from('shared-files').getPublicUrl(imgPath);
+            await supabase.from('shared_files').insert({
+              user_id: user.id, file_name: `${slug}-imagen.${ext}`, file_path: imgUrl,
+              file_size: imgBlob.size, file_type: imgBlob.type, folder_id: folder.id,
+            });
+          } catch { /* skip */ }
+        }
+      }
+      toast.success('Guardado en Archivos Compartidos');
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al guardar');
+    } finally {
+      setSavingToCloud(false);
     }
   };
 
@@ -205,20 +259,35 @@ export const SeoArticleCard = ({ article, onDelete, onView, compact = false }: S
                 <Eye className="h-3.5 w-3.5 mr-1" />
                 Ver artículo
               </Button>
-              <Button variant="outline" size="sm" className="h-8" onClick={copyHtml}>
+              <Button variant="outline" size="sm" className="h-8" onClick={copyHtml} title="Copiar HTML">
                 <Copy className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-8" onClick={saveToSharedFiles} disabled={savingToCloud} title="Guardar en Cloud">
+                {savingToCloud ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderUp className="h-3.5 w-3.5" />}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={handleDelete}
+                disabled={deleting}
+                title="Eliminar"
+              >
+                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
               </Button>
             </>
           )}
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={handleDelete}
-            disabled={deleting}
-          >
-            {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-          </Button>
+          {article.status !== 'completed' && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
