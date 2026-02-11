@@ -15,7 +15,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import WhatsAppTest from "./pages/WhatsAppTest";
 import Scraper from "./pages/Scraper";
-import FileManager from "./pages/FileManager";
+
 import Install from "./pages/Install";
 import AdminUsers from "./pages/AdminUsers";
 import GeneralReminders from "./pages/GeneralReminders";
@@ -61,14 +61,7 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
-                <Route
-                  path="/tools/files"
-                  element={
-                    <ProtectedRoute>
-                      <FileManager />
-                    </ProtectedRoute>
-                  }
-                />
+                
                 <Route
                   path="/"
                   element={
