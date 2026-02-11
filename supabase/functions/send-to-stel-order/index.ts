@@ -6,14 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Correct STEL Order API v1 base URL
-const STEL_API_BASE = 'https://app.stelorder.com/api/v1';
+// Official STEL Order API base URL (per docs)
+const STEL_API_BASE = 'https://app.stelorder.com/app';
 
-// Map REST resource paths to their required root JSON key for POST/PUT
+// Map endpoint paths to their required root JSON key for POST/PUT
 const ROOT_KEY_MAP: Record<string, string> = {
-  'est_quotes': 'est_quote',
-  'est_ordinary_invoices': 'est_ordinary_invoice',
-  'est_sales_orders': 'est_sales_order',
+  'salesEstimates': 'est_quote',
+  'ordinaryInvoices': 'est_ordinary_invoice',
+  'salesOrders': 'est_sales_order',
   'clients': 'client',
 };
 
@@ -26,14 +26,16 @@ function getRootKey(endpoint: string): string | null {
 
 // deno-lint-ignore no-explicit-any
 async function stelFetch(endpoint: string, method: string, apiKey: string, payload?: any) {
-  const fullUrl = `${STEL_API_BASE}/${endpoint}`;
-  console.log(`[STEL] ${method} ${fullUrl}`);
+  // Auth via APIKEY query param + header (per STEL docs)
+  const sep = endpoint.includes('?') ? '&' : '?';
+  const fullUrl = `${STEL_API_BASE}/${endpoint}${sep}APIKEY=${encodeURIComponent(apiKey)}`;
+  console.log(`[STEL] ${method} ${STEL_API_BASE}/${endpoint}`);
 
   // deno-lint-ignore no-explicit-any
   const opts: any = {
     method,
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      'APIKEY': apiKey,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
@@ -50,12 +52,19 @@ async function stelFetch(endpoint: string, method: string, apiKey: string, paylo
   const text = await res.text();
   // deno-lint-ignore no-explicit-any
   let data: any;
-  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  try { data = JSON.parse(text); } catch {
+    if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+      console.error('[STEL] Received HTML instead of JSON');
+      data = { error: 'STEL returned HTML instead of JSON', error_code: 'E000003' };
+      return { ok: false, status: 401, data };
+    }
+    data = { raw: text };
+  }
 
   if (!res.ok || data?.error_code) {
     console.error(`[STEL] Error ${res.status}:`, JSON.stringify(data));
     if (data?.error_code === 'E000003') {
-      console.error('[STEL] E000003: Authentication error or incorrect endpoint.');
+      console.error('[STEL] E000003: Missing root JSON key or auth error.');
     }
   }
 
@@ -128,7 +137,6 @@ serve(async (req) => {
       );
     }
 
-    // Search or create client in STEL Order
     let clientId = customer_id;
     
     if (!clientId && budget.proveedor) {
@@ -169,8 +177,8 @@ serve(async (req) => {
       validUntil: budget.validez || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     };
 
-    // Use correct REST endpoints
-    const endpoint = create_type === 'invoice' ? 'est_ordinary_invoices' : 'est_quotes';
+    // Use correct STEL Order endpoints (camelCase per docs)
+    const endpoint = create_type === 'invoice' ? 'ordinaryInvoices' : 'salesEstimates';
     const stelResult = await stelFetch(endpoint, 'POST', stelApiKey, stelPayload);
 
     console.log('STEL Order response:', stelResult.status, JSON.stringify(stelResult.data));
