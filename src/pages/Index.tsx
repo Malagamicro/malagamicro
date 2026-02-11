@@ -30,6 +30,7 @@ import { GoogleSheetsImportModal } from '@/components/leads/GoogleSheetsImportMo
 import { PerplexityChatbot } from '@/components/chat/PerplexityChatbot';
 import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
 import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
+import { DocumentEditor } from '@/components/editor/DocumentEditor';
 import { BudgetChatbot } from '@/components/budget/BudgetChatbot';
 import BudgetModule from '@/components/budget/BudgetModule';
 import { EmailModule } from '@/components/email/EmailModule';
@@ -255,6 +256,12 @@ const IndexContent = () => {
         return (
           <div className="p-8 h-full animate-fade-in">
             <SharedFilesPanel />
+          </div>
+        );
+      case 'editor':
+        return (
+          <div className="h-full animate-fade-in">
+            <DocumentEditor />
           </div>
         );
       case 'presupuesto':
