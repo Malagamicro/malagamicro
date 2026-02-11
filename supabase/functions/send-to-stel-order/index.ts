@@ -6,13 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const STEL_API_BASE = 'https://app.stelorder.com/app';
+// Correct STEL Order API v1 base URL
+const STEL_API_BASE = 'https://app.stelorder.com/api/v1';
 
-// Map endpoint paths to their required root JSON key for POST/PUT
+// Map REST resource paths to their required root JSON key for POST/PUT
 const ROOT_KEY_MAP: Record<string, string> = {
-  'salesEstimates': 'est_quote',
-  'ordinaryInvoices': 'est_ordinary_invoice',
-  'salesOrders': 'est_sales_order',
+  'est_quotes': 'est_quote',
+  'est_ordinary_invoices': 'est_ordinary_invoice',
+  'est_sales_orders': 'est_sales_order',
   'clients': 'client',
 };
 
@@ -25,14 +26,17 @@ function getRootKey(endpoint: string): string | null {
 
 // deno-lint-ignore no-explicit-any
 async function stelFetch(endpoint: string, method: string, apiKey: string, payload?: any) {
-  const sep = endpoint.includes('?') ? '&' : '?';
-  const fullUrl = `${STEL_API_BASE}/${endpoint}${sep}APIKEY=${encodeURIComponent(apiKey)}`;
-  console.log('[STEL] ' + method + ' ' + STEL_API_BASE + '/' + endpoint);
+  const fullUrl = `${STEL_API_BASE}/${endpoint}`;
+  console.log(`[STEL] ${method} ${fullUrl}`);
 
   // deno-lint-ignore no-explicit-any
   const opts: any = {
     method,
-    headers: { 'APIKEY': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
   };
 
   if (payload && (method === 'POST' || method === 'PUT')) {
@@ -47,13 +51,17 @@ async function stelFetch(endpoint: string, method: string, apiKey: string, paylo
   // deno-lint-ignore no-explicit-any
   let data: any;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
-  if (!res.ok) console.error('[STEL] Error ' + res.status + ':', JSON.stringify(data));
-  return { ok: res.ok, status: res.status, data };
+
+  if (!res.ok || data?.error_code) {
+    console.error(`[STEL] Error ${res.status}:`, JSON.stringify(data));
+    if (data?.error_code === 'E000003') {
+      console.error('[STEL] E000003: Authentication error or incorrect endpoint.');
+    }
+  }
+
+  return { ok: res.ok && !data?.error_code, status: res.status, data };
 }
 
-/**
- * Sends an approved budget to STEL Order API
- */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -71,7 +79,6 @@ serve(async (req) => {
       );
     }
 
-    // Verify user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -108,7 +115,6 @@ serve(async (req) => {
       );
     }
 
-    // Get the budget from database
     const { data: budget, error: fetchError } = await serviceClient
       .from('budgets_received')
       .select('*')
@@ -134,7 +140,6 @@ serve(async (req) => {
         clientId = searchResult.data[0].id;
       }
 
-      // Create client if not found
       if (!clientId) {
         const createResult = await stelFetch('clients', 'POST', stelApiKey, {
           name: budget.proveedor,
@@ -146,7 +151,6 @@ serve(async (req) => {
       }
     }
 
-    // Prepare items from productos
     // deno-lint-ignore no-explicit-any
     const productos = Array.isArray(budget.productos) ? budget.productos : [];
     // deno-lint-ignore no-explicit-any
@@ -158,7 +162,6 @@ serve(async (req) => {
       discount: 0,
     }));
 
-    // Build payload
     const stelPayload = {
       clientId: clientId,
       lines,
@@ -166,8 +169,8 @@ serve(async (req) => {
       validUntil: budget.validez || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     };
 
-    // Create budget or invoice
-    const endpoint = create_type === 'invoice' ? 'ordinaryInvoices' : 'salesEstimates';
+    // Use correct REST endpoints
+    const endpoint = create_type === 'invoice' ? 'est_ordinary_invoices' : 'est_quotes';
     const stelResult = await stelFetch(endpoint, 'POST', stelApiKey, stelPayload);
 
     console.log('STEL Order response:', stelResult.status, JSON.stringify(stelResult.data));
@@ -188,7 +191,6 @@ serve(async (req) => {
       );
     }
 
-    // Update budget with STEL Order ID
     const updateField = create_type === 'invoice' ? 'invoice_id' : 'stel_budget_id';
     await serviceClient
       .from('budgets_received')
@@ -199,7 +201,6 @@ serve(async (req) => {
       })
       .eq('id', budget_id);
 
-    // Create notification
     await serviceClient
       .from('budget_notifications')
       .insert({
@@ -210,14 +211,13 @@ serve(async (req) => {
         metadata: { stel_id: stelResult.data.id, budget_id }
       });
 
-    // Log success
     await serviceClient
       .from('workflow_logs')
       .insert({
         level: 'info',
         message: (create_type === 'invoice' ? 'Factura' : 'Presupuesto') + ' creado en STEL Order',
         request_id: budget.request_id,
-        metadata: { stel_id: stelResult.data.id, budget_id, user_email: user.email }
+        metadata: { stel_id: stelResult.data.id, budget_id }
       });
 
     return new Response(

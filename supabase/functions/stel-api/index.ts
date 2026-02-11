@@ -5,20 +5,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const STEL_API_BASE = 'https://app.stelorder.com/app';
+// Correct STEL Order API v1 base URL
+const STEL_API_BASE = 'https://app.stelorder.com/api/v1';
 
-// Map endpoint paths to their required root JSON key for POST/PUT
-// deno-lint-ignore no-explicit-any
+// Map REST resource paths to their required root JSON key for POST/PUT
 const ROOT_KEY_MAP: Record<string, string> = {
-  'salesEstimates': 'est_quote',
-  'ordinaryInvoices': 'est_ordinary_invoice',
-  'salesOrders': 'est_sales_order',
+  'est_quotes': 'est_quote',
+  'est_ordinary_invoices': 'est_ordinary_invoice',
+  'est_sales_orders': 'est_sales_order',
   'clients': 'client',
   'contacts': 'contact',
   'products': 'product',
   'services': 'service',
   'suppliers': 'supplier',
-  'potentialClients': 'potential_client',
+  'potential_clients': 'potential_client',
 };
 
 function getRootKey(endpoint: string): string | null {
@@ -63,12 +63,19 @@ serve(async (req) => {
 
     // deno-lint-ignore no-explicit-any
     async function stelFetch(endpoint: string, method = 'GET', payload?: any) {
-      const sep = endpoint.includes('?') ? '&' : '?';
-      const fullUrl = STEL_API_BASE + '/' + endpoint + sep + 'APIKEY=' + encodeURIComponent(apiKey);
-      console.log('[STEL] ' + method + ' ' + STEL_API_BASE + '/' + endpoint);
+      const fullUrl = `${STEL_API_BASE}/${endpoint}`;
+      console.log(`[STEL] ${method} ${fullUrl}`);
       
       // deno-lint-ignore no-explicit-any
-      const opts: any = { method, headers: { 'APIKEY': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' } };
+      const opts: any = {
+        method,
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      };
+
       if (payload && (method === 'POST' || method === 'PUT')) {
         // Wrap payload in root key if required by STEL Order API
         const rootKey = getRootKey(endpoint);
@@ -86,8 +93,16 @@ serve(async (req) => {
       } catch {
         data = { raw: text };
       }
-      if (!res.ok) console.error('[STEL] Error ' + res.status + ':', JSON.stringify(data));
-      return { ok: res.ok, status: res.status, data };
+
+      // Handle specific STEL error codes
+      if (!res.ok || data?.error_code) {
+        console.error(`[STEL] Error ${res.status}:`, JSON.stringify(data));
+        if (data?.error_code === 'E000003') {
+          console.error('[STEL] E000003: Authentication error or incorrect endpoint. Check API Token and URL.');
+        }
+      }
+
+      return { ok: res.ok && !data?.error_code, status: res.status, data };
     }
 
     // deno-lint-ignore no-explicit-any
@@ -109,7 +124,7 @@ serve(async (req) => {
     if (action === 'list-budgets') {
       const page = url.searchParams.get('page') || '1';
       const limit = url.searchParams.get('limit') || '50';
-      let ep = 'salesEstimates?limit=' + limit + '&page=' + page;
+      let ep = `est_quotes?limit=${limit}&page=${page}`;
       if (sanitizedSearch) ep += '&search=' + encodeURIComponent(sanitizedSearch);
       const r = await stelFetch(ep);
       return respond(r.data, r.ok ? 200 : r.status);
@@ -118,7 +133,7 @@ serve(async (req) => {
     if (action === 'get-budget') {
       const id = url.searchParams.get('id');
       if (!id) return respond({ error: 'id requerido' }, 400);
-      const r = await stelFetch('salesEstimates/' + id);
+      const r = await stelFetch(`est_quotes/${id}`);
       return respond(r.data, r.ok ? 200 : r.status);
     }
 
@@ -146,7 +161,7 @@ serve(async (req) => {
       };
       if (body.subject) payload.subject = body.subject;
 
-      const r = await stelFetch('salesEstimates', 'POST', payload);
+      const r = await stelFetch('est_quotes', 'POST', payload);
       if (!r.ok) return respond({ error: 'Error al crear presupuesto', details: r.data }, r.status);
       return respond({ success: true, budget: r.data });
     }
@@ -154,7 +169,7 @@ serve(async (req) => {
     if (action === 'update-budget') {
       const id = url.searchParams.get('id');
       if (!id || !body) return respond({ error: 'id y body requeridos' }, 400);
-      const r = await stelFetch('salesEstimates/' + id, 'PUT', body);
+      const r = await stelFetch(`est_quotes/${id}`, 'PUT', body);
       if (!r.ok) return respond({ error: 'Error al actualizar', details: r.data }, r.status);
       return respond({ success: true, budget: r.data });
     }
@@ -162,21 +177,21 @@ serve(async (req) => {
     if (action === 'delete-budget') {
       const id = url.searchParams.get('id');
       if (!id) return respond({ error: 'id requerido' }, 400);
-      const r = await stelFetch('salesEstimates/' + id, 'DELETE');
+      const r = await stelFetch(`est_quotes/${id}`, 'DELETE');
       return respond(r.ok ? { success: true } : { error: 'Error al eliminar', details: r.data }, r.ok ? 200 : r.status);
     }
 
     if (action === 'get-budget-pdf') {
       const id = url.searchParams.get('id');
       if (!id) return respond({ error: 'id requerido' }, 400);
-      const r = await stelFetch('salesEstimates/' + id + '/pdf');
+      const r = await stelFetch(`est_quotes/${id}/pdf`);
       return respond(r.data, r.ok ? 200 : r.status);
     }
 
     if (action === 'convert-to-invoice') {
       const id = url.searchParams.get('id');
       if (!id) return respond({ error: 'id requerido' }, 400);
-      const br = await stelFetch('salesEstimates/' + id);
+      const br = await stelFetch(`est_quotes/${id}`);
       if (!br.ok) return respond({ error: 'Presupuesto no encontrado', details: br.data }, 404);
       const b = br.data;
       const ip = {
@@ -185,7 +200,7 @@ serve(async (req) => {
         lines: (b.lines || []).map((l: any) => ({ concept: l.concept || l.description, quantity: l.quantity || 1, price: l.price || l.unitPrice || 0, taxPercentage: l.taxPercentage || 21, discount: l.discount || 0 })),
         notes: b.notes || 'Generado desde presupuesto #' + (b.number || id),
       };
-      const ir = await stelFetch('ordinaryInvoices', 'POST', ip);
+      const ir = await stelFetch('est_ordinary_invoices', 'POST', ip);
       if (!ir.ok) return respond({ error: 'Error al crear factura', details: ir.data }, ir.status);
       return respond({ success: true, invoice: ir.data, message: 'Factura creada desde presupuesto #' + (b.number || id) });
     }
@@ -193,7 +208,7 @@ serve(async (req) => {
     if (action === 'convert-to-order') {
       const id = url.searchParams.get('id');
       if (!id) return respond({ error: 'id requerido' }, 400);
-      const br = await stelFetch('salesEstimates/' + id);
+      const br = await stelFetch(`est_quotes/${id}`);
       if (!br.ok) return respond({ error: 'Presupuesto no encontrado' }, 404);
       const b = br.data;
       const op = {
@@ -202,14 +217,14 @@ serve(async (req) => {
         lines: (b.lines || []).map((l: any) => ({ concept: l.concept || l.description, quantity: l.quantity || 1, price: l.price || l.unitPrice || 0, taxPercentage: l.taxPercentage || 21, discount: l.discount || 0 })),
         notes: b.notes || 'Generado desde presupuesto #' + (b.number || id),
       };
-      const or2 = await stelFetch('salesOrders', 'POST', op);
+      const or2 = await stelFetch('est_sales_orders', 'POST', op);
       if (!or2.ok) return respond({ error: 'Error al crear pedido', details: or2.data }, or2.status);
       return respond({ success: true, order: or2.data, message: 'Pedido creado desde presupuesto #' + (b.number || id) });
     }
 
     if (action === 'list-clients') {
       const page = url.searchParams.get('page') || '1';
-      let ep = 'clients?page=' + page + '&limit=50';
+      let ep = `clients?page=${page}&limit=50`;
       if (sanitizedSearch) ep += '&search=' + encodeURIComponent(sanitizedSearch);
       const r = await stelFetch(ep);
       return respond(r.data, r.ok ? 200 : r.status);
@@ -217,7 +232,7 @@ serve(async (req) => {
 
     if (action === 'list-invoices') {
       const page = url.searchParams.get('page') || '1';
-      const r = await stelFetch('ordinaryInvoices?page=' + page + '&limit=50');
+      const r = await stelFetch(`est_ordinary_invoices?page=${page}&limit=50`);
       return respond(r.data, r.ok ? 200 : r.status);
     }
 
@@ -234,7 +249,7 @@ serve(async (req) => {
         lines: (body.items || body.lines || []).map((i: any) => mapLine(i)),
         notes: body.notes || '',
       };
-      const r = await stelFetch('ordinaryInvoices', 'POST', ip);
+      const r = await stelFetch('est_ordinary_invoices', 'POST', ip);
       if (!r.ok) return respond({ error: 'Error al crear factura', details: r.data }, r.status);
       return respond({ success: true, invoice: r.data });
     }
