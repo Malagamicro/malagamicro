@@ -6,8 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const ADMIN_EMAIL = 'administracion@malagamicro.com';
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -18,7 +16,6 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    // Get the JWT from the Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -27,7 +24,6 @@ serve(async (req) => {
       );
     }
 
-    // Verify the user's JWT using anon client
     const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { persistSession: false },
       global: { headers: { Authorization: authHeader } }
@@ -42,18 +38,26 @@ serve(async (req) => {
       );
     }
 
-    // Check if user is the admin
-    if (user.email !== ADMIN_EMAIL) {
+    // Use the database role system instead of hardcoded email
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
+    });
+
+    const { data: roleData } = await serviceClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!roleData) {
       return new Response(
-        JSON.stringify({ error: 'Access denied. Admin only.' }),
+        JSON.stringify({ error: 'Access denied. Admin role required.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Create service role client for admin operations
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false }
-    });
+    const adminClient = serviceClient;
 
     const url = new URL(req.url);
     const action = url.searchParams.get('action');
@@ -69,7 +73,6 @@ serve(async (req) => {
         throw error;
       }
 
-      // Get roles for each user
       const { data: roles } = await adminClient
         .from('user_roles')
         .select('user_id, role');
@@ -115,7 +118,6 @@ serve(async (req) => {
       });
 
       if (createError) {
-        // Handle specific error codes
         if (createError.code === 'email_exists' || createError.message?.includes('already been registered')) {
           return new Response(
             JSON.stringify({ error: 'Este email ya está registrado en el sistema' }),
@@ -128,7 +130,6 @@ serve(async (req) => {
         );
       }
 
-      // Assign role if provided
       if (role && newUser.user) {
         await adminClient.from('user_roles').insert({
           user_id: newUser.user.id,
@@ -136,7 +137,6 @@ serve(async (req) => {
         });
       }
 
-      // Create profile for the user
       await adminClient.from('profiles').insert({
         user_id: newUser.user!.id,
         full_name: email.split('@')[0]
@@ -148,7 +148,7 @@ serve(async (req) => {
       );
     }
 
-    // DELETE USER (using POST because some environments block DELETE with body)
+    // DELETE USER
     if (req.method === 'POST' && action === 'delete') {
       const { userId } = await req.json();
 
@@ -159,11 +159,10 @@ serve(async (req) => {
         );
       }
 
-      // Prevent deleting the admin account
-      const { data: { user: targetUser } } = await adminClient.auth.admin.getUserById(userId);
-      if (targetUser?.email === ADMIN_EMAIL) {
+      // Prevent deleting yourself
+      if (userId === user.id) {
         return new Response(
-          JSON.stringify({ error: 'Cannot delete the admin account' }),
+          JSON.stringify({ error: 'Cannot delete your own account' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -191,10 +190,8 @@ serve(async (req) => {
         );
       }
 
-      // Remove existing roles
       await adminClient.from('user_roles').delete().eq('user_id', userId);
 
-      // Add new role
       const { error: roleError } = await adminClient.from('user_roles').insert({
         user_id: userId,
         role: role
