@@ -158,6 +158,7 @@ export function useSharedFiles(folderId: string | null = null) {
       let query = supabase
         .from('shared_files')
         .select('*')
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
 
       if (folderId === null) {
@@ -329,6 +330,27 @@ export function useSharedFiles(folderId: string | null = null) {
     },
   });
 
+  const reorderFiles = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      // Update sort_order for each file
+      const updates = orderedIds.map((id, index) =>
+        supabase
+          .from('shared_files')
+          .update({ sort_order: index })
+          .eq('id', id)
+      );
+      const results = await Promise.all(updates);
+      const failed = results.find(r => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shared-files'] });
+    },
+    onError: () => {
+      toast.error('Error al reordenar archivos');
+    },
+  });
+
   return {
     files,
     isLoading,
@@ -336,6 +358,7 @@ export function useSharedFiles(folderId: string | null = null) {
     deleteFile,
     updateDescription,
     moveFile,
+    reorderFiles,
   };
 }
 

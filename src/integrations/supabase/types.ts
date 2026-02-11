@@ -1409,6 +1409,7 @@ export type Database = {
           folder_id: string | null
           folder_path: string | null
           id: string
+          sort_order: number | null
           updated_at: string | null
           user_id: string
         }
@@ -1422,6 +1423,7 @@ export type Database = {
           folder_id?: string | null
           folder_path?: string | null
           id?: string
+          sort_order?: number | null
           updated_at?: string | null
           user_id: string
         }
@@ -1435,6 +1437,7 @@ export type Database = {
           folder_id?: string | null
           folder_path?: string | null
           id?: string
+          sort_order?: number | null
           updated_at?: string | null
           user_id?: string
         }
