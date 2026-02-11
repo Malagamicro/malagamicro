@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -155,7 +156,7 @@ export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerPro
                 {article.html_content ? (
                   <div 
                     className="prose prose-sm max-w-none dark:prose-invert"
-                    dangerouslySetInnerHTML={{ __html: article.html_content }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.html_content) }}
                   />
                 ) : (
                   <p className="text-muted-foreground">No hay contenido disponible</p>

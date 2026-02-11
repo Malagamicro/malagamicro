@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -142,7 +143,7 @@ export function EmailInbox() {
             {/* Body */}
             <div className="border-t pt-4">
               {selectedMessage.body_html ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: selectedMessage.body_html }} />
+                <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedMessage.body_html) }} />
               ) : (
                 <pre className="whitespace-pre-wrap text-sm">{selectedMessage.body_text || '(Sin contenido)'}</pre>
               )}
