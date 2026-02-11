@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useActiveCalls } from '@/hooks/useActiveCalls';
 import { IncomingCallDialog } from './IncomingCallDialog';
 import { VideoCallModal } from './VideoCallModal';
@@ -12,6 +12,43 @@ export function GlobalCallListener() {
     isVideo: boolean;
     conversationId: string;
   } | null>(null);
+  const vibrationRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Vibration for mobile incoming calls
+  useEffect(() => {
+    if (incomingCall) {
+      // Start vibration pattern
+      if ('vibrate' in navigator) {
+        // Vibrate immediately
+        navigator.vibrate([300, 200, 300, 200, 300]);
+        // Repeat every 2 seconds
+        vibrationRef.current = setInterval(() => {
+          if ('vibrate' in navigator) {
+            navigator.vibrate([300, 200, 300, 200, 300]);
+          }
+        }, 2000);
+      }
+    } else {
+      // Stop vibration
+      if (vibrationRef.current) {
+        clearInterval(vibrationRef.current);
+        vibrationRef.current = null;
+      }
+      if ('vibrate' in navigator) {
+        navigator.vibrate(0); // Cancel any ongoing vibration
+      }
+    }
+
+    return () => {
+      if (vibrationRef.current) {
+        clearInterval(vibrationRef.current);
+        vibrationRef.current = null;
+      }
+      if ('vibrate' in navigator) {
+        navigator.vibrate(0);
+      }
+    };
+  }, [incomingCall]);
 
   const handleAccept = async () => {
     const call = await acceptCall();
