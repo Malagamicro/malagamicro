@@ -116,10 +116,17 @@ export function useSidebarConfig() {
       if (data?.categories) {
         const saved = data.categories as unknown as SidebarCategory[];
         if (saved.length > 0) {
+          // Remove deprecated items (e.g. old file manager)
+          const deprecatedIds = new Set(['files']);
+          const cleaned = saved.map(cat => ({
+            ...cat,
+            items: cat.items.filter(i => !deprecatedIds.has(i.id)),
+          }));
+
           // Merge any new default items that don't exist in saved config
-          const allSavedItemIds = new Set(saved.flatMap(c => c.items.map(i => i.id)));
+          const allSavedItemIds = new Set(cleaned.flatMap(c => c.items.map(i => i.id)));
           let hasNewItems = false;
-          const merged = saved.map(savedCat => {
+          const merged = cleaned.map(savedCat => {
             const defaultCat = DEFAULT_CATEGORIES.find(dc => dc.id === savedCat.id);
             if (!defaultCat) return savedCat;
             const newItems = defaultCat.items.filter(di => !allSavedItemIds.has(di.id));
@@ -130,13 +137,15 @@ export function useSidebarConfig() {
             return savedCat;
           });
           // Also add entirely new default categories
-          const savedCatIds = new Set(saved.map(c => c.id));
+          const savedCatIds = new Set(cleaned.map(c => c.id));
           const newCats = DEFAULT_CATEGORIES.filter(dc => !savedCatIds.has(dc.id) && dc.items.some(i => !allSavedItemIds.has(i.id)));
           if (newCats.length > 0) hasNewItems = true;
           const final = [...merged, ...newCats];
           setCategories(final);
-          if (hasNewItems) saveConfig(final);
-          else setCategories(saved);
+          // Always save if we cleaned deprecated items or added new ones
+          if (hasNewItems || cleaned.some((c, i) => c.items.length !== (saved[i]?.items.length ?? 0))) {
+            saveConfig(final);
+          }
         }
       }
     } catch (err) {
