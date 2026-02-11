@@ -172,39 +172,66 @@ export function VideoCallModal({
         });
         channelRef.current = channel;
 
-        // Handle new peer joining
+        // Polite peer: the peer with the "higher" ID yields on glare
+        const amIPolite = (remotePeerId: string) => myPeerId > remotePeerId;
+
+        // Handle new peer joining - only the "impolite" peer (lower ID) creates the offer
         channel.on('broadcast', { event: 'peer-join' }, async ({ payload }) => {
           if (destroyedRef.current || payload.peerId === myPeerId) return;
           
-          // Avoid duplicate connections
-          if (peersRef.current.has(payload.peerId)) {
-            console.log('[GroupCall] Already connected to peer:', payload.peerId);
+          // If already connected and stable, skip
+          const existingPc = peersRef.current.get(payload.peerId);
+          if (existingPc && (existingPc.connectionState === 'connected' || existingPc.connectionState === 'connecting')) {
+            console.log('[GroupCall] Already connected/connecting to peer:', payload.peerId);
             return;
           }
           
-          console.log('[GroupCall] Peer joined:', payload.peerId);
+          console.log('[GroupCall] Peer joined:', payload.peerId, 'I am polite:', amIPolite(payload.peerId));
           
-          // Create PC and send offer to the new peer
-          const pc = createPeerConnection(payload.peerId, payload.displayName);
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            channel.send({
-              type: 'broadcast',
-              event: 'sdp-offer',
-              payload: { sdp: offer, from: myPeerId, to: payload.peerId, displayName },
-            });
-          } catch (err) {
-            console.error('[GroupCall] Error creating offer:', err);
+          // Only the impolite peer (lower ID) initiates the offer to avoid glare
+          if (!amIPolite(payload.peerId)) {
+            // Remove old PC if it exists in a bad state
+            if (existingPc) { existingPc.close(); peersRef.current.delete(payload.peerId); }
+            
+            const pc = createPeerConnection(payload.peerId, payload.displayName);
+            try {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              channel.send({
+                type: 'broadcast',
+                event: 'sdp-offer',
+                payload: { sdp: offer, from: myPeerId, to: payload.peerId, displayName },
+              });
+            } catch (err) {
+              console.error('[GroupCall] Error creating offer:', err);
+            }
           }
         });
 
         // Handle SDP offer
         channel.on('broadcast', { event: 'sdp-offer' }, async ({ payload }) => {
           if (destroyedRef.current || payload.to !== myPeerId) return;
-          console.log('[GroupCall] Received offer from:', payload.from);
+          console.log('[GroupCall] Received offer from:', payload.from, 'signalingState:', peersRef.current.get(payload.from)?.signalingState);
           
-          const pc = createPeerConnection(payload.from, payload.displayName);
+          let pc = peersRef.current.get(payload.from);
+          
+          // Handle glare: if we also sent an offer, the polite peer rolls back
+          if (pc && pc.signalingState === 'have-local-offer') {
+            if (amIPolite(payload.from)) {
+              console.log('[GroupCall] Glare detected, rolling back as polite peer');
+              await pc.setLocalDescription({ type: 'rollback' });
+            } else {
+              console.log('[GroupCall] Glare detected, ignoring offer as impolite peer');
+              return;
+            }
+          }
+          
+          if (!pc || pc.signalingState === 'closed') {
+            // Remove old closed PC
+            if (pc) { peersRef.current.delete(payload.from); }
+            pc = createPeerConnection(payload.from, payload.displayName);
+          }
+          
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
             const answer = await pc.createAnswer();
@@ -225,8 +252,12 @@ export function VideoCallModal({
           console.log('[GroupCall] Received answer from:', payload.from);
           const pc = peersRef.current.get(payload.from);
           if (pc && pc.signalingState === 'have-local-offer') {
-            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-            updateRemotePeer(payload.from, { displayName: payload.displayName });
+            try {
+              await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+              updateRemotePeer(payload.from, { displayName: payload.displayName });
+            } catch (err) {
+              console.error('[GroupCall] Error setting answer:', err);
+            }
           }
         });
 
