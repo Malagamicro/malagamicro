@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import nodemailer from "nodemailer";
 
 const corsHeaders = {
@@ -13,18 +14,17 @@ interface EmailRequest {
   html?: string;
   text?: string;
   replyTo?: string;
+  profileId?: string; // Use a specific email profile
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { to, subject, html, text, replyTo }: EmailRequest = await req.json();
+    const { to, subject, html, text, replyTo, profileId }: EmailRequest = await req.json();
 
-    // Validate required fields
     if (!to || !subject || (!html && !text)) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: to, subject, and html or text" }),
@@ -32,69 +32,89 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Get SMTP configuration from secrets
-    const smtpHost = Deno.env.get("SMTP_HOST");
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const smtpUser = Deno.env.get("SMTP_USER");
-    const smtpPassword = Deno.env.get("SMTP_PASSWORD");
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
-    const fromName = Deno.env.get("SMTP_FROM_NAME") || "Sistema";
+    let smtpHost: string | undefined;
+    let smtpPort: number;
+    let smtpUser: string | undefined;
+    let smtpPassword: string | undefined;
+    let fromEmail: string | undefined;
+    let fromName: string = "Sistema";
+    let smtpSecure = false;
+
+    // If profileId is provided, load SMTP config from DB
+    if (profileId) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { data: profile, error: profileError } = await supabase
+        .from("email_profiles")
+        .select("*")
+        .eq("id", profileId)
+        .single();
+
+      if (profileError || !profile) {
+        return new Response(
+          JSON.stringify({ error: "Perfil de correo no encontrado" }),
+          { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      smtpHost = profile.smtp_host;
+      smtpPort = profile.smtp_port || 587;
+      smtpUser = profile.smtp_user;
+      smtpPassword = profile.smtp_password;
+      fromEmail = profile.from_email;
+      fromName = profile.from_name || profile.profile_name || "Sistema";
+      smtpSecure = profile.smtp_secure === "ssl";
+    } else {
+      // Fallback to env secrets
+      smtpHost = Deno.env.get("SMTP_HOST");
+      smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587");
+      smtpUser = Deno.env.get("SMTP_USER");
+      smtpPassword = Deno.env.get("SMTP_PASSWORD");
+      fromEmail = Deno.env.get("SMTP_FROM_EMAIL");
+      fromName = Deno.env.get("SMTP_FROM_NAME") || "Sistema";
+    }
 
     if (!smtpHost || !smtpUser || !smtpPassword || !fromEmail) {
       console.error("Missing SMTP configuration");
       return new Response(
-        JSON.stringify({ error: "SMTP not configured. Please set SMTP_HOST, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL" }),
+        JSON.stringify({ error: "SMTP not configured" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    console.log(`Connecting to SMTP: ${smtpHost}:${smtpPort}`);
+    console.log(`Sending via ${smtpHost}:${smtpPort} from ${fromEmail}`);
 
-    // Create nodemailer transporter for Office 365
     const transporter = nodemailer.createTransport({
       host: smtpHost,
       port: smtpPort,
-      secure: false, // false for STARTTLS on port 587
-      auth: {
-        user: smtpUser,
-        pass: smtpPassword,
-      },
-      tls: {
-        ciphers: 'SSLv3',
-        rejectUnauthorized: false,
-      },
+      secure: smtpSecure,
+      auth: { user: smtpUser, pass: smtpPassword },
+      tls: { ciphers: "SSLv3", rejectUnauthorized: false },
     });
 
-    // Prepare recipients
     const recipients = Array.isArray(to) ? to.join(", ") : to;
 
-    // Send email
     const info = await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to: recipients,
-      subject: subject,
+      subject,
       text: text || undefined,
       html: html || undefined,
       replyTo: replyTo || undefined,
     });
 
-    console.log("Email sent successfully:", info.messageId);
+    console.log("Email sent:", info.messageId);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: "Email sent successfully",
-        messageId: info.messageId,
-      }),
+      JSON.stringify({ success: true, messageId: info.messageId }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {
     console.error("Error sending email:", error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || "Failed to send email",
-        details: error.toString()
-      }),
+      JSON.stringify({ error: error.message || "Failed to send email" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
