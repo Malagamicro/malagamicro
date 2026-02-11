@@ -15,349 +15,213 @@ serve(async (req) => {
   try {
     const apiKey = (Deno.env.get('STELORDER_API_KEY') || '').trim();
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'STELORDER_API_KEY not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'STELORDER_API_KEY not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    console.log(`STEL API Key: "${apiKey}" (length: ${apiKey.length})`);
 
     const url = new URL(req.url);
     const action = url.searchParams.get('action');
-    
-    // Sanitize search param - filter out path artifacts like "/index.ts"
     const rawSearch = url.searchParams.get('search') || '';
-    const sanitizedSearch = (rawSearch && !rawSearch.includes('/') && !rawSearch.includes('.ts')) ? rawSearch.trim() : '';
-    console.log(`STEL action=${action}, rawSearch="${rawSearch}", sanitizedSearch="${sanitizedSearch}"`);
-    const body = req.method === 'POST' || req.method === 'PUT' ? await req.json().catch(() => null) : null;
+    const sanitizedSearch = rawSearch && !rawSearch.includes('/') && !rawSearch.includes('.ts') ? rawSearch.trim() : '';
+    
+    // deno-lint-ignore no-explicit-any
+    let body: any = null;
+    if (req.method === 'POST' || req.method === 'PUT') {
+      try {
+        body = await req.json();
+      } catch {
+        // no body
+      }
+    }
 
-    const callStel = async (endpoint: string, method = 'GET', payload?: any) => {
-      // Try both methods: header AND query parameter
-      const separator = endpoint.includes('?') ? '&' : '?';
-      const fullUrl = `${STEL_API_BASE}/${endpoint}${separator}APIKEY=${encodeURIComponent(apiKey)}`;
-      console.log(`STEL full URL: ${fullUrl}`);
+    // deno-lint-ignore no-explicit-any
+    function respond(data: any, status = 200) {
+      return new Response(JSON.stringify(data),
+        { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // deno-lint-ignore no-explicit-any
+    async function stelFetch(endpoint: string, method = 'GET', payload?: any) {
+      const sep = endpoint.includes('?') ? '&' : '?';
+      const fullUrl = STEL_API_BASE + '/' + endpoint + sep + 'APIKEY=' + encodeURIComponent(apiKey);
+      console.log('[STEL] ' + method + ' ' + STEL_API_BASE + '/' + endpoint);
       
-      const opts: RequestInit = { 
-        method, 
-        headers: {
-          'APIKEY': apiKey,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      };
+      // deno-lint-ignore no-explicit-any
+      const opts: any = { method, headers: { 'APIKEY': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' } };
       if (payload && (method === 'POST' || method === 'PUT')) {
         opts.body = JSON.stringify(payload);
       }
-      console.log(`STEL API call: ${method} ${STEL_API_BASE}/${endpoint}`);
+      
       const res = await fetch(fullUrl, opts);
       const text = await res.text();
+      // deno-lint-ignore no-explicit-any
       let data: any;
-      try { data = JSON.parse(text); } catch { data = { raw: text }; }
-      if (!res.ok) console.error(`STEL API error ${res.status}:`, JSON.stringify(data));
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+      if (!res.ok) console.error('[STEL] Error ' + res.status + ':', JSON.stringify(data));
       return { ok: res.ok, status: res.status, data };
-    };
+    }
 
-    // ===== BUDGETS (salesEstimates) =====
+    // deno-lint-ignore no-explicit-any
+    function mapLine(item: any) {
+      return {
+        concept: item.concept || item.description || item.nombre || 'Producto',
+        quantity: item.quantity || item.cantidad || 1,
+        price: item.price || item.unit_price || item.precio || 0,
+        taxPercentage: item.taxPercentage || item.tax_rate || 21,
+        discount: item.discount || 0,
+      };
+    }
+
+    if (action === 'test-connection') {
+      const result = await stelFetch('clients?limit=1');
+      return respond({ connected: result.ok, status: result.status, data: result.data, apiKeyLength: apiKey.length });
+    }
 
     if (action === 'list-budgets') {
       const page = url.searchParams.get('page') || '1';
       const limit = url.searchParams.get('limit') || '50';
-      
-      let endpoint = `salesEstimates?limit=${limit}&page=${page}`;
-      if (sanitizedSearch.length > 0) endpoint += `&search=${encodeURIComponent(sanitizedSearch)}`;
-      
-      const result = await callStel(endpoint);
-      return new Response(JSON.stringify(result.data), {
-        status: result.ok ? 200 : result.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      let ep = 'salesEstimates?limit=' + limit + '&page=' + page;
+      if (sanitizedSearch) ep += '&search=' + encodeURIComponent(sanitizedSearch);
+      const r = await stelFetch(ep);
+      return respond(r.data, r.ok ? 200 : r.status);
     }
 
     if (action === 'get-budget') {
       const id = url.searchParams.get('id');
-      if (!id) {
-        return new Response(JSON.stringify({ error: 'id requerido' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      const result = await callStel(`salesEstimates/${id}`);
-      return new Response(JSON.stringify(result.data), {
-        status: result.ok ? 200 : result.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      if (!id) return respond({ error: 'id requerido' }, 400);
+      const r = await stelFetch('salesEstimates/' + id);
+      return respond(r.data, r.ok ? 200 : r.status);
     }
 
     if (action === 'create-budget') {
-      if (!body) {
-        return new Response(JSON.stringify({ error: 'Body requerido' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+      if (!body) return respond({ error: 'Body requerido' }, 400);
 
       let clientId = body.client_id || body.clientId;
       if (!clientId && body.client_name) {
-        const searchResult = await callStel(`clients?search=${encodeURIComponent(body.client_name)}`);
-        if (searchResult.ok && Array.isArray(searchResult.data) && searchResult.data.length > 0) {
-          clientId = searchResult.data[0].id;
+        const sr = await stelFetch('clients?search=' + encodeURIComponent(body.client_name));
+        if (sr.ok && Array.isArray(sr.data) && sr.data.length > 0) {
+          clientId = sr.data[0].id;
         } else {
-          const createResult = await callStel('clients', 'POST', {
-            name: body.client_name,
-            email: body.client_email || '',
-            commercialName: body.client_name,
-          });
-          if (createResult.ok) clientId = createResult.data.id;
+          const cr = await stelFetch('clients', 'POST', { name: body.client_name, email: body.client_email || '', commercialName: body.client_name });
+          if (cr.ok) clientId = cr.data.id;
         }
       }
 
-      const budgetPayload: any = {
+      // deno-lint-ignore no-explicit-any
+      const payload: any = {
         clientId: clientId,
-        lines: (body.items || body.lines || []).map((item: any) => ({
-          concept: item.concept || item.description || item.nombre || 'Producto',
-          quantity: item.quantity || item.cantidad || 1,
-          price: item.price || item.unit_price || item.precio || 0,
-          taxPercentage: item.taxPercentage || item.tax_rate || 21,
-          discount: item.discount || 0,
-        })),
+        // deno-lint-ignore no-explicit-any
+        lines: (body.items || body.lines || []).map((i: any) => mapLine(i)),
         notes: body.notes || '',
         validUntil: body.valid_until || body.validUntil || undefined,
       };
+      if (body.subject) payload.subject = body.subject;
 
-      if (body.subject) budgetPayload.subject = body.subject;
-
-      console.log('Creating STEL salesEstimate:', JSON.stringify(budgetPayload));
-      const result = await callStel('salesEstimates', 'POST', budgetPayload);
-
-      if (!result.ok) {
-        return new Response(JSON.stringify({ error: 'Error al crear presupuesto', details: result.data }), {
-          status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      return new Response(JSON.stringify({ success: true, budget: result.data }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const r = await stelFetch('salesEstimates', 'POST', payload);
+      if (!r.ok) return respond({ error: 'Error al crear presupuesto', details: r.data }, r.status);
+      return respond({ success: true, budget: r.data });
     }
 
     if (action === 'update-budget') {
       const id = url.searchParams.get('id');
-      if (!id || !body) {
-        return new Response(JSON.stringify({ error: 'id y body requeridos' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      const result = await callStel(`salesEstimates/${id}`, 'PUT', body);
-      if (!result.ok) {
-        return new Response(JSON.stringify({ error: 'Error al actualizar', details: result.data }), {
-          status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      return new Response(JSON.stringify({ success: true, budget: result.data }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      if (!id || !body) return respond({ error: 'id y body requeridos' }, 400);
+      const r = await stelFetch('salesEstimates/' + id, 'PUT', body);
+      if (!r.ok) return respond({ error: 'Error al actualizar', details: r.data }, r.status);
+      return respond({ success: true, budget: r.data });
     }
 
     if (action === 'delete-budget') {
       const id = url.searchParams.get('id');
-      if (!id) {
-        return new Response(JSON.stringify({ error: 'id requerido' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      const result = await callStel(`salesEstimates/${id}`, 'DELETE' as any);
-      return new Response(JSON.stringify(result.ok ? { success: true } : { error: 'Error al eliminar', details: result.data }), {
-        status: result.ok ? 200 : result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      if (!id) return respond({ error: 'id requerido' }, 400);
+      const r = await stelFetch('salesEstimates/' + id, 'DELETE');
+      return respond(r.ok ? { success: true } : { error: 'Error al eliminar', details: r.data }, r.ok ? 200 : r.status);
     }
 
     if (action === 'get-budget-pdf') {
       const id = url.searchParams.get('id');
-      if (!id) {
-        return new Response(JSON.stringify({ error: 'id requerido' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      const result = await callStel(`salesEstimates/${id}/pdf`);
-      return new Response(JSON.stringify(result.data), {
-        status: result.ok ? 200 : result.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      if (!id) return respond({ error: 'id requerido' }, 400);
+      const r = await stelFetch('salesEstimates/' + id + '/pdf');
+      return respond(r.data, r.ok ? 200 : r.status);
     }
-
-    // ===== CONVERT =====
 
     if (action === 'convert-to-invoice') {
       const id = url.searchParams.get('id');
-      if (!id) {
-        return new Response(JSON.stringify({ error: 'id requerido' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      const budgetResult = await callStel(`salesEstimates/${id}`);
-      if (!budgetResult.ok) {
-        return new Response(JSON.stringify({ error: 'Presupuesto no encontrado', details: budgetResult.data }), {
-          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      const budget = budgetResult.data;
-      const invoicePayload: any = {
-        clientId: budget.clientId || budget.client?.id,
-        lines: (budget.lines || []).map((line: any) => ({
-          concept: line.concept || line.description,
-          quantity: line.quantity || 1,
-          price: line.price || line.unitPrice || 0,
-          taxPercentage: line.taxPercentage || 21,
-          discount: line.discount || 0,
-        })),
-        notes: budget.notes || `Generado desde presupuesto #${budget.number || id}`,
+      if (!id) return respond({ error: 'id requerido' }, 400);
+      const br = await stelFetch('salesEstimates/' + id);
+      if (!br.ok) return respond({ error: 'Presupuesto no encontrado', details: br.data }, 404);
+      const b = br.data;
+      const ip = {
+        clientId: b.clientId || (b.client && b.client.id),
+        // deno-lint-ignore no-explicit-any
+        lines: (b.lines || []).map((l: any) => ({ concept: l.concept || l.description, quantity: l.quantity || 1, price: l.price || l.unitPrice || 0, taxPercentage: l.taxPercentage || 21, discount: l.discount || 0 })),
+        notes: b.notes || 'Generado desde presupuesto #' + (b.number || id),
       };
-
-      const invoiceResult = await callStel('ordinaryInvoices', 'POST', invoicePayload);
-
-      if (!invoiceResult.ok) {
-        return new Response(JSON.stringify({ error: 'Error al crear factura', details: invoiceResult.data }), {
-          status: invoiceResult.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      return new Response(JSON.stringify({ 
-        success: true, 
-        invoice: invoiceResult.data,
-        message: `Factura creada desde presupuesto #${budget.number || id}`
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const ir = await stelFetch('ordinaryInvoices', 'POST', ip);
+      if (!ir.ok) return respond({ error: 'Error al crear factura', details: ir.data }, ir.status);
+      return respond({ success: true, invoice: ir.data, message: 'Factura creada desde presupuesto #' + (b.number || id) });
     }
 
     if (action === 'convert-to-order') {
       const id = url.searchParams.get('id');
-      if (!id) {
-        return new Response(JSON.stringify({ error: 'id requerido' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      const budgetResult = await callStel(`salesEstimates/${id}`);
-      if (!budgetResult.ok) {
-        return new Response(JSON.stringify({ error: 'Presupuesto no encontrado' }), {
-          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      const budget = budgetResult.data;
-      const orderPayload: any = {
-        clientId: budget.clientId || budget.client?.id,
-        lines: (budget.lines || []).map((line: any) => ({
-          concept: line.concept || line.description,
-          quantity: line.quantity || 1,
-          price: line.price || line.unitPrice || 0,
-          taxPercentage: line.taxPercentage || 21,
-          discount: line.discount || 0,
-        })),
-        notes: budget.notes || `Generado desde presupuesto #${budget.number || id}`,
+      if (!id) return respond({ error: 'id requerido' }, 400);
+      const br = await stelFetch('salesEstimates/' + id);
+      if (!br.ok) return respond({ error: 'Presupuesto no encontrado' }, 404);
+      const b = br.data;
+      const op = {
+        clientId: b.clientId || (b.client && b.client.id),
+        // deno-lint-ignore no-explicit-any
+        lines: (b.lines || []).map((l: any) => ({ concept: l.concept || l.description, quantity: l.quantity || 1, price: l.price || l.unitPrice || 0, taxPercentage: l.taxPercentage || 21, discount: l.discount || 0 })),
+        notes: b.notes || 'Generado desde presupuesto #' + (b.number || id),
       };
-
-      const orderResult = await callStel('salesOrders', 'POST', orderPayload);
-
-      if (!orderResult.ok) {
-        return new Response(JSON.stringify({ error: 'Error al crear pedido', details: orderResult.data }), {
-          status: orderResult.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      return new Response(JSON.stringify({ 
-        success: true, 
-        order: orderResult.data,
-        message: `Pedido creado desde presupuesto #${budget.number || id}`
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const or2 = await stelFetch('salesOrders', 'POST', op);
+      if (!or2.ok) return respond({ error: 'Error al crear pedido', details: or2.data }, or2.status);
+      return respond({ success: true, order: or2.data, message: 'Pedido creado desde presupuesto #' + (b.number || id) });
     }
-
-    // ===== CLIENTS =====
 
     if (action === 'list-clients') {
       const page = url.searchParams.get('page') || '1';
-      let endpoint = `clients?page=${page}&limit=50`;
-      if (sanitizedSearch.length > 0) endpoint += `&search=${encodeURIComponent(sanitizedSearch)}`;
-
-      const result = await callStel(endpoint);
-      return new Response(JSON.stringify(result.data), {
-        status: result.ok ? 200 : result.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      let ep = 'clients?page=' + page + '&limit=50';
+      if (sanitizedSearch) ep += '&search=' + encodeURIComponent(sanitizedSearch);
+      const r = await stelFetch(ep);
+      return respond(r.data, r.ok ? 200 : r.status);
     }
-
-    // ===== INVOICES (ordinaryInvoices) =====
 
     if (action === 'list-invoices') {
       const page = url.searchParams.get('page') || '1';
-      const result = await callStel(`ordinaryInvoices?page=${page}&limit=50`);
-      return new Response(JSON.stringify(result.data), {
-        status: result.ok ? 200 : result.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const r = await stelFetch('ordinaryInvoices?page=' + page + '&limit=50');
+      return respond(r.data, r.ok ? 200 : r.status);
     }
 
     if (action === 'create-invoice') {
-      if (!body) {
-        return new Response(JSON.stringify({ error: 'Body requerido' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
+      if (!body) return respond({ error: 'Body requerido' }, 400);
       let clientId = body.client_id || body.clientId;
       if (!clientId && body.client_name) {
-        const searchResult = await callStel(`clients?search=${encodeURIComponent(body.client_name)}`);
-        if (searchResult.ok && Array.isArray(searchResult.data) && searchResult.data.length > 0) {
-          clientId = searchResult.data[0].id;
-        }
+        const sr = await stelFetch('clients?search=' + encodeURIComponent(body.client_name));
+        if (sr.ok && Array.isArray(sr.data) && sr.data.length > 0) clientId = sr.data[0].id;
       }
-
-      const invoicePayload = {
+      const ip = {
         clientId,
-        lines: (body.items || body.lines || []).map((item: any) => ({
-          concept: item.concept || item.description || item.nombre,
-          quantity: item.quantity || item.cantidad || 1,
-          price: item.price || item.unit_price || item.precio || 0,
-          taxPercentage: item.taxPercentage || item.tax_rate || 21,
-          discount: item.discount || 0,
-        })),
+        // deno-lint-ignore no-explicit-any
+        lines: (body.items || body.lines || []).map((i: any) => mapLine(i)),
         notes: body.notes || '',
       };
-
-      const result = await callStel('ordinaryInvoices', 'POST', invoicePayload);
-      if (!result.ok) {
-        return new Response(JSON.stringify({ error: 'Error al crear factura', details: result.data }), {
-          status: result.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      return new Response(JSON.stringify({ success: true, invoice: result.data }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const r = await stelFetch('ordinaryInvoices', 'POST', ip);
+      if (!r.ok) return respond({ error: 'Error al crear factura', details: r.data }, r.status);
+      return respond({ success: true, invoice: r.data });
     }
 
-    return new Response(
-      JSON.stringify({ 
-        error: 'Acción no válida',
-        available_actions: [
-          'list-budgets', 'get-budget', 'create-budget', 'update-budget', 'delete-budget', 'get-budget-pdf',
-          'convert-to-invoice', 'convert-to-order',
-          'list-clients', 'list-invoices', 'create-invoice'
-        ]
-      }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return respond({
+      error: 'Acción no válida',
+      available_actions: ['list-budgets', 'get-budget', 'create-budget', 'update-budget', 'delete-budget', 'get-budget-pdf', 'convert-to-invoice', 'convert-to-order', 'list-clients', 'list-invoices', 'create-invoice', 'test-connection']
+    }, 400);
 
   } catch (error) {
-    console.error('STEL Order error:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Error desconocido' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error('[STEL] Error:', error);
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Error desconocido' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
