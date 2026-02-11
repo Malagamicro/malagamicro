@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { format, isAfter, isBefore, startOfDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -96,7 +96,76 @@ function getInitials(name: string | null | undefined) {
 
 function canPreview(fileType: string | null): boolean {
   if (!fileType) return false;
-  return fileType.startsWith('image/') || fileType === 'application/pdf';
+  return fileType.startsWith('image/') || fileType === 'application/pdf' || 
+    fileType === 'text/markdown' || fileType === 'text/plain' || fileType === 'text/html';
+}
+
+// Text/Markdown file preview component
+function TextFilePreviewDialog({ open, onOpenChange, file }: { open: boolean; onOpenChange: (v: boolean) => void; file: SharedFile | null }) {
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !file) { setTextContent(null); return; }
+    const isText = file.file_type === 'text/markdown' || file.file_type === 'text/plain' || file.file_type === 'text/html';
+    if (!isText) { setTextContent(null); return; }
+
+    setLoading(true);
+    fetch(file.file_path)
+      .then(r => r.text())
+      .then(t => setTextContent(t))
+      .catch(() => setTextContent(null))
+      .finally(() => setLoading(false));
+  }, [open, file]);
+
+  const isMarkdown = file?.file_type === 'text/markdown';
+  const isText = file?.file_type === 'text/plain' || file?.file_type === 'text/html' || isMarkdown;
+
+  // Lazy import ReactMarkdown
+  const [ReactMarkdown, setReactMarkdown] = useState<any>(null);
+  useEffect(() => {
+    if (isMarkdown && open) {
+      import('react-markdown').then(mod => setReactMarkdown(() => mod.default));
+    }
+  }, [isMarkdown, open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="truncate">{file?.file_name}</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 overflow-auto">
+          {file?.file_type?.startsWith('image/') ? (
+            <img src={file.file_path} alt={file.file_name} className="max-w-full h-auto mx-auto rounded-lg" />
+          ) : file?.file_type === 'application/pdf' ? (
+            <iframe src={file.file_path} className="w-full h-[70vh] rounded-lg border" title={file.file_name} />
+          ) : isText && textContent !== null ? (
+            loading ? (
+              <div className="flex items-center justify-center h-48"><Loader2 className="h-6 w-6 animate-spin" /></div>
+            ) : isMarkdown && ReactMarkdown ? (
+              <div className="p-6 prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown>{textContent}</ReactMarkdown>
+              </div>
+            ) : (
+              <pre className="p-6 text-sm whitespace-pre-wrap font-mono bg-muted rounded-lg">{textContent}</pre>
+            )
+          ) : (
+            <div className="flex items-center justify-center h-48 text-muted-foreground">
+              Vista previa no disponible
+            </div>
+          )}
+        </div>
+        <DialogFooter className="flex-shrink-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <Button onClick={() => file && window.open(file.file_path, '_blank')}>
+            <Download className="h-4 w-4 mr-2" />
+            Descargar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // Breadcrumb type
@@ -846,43 +915,11 @@ export function SharedFilesPanel() {
       </Dialog>
 
       {/* Preview Dialog */}
-      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="flex items-center justify-between pr-8">
-              <span className="truncate">{selectedFile?.file_name}</span>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-auto">
-            {selectedFile?.file_type?.startsWith('image/') ? (
-              <img 
-                src={selectedFile.file_path} 
-                alt={selectedFile.file_name}
-                className="max-w-full h-auto mx-auto rounded-lg"
-              />
-            ) : selectedFile?.file_type === 'application/pdf' ? (
-              <iframe
-                src={selectedFile.file_path}
-                className="w-full h-[70vh] rounded-lg border"
-                title={selectedFile.file_name}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-48 text-muted-foreground">
-                Vista previa no disponible
-              </div>
-            )}
-          </div>
-          <DialogFooter className="flex-shrink-0">
-            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>
-              Cerrar
-            </Button>
-            <Button onClick={() => selectedFile && window.open(selectedFile.file_path, '_blank')}>
-              <Download className="h-4 w-4 mr-2" />
-              Descargar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TextFilePreviewDialog
+        open={previewDialogOpen}
+        onOpenChange={setPreviewDialogOpen}
+        file={selectedFile}
+      />
 
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
