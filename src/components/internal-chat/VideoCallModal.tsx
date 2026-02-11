@@ -55,6 +55,7 @@ export function VideoCallModal({
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const onCloseRef = useRef(onClose);
   const destroyedRef = useRef(false);
+  const announceTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   onCloseRef.current = onClose;
 
   const updateRemotePeer = useCallback((peerId: string, update: Partial<{ stream: MediaStream | null; displayName: string; isScreenSharing: boolean }>) => {
@@ -127,12 +128,37 @@ export function VideoCallModal({
 
     const setup = async () => {
       try {
-        // 1. Get local media
+        // 1. Get local media - retry logic for intermittent video
         let stream: MediaStream;
         if (initialStream && initialStream.getTracks().length > 0) {
           stream = initialStream;
         } else {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideoCall });
+          // Try with video first, fallback to audio-only if video fails
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+              audio: true, 
+              video: isVideoCall ? { 
+                width: { ideal: 640 }, 
+                height: { ideal: 480 },
+                frameRate: { ideal: 24 }
+              } : false 
+            });
+          } catch (mediaErr) {
+            if (isVideoCall) {
+              console.warn('[GroupCall] Video failed, retrying...', mediaErr);
+              // Wait briefly and retry - helps with iOS/Safari timing issues
+              await new Promise(r => setTimeout(r, 500));
+              try {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+              } catch {
+                console.warn('[GroupCall] Video retry failed, falling back to audio only');
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                toast.info('No se pudo activar la cámara, conectando solo con audio');
+              }
+            } else {
+              throw mediaErr;
+            }
+          }
         }
         if (destroyedRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
 
@@ -149,17 +175,28 @@ export function VideoCallModal({
         // Handle new peer joining
         channel.on('broadcast', { event: 'peer-join' }, async ({ payload }) => {
           if (destroyedRef.current || payload.peerId === myPeerId) return;
+          
+          // Avoid duplicate connections
+          if (peersRef.current.has(payload.peerId)) {
+            console.log('[GroupCall] Already connected to peer:', payload.peerId);
+            return;
+          }
+          
           console.log('[GroupCall] Peer joined:', payload.peerId);
           
           // Create PC and send offer to the new peer
           const pc = createPeerConnection(payload.peerId, payload.displayName);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          channel.send({
-            type: 'broadcast',
-            event: 'sdp-offer',
-            payload: { sdp: offer, from: myPeerId, to: payload.peerId, displayName },
-          });
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            channel.send({
+              type: 'broadcast',
+              event: 'sdp-offer',
+              payload: { sdp: offer, from: myPeerId, to: payload.peerId, displayName },
+            });
+          } catch (err) {
+            console.error('[GroupCall] Error creating offer:', err);
+          }
         });
 
         // Handle SDP offer
@@ -168,14 +205,18 @@ export function VideoCallModal({
           console.log('[GroupCall] Received offer from:', payload.from);
           
           const pc = createPeerConnection(payload.from, payload.displayName);
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          channel.send({
-            type: 'broadcast',
-            event: 'sdp-answer',
-            payload: { sdp: answer, from: myPeerId, to: payload.from, displayName },
-          });
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            channel.send({
+              type: 'broadcast',
+              event: 'sdp-answer',
+              payload: { sdp: answer, from: myPeerId, to: payload.from, displayName },
+            });
+          } catch (err) {
+            console.error('[GroupCall] Error handling offer:', err);
+          }
         });
 
         // Handle SDP answer
@@ -183,7 +224,7 @@ export function VideoCallModal({
           if (destroyedRef.current || payload.to !== myPeerId) return;
           console.log('[GroupCall] Received answer from:', payload.from);
           const pc = peersRef.current.get(payload.from);
-          if (pc) {
+          if (pc && pc.signalingState === 'have-local-offer') {
             await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
             updateRemotePeer(payload.from, { displayName: payload.displayName });
           }
@@ -225,24 +266,30 @@ export function VideoCallModal({
 
         await channel.subscribe();
 
-        // 3. Announce ourselves
+        // 3. Announce ourselves - with staggered re-announcements for reliability
+        // Immediate announcement
         channel.send({
           type: 'broadcast',
           event: 'peer-join',
           payload: { peerId: myPeerId, displayName },
         });
 
-        // Re-announce periodically for late joiners
-        const announceInterval = setInterval(() => {
-          if (destroyedRef.current) { clearInterval(announceInterval); return; }
-          channel.send({
-            type: 'broadcast',
-            event: 'peer-join',
-            payload: { peerId: myPeerId, displayName },
-          });
-        }, 3000);
-        setTimeout(() => clearInterval(announceInterval), 20000);
-
+        // Re-announce at increasing intervals for up to 60 seconds
+        // This ensures late joiners in group calls get properly connected
+        announceTimersRef.current.forEach(t => clearTimeout(t));
+        announceTimersRef.current = [];
+        const announceTimes = [1000, 2000, 4000, 8000, 15000, 30000, 45000];
+        for (const delay of announceTimes) {
+          const timer = setTimeout(() => {
+            if (destroyedRef.current) return;
+            channel.send({
+              type: 'broadcast',
+              event: 'peer-join',
+              payload: { peerId: myPeerId, displayName },
+            });
+          }, delay);
+          announceTimersRef.current.push(timer);
+        }
       } catch (err) {
         console.error('Call setup error:', err);
         toast.error('No se pudo acceder a cámara/micrófono');
@@ -259,6 +306,10 @@ export function VideoCallModal({
   }, [open, roomName, isVideoCall, isReceiver, displayName, initialStream, createPeerConnection, updateRemotePeer, removeRemotePeer]);
 
   const cleanup = () => {
+    // Clear announce timers
+    announceTimersRef.current.forEach(t => clearTimeout(t));
+    announceTimersRef.current = [];
+
     // Announce leave
     channelRef.current?.send({
       type: 'broadcast',
