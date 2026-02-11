@@ -56,6 +56,8 @@ export function VideoCallModal({
   const onCloseRef = useRef(onClose);
   const destroyedRef = useRef(false);
   const announceTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const retryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const connectedPeersRef = useRef<Set<string>>(new Set());
   onCloseRef.current = onClose;
 
   const updateRemotePeer = useCallback((peerId: string, update: Partial<{ stream: MediaStream | null; displayName: string; isScreenSharing: boolean }>) => {
@@ -70,6 +72,9 @@ export function VideoCallModal({
   const removeRemotePeer = useCallback((peerId: string) => {
     const pc = peersRef.current.get(peerId);
     if (pc) { pc.close(); peersRef.current.delete(peerId); }
+    connectedPeersRef.current.delete(peerId);
+    const retryTimer = retryTimersRef.current.get(peerId);
+    if (retryTimer) { clearTimeout(retryTimer); retryTimersRef.current.delete(peerId); }
     setRemotePeers(prev => {
       const next = new Map(prev);
       next.delete(peerId);
@@ -77,9 +82,23 @@ export function VideoCallModal({
     });
   }, []);
 
-  const createPeerConnection = useCallback((remotePeerId: string, remoteDisplayName: string) => {
-    if (peersRef.current.has(remotePeerId)) return peersRef.current.get(remotePeerId)!;
+  const createPeerConnection = useCallback((remotePeerId: string, remoteDisplayName: string): RTCPeerConnection => {
+    // Check if we already have a healthy connection
+    const existingPc = peersRef.current.get(remotePeerId);
+    if (existingPc) {
+      const state = existingPc.connectionState;
+      if (state === 'connected') {
+        console.log('[WebRTC] Already connected to', remotePeerId);
+        return existingPc;
+      }
+      // Close stale/failed connections
+      console.log('[WebRTC] Closing stale PC for', remotePeerId, 'state:', state);
+      existingPc.close();
+      peersRef.current.delete(remotePeerId);
+      connectedPeersRef.current.delete(remotePeerId);
+    }
 
+    console.log('[WebRTC] Creating new PC for', remotePeerId);
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     peersRef.current.set(remotePeerId, pc);
 
@@ -92,9 +111,14 @@ export function VideoCallModal({
     // Handle remote stream
     pc.ontrack = (e) => {
       if (destroyedRef.current) return;
+      console.log('[WebRTC] ontrack from', remotePeerId, 'streams:', e.streams.length);
       if (e.streams[0]) {
+        connectedPeersRef.current.add(remotePeerId);
         updateRemotePeer(remotePeerId, { stream: e.streams[0], displayName: remoteDisplayName });
         setIsConnecting(false);
+        // Clear retry timer since we got the stream
+        const rt = retryTimersRef.current.get(remotePeerId);
+        if (rt) { clearTimeout(rt); retryTimersRef.current.delete(remotePeerId); }
         if (!timerRef.current) {
           timerRef.current = setInterval(() => setCallDuration(p => p + 1), 1000);
         }
@@ -113,13 +137,89 @@ export function VideoCallModal({
     };
 
     pc.onconnectionstatechange = () => {
+      console.log('[WebRTC] Connection state for', remotePeerId, ':', pc.connectionState);
+      if (pc.connectionState === 'connected') {
+        connectedPeersRef.current.add(remotePeerId);
+        setIsConnecting(false);
+      }
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        console.log('[WebRTC] Connection lost to', remotePeerId, '- will retry');
+        connectedPeersRef.current.delete(remotePeerId);
         removeRemotePeer(remotePeerId);
+        // Re-announce to trigger reconnection
+        if (!destroyedRef.current) {
+          setTimeout(() => {
+            if (destroyedRef.current) return;
+            channelRef.current?.send({
+              type: 'broadcast',
+              event: 'peer-join',
+              payload: { peerId: myPeerIdRef.current, displayName },
+            });
+          }, 1000);
+        }
       }
     };
 
     return pc;
-  }, [updateRemotePeer, removeRemotePeer]);
+  }, [updateRemotePeer, removeRemotePeer, displayName]);
+
+  // Send an SDP offer with retry logic
+  const sendOfferWithRetry = useCallback(async (remotePeerId: string, remoteDisplayName: string) => {
+    if (destroyedRef.current) return;
+    const myPeerId = myPeerIdRef.current;
+    
+    // Don't send if already connected
+    if (connectedPeersRef.current.has(remotePeerId)) return;
+
+    const pc = createPeerConnection(remotePeerId, remoteDisplayName);
+    
+    // Don't create offer if already in progress or connected
+    if (pc.connectionState === 'connected') return;
+    if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') return;
+
+    // If we already have a local offer, don't create another
+    if (pc.signalingState === 'have-local-offer') {
+      console.log('[WebRTC] Already have local offer for', remotePeerId, '- resending');
+      if (pc.localDescription) {
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'sdp-offer',
+          payload: { sdp: pc.localDescription, from: myPeerId, to: remotePeerId, displayName },
+        });
+      }
+    } else {
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'sdp-offer',
+          payload: { sdp: offer, from: myPeerId, to: remotePeerId, displayName },
+        });
+        console.log('[WebRTC] Offer sent to', remotePeerId);
+      } catch (err) {
+        console.error('[WebRTC] Error creating offer:', err);
+        return;
+      }
+    }
+
+    // Set retry: if no ontrack in 5s, recreate PC and resend offer
+    const existingRetry = retryTimersRef.current.get(remotePeerId);
+    if (existingRetry) clearTimeout(existingRetry);
+
+    const retryTimer = setTimeout(() => {
+      retryTimersRef.current.delete(remotePeerId);
+      if (destroyedRef.current) return;
+      if (connectedPeersRef.current.has(remotePeerId)) return;
+      
+      console.log('[WebRTC] No stream from', remotePeerId, 'after 5s - retrying offer');
+      // Close old PC and recreate
+      const oldPc = peersRef.current.get(remotePeerId);
+      if (oldPc) { oldPc.close(); peersRef.current.delete(remotePeerId); }
+      sendOfferWithRetry(remotePeerId, remoteDisplayName);
+    }, 5000);
+    retryTimersRef.current.set(remotePeerId, retryTimer);
+  }, [createPeerConnection, displayName]);
 
   useEffect(() => {
     if (!open) return;
@@ -128,12 +228,11 @@ export function VideoCallModal({
 
     const setup = async () => {
       try {
-        // 1. Get local media - retry logic for intermittent video
+        // 1. Get local media
         let stream: MediaStream;
         if (initialStream && initialStream.getTracks().length > 0) {
           stream = initialStream;
         } else {
-          // Try with video first, fallback to audio-only if video fails
           try {
             stream = await navigator.mediaDevices.getUserMedia({ 
               audio: true, 
@@ -145,13 +244,12 @@ export function VideoCallModal({
             });
           } catch (mediaErr) {
             if (isVideoCall) {
-              console.warn('[GroupCall] Video failed, retrying...', mediaErr);
-              // Wait briefly and retry - helps with iOS/Safari timing issues
+              console.warn('[WebRTC] Video failed, retrying...', mediaErr);
               await new Promise(r => setTimeout(r, 500));
               try {
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
               } catch {
-                console.warn('[GroupCall] Video retry failed, falling back to audio only');
+                console.warn('[WebRTC] Video retry failed, falling back to audio only');
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 toast.info('No se pudo activar la cámara, conectando solo con audio');
               }
@@ -172,62 +270,63 @@ export function VideoCallModal({
         });
         channelRef.current = channel;
 
-        // Polite peer: the peer with the "higher" ID yields on glare
-        const amIPolite = (remotePeerId: string) => myPeerId > remotePeerId;
-
-        // Handle new peer joining - only the "impolite" peer (lower ID) creates the offer
+        // Handle new peer joining
+        // Both peers see the join, but only the one with the LOWER peerId sends the offer
         channel.on('broadcast', { event: 'peer-join' }, async ({ payload }) => {
           if (destroyedRef.current || payload.peerId === myPeerId) return;
           
-          // If already connected and stable, skip
-          const existingPc = peersRef.current.get(payload.peerId);
-          if (existingPc && (existingPc.connectionState === 'connected' || existingPc.connectionState === 'connecting')) {
-            console.log('[GroupCall] Already connected/connecting to peer:', payload.peerId);
+          // If already connected, just ignore
+          if (connectedPeersRef.current.has(payload.peerId)) {
             return;
           }
+
+          console.log('[WebRTC] Peer joined:', payload.peerId);
           
-          console.log('[GroupCall] Peer joined:', payload.peerId, 'I am polite:', amIPolite(payload.peerId));
-          
-          // Only the impolite peer (lower ID) initiates the offer to avoid glare
-          if (!amIPolite(payload.peerId)) {
-            // Remove old PC if it exists in a bad state
-            if (existingPc) { existingPc.close(); peersRef.current.delete(payload.peerId); }
-            
-            const pc = createPeerConnection(payload.peerId, payload.displayName);
-            try {
-              const offer = await pc.createOffer();
-              await pc.setLocalDescription(offer);
-              channel.send({
-                type: 'broadcast',
-                event: 'sdp-offer',
-                payload: { sdp: offer, from: myPeerId, to: payload.peerId, displayName },
-              });
-            } catch (err) {
-              console.error('[GroupCall] Error creating offer:', err);
-            }
+          // The peer with the lower ID sends the offer to avoid glare
+          if (myPeerId < payload.peerId) {
+            console.log('[WebRTC] I have lower ID, sending offer to', payload.peerId);
+            await sendOfferWithRetry(payload.peerId, payload.displayName);
+          } else {
+            console.log('[WebRTC] I have higher ID, waiting for offer from', payload.peerId);
+            // Pre-create the PC so we're ready to receive the offer
+            createPeerConnection(payload.peerId, payload.displayName);
           }
         });
 
         // Handle SDP offer
         channel.on('broadcast', { event: 'sdp-offer' }, async ({ payload }) => {
           if (destroyedRef.current || payload.to !== myPeerId) return;
-          console.log('[GroupCall] Received offer from:', payload.from, 'signalingState:', peersRef.current.get(payload.from)?.signalingState);
+          console.log('[WebRTC] Received offer from:', payload.from, 'signalingState:', peersRef.current.get(payload.from)?.signalingState);
           
+          // If already connected with stream, ignore duplicate offers
+          if (connectedPeersRef.current.has(payload.from)) {
+            console.log('[WebRTC] Already connected to', payload.from, '- ignoring offer');
+            return;
+          }
+
           let pc = peersRef.current.get(payload.from);
           
-          // Handle glare: if we also sent an offer, the polite peer rolls back
+          // If PC is in have-local-offer (glare), the higher ID peer rolls back
           if (pc && pc.signalingState === 'have-local-offer') {
-            if (amIPolite(payload.from)) {
-              console.log('[GroupCall] Glare detected, rolling back as polite peer');
-              await pc.setLocalDescription({ type: 'rollback' });
+            if (myPeerId > payload.from) {
+              // I'm polite (higher ID), I rollback
+              console.log('[WebRTC] Glare: rolling back as polite peer');
+              try {
+                await pc.setLocalDescription({ type: 'rollback' });
+              } catch (e) {
+                console.warn('[WebRTC] Rollback failed, recreating PC:', e);
+                pc.close();
+                peersRef.current.delete(payload.from);
+                pc = null;
+              }
             } else {
-              console.log('[GroupCall] Glare detected, ignoring offer as impolite peer');
+              // I'm impolite (lower ID), ignore their offer
+              console.log('[WebRTC] Glare: ignoring offer as impolite peer');
               return;
             }
           }
           
           if (!pc || pc.signalingState === 'closed') {
-            // Remove old closed PC
             if (pc) { peersRef.current.delete(payload.from); }
             pc = createPeerConnection(payload.from, payload.displayName);
           }
@@ -241,22 +340,23 @@ export function VideoCallModal({
               event: 'sdp-answer',
               payload: { sdp: answer, from: myPeerId, to: payload.from, displayName },
             });
+            console.log('[WebRTC] Answer sent to', payload.from);
           } catch (err) {
-            console.error('[GroupCall] Error handling offer:', err);
+            console.error('[WebRTC] Error handling offer:', err);
           }
         });
 
         // Handle SDP answer
         channel.on('broadcast', { event: 'sdp-answer' }, async ({ payload }) => {
           if (destroyedRef.current || payload.to !== myPeerId) return;
-          console.log('[GroupCall] Received answer from:', payload.from);
+          console.log('[WebRTC] Received answer from:', payload.from);
           const pc = peersRef.current.get(payload.from);
           if (pc && pc.signalingState === 'have-local-offer') {
             try {
               await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
               updateRemotePeer(payload.from, { displayName: payload.displayName });
             } catch (err) {
-              console.error('[GroupCall] Error setting answer:', err);
+              console.error('[WebRTC] Error setting answer:', err);
             }
           }
         });
@@ -265,7 +365,7 @@ export function VideoCallModal({
         channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
           if (destroyedRef.current || payload.to !== myPeerId) return;
           const pc = peersRef.current.get(payload.from);
-          if (pc) {
+          if (pc && pc.remoteDescription) {
             try { await pc.addIceCandidate(new RTCIceCandidate(payload.candidate)); } catch {}
           }
         });
@@ -273,11 +373,10 @@ export function VideoCallModal({
         // Handle peer leaving
         channel.on('broadcast', { event: 'peer-leave' }, ({ payload }) => {
           if (destroyedRef.current || payload.peerId === myPeerId) return;
-          console.log('[GroupCall] Peer left:', payload.peerId);
+          console.log('[WebRTC] Peer left:', payload.peerId);
           removeRemotePeer(payload.peerId);
           toast.info(`${payload.displayName || 'Un usuario'} abandonó la llamada`);
           
-          // If no more peers, end call
           if (peersRef.current.size === 0) {
             setTimeout(() => {
               if (peersRef.current.size === 0 && !destroyedRef.current) {
@@ -297,22 +396,21 @@ export function VideoCallModal({
 
         await channel.subscribe();
 
-        // 3. Announce ourselves - with staggered re-announcements for reliability
-        // Immediate announcement
+        // 3. Announce ourselves
         channel.send({
           type: 'broadcast',
           event: 'peer-join',
           payload: { peerId: myPeerId, displayName },
         });
 
-        // Re-announce at increasing intervals for up to 60 seconds
-        // This ensures late joiners in group calls get properly connected
+        // Re-announce at staggered intervals for reliability
         announceTimersRef.current.forEach(t => clearTimeout(t));
         announceTimersRef.current = [];
-        const announceTimes = [1000, 2000, 4000, 8000, 15000, 30000, 45000];
+        const announceTimes = [500, 1500, 3000, 6000, 10000, 20000, 35000, 50000];
         for (const delay of announceTimes) {
           const timer = setTimeout(() => {
             if (destroyedRef.current) return;
+            // Only re-announce if we haven't connected to anyone yet, or always for group calls
             channel.send({
               type: 'broadcast',
               event: 'peer-join',
@@ -321,6 +419,24 @@ export function VideoCallModal({
           }, delay);
           announceTimersRef.current.push(timer);
         }
+
+        // 4. Reconnection watchdog: if no peers after 8s, force a full re-announce cycle
+        const watchdog = setTimeout(() => {
+          if (destroyedRef.current) return;
+          if (connectedPeersRef.current.size === 0) {
+            console.log('[WebRTC] Watchdog: no connections after 8s, re-announcing');
+            // Clear all existing PCs
+            peersRef.current.forEach((pc, id) => { pc.close(); });
+            peersRef.current.clear();
+            channel.send({
+              type: 'broadcast',
+              event: 'peer-join',
+              payload: { peerId: myPeerId, displayName },
+            });
+          }
+        }, 8000);
+        announceTimersRef.current.push(watchdog);
+
       } catch (err) {
         console.error('Call setup error:', err);
         toast.error('No se pudo acceder a cámara/micrófono');
@@ -334,12 +450,16 @@ export function VideoCallModal({
       destroyedRef.current = true;
       cleanup();
     };
-  }, [open, roomName, isVideoCall, isReceiver, displayName, initialStream, createPeerConnection, updateRemotePeer, removeRemotePeer]);
+  }, [open, roomName, isVideoCall, isReceiver, displayName, initialStream, createPeerConnection, updateRemotePeer, removeRemotePeer, sendOfferWithRetry]);
 
   const cleanup = () => {
     // Clear announce timers
     announceTimersRef.current.forEach(t => clearTimeout(t));
     announceTimersRef.current = [];
+    // Clear retry timers
+    retryTimersRef.current.forEach(t => clearTimeout(t));
+    retryTimersRef.current.clear();
+    connectedPeersRef.current.clear();
 
     // Announce leave
     channelRef.current?.send({
@@ -381,7 +501,6 @@ export function VideoCallModal({
 
   const toggleScreenShare = async () => {
     if (isScreenSharing) {
-      // Stop screen share, restore camera
       screenStreamRef.current?.getTracks().forEach(t => t.stop());
       screenStreamRef.current = null;
       const camTrack = localStreamRef.current?.getVideoTracks()[0];
@@ -401,7 +520,6 @@ export function VideoCallModal({
         const screenTrack = screen.getVideoTracks()[0];
         screenStreamRef.current = screen;
         
-        // Replace video track in all peer connections
         peersRef.current.forEach(pc => {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
           if (sender) sender.replaceTrack(screenTrack);
@@ -445,14 +563,12 @@ export function VideoCallModal({
 
   // Build participants list for grid
   const remoteEntries = Array.from(remotePeers.entries());
-  const totalParticipants = remoteEntries.length + 1; // +1 for self
+  const totalParticipants = remoteEntries.length + 1;
   
-  // Find if anyone is screen sharing (they get featured)
   const screenSharer = remoteEntries.find(([, p]) => p.isScreenSharing);
   const isSelfSharing = isScreenSharing;
   const hasScreenShare = !!screenSharer || isSelfSharing;
 
-  // Grid layout classes based on participant count
   const getGridClass = () => {
     if (hasScreenShare) return 'grid-cols-1 grid-rows-[2fr_1fr]';
     if (totalParticipants <= 1) return 'grid-cols-1';
@@ -499,7 +615,6 @@ export function VideoCallModal({
 
           {/* Video grid */}
           <div className={cn('flex-1 min-h-0 grid gap-1 p-1', getGridClass())}>
-            {/* Screen share featured area */}
             {hasScreenShare && (
               <div className="relative rounded-lg overflow-hidden bg-[#1a1a1a] col-span-full">
                 {isSelfSharing ? (
@@ -529,13 +644,11 @@ export function VideoCallModal({
               </div>
             )}
 
-            {/* Participant tiles */}
             <div className={cn(
               hasScreenShare 
                 ? 'flex gap-1 overflow-x-auto col-span-full' 
                 : 'contents'
             )}>
-              {/* Self tile */}
               <div className={cn(
                 'relative rounded-lg overflow-hidden bg-[#1a1a1a]',
                 hasScreenShare ? 'min-w-[120px] w-[120px] h-[90px] sm:min-w-[160px] sm:w-[160px] sm:h-[120px] flex-shrink-0' : 'min-h-0'
@@ -558,7 +671,6 @@ export function VideoCallModal({
                 )}
               </div>
 
-              {/* Remote peers */}
               {remoteEntries.map(([peerId, peer]) => (
                 <div
                   key={peerId}
@@ -577,7 +689,6 @@ export function VideoCallModal({
               ))}
             </div>
 
-            {/* Connecting overlay */}
             {isConnecting && remoteEntries.length === 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a0a]/80 z-10">
                 <div className="h-12 w-12 rounded-full border-2 border-primary border-t-transparent animate-spin mb-4" />
