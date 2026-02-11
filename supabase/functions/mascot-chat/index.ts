@@ -53,6 +53,81 @@ const tools = [
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "send_email",
+      description: "Enviar un correo electrónico a una dirección. Requiere especificar destinatario, asunto y cuerpo.",
+      parameters: {
+        type: "object",
+        properties: {
+          to: { type: "string", description: "Dirección email del destinatario" },
+          subject: { type: "string", description: "Asunto del correo" },
+          body: { type: "string", description: "Cuerpo del correo en texto plano o HTML" },
+        },
+        required: ["to", "subject", "body"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_inbox",
+      description: "Ver los últimos correos recibidos en la bandeja de entrada.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Número máximo de correos (default 5)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_whatsapp",
+      description: "Enviar un mensaje de WhatsApp a un número de teléfono.",
+      parameters: {
+        type: "object",
+        properties: {
+          phone: { type: "string", description: "Número de teléfono con código de país (ej: 34612345678)" },
+          message: { type: "string", description: "Contenido del mensaje" },
+        },
+        required: ["phone", "message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_leads",
+      description: "Buscar y listar leads/clientes del CRM. Puede filtrar por nombre de empresa, estado o ciudad.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "Término de búsqueda (nombre empresa, contacto, etc.)" },
+          status: { type: "string", description: "Estado del lead: nuevo, contactado, interesado, cliente, perdido" },
+          limit: { type: "number", description: "Número máximo de resultados (default 5)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_reminders",
+      description: "Ver los recordatorios generales pendientes del usuario.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Número máximo de recordatorios (default 5)" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 async function executeToolCall(
@@ -87,9 +162,7 @@ async function executeToolCall(
           return JSON.stringify({ success: false, error: "Faltan parámetros" });
         }
 
-        // Find recipient
         const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").neq("user_id", userId);
-
         const recipient = profiles?.find((p) => p.full_name?.toLowerCase().includes(recipientName));
 
         if (!recipient) {
@@ -100,14 +173,12 @@ async function executeToolCall(
           });
         }
 
-        // Check or create conversation
         const { data: myConvs } = await supabase
           .from("conversation_participants")
           .select("conversation_id")
           .eq("user_id", userId);
 
         const myConvIds = myConvs?.map((c) => c.conversation_id) || [];
-
         let conversationId: string | null = null;
 
         if (myConvIds.length) {
@@ -117,7 +188,6 @@ async function executeToolCall(
             .eq("user_id", recipient.user_id)
             .in("conversation_id", myConvIds);
 
-          // Find a 1:1 conversation
           for (const tc of theirConvs || []) {
             const { data: conv } = await supabase
               .from("internal_conversations")
@@ -134,7 +204,6 @@ async function executeToolCall(
         }
 
         if (!conversationId) {
-          // Create new conversation
           const { data: newConv, error: convErr } = await supabase
             .from("internal_conversations")
             .insert({ created_by: userId, is_group: false })
@@ -142,7 +211,6 @@ async function executeToolCall(
             .single();
 
           if (convErr) throw convErr;
-
           conversationId = newConv.id;
 
           await supabase.from("conversation_participants").insert([
@@ -151,7 +219,6 @@ async function executeToolCall(
           ]);
         }
 
-        // Send message
         const { error: msgErr } = await supabase.from("internal_messages").insert({
           conversation_id: conversationId,
           sender_id: userId,
@@ -206,6 +273,205 @@ async function executeToolCall(
         return JSON.stringify({
           message: `${data.length} carpeta(s)`,
           folders: data.map((f) => ({ nombre: f.name, color: f.color })),
+        });
+      }
+
+      case "send_email": {
+        const to = String(args.to || "");
+        const subject = String(args.subject || "");
+        const body = String(args.body || "");
+
+        if (!to || !subject || !body) {
+          return JSON.stringify({ success: false, error: "Faltan parámetros: to, subject y body son obligatorios." });
+        }
+
+        // Get user's default email profile
+        const { data: profile } = await supabase
+          .from("email_profiles")
+          .select("id, from_email, from_name")
+          .eq("user_id", userId)
+          .eq("is_default", true)
+          .maybeSingle();
+
+        if (!profile) {
+          // Try any profile
+          const { data: anyProfile } = await supabase
+            .from("email_profiles")
+            .select("id, from_email, from_name")
+            .eq("user_id", userId)
+            .limit(1)
+            .maybeSingle();
+
+          if (!anyProfile) {
+            return JSON.stringify({ success: false, error: "No tienes ningún perfil de correo configurado. Ve a Ajustes para configurar uno." });
+          }
+
+          // Use this profile
+          const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+          const res = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({ to, subject, html: body, profileId: anyProfile.id }),
+          });
+          const result = await res.json();
+          if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al enviar" });
+          return JSON.stringify({ success: true, message: `Correo enviado a ${to} desde ${anyProfile.from_email}` });
+        }
+
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const res = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({ to, subject, html: body, profileId: profile.id }),
+        });
+        const result = await res.json();
+        if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al enviar" });
+        return JSON.stringify({ success: true, message: `Correo enviado a ${to} desde ${profile.from_email}` });
+      }
+
+      case "get_inbox": {
+        const limit = Number(args.limit) || 5;
+
+        const { data, error } = await supabase
+          .from("email_messages")
+          .select("id, subject, from_address, from_name, date, is_read, folder")
+          .eq("user_id", userId)
+          .eq("folder", "inbox")
+          .eq("is_deleted", false)
+          .order("date", { ascending: false })
+          .limit(limit);
+
+        if (error) throw error;
+
+        if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada." });
+
+        return JSON.stringify({
+          message: `${data.length} correo(s) recientes`,
+          emails: data.map((e) => ({
+            asunto: e.subject || "(Sin asunto)",
+            de: e.from_name || e.from_address,
+            fecha: e.date,
+            leido: e.is_read,
+          })),
+        });
+      }
+
+      case "send_whatsapp": {
+        const phone = String(args.phone || "").replace(/\D/g, "");
+        const message = String(args.message || "");
+
+        if (!phone || !message) {
+          return JSON.stringify({ success: false, error: "Faltan parámetros: phone y message son obligatorios." });
+        }
+
+        const chatId = `${phone}@c.us`;
+
+        // Send via WAHA
+        const wahaUrl = Deno.env.get("WAHA_API_URL");
+        const wahaKey = Deno.env.get("WAHA_API_KEY");
+
+        if (!wahaUrl) {
+          return JSON.stringify({ success: false, error: "WAHA no está configurado." });
+        }
+
+        try {
+          const res = await fetch(`${wahaUrl}/api/sendText`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(wahaKey ? { "X-Api-Key": wahaKey } : {}),
+            },
+            body: JSON.stringify({ chatId, text: message, session: "default" }),
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            return JSON.stringify({ success: false, error: `Error WAHA [${res.status}]: ${errText}` });
+          }
+
+          // Save message in DB
+          await supabase.from("waha_messages").insert({
+            chat_id: chatId,
+            content: message,
+            from_me: true,
+            user_id: userId,
+            message_type: "text",
+          });
+
+          return JSON.stringify({ success: true, message: `WhatsApp enviado a ${phone}` });
+        } catch (err) {
+          return JSON.stringify({ success: false, error: `Error de conexión con WAHA: ${String(err)}` });
+        }
+      }
+
+      case "get_leads": {
+        const limit = Number(args.limit) || 5;
+        const search = String(args.search || "");
+        const status = String(args.status || "");
+
+        let query = supabase
+          .from("leads")
+          .select("id, company_name, contact_name, email, phone, status, city, score")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(limit);
+
+        if (search) {
+          query = query.or(`company_name.ilike.%${search}%,contact_name.ilike.%${search}%,email.ilike.%${search}%`);
+        }
+        if (status) {
+          query = query.eq("status", status);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        if (!data?.length) return JSON.stringify({ message: "No se encontraron leads." });
+
+        return JSON.stringify({
+          message: `${data.length} lead(s) encontrado(s)`,
+          leads: data.map((l) => ({
+            empresa: l.company_name,
+            contacto: l.contact_name || "-",
+            email: l.email || "-",
+            telefono: l.phone || "-",
+            estado: l.status,
+            ciudad: l.city,
+            score: l.score ?? 0,
+          })),
+        });
+      }
+
+      case "get_reminders": {
+        const limit = Number(args.limit) || 5;
+
+        const { data, error } = await supabase
+          .from("general_reminders")
+          .select("id, title, description, reminder_date, priority, is_completed")
+          .eq("user_id", userId)
+          .eq("is_completed", false)
+          .order("reminder_date", { ascending: true })
+          .limit(limit);
+
+        if (error) throw error;
+
+        if (!data?.length) return JSON.stringify({ message: "No tienes recordatorios pendientes. 🎉" });
+
+        return JSON.stringify({
+          message: `${data.length} recordatorio(s) pendiente(s)`,
+          reminders: data.map((r) => ({
+            titulo: r.title,
+            descripcion: r.description || "-",
+            fecha: r.reminder_date,
+            prioridad: r.priority,
+          })),
         });
       }
 
@@ -274,8 +540,13 @@ Tienes acceso a herramientas para:
 - Enviar mensajes internos (send_internal_message)
 - Ver archivos compartidos (get_shared_files)
 - Ver carpetas compartidas (get_shared_folders)
+- Enviar correos electrónicos (send_email) - necesitas destinatario, asunto y cuerpo
+- Ver bandeja de entrada (get_inbox)
+- Enviar mensajes de WhatsApp (send_whatsapp) - necesitas número de teléfono y mensaje
+- Buscar leads/clientes (get_leads) - puedes filtrar por nombre, estado o ciudad
+- Ver recordatorios pendientes (get_reminders)
 
-Si te piden algo que requiere estas herramientas, úsalas. Si te piden algo más avanzado (leads, emails, etc.), sugiere usar el Chat IA principal.`;
+Si te piden algo que requiere estas herramientas, úsalas. Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal.`;
 
     let chatMessages = [{ role: "system", content: systemPrompt }, ...(messages ?? [])];
 

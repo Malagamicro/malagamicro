@@ -18,8 +18,8 @@ export function useActiveCalls() {
   const [incomingCall, setIncomingCall] = useState<ActiveCall | null>(null);
   const incomingCallRef = useRef<ActiveCall | null>(null);
   const userIdRef = useRef<string | null>(null);
+  const processedCallsRef = useRef<Set<string>>(new Set());
 
-  // Keep refs in sync
   useEffect(() => {
     incomingCallRef.current = incomingCall;
   }, [incomingCall]);
@@ -28,7 +28,42 @@ export function useActiveCalls() {
     userIdRef.current = user?.id || null;
   }, [user?.id]);
 
-  // Single stable realtime subscription — NO dependency on incomingCall
+  // Check for any ringing calls on mount (in case we missed the INSERT event)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const checkExistingCalls = async () => {
+      const { data: calls } = await supabase
+        .from('active_calls')
+        .select('*')
+        .eq('status', 'ringing')
+        .neq('caller_id', user.id)
+        .gte('created_at', new Date(Date.now() - 30000).toISOString());
+
+      if (!calls?.length) return;
+
+      for (const call of calls) {
+        if (processedCallsRef.current.has(call.id)) continue;
+
+        const { data } = await supabase
+          .from('conversation_participants')
+          .select('id')
+          .eq('conversation_id', call.conversation_id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (data) {
+          processedCallsRef.current.add(call.id);
+          setIncomingCall(call);
+          break;
+        }
+      }
+    };
+
+    checkExistingCalls();
+  }, [user?.id]);
+
+  // Realtime subscription
   useEffect(() => {
     if (!user?.id) return;
 
@@ -50,11 +85,11 @@ export function useActiveCalls() {
 
           console.log('[useActiveCalls] INSERT received:', call.id, 'caller:', call.caller_id, 'me:', uid);
 
-          // Don't notify the caller themselves
           if (call.caller_id === uid) return;
           if (call.status !== 'ringing') return;
+          if (processedCallsRef.current.has(call.id)) return;
 
-          // Check if user is a participant of this conversation
+          // Check if user is a participant
           const { data } = await supabase
             .from('conversation_participants')
             .select('id')
@@ -64,9 +99,9 @@ export function useActiveCalls() {
 
           if (data) {
             console.log('[useActiveCalls] I am a participant, showing incoming call');
+            processedCallsRef.current.add(call.id);
             setIncomingCall(call);
 
-            // Request notification permission
             if ('Notification' in window && Notification.permission === 'default') {
               Notification.requestPermission();
             }
@@ -101,12 +136,19 @@ export function useActiveCalls() {
       console.log('[useActiveCalls] Unsubscribing');
       supabase.removeChannel(channel);
     };
-  }, [user?.id]); // Only depends on user.id — stable subscription
+  }, [user?.id]);
 
   const initiateCall = useCallback(async (conversationId: string, callerName: string, roomName: string, isVideo: boolean) => {
     if (!user?.id) return;
 
     console.log('[useActiveCalls] Initiating call for conversation:', conversationId);
+
+    // End any existing ringing calls for this conversation first
+    await supabase
+      .from('active_calls')
+      .update({ status: 'ended', ended_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .eq('status', 'ringing');
 
     const { error } = await supabase
       .from('active_calls')
@@ -151,7 +193,7 @@ export function useActiveCalls() {
       .from('active_calls')
       .update({ status: 'ended', ended_at: new Date().toISOString() })
       .eq('conversation_id', conversationId)
-      .eq('status', 'ringing');
+      .in('status', ['ringing', 'accepted']);
   }, []);
 
   return {

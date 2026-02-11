@@ -226,15 +226,21 @@ export function MascotChatWidget() {
                 <div className="space-y-2">
                   <h4 className="font-semibold">¡Hola! Soy Micro 🤖</h4>
                   <p className="text-sm text-muted-foreground max-w-[250px] mx-auto">
-                    Tu asistente de MalagaMicro. Puedo enviar mensajes internos y ver archivos compartidos.
+                    Tu asistente de MalagaMicro. Puedo enviar mensajes, emails, WhatsApp, buscar leads y más.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-center pt-2">
-                  {['Ver archivos', 'Ver usuarios', 'Ayuda'].map((tip) => (
+                  {['Ver leads', 'Ver correos', 'Recordatorios', 'Ayuda'].map((tip) => (
                     <button
                       key={tip}
                       onClick={() => {
-                        setInput(tip === 'Ayuda' ? '¿Qué puedes hacer?' : tip);
+                        const prompts: Record<string, string> = {
+                          'Ver leads': 'Muéstrame mis leads recientes',
+                          'Ver correos': 'Revisa mi bandeja de entrada',
+                          'Recordatorios': 'Muéstrame mis recordatorios pendientes',
+                          'Ayuda': '¿Qué puedes hacer?',
+                        };
+                        setInput(prompts[tip] || tip);
                         inputRef.current?.focus();
                       }}
                       className="text-xs px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
