@@ -22,6 +22,7 @@ import GeneralReminders from "./pages/GeneralReminders";
 import Budgets from "./pages/Budgets";
 import SeoGenerator from "./pages/SeoGenerator";
 import NotFound from "./pages/NotFound";
+import DocumentEditorPage from "./pages/DocumentEditorPage";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -101,6 +102,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <SeoGenerator />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tools/editor"
+                  element={
+                    <ProtectedRoute>
+                      <DocumentEditorPage />
                     </ProtectedRoute>
                   }
                 />

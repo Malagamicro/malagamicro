@@ -95,3 +95,6 @@ verify_jwt = false
 
 [functions.generate-email-template]
 verify_jwt = false
+
+[functions.document-ai]
+verify_jwt = false
