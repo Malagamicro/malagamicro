@@ -68,13 +68,17 @@ export function useStelBudgetForm() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const list = Array.isArray(data) ? data : data?.clientes || data?.data || [];
-      setClients(list.map((c: any) => ({
-        id: String(c.id || c.account_id || c['account-id'] || ''),
-        nombre: c.nombre || c.name || c.commercial_name || c['commercial-name'] || '',
-        nif: c.nif || c.cif || c['tax-number'] || '',
-        email: c.email || '',
-        telefono: c.telefono || c.phone || '',
-      })));
+      setClients(
+        list
+          .filter((c: any) => c && (c.name || c.nombre))
+          .map((c: any, idx: number) => ({
+            id: String(c.id || c.account_id || c['account-id'] || idx),
+            nombre: c.name || c.nombre || c.commercial_name || c['commercial-name'] || '',
+            nif: c.nif || c.cif || c['tax-number'] || '',
+            email: c.email || '',
+            telefono: c.telefono || c.phone || '',
+          }))
+      );
     } catch (e: any) {
       toast({ title: 'Error cargando clientes', description: e.message, variant: 'destructive' });
     } finally {
