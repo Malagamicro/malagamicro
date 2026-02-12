@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { 
   FileText, BarChart2, Building2, Bot, Upload
 } from 'lucide-react';
@@ -8,40 +7,13 @@ import { BudgetChatbot } from './BudgetChatbot';
 import BudgetNotificationsPopover from './BudgetNotificationsPopover';
 import BudgetDashboard from './BudgetDashboard';
 import ProvidersManager from './ProvidersManager';
-import StelBudgetsList from './StelBudgetsList';
-import StelBudgetForm from './StelBudgetForm';
-import StelBudgetDetail from './StelBudgetDetail';
 import ManualBudgetUpload from './ManualBudgetUpload';
-import { StelBudget } from '@/hooks/useStelOrder';
+import StelOrderBudgetForm from './StelOrderBudgetForm';
 import { useAuth } from '@/hooks/useAuth';
-
-type StelView = 'list' | 'create' | 'edit' | 'detail';
 
 const BudgetModule = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('stel');
-  const [stelView, setStelView] = useState<StelView>('list');
-  const [selectedBudget, setSelectedBudget] = useState<StelBudget | null>(null);
-
-  const handleCreateNew = () => {
-    setSelectedBudget(null);
-    setStelView('create');
-  };
-
-  const handleEdit = (budget: StelBudget) => {
-    setSelectedBudget(budget);
-    setStelView('edit');
-  };
-
-  const handleView = (budget: StelBudget) => {
-    setSelectedBudget(budget);
-    setStelView('detail');
-  };
-
-  const handleBack = () => {
-    setStelView('list');
-    setSelectedBudget(null);
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -87,28 +59,9 @@ const BudgetModule = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* STEL Budgets */}
+          {/* STEL Budget Form */}
           <TabsContent value="stel" className="flex-1 mt-4 overflow-hidden">
-            {stelView === 'list' && (
-              <StelBudgetsList
-                onCreateNew={handleCreateNew}
-                onEdit={handleEdit}
-                onView={handleView}
-              />
-            )}
-            {(stelView === 'create' || stelView === 'edit') && (
-              <StelBudgetForm
-                budget={stelView === 'edit' ? selectedBudget : null}
-                onBack={handleBack}
-              />
-            )}
-            {stelView === 'detail' && selectedBudget && (
-              <StelBudgetDetail
-                budget={selectedBudget}
-                onBack={handleBack}
-                onEdit={() => setStelView('edit')}
-              />
-            )}
+            <StelOrderBudgetForm />
           </TabsContent>
 
           {/* Dashboard */}
