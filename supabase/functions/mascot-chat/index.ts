@@ -128,6 +128,21 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_ostickets",
+      description: "Ver los tickets de soporte (osTicket). Puede filtrar por fecha (hoy, semana) o mostrar todos. Muestra subject, cliente, departamento, prioridad y estado de notificación.",
+      parameters: {
+        type: "object",
+        properties: {
+          filter: { type: "string", description: "Filtro: 'today' para tickets de hoy, 'week' para esta semana, o vacío para todos" },
+          limit: { type: "number", description: "Número máximo de tickets (default 10)" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 async function executeToolCall(
@@ -475,6 +490,47 @@ async function executeToolCall(
         });
       }
 
+      case "get_ostickets": {
+        const limit = Number(args.limit) || 10;
+        const filter = String(args.filter || "");
+
+        let query = supabase
+          .from("osticket_tickets")
+          .select("id, ticket_number, subject, customer_name, customer_email, department, priority, notification_sent, created_at")
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (filter === "today") {
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          query = query.gte("created_at", todayStart.toISOString());
+        } else if (filter === "week") {
+          const weekStart = new Date();
+          weekStart.setDate(weekStart.getDate() - 7);
+          query = query.gte("created_at", weekStart.toISOString());
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        if (!data?.length) return JSON.stringify({ message: "No hay tickets registrados" + (filter === "today" ? " hoy" : filter === "week" ? " esta semana" : "") + "." });
+
+        return JSON.stringify({
+          message: `${data.length} ticket(s)` + (filter === "today" ? " hoy" : filter === "week" ? " esta semana" : ""),
+          tickets: data.map((t) => ({
+            numero: t.ticket_number || "-",
+            asunto: t.subject,
+            cliente: t.customer_name || "-",
+            email: t.customer_email || "-",
+            departamento: t.department || "-",
+            prioridad: t.priority || "-",
+            notificado: t.notification_sent ? "Sí" : "No",
+            fecha: t.created_at,
+          })),
+        });
+      }
+
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
@@ -545,6 +601,7 @@ Tienes acceso a herramientas para:
 - Enviar mensajes de WhatsApp (send_whatsapp) - necesitas número de teléfono y mensaje
 - Buscar leads/clientes (get_leads) - puedes filtrar por nombre, estado o ciudad
 - Ver recordatorios pendientes (get_reminders)
+- Ver tickets de soporte/osTicket (get_ostickets) - puedes filtrar por hoy, esta semana o todos
 
 Si te piden algo que requiere estas herramientas, úsalas. Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal.`;
 
