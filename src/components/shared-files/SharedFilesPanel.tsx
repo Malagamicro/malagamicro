@@ -1,5 +1,6 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { format, isAfter, startOfDay, subDays } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { es } from 'date-fns/locale';
 import {
   DragDropContext,
@@ -35,6 +36,7 @@ import {
   FolderInput,
   FileSpreadsheet,
   Presentation,
+  Pencil,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -137,6 +139,18 @@ function isOfficeDoc(fileType: string | null): boolean {
     fileType === 'application/vnd.ms-excel' ||
     fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
     fileType === 'application/vnd.ms-powerpoint'
+  );
+}
+
+function canEditInEditor(fileType: string | null): boolean {
+  if (!fileType) return false;
+  return (
+    fileType === 'text/markdown' ||
+    fileType === 'text/plain' ||
+    fileType === 'text/csv' ||
+    fileType === 'text/html' ||
+    fileType.includes('spreadsheet') ||
+    fileType.includes('excel')
   );
 }
 
@@ -248,6 +262,7 @@ interface BreadcrumbItem {
 
 export function SharedFilesPanel() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { createTemplate, isCreating: isCreatingTemplate } = useMessageTemplates();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([{ id: null, name: 'Inicio' }]);
@@ -442,6 +457,22 @@ export function SharedFilesPanel() {
     try {
       await moveFile.mutateAsync({ fileId, folderId: targetFolderId });
     } catch (error) { console.error(error); }
+  };
+
+  const handleEditInEditor = async (file: SharedFile) => {
+    try {
+      const resp = await fetch(file.file_path);
+      const text = await resp.text();
+      // Store content in sessionStorage for the editor to pick up
+      sessionStorage.setItem('editor_file_content', text);
+      sessionStorage.setItem('editor_file_title', file.file_name.replace(/\.[^/.]+$/, ''));
+      sessionStorage.setItem('editor_file_type', file.file_type || 'text/plain');
+      sessionStorage.setItem('editor_file_id', file.id);
+      navigate('/tools/editor');
+    } catch (e) {
+      console.error(e);
+      toast.error('Error al cargar el archivo para edición');
+    }
   };
 
   // Drag and drop handler
@@ -719,6 +750,11 @@ export function SharedFilesPanel() {
                                             ))}
                                           </DropdownMenuSubContent>
                                         </DropdownMenuSub>
+                                        {canEditInEditor(file.file_type) && (
+                                          <DropdownMenuItem onClick={() => handleEditInEditor(file)}>
+                                            <Pencil className="h-4 w-4 mr-2" />Editar en Editor IA
+                                          </DropdownMenuItem>
+                                        )}
                                         <DropdownMenuItem onClick={() => handleCreateTemplateFromFile(file)}>
                                           <FileUp className="h-4 w-4 mr-2" />Crear plantilla
                                         </DropdownMenuItem>
