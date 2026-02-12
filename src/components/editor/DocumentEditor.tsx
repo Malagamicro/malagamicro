@@ -37,7 +37,7 @@ type AiAction = 'write' | 'edit' | 'improve' | 'summarize';
 type ViewMode = 'edit' | 'preview' | 'split';
 
 interface ChatMessage { role: 'user' | 'assistant'; content: string; }
-interface SpreadsheetCell { value: string; }
+interface SpreadsheetCell { value: string; formula?: string; }
 
 interface DocumentEditorProps {
   initialContent?: string;
@@ -53,37 +53,250 @@ function sanitizeFileName(name: string): string {
     .replace(/_+/g, '_');
 }
 
+// ── Formula Engine ─────────────────────────────────
+function colToIndex(col: string): number {
+  let idx = 0;
+  for (let i = 0; i < col.length; i++) {
+    idx = idx * 26 + (col.charCodeAt(i) - 64);
+  }
+  return idx - 1;
+}
+
+function parseCellRef(ref: string): [number, number] | null {
+  const m = ref.match(/^([A-Z]+)(\d+)$/);
+  if (!m) return null;
+  return [parseInt(m[2]) - 1, colToIndex(m[1])];
+}
+
+function parseRange(range: string, data: SpreadsheetCell[][]): number[] {
+  const [start, end] = range.split(':');
+  const s = parseCellRef(start);
+  const e = parseCellRef(end);
+  if (!s || !e) return [];
+  const values: number[] = [];
+  for (let r = Math.min(s[0], e[0]); r <= Math.max(s[0], e[0]); r++) {
+    for (let c = Math.min(s[1], e[1]); c <= Math.max(s[1], e[1]); c++) {
+      const v = parseFloat(getCellDisplay(data, r, c));
+      if (!isNaN(v)) values.push(v);
+    }
+  }
+  return values;
+}
+
+function getCellDisplay(data: SpreadsheetCell[][], row: number, col: number): string {
+  const cell = data[row]?.[col];
+  if (!cell) return '';
+  if (cell.formula) return evaluateFormula(cell.formula, data);
+  return cell.value;
+}
+
+function resolveArg(arg: string, data: SpreadsheetCell[][]): number[] {
+  arg = arg.trim();
+  if (arg.includes(':')) return parseRange(arg, data);
+  const ref = parseCellRef(arg);
+  if (ref) {
+    const v = parseFloat(getCellDisplay(data, ref[0], ref[1]));
+    return isNaN(v) ? [] : [v];
+  }
+  const n = parseFloat(arg);
+  return isNaN(n) ? [] : [n];
+}
+
+function evaluateFormula(formula: string, data: SpreadsheetCell[][]): string {
+  try {
+    const expr = formula.toUpperCase().trim();
+
+    // SUM
+    let m = expr.match(/^SUM\((.+)\)$/);
+    if (m) {
+      const vals = m[1].split(',').flatMap(a => resolveArg(a, data));
+      return String(vals.reduce((a, b) => a + b, 0));
+    }
+    // AVERAGE / PROMEDIO
+    m = expr.match(/^(?:AVERAGE|PROMEDIO)\((.+)\)$/);
+    if (m) {
+      const vals = m[1].split(',').flatMap(a => resolveArg(a, data));
+      return vals.length ? String(vals.reduce((a, b) => a + b, 0) / vals.length) : '0';
+    }
+    // COUNT / CONTAR
+    m = expr.match(/^(?:COUNT|CONTAR)\((.+)\)$/);
+    if (m) {
+      const vals = m[1].split(',').flatMap(a => resolveArg(a, data));
+      return String(vals.length);
+    }
+    // MIN
+    m = expr.match(/^MIN\((.+)\)$/);
+    if (m) {
+      const vals = m[1].split(',').flatMap(a => resolveArg(a, data));
+      return vals.length ? String(Math.min(...vals)) : '0';
+    }
+    // MAX
+    m = expr.match(/^MAX\((.+)\)$/);
+    if (m) {
+      const vals = m[1].split(',').flatMap(a => resolveArg(a, data));
+      return vals.length ? String(Math.max(...vals)) : '0';
+    }
+    // IF / SI
+    m = expr.match(/^(?:IF|SI)\((.+)\)$/);
+    if (m) {
+      const parts = m[1].split(',');
+      if (parts.length >= 3) {
+        const cond = parts[0].trim();
+        // Parse condition: A1>5, A1=5, A1<5, A1>=5, A1<=5, A1<>5
+        const condMatch = cond.match(/^([A-Z]+\d+)\s*(>=|<=|<>|>|<|=)\s*(.+)$/);
+        if (condMatch) {
+          const ref = parseCellRef(condMatch[1]);
+          const op = condMatch[2];
+          const compareVal = parseFloat(condMatch[3].trim());
+          const cellVal = ref ? parseFloat(getCellDisplay(data, ref[0], ref[1])) : NaN;
+          let result = false;
+          if (!isNaN(cellVal) && !isNaN(compareVal)) {
+            switch (op) {
+              case '>': result = cellVal > compareVal; break;
+              case '<': result = cellVal < compareVal; break;
+              case '>=': result = cellVal >= compareVal; break;
+              case '<=': result = cellVal <= compareVal; break;
+              case '=': result = cellVal === compareVal; break;
+              case '<>': result = cellVal !== compareVal; break;
+            }
+          }
+          return result ? parts[1].trim().replace(/"/g, '') : parts[2].trim().replace(/"/g, '');
+        }
+      }
+    }
+    // ROUND / REDONDEAR
+    m = expr.match(/^(?:ROUND|REDONDEAR)\((.+),\s*(\d+)\)$/);
+    if (m) {
+      const vals = resolveArg(m[1], data);
+      const decimals = parseInt(m[2]);
+      return vals.length ? String(Number(vals[0].toFixed(decimals))) : '0';
+    }
+    // ABS
+    m = expr.match(/^ABS\((.+)\)$/);
+    if (m) {
+      const vals = resolveArg(m[1], data);
+      return vals.length ? String(Math.abs(vals[0])) : '0';
+    }
+    // POWER / POTENCIA
+    m = expr.match(/^(?:POWER|POTENCIA)\((.+),\s*(.+)\)$/);
+    if (m) {
+      const base = resolveArg(m[1], data);
+      const exp = resolveArg(m[2], data);
+      return base.length && exp.length ? String(Math.pow(base[0], exp[0])) : '0';
+    }
+    // CONCATENATE / CONCATENAR
+    m = expr.match(/^(?:CONCATENATE|CONCATENAR)\((.+)\)$/);
+    if (m) {
+      const parts = m[1].split(',').map(a => {
+        const t = a.trim();
+        if (t.startsWith('"') && t.endsWith('"')) return t.slice(1, -1);
+        const ref = parseCellRef(t);
+        if (ref) return getCellDisplay(data, ref[0], ref[1]);
+        return t;
+      });
+      return parts.join('');
+    }
+    // Simple cell reference: =A1
+    const ref = parseCellRef(expr);
+    if (ref) return getCellDisplay(data, ref[0], ref[1]);
+    // Simple arithmetic: =A1+B1, =A1*2, etc.
+    const arithMatch = expr.match(/^([A-Z]+\d+)\s*([+\-*/])\s*([A-Z]+\d+|\d+\.?\d*)$/);
+    if (arithMatch) {
+      const left = resolveArg(arithMatch[1], data);
+      const right = resolveArg(arithMatch[3], data);
+      if (left.length && right.length) {
+        switch (arithMatch[2]) {
+          case '+': return String(left[0] + right[0]);
+          case '-': return String(left[0] - right[0]);
+          case '*': return String(left[0] * right[0]);
+          case '/': return right[0] !== 0 ? String(left[0] / right[0]) : '#DIV/0!';
+        }
+      }
+    }
+    return '#ERROR!';
+  } catch {
+    return '#ERROR!';
+  }
+}
+
 // ── Spreadsheet Component ──────────────────────────
 function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onChange: (d: SpreadsheetCell[][]) => void }) {
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null);
+  const [editingCell, setEditingCell] = useState<[number, number] | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const formulaBarRef = useRef<HTMLInputElement>(null);
 
-  const updateCell = (row: number, col: number, value: string) => {
-    const newData = data.map((r, ri) => r.map((c, ci) => ri === row && ci === col ? { value } : c));
+  const updateCell = (row: number, col: number, rawValue: string) => {
+    const isFormula = rawValue.startsWith('=');
+    const newData = data.map((r, ri) => r.map((c, ci) => {
+      if (ri === row && ci === col) {
+        return isFormula
+          ? { value: '', formula: rawValue.slice(1) }
+          : { value: rawValue, formula: undefined };
+      }
+      return c;
+    }));
     onChange(newData);
   };
+
+  const commitEdit = () => {
+    if (editingCell) {
+      updateCell(editingCell[0], editingCell[1], editValue);
+      setEditingCell(null);
+    }
+  };
+
+  const startEdit = (row: number, col: number) => {
+    setEditingCell([row, col]);
+    const cell = data[row]?.[col];
+    setEditValue(cell?.formula ? `=${cell.formula}` : cell?.value || '');
+  };
+
+  const cellLabel = selectedCell
+    ? `${String.fromCharCode(65 + (selectedCell[1] % 26))}${selectedCell[0] + 1}`
+    : '';
+
+  const selectedCellRaw = selectedCell
+    ? (data[selectedCell[0]]?.[selectedCell[1]]?.formula
+      ? `=${data[selectedCell[0]][selectedCell[1]].formula}`
+      : data[selectedCell[0]]?.[selectedCell[1]]?.value || '')
+    : '';
 
   const addRow = () => {
     const cols = data[0]?.length || 5;
     onChange([...data, Array.from({ length: cols }, () => ({ value: '' }))]);
   };
-
-  const addCol = () => {
-    onChange(data.map(r => [...r, { value: '' }]));
-  };
-
-  const deleteRow = (idx: number) => {
-    if (data.length <= 1) return;
-    onChange(data.filter((_, i) => i !== idx));
-  };
-
-  const deleteCol = (idx: number) => {
-    if ((data[0]?.length || 0) <= 1) return;
-    onChange(data.map(r => r.filter((_, i) => i !== idx)));
-  };
+  const addCol = () => onChange(data.map(r => [...r, { value: '' }]));
+  const deleteRow = (idx: number) => { if (data.length > 1) onChange(data.filter((_, i) => i !== idx)); };
+  const deleteCol = (idx: number) => { if ((data[0]?.length || 0) > 1) onChange(data.map(r => r.filter((_, i) => i !== idx))); };
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30">
+      {/* Formula bar */}
+      <div className="flex items-center gap-1 px-2 py-1 border-b bg-muted/30">
+        <span className="text-xs font-mono w-10 text-center text-muted-foreground font-semibold">{cellLabel}</span>
+        <span className="text-muted-foreground text-xs">ƒx</span>
+        <input
+          ref={formulaBarRef}
+          className="flex-1 h-7 px-2 text-sm bg-background border rounded outline-none focus:ring-1 ring-primary font-mono"
+          value={editingCell ? editValue : selectedCellRaw}
+          onChange={e => {
+            if (editingCell) setEditValue(e.target.value);
+            else if (selectedCell) {
+              startEdit(selectedCell[0], selectedCell[1]);
+              setEditValue(e.target.value);
+            }
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { commitEdit(); formulaBarRef.current?.blur(); }
+            if (e.key === 'Escape') { setEditingCell(null); }
+          }}
+          onBlur={commitEdit}
+          placeholder="Introduce valor o fórmula (=SUM, =AVERAGE, =IF...)"
+        />
+      </div>
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-muted/20">
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addRow}>
           <Plus className="h-3 w-3 mr-1" /> Fila
         </Button>
@@ -101,15 +314,18 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
             </Button>
           </>
         )}
+        <div className="ml-auto text-[10px] text-muted-foreground">
+          Fórmulas: =SUM, =AVERAGE, =COUNT, =MIN, =MAX, =IF, =ROUND, =ABS, =POWER, =CONCATENATE
+        </div>
       </div>
       <ScrollArea className="flex-1">
         <div className="overflow-auto">
           <table className="border-collapse w-full min-w-max">
             <thead>
               <tr>
-                <th className="w-10 bg-muted/50 border text-xs text-center text-muted-foreground p-1">#</th>
+                <th className="w-10 bg-muted/50 border text-xs text-center text-muted-foreground p-1 sticky left-0 z-10">#</th>
                 {data[0]?.map((_, ci) => (
-                  <th key={ci} className="bg-muted/50 border text-xs text-center text-muted-foreground p-1 min-w-[120px]">
+                  <th key={ci} className="bg-muted/50 border text-xs text-center text-muted-foreground p-1 min-w-[100px]">
                     {String.fromCharCode(65 + (ci % 26))}
                     {ci >= 26 ? String.fromCharCode(65 + Math.floor(ci / 26) - 1) : ''}
                   </th>
@@ -119,24 +335,49 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
             <tbody>
               {data.map((row, ri) => (
                 <tr key={ri}>
-                  <td className="bg-muted/30 border text-xs text-center text-muted-foreground p-1 select-none">{ri + 1}</td>
-                  {row.map((cell, ci) => (
-                    <td
-                      key={ci}
-                      className={cn(
-                        "border p-0 relative",
-                        selectedCell?.[0] === ri && selectedCell?.[1] === ci && "ring-2 ring-primary ring-inset"
-                      )}
-                      onClick={() => setSelectedCell([ri, ci])}
-                    >
-                      <input
-                        className="w-full h-full px-2 py-1.5 text-xs bg-transparent border-none outline-none focus:bg-primary/5"
-                        value={cell.value}
-                        onChange={e => updateCell(ri, ci, e.target.value)}
-                        onFocus={() => setSelectedCell([ri, ci])}
-                      />
-                    </td>
-                  ))}
+                  <td className="bg-muted/30 border text-xs text-center text-muted-foreground p-1 select-none sticky left-0 z-10">{ri + 1}</td>
+                  {row.map((cell, ci) => {
+                    const isEditing = editingCell?.[0] === ri && editingCell?.[1] === ci;
+                    const isSelected = selectedCell?.[0] === ri && selectedCell?.[1] === ci;
+                    const displayVal = cell.formula ? evaluateFormula(cell.formula, data) : cell.value;
+                    const hasFormula = !!cell.formula;
+                    return (
+                      <td
+                        key={ci}
+                        className={cn(
+                          "border p-0 relative",
+                          isSelected && "ring-2 ring-primary ring-inset",
+                          hasFormula && !isEditing && "bg-blue-50/50 dark:bg-blue-950/20"
+                        )}
+                        onClick={() => { setSelectedCell([ri, ci]); if (!isEditing) setEditingCell(null); }}
+                        onDoubleClick={() => startEdit(ri, ci)}
+                      >
+                        {isEditing ? (
+                          <input
+                            autoFocus
+                            className="w-full h-full px-2 py-1.5 text-xs bg-background border-none outline-none font-mono"
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { commitEdit(); e.preventDefault(); }
+                              if (e.key === 'Escape') setEditingCell(null);
+                              if (e.key === 'Tab') { e.preventDefault(); commitEdit(); const nc = ci + 1; if (nc < row.length) { setSelectedCell([ri, nc]); startEdit(ri, nc); } }
+                            }}
+                            onBlur={commitEdit}
+                          />
+                        ) : (
+                          <div
+                            className={cn(
+                              "w-full px-2 py-1.5 text-xs min-h-[28px] cursor-cell",
+                              displayVal.startsWith('#') && "text-destructive font-semibold"
+                            )}
+                          >
+                            {displayVal}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
