@@ -23,10 +23,11 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 
 interface DashboardProps {
   onViewLead: (id: string) => void;
+  onTabChange?: (tab: string) => void;
 }
 
-function WidgetContent({ widget, stats, leads, onViewLead }: {
-  widget: DashboardWidget; stats: any; leads: any[]; onViewLead: (id: string) => void;
+function WidgetContent({ widget, stats, leads, onViewLead, onTabChange }: {
+  widget: DashboardWidget; stats: any; leads: any[]; onViewLead: (id: string) => void; onTabChange?: (tab: string) => void;
 }) {
   switch (widget.type) {
     case 'stats':
@@ -42,7 +43,7 @@ function WidgetContent({ widget, stats, leads, onViewLead }: {
     case 'recent-leads': return <RecentLeads leads={leads} onViewLead={onViewLead} />;
     case 'reminders': return <UpcomingReminders onLeadClick={onViewLead} />;
     case 'company-reminders': return <CompanyReminders />;
-    case 'tickets': return <RecentTickets />;
+    case 'tickets': return <RecentTickets onNavigateToTickets={() => onTabChange?.('osticket')} />;
     case 'online-users': return <OnlineUsersWidget />;
     case 'inbox-preview':
       return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">📬 Inbox</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Acceso rápido a tu bandeja de entrada.</p></CardContent></Card>;
@@ -57,7 +58,7 @@ function WidgetContent({ widget, stats, leads, onViewLead }: {
   }
 }
 
-export function Dashboard({ onViewLead }: DashboardProps) {
+export function Dashboard({ onViewLead, onTabChange }: DashboardProps) {
   const { leads, isLoading: leadsLoading } = useLeads();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const {
@@ -171,7 +172,7 @@ export function Dashboard({ onViewLead }: DashboardProps) {
               </div>
             )}
             <div className={cn("h-full overflow-auto", editMode && "pt-4")}>
-              <WidgetContent widget={widget} stats={dashboardStats} leads={leads} onViewLead={onViewLead} />
+              <WidgetContent widget={widget} stats={dashboardStats} leads={leads} onViewLead={onViewLead} onTabChange={onTabChange} />
             </div>
           </div>
         ))}

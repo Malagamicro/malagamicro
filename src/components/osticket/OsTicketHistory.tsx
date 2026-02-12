@@ -55,11 +55,22 @@ export function OsTicketHistory() {
   const [search, setSearch] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<OsTicketRecord | null>(null);
 
+  // Parse customer_email which may be a JSON string like {"email":"x@y.com","address":"\"Name\" <x@y.com>"}
+  const parseEmail = (raw: string | null): string => {
+    if (!raw) return '';
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.email || raw;
+    } catch {
+      return raw;
+    }
+  };
+
   const filteredTickets = tickets.filter(
     (t) =>
       t.subject.toLowerCase().includes(search.toLowerCase()) ||
       t.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
-      t.customer_email?.toLowerCase().includes(search.toLowerCase()) ||
+      parseEmail(t.customer_email).toLowerCase().includes(search.toLowerCase()) ||
       t.ticket_number?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -253,9 +264,9 @@ export function OsTicketHistory() {
                             </span>
                           )}
                           {ticket.customer_email && (
-                            <span className="flex items-center gap-1">
-                              <Mail className="h-3 w-3" />
-                              {ticket.customer_email}
+                            <span className="flex items-center gap-1 truncate">
+                              <Mail className="h-3 w-3 flex-shrink-0" />
+                              {parseEmail(ticket.customer_email)}
                             </span>
                           )}
                           {ticket.department && (
@@ -326,8 +337,8 @@ export function OsTicketHistory() {
                 </div>
                 <div>
                   <h4 className="font-medium mb-1">Email</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedTicket.customer_email || 'N/A'}
+                  <p className="text-sm text-muted-foreground break-all">
+                    {parseEmail(selectedTicket.customer_email) || 'N/A'}
                   </p>
                 </div>
                 <div>

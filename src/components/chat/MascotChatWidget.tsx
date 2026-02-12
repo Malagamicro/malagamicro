@@ -40,9 +40,10 @@ export function MascotChatWidget() {
 
   // Initialize position to bottom-right on mount
   useLayoutEffect(() => {
+    const isMobileView = window.innerWidth < 768;
     setPosition({
-      x: window.innerWidth - 384 - 24, // 360px widget + 24px margin
-      y: window.innerHeight - 524 - 24, // 500px widget + 24px margin
+      x: window.innerWidth - (isMobileView ? 80 : 384) - 16,
+      y: window.innerHeight - (isMobileView ? 80 : 524) - 16,
     });
   }, []);
 
@@ -125,7 +126,7 @@ export function MascotChatWidget() {
 
   if (!user) return null;
 
-  // Floating mascot button
+  // Floating mascot button - fully draggable
   if (!isOpen) {
     return (
       <button
@@ -133,18 +134,18 @@ export function MascotChatWidget() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsOpen(true); }}
-        style={{ left: position.x + 296, top: position.y + 460, position: 'fixed' }}
+        style={{ left: position.x, top: position.y, position: 'fixed' }}
         className={cn(
           'z-50 group touch-none',
-          'w-16 h-16 rounded-full shadow-2xl',
+          'w-14 h-14 rounded-full shadow-2xl',
           'bg-card border border-primary/20',
           'flex items-center justify-center',
           'hover:scale-105 transition-transform cursor-grab active:cursor-grabbing'
         )}
         aria-label="Abrir chat con Micro"
       >
-        <img src={mascotImage} alt="Micro" className="w-14 h-14 object-contain pointer-events-none" />
-        <span className="absolute -top-2 -right-1 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full font-medium shadow pointer-events-none">
+        <img src={mascotImage} alt="Micro" className="w-12 h-12 object-contain pointer-events-none" />
+        <span className="absolute -top-2 -right-1 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full font-medium shadow pointer-events-none">
           ¡Hola!
         </span>
       </button>
@@ -159,16 +160,16 @@ export function MascotChatWidget() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsMinimized(false); }}
-        style={{ left: position.x + 300, top: position.y + 462, position: 'fixed' }}
+        style={{ left: position.x, top: position.y, position: 'fixed' }}
         className={cn(
           'z-50 touch-none',
-          'w-14 h-14 rounded-full shadow-xl',
+          'w-12 h-12 rounded-full shadow-xl',
           'bg-primary text-primary-foreground',
           'flex items-center justify-center',
           'hover:scale-105 transition-transform cursor-grab active:cursor-grabbing'
         )}
       >
-        <img src={mascotImage} alt="Micro" className="w-12 h-12 object-contain pointer-events-none" />
+        <img src={mascotImage} alt="Micro" className="w-10 h-10 object-contain pointer-events-none" />
       </button>
     );
   }

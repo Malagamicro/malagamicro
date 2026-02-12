@@ -36,37 +36,35 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
     <div
       onClick={onClick}
       className={cn(
-        "bg-card rounded-xl p-5 border border-border shadow-card",
+        "bg-card rounded-xl p-3 sm:p-5 border border-border shadow-card",
         "hover:shadow-lg hover:border-primary/30 transition-all duration-200",
-        "cursor-pointer animate-slide-up"
+        "cursor-pointer animate-slide-up overflow-hidden"
       )}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-primary" />
+      <div className="flex items-start justify-between gap-2 mb-3 sm:mb-4">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
           </div>
-          <div>
-            <h3 className="font-semibold text-foreground leading-tight">
+          <div className="min-w-0">
+            <h3 className="font-semibold text-foreground leading-tight text-sm sm:text-base truncate">
               {lead.companyName}
             </h3>
-            {/* Clickable address link */}
             <a
               href={getMapsUrl()}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5 hover:text-primary hover:underline transition-colors"
+              className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 mt-0.5 hover:text-primary hover:underline transition-colors"
             >
               <MapPin className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate max-w-[180px]">
+              <span className="truncate">
                 {lead.address || lead.city || 'Sin dirección'}
               </span>
-              <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-100" />
             </a>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           {(lead.whatsappSentCount ?? 0) > 0 && (
             <TooltipProvider>
               <Tooltip>
