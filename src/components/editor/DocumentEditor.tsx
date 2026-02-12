@@ -869,7 +869,7 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
   };
 
   // ── AI streaming ──
-  const streamAi = useCallback(async (messages: ChatMessage[], action: AiAction) => {
+  const streamAi = useCallback(async (messages: ChatMessage[], action: AiAction, docType: FileType | null) => {
     setIsStreaming(true);
     let assistantContent = '';
     try {
@@ -879,7 +879,7 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
           'Content-Type': 'application/json',
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages, action }),
+        body: JSON.stringify({ messages, action, fileType: docType || 'markdown' }),
       });
 
       if (!resp.ok) {
@@ -934,8 +934,8 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
   const handleSendChat = async () => {
     if (!chatInput.trim() || isStreaming) return;
     let userMessage = chatInput.trim();
-    const docContent = fileType === 'spreadsheet' 
-      ? spreadsheetData.map(r => r.map(c => c.value).join('\t')).join('\n')
+    const docContent = fileType === 'spreadsheet'
+      ? spreadsheetData.map(r => r.map(c => c.formula ? `=${c.formula}` : c.value).join('\t')).join('\n')
       : content;
     if ((aiAction === 'edit' || aiAction === 'improve' || aiAction === 'summarize') && docContent) {
       userMessage = `Documento actual:\n\n${docContent}\n\n---\n\nInstrucciones: ${userMessage}`;
@@ -944,7 +944,7 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
     const newMessages = [...chatMessages, { role: 'user' as const, content: userMessage }];
     setChatMessages(prev => [...prev, userMsg]);
     setChatInput('');
-    await streamAi(newMessages, aiAction);
+    await streamAi(newMessages, aiAction, fileType);
   };
 
   const applyAiToDocument = () => {
