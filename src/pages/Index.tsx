@@ -31,8 +31,6 @@ import { PerplexityChatbot } from '@/components/chat/PerplexityChatbot';
 import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
 import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
 import { DocumentEditor } from '@/components/editor/DocumentEditor';
-import { BudgetChatbot } from '@/components/budget/BudgetChatbot';
-import BudgetModule from '@/components/budget/BudgetModule';
 import { EmailModule } from '@/components/email/EmailModule';
 import { OsTicketHistory } from '@/components/osticket/OsTicketHistory';
 import { useLeads } from '@/hooks/useLeads';
@@ -262,12 +260,6 @@ const IndexContent = () => {
         return (
           <div className="h-full animate-fade-in">
             <DocumentEditor />
-          </div>
-        );
-      case 'presupuesto':
-        return (
-          <div className="h-full animate-fade-in">
-            <BudgetModule />
           </div>
         );
       case 'correo':

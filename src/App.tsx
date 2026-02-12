@@ -19,7 +19,7 @@ import Scraper from "./pages/Scraper";
 import Install from "./pages/Install";
 import AdminUsers from "./pages/AdminUsers";
 import GeneralReminders from "./pages/GeneralReminders";
-import Budgets from "./pages/Budgets";
+
 import SeoGenerator from "./pages/SeoGenerator";
 import NotFound from "./pages/NotFound";
 import DocumentEditorPage from "./pages/DocumentEditorPage";
@@ -86,14 +86,6 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <GeneralReminders />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/budgets"
-                  element={
-                    <ProtectedRoute>
-                      <Budgets />
                     </ProtectedRoute>
                   }
                 />

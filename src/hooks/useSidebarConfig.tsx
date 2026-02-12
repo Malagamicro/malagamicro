@@ -72,7 +72,6 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
     icon: 'Calculator',
     color: 'text-emerald-500',
     items: [
-      { id: 'presupuesto', label: 'Presupuestos', icon: 'Calculator', color: 'text-emerald-500' },
       { id: 'reminders', label: 'Recordatorios', icon: 'Bell', color: 'text-rose-400', route: '/reminders' },
       { id: 'shared-files', label: 'Archivos', icon: 'Cloud', color: 'text-slate-400' },
     ]
@@ -118,7 +117,7 @@ export function useSidebarConfig() {
         const saved = data.categories as unknown as SidebarCategory[];
         if (saved.length > 0) {
           // Remove deprecated items (e.g. old file manager)
-          const deprecatedIds = new Set(['files']);
+          const deprecatedIds = new Set(['files', 'presupuesto']);
           const cleaned = saved.map(cat => ({
             ...cat,
             items: cat.items.filter(i => !deprecatedIds.has(i.id)),
