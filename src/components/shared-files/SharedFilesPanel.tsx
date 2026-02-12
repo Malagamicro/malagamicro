@@ -493,46 +493,46 @@ export function SharedFilesPanel() {
   return (
     <div className="h-full flex flex-col">
       <Card className="flex-1 flex flex-col">
-        <CardHeader className="pb-3 md:pb-4 px-3 md:px-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="p-1.5 md:p-2 rounded-lg bg-primary/10 shrink-0">
-                <Cloud className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+        <CardHeader className="pb-2 md:pb-4 px-2 md:px-6 pt-2 md:pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1 md:p-2 rounded-lg bg-primary/10 shrink-0">
+                <Cloud className="h-4 w-4 md:h-6 md:w-6 text-primary" />
               </div>
               <div className="min-w-0">
-                <CardTitle className="text-base md:text-lg">Archivos Compartidos</CardTitle>
-                <p className="text-xs md:text-sm text-muted-foreground mt-0.5 hidden sm:block">
+                <CardTitle className="text-sm md:text-lg">Archivos Compartidos</CardTitle>
+                <p className="text-[10px] md:text-sm text-muted-foreground mt-0.5 hidden sm:block">
                   Comparte archivos con todo el equipo
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="flex-1 sm:flex-none text-xs md:text-sm h-9 md:h-10" onClick={() => setCreateFolderDialogOpen(true)}>
-                <FolderPlus className="h-4 w-4 mr-1.5 md:mr-2 shrink-0" />
-                <span className="truncate">Nueva Carpeta</span>
+            <div className="flex items-center gap-1.5 md:gap-2">
+              <Button variant="outline" size="sm" className="flex-1 sm:flex-none text-[11px] md:text-sm h-7 md:h-10 px-2 md:px-3" onClick={() => setCreateFolderDialogOpen(true)}>
+                <FolderPlus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1 md:mr-2 shrink-0" />
+                <span className="truncate">Carpeta</span>
               </Button>
-              <Button size="sm" className="flex-1 sm:flex-none text-xs md:text-sm h-9 md:h-10" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="h-4 w-4 mr-1.5 md:mr-2 shrink-0" />
+              <Button size="sm" className="flex-1 sm:flex-none text-[11px] md:text-sm h-7 md:h-10 px-2 md:px-3" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1 md:mr-2 shrink-0" />
                 <span className="truncate">Subir</span>
               </Button>
             </div>
           </div>
 
           {/* Breadcrumbs */}
-          <div className="flex items-center gap-1 mt-3 text-xs md:text-sm overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex items-center gap-0.5 md:gap-1 mt-2 md:mt-3 text-[11px] md:text-sm overflow-x-auto pb-1 -mx-1 px-1">
             {breadcrumbs.length > 1 && (
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 mr-1" onClick={goBack}>
-                <ArrowLeft className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-6 w-6 md:h-7 md:w-7 shrink-0 mr-0.5 md:mr-1" onClick={goBack}>
+                <ArrowLeft className="h-3 w-3 md:h-4 md:w-4" />
               </Button>
             )}
             {breadcrumbs.map((crumb, index) => (
               <div key={crumb.id || 'root'} className="flex items-center shrink-0">
-                {index > 0 && <ChevronRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground mx-0.5 md:mx-1" />}
+                {index > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground mx-0.5" />}
                 <button
                   onClick={() => navigateToBreadcrumb(index)}
-                  className={cn('px-1.5 md:px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1 whitespace-nowrap', index === breadcrumbs.length - 1 && 'font-medium text-foreground')}
+                  className={cn('px-1 md:px-2 py-0.5 md:py-1 rounded hover:bg-muted transition-colors flex items-center gap-0.5 md:gap-1 whitespace-nowrap', index === breadcrumbs.length - 1 && 'font-medium text-foreground')}
                 >
-                  {index === 0 && <Home className="h-3 w-3 md:h-3.5 md:w-3.5" />}
+                  {index === 0 && <Home className="h-3 w-3" />}
                   {crumb.name}
                 </button>
               </div>
@@ -540,27 +540,27 @@ export function SharedFilesPanel() {
           </div>
 
           {/* Search and Filters */}
-          <div className="space-y-2 mt-2 md:mt-3">
+          <div className="space-y-1.5 md:space-y-2 mt-1.5 md:mt-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar archivos y carpetas..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 h-9 md:h-10 text-sm" />
+              <Search className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
+              <Input placeholder="Buscar..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 md:pl-10 h-7 md:h-10 text-xs md:text-sm" />
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            <div className="flex items-center gap-1.5 md:gap-2 overflow-x-auto pb-1 -mx-1 px-1">
               <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-[100px] md:w-[120px] h-8 text-xs md:text-sm shrink-0">
-                  <Calendar className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+                <SelectTrigger className="w-[80px] md:w-[120px] h-7 md:h-8 text-[10px] md:text-sm shrink-0">
+                  <Calendar className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1 shrink-0" />
                   <SelectValue placeholder="Fecha" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
                   <SelectItem value="today">Hoy</SelectItem>
-                  <SelectItem value="week">Esta semana</SelectItem>
-                  <SelectItem value="month">Este mes</SelectItem>
+                  <SelectItem value="week">Semana</SelectItem>
+                  <SelectItem value="month">Mes</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={userFilter} onValueChange={setUserFilter}>
-                <SelectTrigger className="w-[110px] md:w-[140px] h-8 text-xs md:text-sm shrink-0">
-                  <User className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+                <SelectTrigger className="w-[80px] md:w-[140px] h-7 md:h-8 text-[10px] md:text-sm shrink-0">
+                  <User className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1 shrink-0" />
                   <SelectValue placeholder="Usuario" />
                 </SelectTrigger>
                 <SelectContent>
@@ -571,21 +571,21 @@ export function SharedFilesPanel() {
                 </SelectContent>
               </Select>
               {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs shrink-0 text-muted-foreground hover:text-foreground">
-                  <X className="w-3.5 h-3.5 mr-1" />
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-1.5 text-[10px] md:text-xs shrink-0 text-muted-foreground hover:text-foreground">
+                  <X className="w-3 h-3 mr-0.5" />
                   Limpiar
                 </Button>
               )}
               {(filteredFiles.length > 0 || filteredFolders.length > 0) && (
-                <Badge variant="secondary" className="ml-auto shrink-0 text-xs">
-                  {filteredFolders.length + filteredFiles.length} items
+                <Badge variant="secondary" className="ml-auto shrink-0 text-[10px] md:text-xs">
+                  {filteredFolders.length + filteredFiles.length}
                 </Badge>
               )}
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-hidden px-3 md:px-6 pb-3 md:pb-6">
+        <CardContent className="flex-1 overflow-hidden px-2 md:px-6 pb-2 md:pb-6">
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} accept="*/*" />
 
           {isLoading ? (
@@ -599,35 +599,35 @@ export function SharedFilesPanel() {
               <p className="text-xs md:text-sm">Sube archivos o crea carpetas para organizar</p>
             </div>
           ) : (
-            <ScrollArea className="h-[calc(100vh-280px)] md:h-[calc(100vh-340px)]">
-              <div className="grid gap-2 md:gap-3">
+            <ScrollArea className="h-[calc(100vh-240px)] md:h-[calc(100vh-340px)]">
+              <div className="grid gap-1.5 md:gap-3">
                 {/* Folders (not draggable) */}
                 {filteredFolders.map((folder) => {
                   const isOwner = folder.user_id === user?.id;
                   return (
                     <div
                       key={folder.id}
-                      className="flex items-center gap-2 md:gap-4 p-2.5 md:p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                      className="flex items-center gap-2 md:gap-4 p-2 md:p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
                       onClick={() => navigateToFolder(folder)}
                     >
-                      <div className="p-2 md:p-3 rounded-lg bg-amber-500/10 shrink-0">
-                        <Folder className="h-5 w-5 md:h-6 md:w-6 text-amber-500" />
+                      <div className="p-1.5 md:p-3 rounded-lg bg-amber-500/10 shrink-0">
+                        <Folder className="h-4 w-4 md:h-6 md:w-6 text-amber-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate text-sm md:text-base">{folder.name}</p>
-                        <div className="flex items-center gap-2 md:gap-3 mt-0.5 md:mt-1 text-[10px] md:text-xs text-muted-foreground">
-                          <span>{format(new Date(folder.created_at), "d MMM yyyy", { locale: es })}</span>
+                        <p className="font-medium truncate text-xs md:text-base">{folder.name}</p>
+                        <div className="flex items-center gap-1.5 md:gap-3 mt-0.5 text-[10px] md:text-xs text-muted-foreground">
+                          <span>{format(new Date(folder.created_at), "d MMM", { locale: es })}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 md:gap-2 shrink-0">
-                        <Avatar className="h-6 w-6 md:h-7 md:w-7 hidden sm:flex">
+                      <div className="flex items-center gap-0.5 md:gap-2 shrink-0">
+                        <Avatar className="h-5 w-5 md:h-7 md:w-7 hidden sm:flex">
                           {folder.owner?.avatar_url && <AvatarImage src={folder.owner.avatar_url} />}
-                          <AvatarFallback className="text-[10px] md:text-xs">{getInitials(folder.owner?.full_name)}</AvatarFallback>
+                          <AvatarFallback className="text-[9px] md:text-xs">{getInitials(folder.owner?.full_name)}</AvatarFallback>
                         </Avatar>
                         {isOwner && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9">
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -650,7 +650,7 @@ export function SharedFilesPanel() {
                 <DragDropContext onDragEnd={onDragEnd}>
                   <Droppable droppableId="files-list">
                     {(provided) => (
-                      <div ref={provided.innerRef} {...provided.droppableProps} className="grid gap-2 md:gap-3">
+                      <div ref={provided.innerRef} {...provided.droppableProps} className="grid gap-1.5 md:gap-3">
                         {filteredFiles.map((file, index) => {
                           const FileIcon = getFileIcon(file.file_type);
                           const isOwner = file.user_id === user?.id;
@@ -659,21 +659,21 @@ export function SharedFilesPanel() {
                           return (
                             <Draggable key={file.id} draggableId={file.id} index={index}>
                               {(provided, snapshot) => (
-                                <div
+                                 <div
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   className={cn(
-                                    'flex items-center gap-2 md:gap-4 p-2.5 md:p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors',
+                                    'flex items-center gap-1.5 md:gap-4 p-1.5 md:p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors',
                                     snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30'
                                   )}
                                 >
                                   {/* Drag handle */}
                                   <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing shrink-0 text-muted-foreground hover:text-foreground touch-none">
-                                    <GripVertical className="h-4 w-4" />
+                                    <GripVertical className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                   </div>
 
                                   <div className={cn(
-                                    'p-2 md:p-3 rounded-lg shrink-0',
+                                    'p-1.5 md:p-3 rounded-lg shrink-0',
                                     file.file_type?.startsWith('image/') ? 'bg-pink-500/10' :
                                     file.file_type?.startsWith('video/') ? 'bg-purple-500/10' :
                                     file.file_type?.startsWith('audio/') ? 'bg-orange-500/10' :
@@ -683,7 +683,7 @@ export function SharedFilesPanel() {
                                     'bg-blue-500/10'
                                   )}>
                                     <FileIcon className={cn(
-                                      'h-5 w-5 md:h-6 md:w-6',
+                                      'h-4 w-4 md:h-6 md:w-6',
                                       file.file_type?.startsWith('image/') ? 'text-pink-500' :
                                       file.file_type?.startsWith('video/') ? 'text-purple-500' :
                                       file.file_type?.startsWith('audio/') ? 'text-orange-500' :
@@ -694,14 +694,14 @@ export function SharedFilesPanel() {
                                   </div>
 
                                   <div className="flex-1 min-w-0">
-                                    <p className="font-medium truncate text-sm md:text-base">{file.file_name}</p>
+                                    <p className="font-medium truncate text-xs md:text-base">{file.file_name}</p>
                                     {file.description && (
-                                      <p className="text-xs md:text-sm text-muted-foreground truncate mt-0.5 hidden sm:block">{file.description}</p>
+                                      <p className="text-[10px] md:text-sm text-muted-foreground truncate mt-0.5 hidden sm:block">{file.description}</p>
                                     )}
-                                    <div className="flex items-center gap-2 md:gap-3 mt-0.5 md:mt-1.5 text-[10px] md:text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-1.5 md:gap-3 mt-0.5 text-[10px] md:text-xs text-muted-foreground">
                                       <span>{formatFileSize(file.file_size)}</span>
                                       <span>•</span>
-                                      <span>{format(new Date(file.created_at), "d MMM yyyy", { locale: es })}</span>
+                                      <span>{format(new Date(file.created_at), "d MMM", { locale: es })}</span>
                                     </div>
                                   </div>
 
@@ -715,19 +715,19 @@ export function SharedFilesPanel() {
                                     </div>
 
                                     {showPreview && (
-                                      <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9" onClick={() => handlePreview(file)} title="Vista previa">
-                                        <Eye className="h-4 w-4" />
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9" onClick={() => handlePreview(file)} title="Vista previa">
+                                        <Eye className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                       </Button>
                                     )}
 
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9" onClick={() => window.open(file.file_path, '_blank')} title="Descargar archivo">
-                                      <Download className="h-4 w-4" />
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9" onClick={() => window.open(file.file_path, '_blank')} title="Descargar">
+                                      <Download className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                     </Button>
 
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9">
-                                          <MoreVertical className="h-4 w-4" />
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9">
+                                          <MoreVertical className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                         </Button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">

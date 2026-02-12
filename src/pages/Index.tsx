@@ -185,10 +185,10 @@ const IndexContent = () => {
         return <ProspectingPanel />;
       case 'pipeline':
         return (
-          <div className="p-8 space-y-6 animate-fade-in">
+          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Pipeline</h1>
-              <p className="text-muted-foreground mt-1">
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Pipeline</h1>
+              <p className="text-xs sm:text-base text-muted-foreground mt-1">
                 Arrastra los leads entre columnas para cambiar su estado
               </p>
             </div>
@@ -203,11 +203,11 @@ const IndexContent = () => {
         return <EmailCampaigns />;
       case 'mapa':
         return (
-          <div className="p-8 h-full flex flex-col space-y-6 animate-fade-in">
+          <div className="p-3 sm:p-8 h-full flex flex-col space-y-4 sm:space-y-6 animate-fade-in">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Mapa de Leads</h1>
-              <p className="text-muted-foreground mt-1">
-                Visualiza tus leads en el mapa según su ubicación
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Mapa de Leads</h1>
+              <p className="text-xs sm:text-base text-muted-foreground mt-1">
+                Visualiza tus leads en el mapa
               </p>
             </div>
             <LeadMap 
@@ -224,11 +224,11 @@ const IndexContent = () => {
         return <Inbox />;
       case 'whatsapp':
         return (
-          <div className="p-8 space-y-6 animate-fade-in">
+          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">WhatsApp</h1>
-              <p className="text-muted-foreground mt-1">
-                Gestiona tus conversaciones de WhatsApp
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground">WhatsApp</h1>
+              <p className="text-xs sm:text-base text-muted-foreground mt-1">
+                Gestiona tus conversaciones
               </p>
             </div>
             <WhatsAppPanel />
@@ -252,7 +252,7 @@ const IndexContent = () => {
         );
       case 'shared-files':
         return (
-          <div className="p-8 h-full animate-fade-in">
+          <div className="p-2 sm:p-4 md:p-8 h-full animate-fade-in">
             <SharedFilesPanel />
           </div>
         );
@@ -266,10 +266,10 @@ const IndexContent = () => {
         return <EmailModule />;
       case 'osticket':
         return (
-          <div className="p-8 space-y-6 animate-fade-in">
+          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Historial de Tickets</h1>
-              <p className="text-muted-foreground mt-1">
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Historial de Tickets</h1>
+              <p className="text-xs sm:text-base text-muted-foreground mt-1">
                 Tickets recibidos desde osTicket
               </p>
             </div>
@@ -278,10 +278,10 @@ const IndexContent = () => {
         );
       case 'chat-ai':
         return (
-          <div className="p-4 md:p-8 space-y-6 animate-fade-in w-full max-w-none md:max-w-4xl md:mx-auto">
+          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in w-full max-w-none md:max-w-4xl md:mx-auto">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Chat IA</h1>
-              <p className="text-muted-foreground mt-1">
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Chat IA</h1>
+              <p className="text-xs sm:text-base text-muted-foreground mt-1">
                 Asistente inteligente con búsqueda en tiempo real
               </p>
             </div>
@@ -290,20 +290,19 @@ const IndexContent = () => {
         );
       case 'settings':
         return (
-          <div className="p-8 space-y-6 animate-fade-in">
+          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Ajustes</h1>
-              <p className="text-muted-foreground mt-1">
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Ajustes</h1>
+              <p className="text-xs sm:text-base text-muted-foreground mt-1">
                 Configuración y registro de actividad
               </p>
             </div>
             <ProfileSettings />
             <ThemeToggleCard />
             
-            {/* Integraciones Section */}
-            <div className="pt-4">
-              <h2 className="text-xl font-semibold text-foreground mb-4">Integraciones</h2>
-              <div className="space-y-4">
+            <div className="pt-2 sm:pt-4">
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">Integraciones</h2>
+              <div className="space-y-3 sm:space-y-4">
                 <GoogleSheetsCard />
                 <OsTicketConfigCard />
               </div>
