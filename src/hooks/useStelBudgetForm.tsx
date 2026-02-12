@@ -66,8 +66,18 @@ export function useStelBudgetForm() {
       const url = WEBHOOK_URLS[env].clientes;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : data?.clientes || data?.data || [];
+      const raw = await res.json();
+      // Handle single object, array, or nested response
+      let list: any[];
+      if (Array.isArray(raw)) {
+        list = raw;
+      } else if (raw?.clientes || raw?.data) {
+        list = raw.clientes || raw.data;
+      } else if (raw && typeof raw === 'object' && (raw.name || raw.nombre)) {
+        list = [raw];
+      } else {
+        list = [];
+      }
       setClients(
         list
           .filter((c: any) => c && (c.name || c.nombre))

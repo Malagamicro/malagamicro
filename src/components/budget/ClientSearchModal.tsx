@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Loader2, User, RefreshCw } from 'lucide-react';
 import { StelClient } from '@/types/stelBudget';
 
 interface Props {
@@ -10,9 +11,10 @@ interface Props {
   clients: StelClient[];
   loading: boolean;
   onSelect: (client: StelClient) => void;
+  onRefresh?: () => void;
 }
 
-export default function ClientSearchModal({ open, onOpenChange, clients, loading, onSelect }: Props) {
+export default function ClientSearchModal({ open, onOpenChange, clients, loading, onSelect, onRefresh }: Props) {
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
@@ -27,7 +29,14 @@ export default function ClientSearchModal({ open, onOpenChange, clients, loading
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Buscar cliente</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Buscar cliente</DialogTitle>
+            {onRefresh && (
+              <Button variant="ghost" size="icon" onClick={onRefresh} disabled={loading} className="h-8 w-8">
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+            )}
+          </div>
         </DialogHeader>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -45,7 +54,14 @@ export default function ClientSearchModal({ open, onOpenChange, clients, loading
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No se encontraron clientes</p>
+            <div className="text-center py-8 space-y-3">
+              <p className="text-muted-foreground">No se encontraron clientes</p>
+              {onRefresh && (
+                <Button variant="outline" size="sm" onClick={onRefresh}>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Actualizar clientes
+                </Button>
+              )}
+            </div>
           ) : (
             filtered.map(client => (
               <button

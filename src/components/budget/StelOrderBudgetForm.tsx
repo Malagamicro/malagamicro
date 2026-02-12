@@ -20,7 +20,7 @@ export default function StelOrderBudgetForm() {
   const {
     env, setEnv,
     form, updateField,
-    clients, loadingClients,
+    clients, loadingClients, fetchClients,
     selectClient,
     addLine, removeLine, updateLine,
     calculations, lineSubtotal,
@@ -322,6 +322,7 @@ export default function StelOrderBudgetForm() {
         clients={clients}
         loading={loadingClients}
         onSelect={selectClient}
+        onRefresh={fetchClients}
       />
 
       {/* AI Report modal */}
