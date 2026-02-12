@@ -166,7 +166,7 @@ const IndexContent = () => {
 
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard onViewLead={handleViewLead} />;
+        return <Dashboard onViewLead={handleViewLead} onTabChange={setActiveTab} />;
       case 'leads':
         return (
           <LeadsList 

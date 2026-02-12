@@ -4,11 +4,13 @@ import { Ticket, CheckCircle2, XCircle } from 'lucide-react';
 import { useOsTicketHistory } from '@/hooks/useOsTicketHistory';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
 
-export function RecentTickets() {
+interface RecentTicketsProps {
+  onNavigateToTickets?: () => void;
+}
+
+export function RecentTickets({ onNavigateToTickets }: RecentTicketsProps) {
   const { tickets, isLoading } = useOsTicketHistory();
-  const navigate = useNavigate();
 
   // Get last 5 tickets
   const recentTickets = tickets.slice(0, 5);
@@ -22,7 +24,7 @@ export function RecentTickets() {
             Últimos Tickets
           </div>
           <button 
-            onClick={() => navigate('/tickets')}
+            onClick={() => onNavigateToTickets?.()}
             className="text-sm font-normal text-muted-foreground hover:text-foreground transition-colors"
           >
             Ver todos →
@@ -42,7 +44,7 @@ export function RecentTickets() {
               <div 
                 key={ticket.id}
                 className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
-                onClick={() => navigate('/tickets')}
+                onClick={() => onNavigateToTickets?.()}
               >
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm truncate">{ticket.subject}</p>

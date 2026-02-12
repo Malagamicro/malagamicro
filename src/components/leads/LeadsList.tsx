@@ -374,7 +374,7 @@ export function LeadsList({
               Seleccionar todos
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {filteredAndSortedLeads.map((lead) => (
               <div key={lead.id} className="relative">
                 <div className="absolute top-3 left-3 z-10">
