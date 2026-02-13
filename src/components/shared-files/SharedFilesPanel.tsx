@@ -674,7 +674,7 @@ export function SharedFilesPanel() {
                                   </div>
 
                                   <div className={cn(
-                                    'p-1.5 md:p-3 rounded-lg shrink-0',
+                                    'p-1.5 md:p-3 rounded-lg shrink-0 hidden md:block',
                                     file.file_type?.startsWith('image/') ? 'bg-pink-500/10' :
                                     file.file_type?.startsWith('video/') ? 'bg-purple-500/10' :
                                     file.file_type?.startsWith('audio/') ? 'bg-orange-500/10' :
@@ -684,7 +684,7 @@ export function SharedFilesPanel() {
                                     'bg-blue-500/10'
                                   )}>
                                     <FileIcon className={cn(
-                                      'h-4 w-4 md:h-6 md:w-6',
+                                      'h-6 w-6',
                                       file.file_type?.startsWith('image/') ? 'text-pink-500' :
                                       file.file_type?.startsWith('video/') ? 'text-purple-500' :
                                       file.file_type?.startsWith('audio/') ? 'text-orange-500' :
