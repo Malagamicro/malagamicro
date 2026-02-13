@@ -55,15 +55,42 @@ export function OsTicketHistory() {
   const [search, setSearch] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<OsTicketRecord | null>(null);
 
-  // Parse customer_email which may be a JSON string like {"email":"x@y.com","address":"\"Name\" <x@y.com>"}
+  // Parse customer_email which may be stored as JSON, stringified JSON, or plain text
   const parseEmail = (raw: string | null): string => {
     if (!raw) return '';
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed.email || raw;
-    } catch {
-      return raw;
+    const str = raw.trim();
+    // Try to extract email from JSON-like strings
+    if (str.startsWith('{') || str.startsWith('"')) {
+      // Try direct JSON parse
+      try {
+        const parsed = JSON.parse(str);
+        if (typeof parsed === 'string') {
+          // It was a double-encoded string, try parsing again
+          try {
+            const inner = JSON.parse(parsed);
+            if (inner.email) return inner.email;
+          } catch { /* use parsed string */ }
+          // Extract email from "Name <email>" format
+          const angleMatch = parsed.match(/<([^>]+)>/);
+          if (angleMatch) return angleMatch[1];
+          return parsed;
+        }
+        if (parsed.email) return parsed.email;
+        if (parsed.address) {
+          const angleMatch = parsed.address.match(/<([^>]+)>/);
+          if (angleMatch) return angleMatch[1];
+          return parsed.address;
+        }
+        return raw;
+      } catch { /* fall through */ }
+      // Regex fallback: extract any email from the raw string
+      const emailMatch = str.match(/[\w.+-]+@[\w.-]+\.\w{2,}/);
+      if (emailMatch) return emailMatch[0];
     }
+    // "Name <email>" format
+    const angleMatch = str.match(/<([^>]+)>/);
+    if (angleMatch) return angleMatch[1];
+    return raw;
   };
 
   const filteredTickets = tickets.filter(
