@@ -663,10 +663,11 @@ export function SharedFilesPanel() {
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   className={cn(
-                                    'flex items-center gap-2 md:gap-4 p-2 md:p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors',
+                                    'overflow-x-auto rounded-lg border bg-card hover:bg-accent/50 transition-colors',
                                     snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30'
                                   )}
                                 >
+                                 <div className="flex items-center gap-2 md:gap-4 p-2 md:p-4 min-w-fit">
                                   {/* Drag handle - hidden on mobile to save space */}
                                   <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing shrink-0 text-muted-foreground hover:text-foreground touch-none hidden md:block">
                                     <GripVertical className="h-4 w-4" />
@@ -769,6 +770,7 @@ export function SharedFilesPanel() {
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                   </div>
+                                 </div>
                                 </div>
                               )}
                             </Draggable>
