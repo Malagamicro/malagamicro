@@ -694,7 +694,7 @@ export function SharedFilesPanel() {
                                   </div>
 
                                   <div className="flex-1 min-w-0 overflow-hidden">
-                                    <p className="font-medium text-xs md:text-base leading-tight" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}>{file.file_name}</p>
+                                    <p className="font-medium text-xs md:text-base leading-tight truncate">{file.file_name}</p>
                                     {file.description && (
                                       <p className="text-[10px] md:text-sm text-muted-foreground truncate mt-0.5 hidden sm:block">{file.description}</p>
                                     )}
