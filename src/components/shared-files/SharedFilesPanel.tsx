@@ -650,7 +650,7 @@ export function SharedFilesPanel() {
                 <DragDropContext onDragEnd={onDragEnd}>
                   <Droppable droppableId="files-list">
                     {(provided) => (
-                      <div ref={provided.innerRef} {...provided.droppableProps} className="grid gap-1.5 md:gap-3 overflow-x-auto md:overflow-x-visible">
+                      <div ref={provided.innerRef} {...provided.droppableProps} className="grid gap-1.5 md:gap-3">
                         {filteredFiles.map((file, index) => {
                           const FileIcon = getFileIcon(file.file_type);
                           const isOwner = file.user_id === user?.id;
@@ -667,7 +667,7 @@ export function SharedFilesPanel() {
                                     snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30'
                                   )}
                                 >
-                                 <div className="flex items-center gap-2 md:gap-4 p-2 md:p-4 min-w-fit">
+                                 <div className="flex items-center gap-1 md:gap-4 p-2 md:p-4">
                                   {/* Drag handle - hidden on mobile to save space */}
                                   <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing shrink-0 text-muted-foreground hover:text-foreground touch-none hidden md:block">
                                     <GripVertical className="h-4 w-4" />
