@@ -113,12 +113,12 @@ export function InternalChatPage() {
 
   return (
     <div className="h-[calc(100vh-8rem)] flex border rounded-xl overflow-hidden bg-card shadow-lg">
-      <div className="w-80 border-r flex-shrink-0">
+      <div className="w-80 min-w-[320px] border-r flex-shrink-0 overflow-hidden">
         <ConversationList conversations={conversations} activeConversationId={activeConversationId}
           onSelectConversation={setActiveConversationId}
           onNewConversation={() => setShowNewConversation(true)} isLoading={conversationsLoading} />
       </div>
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <ChatPanel {...chatPanelProps} />
       </div>
       <NewConversationModal open={showNewConversation} onClose={() => setShowNewConversation(false)}
