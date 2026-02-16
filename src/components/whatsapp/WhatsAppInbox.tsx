@@ -275,12 +275,9 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
                               {chat.lastMessage || 'Sin mensajes'}
                             </p>
                             {chat.unreadCount > 0 && (
-                              <Badge 
-                                variant="default" 
-                                className="ml-2 h-5 min-w-[20px] flex items-center justify-center bg-primary hover:bg-primary/90"
-                              >
-                                {chat.unreadCount}
-                              </Badge>
+                              <span className="ml-2 h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold leading-none">
+                                {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+                              </span>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
