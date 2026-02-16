@@ -26,6 +26,9 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import logoFull from '@/assets/logo-full.png';
 import logoIcon from '@/assets/logo-icon.png';
 
+const APP_VERSION = 'v2.8.1';
+const APP_BUILD_DATE = '2026-02-16 19:45';
+
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
@@ -417,7 +420,8 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   // Collapsed sidebar content
   const collapsedContent = (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b border-sidebar-border flex justify-center">
+      <div className="p-3 border-b border-sidebar-border flex flex-col items-center gap-1">
+        <span className="text-[8px] font-mono text-muted-foreground/60 leading-none">{APP_VERSION}</span>
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -425,7 +429,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                 <img src={logoIcon} alt="MalagaMicro" className="w-9 h-9 object-contain" />
               </div>
             </TooltipTrigger>
-            <TooltipContent side="right"><p className="font-bold">MalagaMicro CRM</p></TooltipContent>
+            <TooltipContent side="right"><p className="font-bold">MalagaMicro CRM {APP_VERSION} · {APP_BUILD_DATE}</p></TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
@@ -513,6 +517,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const expandedContent = (
     <>
       <div className="p-4 border-b border-sidebar-border">
+        <div className="text-[9px] font-mono text-muted-foreground/60 mb-1">{APP_VERSION} · {APP_BUILD_DATE}</div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white px-2">
@@ -559,6 +564,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const mobileContent = (
     <>
       <div className="p-2.5 border-b border-sidebar-border">
+        <div className="text-[8px] font-mono text-muted-foreground/60 mb-0.5">{APP_VERSION} · {APP_BUILD_DATE}</div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white px-1.5">
