@@ -147,9 +147,9 @@ export function ConversationList({
                           : conv.last_message?.content || 'Sin mensajes'}
                       </p>
                       {hasUnread && (
-                        <Badge variant="default" className="h-5 min-w-[20px] px-1.5">
-                          {conv.unread_count}
-                        </Badge>
+                        <span className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold leading-none">
+                          {(conv.unread_count || 0) > 99 ? '99+' : conv.unread_count}
+                        </span>
                       )}
                     </div>
                   </div>
