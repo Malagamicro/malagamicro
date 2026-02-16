@@ -292,6 +292,51 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_events: {
+        Row: {
+          all_day: boolean | null
+          color: string | null
+          created_at: string
+          creator_id: string
+          description: string | null
+          end_time: string | null
+          event_date: string
+          id: string
+          reminder_minutes: number | null
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          all_day?: boolean | null
+          color?: string | null
+          created_at?: string
+          creator_id: string
+          description?: string | null
+          end_time?: string | null
+          event_date: string
+          id?: string
+          reminder_minutes?: number | null
+          start_time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          all_day?: boolean | null
+          color?: string | null
+          created_at?: string
+          creator_id?: string
+          description?: string | null
+          end_time?: string | null
+          event_date?: string
+          id?: string
+          reminder_minutes?: number | null
+          start_time?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       campaign_emails: {
         Row: {
           campaign_id: string
@@ -690,6 +735,80 @@ export type Database = {
           subject?: string
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      event_participants: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          permission: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          permission?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          permission?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_participants_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exit_records: {
+        Row: {
+          created_at: string
+          destination: string | null
+          exit_date: string
+          exit_time: string | null
+          id: string
+          notes: string | null
+          reason: string
+          return_time: string | null
+          student_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          destination?: string | null
+          exit_date?: string
+          exit_time?: string | null
+          id?: string
+          notes?: string | null
+          reason: string
+          return_time?: string | null
+          student_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          destination?: string | null
+          exit_date?: string
+          exit_time?: string | null
+          id?: string
+          notes?: string | null
+          reason?: string
+          return_time?: string | null
+          student_name?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1308,6 +1427,51 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           web?: string | null
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          content: string
+          created_at: string
+          generated_by: string
+          id: string
+          recipient_id: string | null
+          report_type: string
+          source_data: Json | null
+          status: string
+          title: string
+          updated_at: string
+          week_end: string | null
+          week_start: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          generated_by: string
+          id?: string
+          recipient_id?: string | null
+          report_type?: string
+          source_data?: Json | null
+          status?: string
+          title: string
+          updated_at?: string
+          week_end?: string | null
+          week_start?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          generated_by?: string
+          id?: string
+          recipient_id?: string | null
+          report_type?: string
+          source_data?: Json | null
+          status?: string
+          title?: string
+          updated_at?: string
+          week_end?: string | null
+          week_start?: string | null
         }
         Relationships: []
       }

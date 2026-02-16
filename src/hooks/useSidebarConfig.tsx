@@ -72,6 +72,8 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
     icon: 'Calculator',
     color: 'text-emerald-500',
     items: [
+      { id: 'calendario', label: 'Calendario', icon: 'Calendar', color: 'text-blue-500' },
+      { id: 'informes', label: 'Informes', icon: 'FileText', color: 'text-emerald-500' },
       { id: 'reminders', label: 'Recordatorios', icon: 'Bell', color: 'text-rose-400', route: '/reminders' },
       { id: 'shared-files', label: 'Archivos', icon: 'Cloud', color: 'text-slate-400' },
     ]

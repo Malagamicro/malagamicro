@@ -33,6 +33,8 @@ import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
 import { DocumentEditor } from '@/components/editor/DocumentEditor';
 import { EmailModule } from '@/components/email/EmailModule';
 import { OsTicketHistory } from '@/components/osticket/OsTicketHistory';
+import { CalendarModule } from '@/components/calendar/CalendarModule';
+import { ReportsModule } from '@/components/reports/ReportsModule';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -276,6 +278,10 @@ const IndexContent = () => {
             <OsTicketHistory />
           </div>
         );
+      case 'calendario':
+        return <CalendarModule />;
+      case 'informes':
+        return <ReportsModule />;
       case 'chat-ai':
         return (
           <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in w-full max-w-none md:max-w-4xl md:mx-auto">
