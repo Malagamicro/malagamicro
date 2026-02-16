@@ -101,3 +101,6 @@ verify_jwt = false
 
 [functions.document-ai]
 verify_jwt = false
+
+[functions.generate-exit-report]
+verify_jwt = false

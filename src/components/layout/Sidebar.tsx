@@ -7,6 +7,7 @@ import {
   Menu, X, Bell, Megaphone, Briefcase, Wrench, MessageCircle,
   ChevronDown, PanelLeftClose, PanelLeft, Sparkles, Pencil,
   GripVertical, Plus, RotateCcw, Trash2, FolderPlus, Check,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +36,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, Users, Search, Mail, MessageSquare, MessagesSquare,
   MapPin, Settings, Kanban, BarChart3, Inbox, FileText, Globe,
   Ticket, FolderOpen, Bot, Cloud, Calculator, Bell, Megaphone,
-  Briefcase, Wrench, MessageCircle, Sparkles, FolderPlus,
+  Briefcase, Wrench, MessageCircle, Sparkles, FolderPlus, Calendar: CalendarIcon,
 };
 
 const ICON_OPTIONS = Object.keys(ICON_MAP);

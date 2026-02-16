@@ -10,6 +10,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeSyncProvider } from "@/components/ThemeSyncProvider";
 import { MascotChatWidget } from "@/components/chat/MascotChatWidget";
 import { GlobalCallListener } from "@/components/internal-chat/GlobalCallListener";
+import { EventReminderMonitor } from "@/components/calendar/EventReminderMonitor";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -110,6 +111,7 @@ const App = () => (
             </Routes>
             <MascotChatWidget />
             <GlobalCallListener />
+            <EventReminderMonitor />
           </BrowserRouter>
           </TooltipProvider>
         </NotificationProvider>
