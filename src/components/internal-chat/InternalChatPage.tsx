@@ -6,8 +6,9 @@ import { NewConversationModal } from './NewConversationModal';
 import { VideoCallModal } from './VideoCallModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowLeft, Phone, Video } from 'lucide-react';
+import { ArrowLeft, Phone, Video, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function InternalChatPage() {
   const {
@@ -20,6 +21,7 @@ export function InternalChatPage() {
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [mobileCallOpen, setMobileCallOpen] = useState(false);
   const [mobileIsVideo, setMobileIsVideo] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isMobile = useIsMobile();
   const { user } = useAuth();
 
@@ -113,12 +115,34 @@ export function InternalChatPage() {
 
   return (
     <div className="h-full flex overflow-hidden bg-card">
-      <div className="w-96 min-w-[384px] border-r flex-shrink-0 overflow-hidden">
-        <ConversationList conversations={conversations} activeConversationId={activeConversationId}
-          onSelectConversation={setActiveConversationId}
-          onNewConversation={() => setShowNewConversation(true)} isLoading={conversationsLoading} />
-      </div>
-      <div className="flex-1 min-w-0">
+      {!sidebarCollapsed && (
+        <div className="w-96 min-w-[384px] border-r flex-shrink-0 overflow-hidden relative">
+          <ConversationList conversations={conversations} activeConversationId={activeConversationId}
+            onSelectConversation={setActiveConversationId}
+            onNewConversation={() => setShowNewConversation(true)} isLoading={conversationsLoading} />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 opacity-60 hover:opacity-100 z-10"
+                onClick={() => setSidebarCollapsed(true)}>
+                <PanelLeftClose className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Ocultar conversaciones</TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+      <div className="flex-1 min-w-0 relative">
+        {sidebarCollapsed && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="absolute top-2 left-2 h-7 w-7 z-10 opacity-60 hover:opacity-100"
+                onClick={() => setSidebarCollapsed(false)}>
+                <PanelLeftOpen className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Mostrar conversaciones</TooltipContent>
+          </Tooltip>
+        )}
         <ChatPanel {...chatPanelProps} />
       </div>
       <NewConversationModal open={showNewConversation} onClose={() => setShowNewConversation(false)}
