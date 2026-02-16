@@ -113,7 +113,7 @@ export function InternalChatPage() {
 
   return (
     <div className="h-full flex overflow-hidden bg-card">
-      <div className="w-80 min-w-[320px] border-r flex-shrink-0 overflow-hidden">
+      <div className="w-96 min-w-[384px] border-r flex-shrink-0 overflow-hidden">
         <ConversationList conversations={conversations} activeConversationId={activeConversationId}
           onSelectConversation={setActiveConversationId}
           onNewConversation={() => setShowNewConversation(true)} isLoading={conversationsLoading} />
