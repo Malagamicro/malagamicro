@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, ReactNode, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useCallback, ReactNode, useState, useRef } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useTabNotification } from '@/hooks/useTabNotification';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
@@ -26,18 +27,37 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [showPermissionBanner, setShowPermissionBanner] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [hasTabNotification, setHasTabNotification] = useState(false);
   const notifiedIdsRef = useRef<Set<string>>(new Set());
+
+  // Tab notification (red dot on favicon + blinking title)
+  useTabNotification(hasTabNotification);
+
+  // Clear tab notification when window gets focus
+  useEffect(() => {
+    const onFocus = () => setHasTabNotification(false);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
   
   const {
     permission,
     unreadCount,
     soundEnabled,
     requestPermission,
-    handleNewMessage,
+    handleNewMessage: rawHandleNewMessage,
     sendTestNotification,
     toggleSound,
     refreshUnreadCount,
   } = useNotifications();
+
+  // Wrap handleNewMessage to also trigger tab notification
+  const handleNewMessage = useCallback((title: string, body: string) => {
+    if (!document.hasFocus()) {
+      setHasTabNotification(true);
+    }
+    rawHandleNewMessage(title, body);
+  }, [rawHandleNewMessage]);
 
   // Show permission banner if not granted and not dismissed
   useEffect(() => {
