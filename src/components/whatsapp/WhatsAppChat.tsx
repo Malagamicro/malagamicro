@@ -222,7 +222,16 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      setNewMessage(prev => prev.slice(0, start) + '\n' + prev.slice(end));
+      setTimeout(() => { target.selectionStart = target.selectionEnd = start + 1; }, 0);
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();

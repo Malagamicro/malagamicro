@@ -124,7 +124,17 @@ export function ChatPanel({
     setInput('');
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const newValue = input.slice(0, start) + '\n' + input.slice(end);
+      setInput(newValue);
+      setTimeout(() => { target.selectionStart = target.selectionEnd = start + 1; }, 0);
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
@@ -405,10 +415,14 @@ export function ChatPanel({
           <div className="hidden sm:block">
             <EmojiStickerPicker onSelect={(emoji) => setInput(prev => prev + emoji)} />
           </div>
-          <Input
+          <textarea
             value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
             placeholder={isRecordingAudio ? "🎙️ Grabando..." : "Mensaje..."}
-            disabled={isSending || isRecordingAudio} className="flex-1 min-w-0 h-9 text-sm"
+            disabled={isSending || isRecordingAudio}
+            rows={1}
+            className="flex-1 min-w-0 min-h-[36px] max-h-[120px] resize-none text-sm rounded-md border border-input bg-background px-3 py-2 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{ height: 'auto', overflow: 'hidden' }}
+            onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 120) + 'px'; }}
           />
           <Button onClick={handleSend} disabled={!input.trim() || isSending || isRecordingAudio} size="icon" className="h-9 w-9 shrink-0">
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
