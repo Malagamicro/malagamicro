@@ -26,8 +26,8 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import logoFull from '@/assets/logo-full.png';
 import logoIcon from '@/assets/logo-icon.png';
 
-const APP_VERSION = 'v2.8.1';
-const APP_BUILD_DATE = '2026-02-16 19:45';
+const APP_VERSION = 'v2.8.2';
+const APP_BUILD_DATE = '2026-02-16 20:10';
 
 interface SidebarProps {
   activeTab: string;

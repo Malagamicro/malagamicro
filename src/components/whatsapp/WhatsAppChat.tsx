@@ -17,6 +17,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -263,6 +264,21 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
     return format(timestamp, 'HH:mm');
   };
 
+  const formatDateSeparator = (date: Date) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.floor((today.getTime() - msgDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Hoy';
+    if (diffDays === 1) return 'Ayer';
+    return format(date, 'EEEE, d MMMM yyyy', { locale: es });
+  };
+
+  const getMessageDateKey = (date: Date) => {
+    return format(date, 'yyyy-MM-dd');
+  };
+
   const getAckIcon = (ackStatus: string | null) => {
     switch (ackStatus) {
       case 'pending':
@@ -327,47 +343,58 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
                   <p className="text-sm mt-2">Envía un mensaje para empezar</p>
                 </div>
               ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                        message.fromMe
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
-                      } ${message.isRevoked ? 'opacity-60 italic' : ''}`}
-                    >
-                      {message.mediaUrl && !message.isRevoked && (
-                        <img
-                          src={message.mediaUrl}
-                          alt="Media"
-                          className="max-w-full rounded mb-2"
-                        />
+                messages.map((message, index) => {
+                  const showDateSeparator = index === 0 || 
+                    getMessageDateKey(message.timestamp) !== getMessageDateKey(messages[index - 1].timestamp);
+                  
+                  return (
+                    <div key={message.id}>
+                      {showDateSeparator && (
+                        <div className="flex items-center justify-center my-4">
+                          <span className="bg-muted text-muted-foreground text-xs px-3 py-1 rounded-full shadow-sm">
+                            {formatDateSeparator(message.timestamp)}
+                          </span>
+                        </div>
                       )}
-                      <p className="text-sm whitespace-pre-wrap break-words">
-                        {message.content}
-                        {message.isEdited && (
-                          <span className="text-xs opacity-70 ml-1">(editado)</span>
-                        )}
-                      </p>
-                      {message.reaction && (
-                        <span className="text-lg">{message.reaction}</span>
-                      )}
-                      <div
-                        className={`flex items-center justify-end gap-1 mt-1 ${
-                          message.fromMe
-                            ? 'text-primary-foreground/70'
-                            : 'text-muted-foreground'
-                        }`}
-                      >
-                        <span className="text-xs">{formatTime(message.timestamp)}</span>
-                        {message.fromMe && getAckIcon(message.ackStatus)}
+                      <div className={`flex ${message.fromMe ? 'justify-end' : 'justify-start'}`}>
+                        <div
+                          className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                            message.fromMe
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted'
+                          } ${message.isRevoked ? 'opacity-60 italic' : ''}`}
+                        >
+                          {message.mediaUrl && !message.isRevoked && (
+                            <img
+                              src={message.mediaUrl}
+                              alt="Media"
+                              className="max-w-full rounded mb-2"
+                            />
+                          )}
+                          <p className="text-sm whitespace-pre-wrap break-words">
+                            {message.content}
+                            {message.isEdited && (
+                              <span className="text-xs opacity-70 ml-1">(editado)</span>
+                            )}
+                          </p>
+                          {message.reaction && (
+                            <span className="text-lg">{message.reaction}</span>
+                          )}
+                          <div
+                            className={`flex items-center justify-end gap-1 mt-1 ${
+                              message.fromMe
+                                ? 'text-primary-foreground/70'
+                                : 'text-muted-foreground'
+                            }`}
+                          >
+                            <span className="text-xs">{formatTime(message.timestamp)}</span>
+                            {message.fromMe && getAckIcon(message.ackStatus)}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
               <div ref={scrollRef} />
             </div>
