@@ -120,12 +120,19 @@ export function ConversationList({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className={cn(
-                        'font-medium truncate',
-                        hasUnread && 'text-foreground'
-                      )}>
-                        {name}
-                      </span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={cn(
+                          'font-medium truncate',
+                          hasUnread && 'text-foreground'
+                        )}>
+                          {name}
+                        </span>
+                        {hasUnread && (
+                          <span className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold leading-none flex-shrink-0">
+                            {(conv.unread_count || 0) > 99 ? '99+' : conv.unread_count}
+                          </span>
+                        )}
+                      </div>
                       {conv.last_message && (
                         <span className="text-xs text-muted-foreground flex-shrink-0">
                           {formatDistanceToNow(new Date(conv.last_message.created_at), {
@@ -135,23 +142,16 @@ export function ConversationList({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className={cn(
-                        'text-sm truncate',
-                        hasUnread ? 'text-foreground font-medium' : 'text-muted-foreground'
-                      )}>
-                        {conv.last_message?.is_deleted 
-                          ? 'Mensaje eliminado'
-                          : conv.last_message?.message_type !== 'text'
-                          ? `📎 ${conv.last_message?.file_name || 'Archivo'}`
-                          : conv.last_message?.content || 'Sin mensajes'}
-                      </p>
-                      {hasUnread && (
-                        <span className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold leading-none">
-                          {(conv.unread_count || 0) > 99 ? '99+' : conv.unread_count}
-                        </span>
-                      )}
-                    </div>
+                    <p className={cn(
+                      'text-sm truncate',
+                      hasUnread ? 'text-foreground font-medium' : 'text-muted-foreground'
+                    )}>
+                      {conv.last_message?.is_deleted 
+                        ? 'Mensaje eliminado'
+                        : conv.last_message?.message_type !== 'text'
+                        ? `📎 ${conv.last_message?.file_name || 'Archivo'}`
+                        : conv.last_message?.content || 'Sin mensajes'}
+                    </p>
                   </div>
                 </button>
               );
