@@ -112,7 +112,7 @@ export function InternalChatPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex border rounded-xl overflow-hidden bg-card shadow-lg">
+    <div className="h-full flex overflow-hidden bg-card">
       <div className="w-80 min-w-[320px] border-r flex-shrink-0 overflow-hidden">
         <ConversationList conversations={conversations} activeConversationId={activeConversationId}
           onSelectConversation={setActiveConversationId}
