@@ -370,6 +370,44 @@ const tools = [
       },
     },
   },
+  // Calendar
+  {
+    type: "function",
+    function: {
+      name: "get_calendar_events",
+      description: "Ver los eventos del calendario del usuario. Puede filtrar por rango de fechas.",
+      parameters: {
+        type: "object",
+        properties: {
+          from_date: { type: "string", description: "Fecha desde (formato YYYY-MM-DD, default: hoy)" },
+          to_date: { type: "string", description: "Fecha hasta (formato YYYY-MM-DD, default: +30 días)" },
+          limit: { type: "number", description: "Número máximo de eventos (default 10)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_calendar_event",
+      description: "Crear un nuevo evento en el calendario.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título del evento" },
+          event_date: { type: "string", description: "Fecha del evento (formato YYYY-MM-DD)" },
+          start_time: { type: "string", description: "Hora de inicio (formato HH:MM)" },
+          end_time: { type: "string", description: "Hora de fin (formato HH:MM)" },
+          description: { type: "string", description: "Descripción del evento" },
+          all_day: { type: "boolean", description: "Si es un evento de todo el día" },
+          color: { type: "string", description: "Color del evento (hex, default #3b82f6)" },
+          reminder_minutes: { type: "number", description: "Minutos antes para recordatorio (default 15)" },
+        },
+        required: ["title", "event_date", "start_time"],
+      },
+    },
+  },
   // ===== STEL ORDER BUDGETS =====
   {
     type: "function",
@@ -1259,6 +1297,74 @@ async function executeToolCall(
         });
       }
       
+      case "get_calendar_events": {
+        const today = new Date();
+        const fromDate = args.from_date || today.toISOString().split('T')[0];
+        const futureDate = new Date(today);
+        futureDate.setDate(futureDate.getDate() + 30);
+        const toDate = args.to_date || futureDate.toISOString().split('T')[0];
+        const limit = Math.min(args.limit || 10, 50);
+
+        const { data, error } = await supabase
+          .from("calendar_events")
+          .select("id, title, description, event_date, start_time, end_time, all_day, color, reminder_minutes")
+          .eq("creator_id", userId)
+          .gte("event_date", fromDate)
+          .lte("event_date", toDate)
+          .order("event_date", { ascending: true })
+          .order("start_time", { ascending: true })
+          .limit(limit);
+
+        if (error) throw error;
+
+        return JSON.stringify({
+          message: `${data?.length || 0} evento(s) encontrado(s)`,
+          eventos: data?.map((e: any) => ({
+            id: e.id,
+            titulo: e.title,
+            descripcion: e.description || "-",
+            fecha: e.event_date,
+            hora_inicio: e.start_time,
+            hora_fin: e.end_time || "-",
+            todo_el_dia: e.all_day,
+            color: e.color,
+          })) || [],
+        });
+      }
+
+      case "create_calendar_event": {
+        const title = args.title;
+        const eventDate = args.event_date;
+        const startTime = args.start_time || "09:00";
+
+        if (!title || !eventDate) {
+          return JSON.stringify({ success: false, error: "Faltan parámetros: title y event_date son obligatorios." });
+        }
+
+        const { data, error } = await supabase
+          .from("calendar_events")
+          .insert({
+            creator_id: userId,
+            title,
+            event_date: eventDate,
+            start_time: startTime,
+            end_time: args.end_time || null,
+            description: args.description || null,
+            all_day: args.all_day || false,
+            color: args.color || "#3b82f6",
+            reminder_minutes: args.reminder_minutes ?? 15,
+          })
+          .select("id, title, event_date, start_time")
+          .single();
+
+        if (error) throw error;
+        return JSON.stringify({
+          success: true,
+          message: `Evento "${data.title}" creado para el ${data.event_date} a las ${data.start_time}`,
+          event_id: data.id,
+        });
+      }
+      
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
@@ -1346,6 +1452,10 @@ Puedes:
 
 **SOPORTE:**
 - Ver tickets de osTicket
+
+**CALENDARIO:**
+- Ver eventos del calendario (filtrar por fechas)
+- Crear nuevos eventos con título, fecha, hora y descripción
 
 **AUDITORÍA:**
 - Ver registro de acciones del sistema

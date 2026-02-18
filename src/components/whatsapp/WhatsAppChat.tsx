@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   ArrowLeft, 
   Send, 
@@ -41,6 +42,7 @@ interface WhatsAppChatProps {
 
 export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: WhatsAppChatProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { useMessagesForChat, updateChat, uploadAvatar, updateChatLastMessage } = useWhatsAppChats();
   const { data: messages = [], isLoading, refetch } = useMessagesForChat(chatId);
   
@@ -182,6 +184,16 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
     const savedPreview = imagePreview;
     removeImage();
 
+    // Optimistic update - add message to query cache immediately
+    queryClient.setQueryData<WahaMessage[]>(['whatsapp-messages', chatId], (old = []) => {
+      return [...old, optimisticMessage];
+    });
+
+    // Scroll to bottom immediately
+    setTimeout(() => {
+      scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
+
     try {
       let wahaResponse;
       
@@ -208,13 +220,9 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
       // Update chat last message
       await updateChatLastMessage({ chatId });
 
-      // Scroll to bottom
-      setTimeout(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-      
-      // Refetch to get server confirmation
-      setTimeout(() => refetch(), 500);
+      // Refetch to replace optimistic message with real data
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', chatId] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-chats'] });
     } catch (err) {
       console.error('Error sending message:', err);
       toast.error('Error al enviar el mensaje');
