@@ -74,7 +74,7 @@ function stripHtml(html: string): string {
 }
 
 // MalagaMicro logo URL for WhatsApp image messages
-const MALAGAMICRO_LOGO_URL = "https://malagamicro.lovable.app/favicon.png";
+const MALAGAMICRO_LOGO_URL = "https://malagamicro.lovable.app/images/nuevo-ticket.png";
 
 async function sendWhatsAppMessage(phone: string, message: string): Promise<boolean> {
   try {
