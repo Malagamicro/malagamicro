@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { fetchAllChats, fetchChatMessages, extractMessageContent, formatPhoneNumber } from '@/services/evolutionService';
+import { toast } from 'sonner';
 
 export interface WhatsAppChat {
   id: string;
@@ -290,6 +292,106 @@ export function useWhatsAppChats() {
     });
   };
 
+  // Sync chats from Evolution API
+  const syncFromEvolution = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('User not authenticated');
+
+      const evolutionChats = await fetchAllChats();
+      if (evolutionChats.length === 0) {
+        toast.info('No se encontraron chats en Evolution API');
+        return { synced: 0, messages: 0 };
+      }
+
+      let syncedChats = 0;
+      let syncedMessages = 0;
+
+      for (const chat of evolutionChats) {
+        const phone = chat.remoteJid.replace(/@s\.whatsapp\.net$/, '');
+        const chatId = chat.remoteJid;
+
+        // Upsert chat
+        const { data: existingChat } = await supabase
+          .from('whatsapp_chats')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('chat_id', chatId)
+          .maybeSingle();
+
+        if (!existingChat) {
+          await supabase.from('whatsapp_chats').insert({
+            user_id: user.id,
+            chat_id: chatId,
+            phone,
+            custom_name: chat.name || null,
+            last_message_at: chat.lastMsgTimestamp
+              ? new Date(chat.lastMsgTimestamp * 1000).toISOString()
+              : new Date().toISOString(),
+            unread_count: chat.unreadMessages || 0,
+          });
+          syncedChats++;
+        } else if (chat.name) {
+          // Update name if we have one and chat exists
+          await supabase
+            .from('whatsapp_chats')
+            .update({ 
+              custom_name: chat.name,
+              unread_count: chat.unreadMessages || 0,
+            })
+            .eq('id', existingChat.id);
+        }
+
+        // Fetch and sync last messages for this chat
+        const messages = await fetchChatMessages(chatId, 30);
+        
+        for (const msg of messages) {
+          if (!msg.key?.id) continue;
+
+          // Check if message already exists
+          const { data: existingMsg } = await supabase
+            .from('waha_messages')
+            .select('id')
+            .eq('message_id', msg.key.id)
+            .maybeSingle();
+
+          if (existingMsg) continue;
+
+          const content = extractMessageContent(msg);
+          const msgType = msg.message?.imageMessage ? 'image'
+            : msg.message?.videoMessage ? 'video'
+            : msg.message?.documentMessage ? 'document'
+            : 'text';
+
+          const timestamp = msg.messageTimestamp
+            ? new Date(msg.messageTimestamp * 1000).toISOString()
+            : new Date().toISOString();
+
+          await supabase.from('waha_messages').insert({
+            chat_id: chatId,
+            content: content || (msgType !== 'text' ? `[${msgType}]` : ''),
+            from_me: msg.key.fromMe ?? false,
+            timestamp,
+            user_id: user.id,
+            message_id: msg.key.id,
+            media_url: msg.mediaUrl || null,
+            message_type: msgType,
+          });
+          syncedMessages++;
+        }
+      }
+
+      return { synced: syncedChats, messages: syncedMessages };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-chats'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-messages'] });
+      toast.success(`Sincronización completada: ${result.synced} chats nuevos, ${result.messages} mensajes importados`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Error al sincronizar: ${error.message}`);
+    },
+  });
+
   // NOTE: Realtime subscriptions are now handled by useRealtimeConnection hook
   // This prevents duplicate subscriptions and provides centralized connection management
 
@@ -305,5 +407,7 @@ export function useWhatsAppChats() {
     uploadAvatar,
     useMessagesForChat,
     isCreatingChat: getOrCreateChat.isPending,
+    syncFromEvolution: syncFromEvolution.mutateAsync,
+    isSyncing: syncFromEvolution.isPending,
   };
 }
