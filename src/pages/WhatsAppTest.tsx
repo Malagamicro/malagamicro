@@ -23,7 +23,7 @@ export default function WhatsAppTest() {
             Prueba de WhatsApp
           </h1>
           <p className="text-muted-foreground mt-2">
-            Envía un mensaje de prueba para verificar la conexión con WAHA
+            Envía un mensaje de prueba para verificar la conexión con Evolution API
           </p>
         </div>
 
@@ -32,7 +32,7 @@ export default function WhatsAppTest() {
         <div className="text-center text-sm text-muted-foreground mt-6 p-4 bg-muted rounded-lg">
           <p className="font-medium mb-2">💡 Instrucciones:</p>
           <ol className="text-left space-y-1">
-            <li>1. Asegúrate de que WAHA esté corriendo en localhost:3000</li>
+            <li>1. Asegúrate de que Evolution API esté configurada correctamente</li>
             <li>2. Introduce tu número con código de país (ej: 34612345678)</li>
             <li>3. Escribe un mensaje de prueba</li>
             <li>4. Haz clic en "Enviar WhatsApp"</li>

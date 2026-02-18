@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageCircle, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { sendText } from "@/services/wahaService";
+import { sendText } from "@/services/evolutionService";
 
 export function WhatsAppSimpleForm() {
   const [phone, setPhone] = useState("");
@@ -32,7 +32,7 @@ export function WhatsAppSimpleForm() {
       console.error("Error sending WhatsApp:", error);
       
       if (error.name === "TypeError" && error.message.includes("fetch")) {
-        toast.error("No se pudo conectar con el servidor WAHA. Verifica que esté corriendo.");
+        toast.error("No se pudo conectar con Evolution API. Verifica la conexión.");
       } else {
         toast.error(error.message || "Error al enviar el mensaje de WhatsApp");
       }

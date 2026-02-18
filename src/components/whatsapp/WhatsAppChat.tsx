@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useWhatsAppChats, WahaMessage } from '@/hooks/useWhatsAppChats';
 import { EditContactModal } from './EditContactModal';
-import { sendTextMessage, sendImageMessage } from '@/services/wahaService';
+import { sendTextMessage, sendImageMessage } from '@/services/evolutionService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
