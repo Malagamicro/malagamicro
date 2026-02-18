@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Sparkles, Loader2, ImageIcon, FlaskConical, Wand2 } from 'lucide-react';
 
-const PRODUCTION_URL = 'https://n8n.srv1304274.hstgr.cloud/webhook/generate-seo-article';
-const TEST_URL = 'https://n8n.srv1304274.hstgr.cloud/webhook-test/generate-seo-article';
+const PRODUCTION_URL = 'https://n8n.malagamicro.com/webhook/generate-seo-article';
+const TEST_URL = 'https://n8n.malagamicro.com/webhook-test/generate-seo-article';
 const TEST_MODE_KEY = 'seo-generator-test-mode';
 
 interface SeoArticleGeneratorProps {
