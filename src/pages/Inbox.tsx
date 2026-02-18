@@ -358,7 +358,7 @@ export default function Inbox() {
   ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
   return (
-    <div className="flex h-full overflow-hidden bg-background">
+    <div className="flex h-[calc(100vh-3.5rem)] md:h-screen overflow-hidden bg-background">
       {/* Chat List - Sidebar */}
       <div className={cn(
         "w-full md:w-80 lg:w-[30%] min-w-[320px] max-w-[400px] border-r border-border flex flex-col bg-card",
