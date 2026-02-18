@@ -425,11 +425,14 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white">
+              <button
+                onClick={() => { onTabChange('dashboard'); }}
+                className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+              >
                 <img src={logoIcon} alt="MalagaMicro" className="w-9 h-9 object-contain" />
-              </div>
+              </button>
             </TooltipTrigger>
-            <TooltipContent side="right"><p className="font-bold">MalagaMicro CRM {APP_VERSION} · {APP_BUILD_DATE}</p></TooltipContent>
+            <TooltipContent side="right"><p className="font-bold">Ir al Dashboard</p></TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
@@ -520,9 +523,12 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         <div className="text-[9px] font-mono text-muted-foreground/60 mb-1">{APP_VERSION} · {APP_BUILD_DATE}</div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white px-2">
+            <button
+              onClick={() => { onTabChange('dashboard'); }}
+              className="h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white px-2 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+            >
               <img src={logoFull} alt="MalagaMicro CRM" className="h-8 object-contain" />
-            </div>
+            </button>
           </div>
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -567,9 +573,12 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         <div className="text-[8px] font-mono text-muted-foreground/60 mb-0.5">{APP_VERSION} · {APP_BUILD_DATE}</div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white px-1.5">
+            <button
+              onClick={() => { onTabChange('dashboard'); if (isMobile) setMobileOpen(false); }}
+              className="h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white px-1.5 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+            >
               <img src={logoFull} alt="MalagaMicro CRM" className="h-6 object-contain" />
-            </div>
+            </button>
           </div>
           <div className="flex items-center gap-0.5">
             <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-7 w-7 text-sidebar-foreground hover:bg-sidebar-accent">
