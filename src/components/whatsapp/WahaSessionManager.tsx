@@ -10,161 +10,100 @@ import {
   QrCode, 
   RefreshCw, 
   Trash2, 
-  Plus,
   Wifi,
-  WifiOff
+  WifiOff,
+  Power,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  getSessionStatus,
-  getSessionQrCode,
-  createSession,
-  startSession,
-  stopSession,
-  restartSession,
-  deleteSession,
-  type SessionStatus,
-  type SessionInfo,
-} from '@/services/wahaService';
+  getConnectionState,
+  connectInstance,
+  restartInstance,
+  logoutInstance,
+  type ConnectionState,
+} from '@/services/evolutionService';
 
 export function WahaSessionManager() {
-  const [status, setStatus] = useState<SessionStatus>('NOT_FOUND');
-  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
+  const [status, setStatus] = useState<ConnectionState | 'loading'>('loading');
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [qrLoading, setQrLoading] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
-      const data = await getSessionStatus();
-      
-      if (!data) {
-        setStatus('NOT_FOUND');
-        setSessionInfo(null);
-        setQrCode(null);
-        setLoading(false);
-        return;
-      }
-
-      console.log('📱 Session data:', data);
-      setSessionInfo(data);
-      setStatus(data.status);
+      const state = await getConnectionState();
+      setStatus(state);
       setLoading(false);
 
-      // If status is SCAN_QR_CODE, obtain the WhatsApp login QR.
-      // Some WAHA versions return it directly in `qr`, others require calling /auth/qr.
-      if (data.status === 'SCAN_QR_CODE') {
-        const directQr =
-          typeof (data as any).qr === 'string'
-            ? ((data as any).qr as string)
-            : ((data as any).qr?.value as string | undefined) ||
-              ((data as any).qr?.data as string | undefined) ||
-              null;
-
-        if (directQr) {
-          console.log('📲 QR from session response:', directQr.substring(0, 50) + '...');
-          setQrCode(directQr);
-          return;
+      // If disconnected, try to get QR
+      if (state === 'close') {
+        const qrData = await connectInstance();
+        if (qrData) {
+          if (qrData.base64) {
+            setQrBase64(qrData.base64);
+            setQrCode(null);
+          } else if (qrData.code) {
+            setQrCode(qrData.code);
+            setQrBase64(null);
+          }
         }
-
-        const qr = await getSessionQrCode();
-        setQrCode(qr);
-        return;
+      } else {
+        setQrCode(null);
+        setQrBase64(null);
       }
-
-      setQrCode(null);
     } catch (error) {
-      console.error('Error fetching session status:', error);
-      setStatus('NOT_FOUND');
+      console.error('Error fetching connection state:', error);
+      setStatus('close');
       setLoading(false);
     }
   }, []);
 
-  const handleRefreshQr = useCallback(async () => {
-    if (status !== 'SCAN_QR_CODE') return;
-    setQrLoading(true);
-    try {
-      const qr = await getSessionQrCode();
-      setQrCode(qr);
-      if (!qr) {
-        toast.error('Aún no hay QR disponible. Intenta reiniciar la sesión.');
-      }
-    } catch (e) {
-      console.error('Error refreshing QR:', e);
-      toast.error('Error al actualizar el QR');
-    } finally {
-      setQrLoading(false);
-    }
-  }, [status]);
-
-  const handleCreateSession = async () => {
+  const handleRestart = async () => {
     setActionLoading(true);
     try {
-      await createSession();
-      toast.success('Sesión creada correctamente');
+      await restartInstance();
+      toast.success('Instancia reiniciada');
       await fetchStatus();
     } catch (error: any) {
-      console.error('Error creating session:', error);
-      toast.error(error.message || 'Error al crear la sesión');
+      toast.error(error.message || 'Error al reiniciar');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleStartSession = async () => {
+  const handleLogout = async () => {
     setActionLoading(true);
     try {
-      await startSession();
-      toast.success('Sesión iniciada');
-      await fetchStatus();
-    } catch (error: any) {
-      console.error('Error starting session:', error);
-      toast.error(error.message || 'Error al iniciar la sesión');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleStopSession = async () => {
-    setActionLoading(true);
-    try {
-      await stopSession();
-      toast.success('Sesión detenida');
-      await fetchStatus();
-    } catch (error: any) {
-      console.error('Error stopping session:', error);
-      toast.error(error.message || 'Error al detener la sesión');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeleteSession = async () => {
-    setActionLoading(true);
-    try {
-      await deleteSession();
-      toast.success('Sesión eliminada');
-      setStatus('NOT_FOUND');
-      setSessionInfo(null);
+      await logoutInstance();
+      toast.success('Sesión cerrada');
+      setStatus('close');
       setQrCode(null);
+      setQrBase64(null);
+      await fetchStatus();
     } catch (error: any) {
-      console.error('Error deleting session:', error);
-      toast.error(error.message || 'Error al eliminar la sesión');
+      toast.error(error.message || 'Error al cerrar sesión');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleRestartSession = async () => {
+  const handleConnect = async () => {
     setActionLoading(true);
     try {
-      await restartSession();
-      toast.success('Sesión reiniciada');
+      const qrData = await connectInstance();
+      if (qrData?.base64) {
+        setQrBase64(qrData.base64);
+        setQrCode(null);
+      } else if (qrData?.code) {
+        setQrCode(qrData.code);
+        setQrBase64(null);
+      } else {
+        toast.info('Esperando QR...');
+      }
       await fetchStatus();
     } catch (error: any) {
-      console.error('Error restarting session:', error);
-      toast.error(error.message || 'Error al reiniciar la sesión');
+      toast.error(error.message || 'Error al conectar');
     } finally {
       setActionLoading(false);
     }
@@ -172,87 +111,68 @@ export function WahaSessionManager() {
 
   useEffect(() => {
     fetchStatus();
-    
-    // Poll for status updates every 5 seconds
-    const interval = setInterval(fetchStatus, 5000);
+    const interval = setInterval(fetchStatus, 8000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
   const getStatusBadge = () => {
     switch (status) {
-      case 'WORKING':
+      case 'open':
         return (
           <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
             <CheckCircle2 className="h-3 w-3 mr-1" />
             Conectado
           </Badge>
         );
-      case 'SCAN_QR_CODE':
-        return (
-          <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/30">
-            <QrCode className="h-3 w-3 mr-1" />
-            Escanear QR
-          </Badge>
-        );
-      case 'STARTING':
+      case 'connecting':
         return (
           <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30">
             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-            Iniciando
+            Conectando
           </Badge>
         );
-      case 'STOPPED':
-        return (
-          <Badge className="bg-orange-500/20 text-orange-500 border-orange-500/30">
-            <WifiOff className="h-3 w-3 mr-1" />
-            Detenido
-          </Badge>
-        );
-      case 'FAILED':
+      case 'close':
         return (
           <Badge className="bg-red-500/20 text-red-500 border-red-500/30">
-            <XCircle className="h-3 w-3 mr-1" />
-            Error
+            <WifiOff className="h-3 w-3 mr-1" />
+            Desconectado
           </Badge>
         );
-      case 'NOT_FOUND':
       default:
         return (
           <Badge className="bg-muted text-muted-foreground">
             <XCircle className="h-3 w-3 mr-1" />
-            Sin sesión
+            Verificando...
           </Badge>
         );
     }
   };
 
   const renderQrCode = () => {
-    if (!qrCode) {
-      return (
-        <div className="w-64 h-64 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Esperando QR de WhatsApp...</p>
-        </div>
-      );
-    }
-
-    // Some fetch paths return an image blob (we prefix it with image: in the service)
-    if (qrCode.startsWith('image:')) {
+    if (qrBase64) {
       return (
         <div className="bg-white p-4 rounded-lg shadow-lg">
           <img
-            src={qrCode.replace('image:', '')}
-            alt="Código QR de inicio de sesión de WhatsApp"
+            src={qrBase64.startsWith('data:') ? qrBase64 : `data:image/png;base64,${qrBase64}`}
+            alt="Código QR de WhatsApp"
             className="w-64 h-64 object-contain"
           />
         </div>
       );
     }
 
-    // Otherwise it's raw QR data, render with qrcode.react
+    if (qrCode) {
+      return (
+        <div className="bg-white p-4 rounded-lg shadow-lg">
+          <QRCodeSVG value={qrCode} size={256} level="M" includeMargin={false} />
+        </div>
+      );
+    }
+
     return (
-      <div className="bg-white p-4 rounded-lg shadow-lg">
-        <QRCodeSVG value={qrCode} size={256} level="M" includeMargin={false} />
+      <div className="w-64 h-64 bg-muted rounded-lg flex flex-col items-center justify-center gap-2">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Esperando QR de WhatsApp...</p>
       </div>
     );
   };
@@ -262,7 +182,7 @@ export function WahaSessionManager() {
       <Card className="mb-4">
         <CardContent className="py-3 flex items-center justify-center">
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          <span className="text-sm text-muted-foreground">Verificando conexión WAHA...</span>
+          <span className="text-sm text-muted-foreground">Verificando conexión Evolution API...</span>
         </CardContent>
       </Card>
     );
@@ -277,12 +197,8 @@ export function WahaSessionManager() {
             <div className="flex items-center gap-3">
               <Wifi className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">Sesión WAHA</p>
-                {sessionInfo?.me?.pushName && (
-                  <p className="text-xs text-muted-foreground">
-                    {sessionInfo.me.pushName}
-                  </p>
-                )}
+                <p className="text-sm font-medium">WhatsApp (Evolution API)</p>
+                <p className="text-xs text-muted-foreground">Instancia: CRM</p>
               </div>
               {getStatusBadge()}
             </div>
@@ -298,44 +214,28 @@ export function WahaSessionManager() {
                 <RefreshCw className={`h-4 w-4 ${actionLoading ? 'animate-spin' : ''}`} />
               </Button>
 
-              {status === 'NOT_FOUND' && (
+              {status === 'close' && (
                 <Button
                   size="sm"
-                  onClick={handleCreateSession}
+                  onClick={handleConnect}
                   disabled={actionLoading}
                 >
                   {actionLoading ? (
                     <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                   ) : (
-                    <Plus className="h-4 w-4 mr-1" />
+                    <Power className="h-4 w-4 mr-1" />
                   )}
-                  Crear Sesión
+                  Conectar
                 </Button>
               )}
 
-              {status === 'STOPPED' && (
-                <Button
-                  size="sm"
-                  onClick={handleStartSession}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 mr-1" />
-                  )}
-                  Iniciar
-                </Button>
-              )}
-
-              {(status === 'WORKING' || status === 'SCAN_QR_CODE' || status === 'FAILED') && (
+              {status === 'open' && (
                 <>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleRestartSession}
+                    onClick={handleRestart}
                     disabled={actionLoading}
-                    title="Reiniciar sesión"
                   >
                     <RefreshCw className="h-4 w-4 mr-1" />
                     Reiniciar
@@ -343,12 +243,11 @@ export function WahaSessionManager() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={handleDeleteSession}
+                    onClick={handleLogout}
                     disabled={actionLoading}
-                    title="Eliminar sesión"
                   >
                     <Trash2 className="h-4 w-4 mr-1" />
-                    Eliminar
+                    Cerrar Sesión
                   </Button>
                 </>
               )}
@@ -356,7 +255,7 @@ export function WahaSessionManager() {
           </div>
 
           {/* QR Code display */}
-          {status === 'SCAN_QR_CODE' && (
+          {status === 'close' && (qrCode || qrBase64) && (
             <div className="flex flex-col items-center gap-3 py-4 border-t">
               <p className="text-sm text-muted-foreground">
                 Escanea este código QR con WhatsApp en tu teléfono
@@ -365,14 +264,14 @@ export function WahaSessionManager() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleRefreshQr}
-                disabled={actionLoading || qrLoading}
+                onClick={handleConnect}
+                disabled={actionLoading}
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${qrLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${actionLoading ? 'animate-spin' : ''}`} />
                 Actualizar QR
               </Button>
               <p className="text-xs text-muted-foreground">
-                El código se actualiza automáticamente cada 5 segundos
+                El estado se actualiza automáticamente cada 8 segundos
               </p>
             </div>
           )}

@@ -77,7 +77,7 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
   const handleCreateChat = async (phone: string, name?: string) => {
-    const chatId = `${phone}@c.us`;
+    const chatId = `${phone}@s.whatsapp.net`;
     await getOrCreateChat({ chatId, phone, customName: name });
     onSelectChat(chatId, name || phone, phone);
   };

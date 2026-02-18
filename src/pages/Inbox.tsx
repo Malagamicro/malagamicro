@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useWhatsAppChats } from '@/hooks/useWhatsAppChats';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 
-import { sendTextMessage } from '@/services/wahaService';
+import { sendTextMessage } from '@/services/evolutionService';
 import { TemplatesModal } from '@/components/whatsapp/TemplatesModal';
 import { EditContactModal } from '@/components/whatsapp/EditContactModal';
 import { NewChatModal } from '@/components/whatsapp/NewChatModal';
@@ -150,7 +150,7 @@ export default function Inbox() {
   };
 
   const handleCreateChat = async (phone: string, name?: string) => {
-    const chatId = `${phone}@c.us`;
+    const chatId = `${phone}@s.whatsapp.net`;
     await getOrCreateChat({ chatId, phone, customName: name });
     setSelectedChatId(chatId);
   };
@@ -178,8 +178,8 @@ export default function Inbox() {
 
     setIsSending(true);
     try {
-      // Send via WAHA
-      const wahaResponse = await sendTextMessage(selectedChatId, content);
+      // Send via Evolution API
+      const evoResponse = await sendTextMessage(selectedChatId, content);
 
       // Save to database
       await supabase.from('waha_messages').insert({
@@ -188,7 +188,7 @@ export default function Inbox() {
         from_me: true,
         user_id: user.id,
         timestamp: new Date().toISOString(),
-        message_id: wahaResponse?.id || null,
+        message_id: evoResponse?.id || null,
         message_type: 'text',
         ack_status: 'sent',
       });
@@ -229,7 +229,7 @@ export default function Inbox() {
     );
 
     try {
-      const wahaResponse = await sendTextMessage(selectedChatId, pendingMsg.content);
+      const evoResponse = await sendTextMessage(selectedChatId, pendingMsg.content);
 
       await supabase.from('waha_messages').insert({
         chat_id: selectedChatId,
@@ -237,7 +237,7 @@ export default function Inbox() {
         from_me: true,
         user_id: user.id,
         timestamp: new Date().toISOString(),
-        message_id: wahaResponse?.id || null,
+        message_id: evoResponse?.id || null,
         message_type: 'text',
         ack_status: 'sent',
       });

@@ -13,16 +13,13 @@ interface WhatsAppRequest {
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verify authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      console.error('Missing authorization header');
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -32,7 +29,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
-    // Create client with user's auth token to verify authentication
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
@@ -40,52 +36,47 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
     
     if (authError || !user) {
-      console.error('Authentication failed:', authError?.message);
       return new Response(
         JSON.stringify({ error: 'Unauthorized - please log in' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Authenticated user: ${user.id}`);
-
     const { phone, message, leadId, leadName } = await req.json() as WhatsAppRequest;
 
     if (!phone || !message) {
-      console.error('Missing required fields:', { phone: !!phone, message: !!message });
       throw new Error('Phone number and message are required');
     }
 
-    // Clean phone number - remove any non-digit characters
     const cleanPhone = phone.replace(/\D/g, '');
     
-    console.log(`Sending WhatsApp message via WAHA to ${cleanPhone} for lead: ${leadName || 'unknown'}`);
+    console.log(`Sending WhatsApp message via Evolution API to ${cleanPhone} for lead: ${leadName || 'unknown'}`);
 
-    // Send message via WAHA local API
-    // Using host.docker.internal for Docker-to-host networking
-    const wahaApiKey = Deno.env.get('WAHA_API_KEY') || '12345678';
+    // Evolution API configuration
+    const evolutionApiUrl = Deno.env.get('WAHA_API_URL') || 'https://evolutionapi.malagamicro.com';
+    const evolutionApiKey = Deno.env.get('WAHA_API_KEY') || '';
+    const instanceName = 'CRM';
     
-    const response = await fetch('http://host.docker.internal:3000/api/sendText', {
+    const response = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': wahaApiKey,
+        'apikey': evolutionApiKey,
       },
       body: JSON.stringify({
-        chatId: `${cleanPhone}@c.us`,
+        number: cleanPhone,
         text: message,
-        session: 'default',
       }),
     });
 
     const responseData = await response.json();
 
     if (!response.ok) {
-      console.error('WAHA API error:', responseData);
+      console.error('Evolution API error:', responseData);
       throw new Error(responseData.message || 'Failed to send WhatsApp message');
     }
 
-    console.log('WhatsApp message sent successfully via WAHA:', responseData);
+    console.log('WhatsApp message sent successfully via Evolution API:', responseData);
 
     // Log activity if leadId is provided
     if (leadId) {
@@ -99,7 +90,6 @@ Deno.serve(async (req) => {
         user_id: user.id,
       });
 
-      // Get current whatsapp_sent_count and increment it
       const { data: leadData } = await supabase
         .from('leads')
         .select('whatsapp_sent_count')
@@ -108,7 +98,6 @@ Deno.serve(async (req) => {
 
       const currentCount = leadData?.whatsapp_sent_count || 0;
 
-      // Update last_contacted_at and increment whatsapp_sent_count
       await supabase
         .from('leads')
         .update({ 
@@ -116,14 +105,12 @@ Deno.serve(async (req) => {
           whatsapp_sent_count: currentCount + 1
         })
         .eq('id', leadId);
-
-      console.log('Activity logged for lead:', leadId, 'WhatsApp count:', currentCount + 1);
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        messageId: responseData.id || 'sent'
+        messageId: responseData?.key?.id || 'sent'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

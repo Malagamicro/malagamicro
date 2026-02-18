@@ -22,7 +22,7 @@ import { Loader2, MessageSquare, CheckCircle, XCircle, ImagePlus, X } from 'luci
 import { useToast } from '@/hooks/use-toast';
 import { Lead } from '@/types/lead';
 import { Progress } from '@/components/ui/progress';
-import { sendText, sendImage } from '@/services/wahaService';
+import { sendText, sendImage } from '@/services/evolutionService';
 import { useMessageTemplates } from '@/hooks/useMessageTemplates';
 
 interface SendResult {
