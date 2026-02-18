@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
+export type SidebarPosition = 'left' | 'right' | 'top' | 'bottom';
+
 export interface SidebarItem {
   id: string;
   label: string;
@@ -17,6 +19,7 @@ export interface SidebarCategory {
   label: string;
   icon: string;
   color: string;
+  bgColor?: string; // Background color for the category section
   items: SidebarItem[];
 }
 
@@ -96,6 +99,7 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
 export function useSidebarConfig() {
   const { user } = useAuth();
   const [categories, setCategories] = useState<SidebarCategory[]>(DEFAULT_CATEGORIES);
+  const [sidebarPosition, setSidebarPositionState] = useState<SidebarPosition>('left');
   const [isLoading, setIsLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
 
@@ -116,7 +120,12 @@ export function useSidebarConfig() {
       if (error) throw error;
 
       if (data?.categories) {
-        const saved = data.categories as unknown as SidebarCategory[];
+        const rawData = data.categories as any;
+        // Support new format with position
+        if (rawData.position) {
+          setSidebarPositionState(rawData.position as SidebarPosition);
+        }
+        const saved = (rawData.items || rawData) as unknown as SidebarCategory[];
         if (saved.length > 0) {
           // Remove deprecated items (e.g. old file manager)
           const deprecatedIds = new Set(['files', 'presupuesto']);
@@ -157,14 +166,14 @@ export function useSidebarConfig() {
     }
   };
 
-  const saveConfig = useCallback(async (newCategories: SidebarCategory[]) => {
+  const saveConfig = useCallback(async (newCategories: SidebarCategory[], position?: SidebarPosition) => {
     if (!user) return;
     try {
       const { error } = await supabase
         .from('user_sidebar_config')
         .upsert({
           user_id: user.id,
-          categories: newCategories as any,
+          categories: { items: newCategories, position: position || sidebarPosition } as any,
         }, { onConflict: 'user_id' });
 
       if (error) throw error;
@@ -172,7 +181,7 @@ export function useSidebarConfig() {
       console.error('Error saving sidebar config:', err);
       toast.error('Error al guardar la configuración del sidebar');
     }
-  }, [user]);
+  }, [user, sidebarPosition]);
 
   const addCategory = (name: string, icon: string, color: string) => {
     const newCat: SidebarCategory = {
@@ -238,12 +247,28 @@ export function useSidebarConfig() {
 
   const resetToDefault = () => {
     setCategories(DEFAULT_CATEGORIES);
-    saveConfig(DEFAULT_CATEGORIES);
+    setSidebarPositionState('left');
+    saveConfig(DEFAULT_CATEGORIES, 'left');
     toast.success('Sidebar restaurado a valores por defecto');
+  };
+
+  const setSidebarPosition = (position: SidebarPosition) => {
+    setSidebarPositionState(position);
+    saveConfig(categories, position);
+  };
+
+  const setCategoryBgColor = (categoryId: string, bgColor: string | undefined) => {
+    const updated = categories.map(c =>
+      c.id === categoryId ? { ...c, bgColor } : c
+    );
+    setCategories(updated);
+    saveConfig(updated);
   };
 
   return {
     categories,
+    sidebarPosition,
+    setSidebarPosition,
     isLoading,
     editMode,
     setEditMode,
@@ -254,5 +279,6 @@ export function useSidebarConfig() {
     moveItem,
     reorderItems,
     resetToDefault,
+    setCategoryBgColor,
   };
 }

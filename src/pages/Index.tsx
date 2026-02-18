@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { useSidebarConfig } from '@/hooks/useSidebarConfig';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { LeadsList } from '@/components/leads/LeadsList';
 import { LeadDetail } from '@/components/leads/LeadDetail';
@@ -42,6 +44,7 @@ import { Loader2 } from 'lucide-react';
 
 const IndexContent = () => {
   const navigate = useNavigate();
+  const { sidebarPosition } = useSidebarConfig();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -318,19 +321,26 @@ const IndexContent = () => {
     }
   };
 
-  return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar 
-        activeTab={activeTab === 'lead-detail' ? 'leads' : activeTab} 
-        onTabChange={setActiveTab} 
-      />
-      <div className="flex-1 flex flex-col overflow-hidden md:ml-0">
-        <EmailVerificationBanner />
-        {/* Add top padding on mobile for hamburger button */}
-        <main className="flex-1 overflow-auto pt-14 md:pt-0">
-          {renderContent()}
-        </main>
-      </div>
+    const isHorizontal = sidebarPosition === 'top' || sidebarPosition === 'bottom';
+    
+    return (
+      <div className={cn(
+        "min-h-screen bg-background",
+        isHorizontal ? "flex flex-col" : "flex",
+        sidebarPosition === 'right' && "flex-row-reverse",
+        sidebarPosition === 'bottom' && "flex-col-reverse",
+      )}>
+        <Sidebar 
+          activeTab={activeTab === 'lead-detail' ? 'leads' : activeTab} 
+          onTabChange={setActiveTab}
+          position={sidebarPosition}
+        />
+        <div className="flex-1 flex flex-col overflow-hidden md:ml-0">
+          <EmailVerificationBanner />
+          <main className="flex-1 overflow-auto pt-14 md:pt-0">
+            {renderContent()}
+          </main>
+        </div>
 
       <LeadFormModal
         open={isFormOpen}
