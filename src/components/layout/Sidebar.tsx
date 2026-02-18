@@ -7,7 +7,7 @@ import {
   Menu, X, Bell, Megaphone, Briefcase, Wrench, MessageCircle,
   ChevronDown, PanelLeftClose, PanelLeft, Sparkles, Pencil,
   GripVertical, Plus, RotateCcw, Trash2, FolderPlus, Check,
-  Calendar as CalendarIcon, Palette,
+  Calendar as CalendarIcon, Palette, Eye, EyeOff,
   PanelLeft as PanelLeftIcon, PanelRight, PanelTop, PanelBottom,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -210,7 +210,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left' }: SidebarPr
   const {
     categories, editMode, setEditMode, addCategory, removeCategory,
     renameCategory, reorderCategories, moveItem, reorderItems, resetToDefault,
-    sidebarPosition, setSidebarPosition, setCategoryBgColor,
+    sidebarPosition, setSidebarPosition, setCategoryBgColor, toggleItemVisibility,
   } = useSidebarConfig();
 
   useEffect(() => {
@@ -311,28 +311,35 @@ export function Sidebar({ activeTab, onTabChange, position = 'left' }: SidebarPr
     );
   };
 
-  const renderCollapsedCategory = (category: SidebarCategory) => (
-    <div key={category.id} className="space-y-1">
-      <div className="flex justify-center py-1">
-        <div className={cn("w-1.5 h-1.5 rounded-full", category.color.replace('text-', 'bg-'))} />
+  const renderCollapsedCategory = (category: SidebarCategory) => {
+    const visibleItems = category.items.filter(i => !i.hidden);
+    if (visibleItems.length === 0) return null;
+    return (
+      <div key={category.id} className="space-y-1">
+        <div className="flex justify-center py-1">
+          <div className={cn("w-1.5 h-1.5 rounded-full", category.color.replace('text-', 'bg-'))} />
+        </div>
+        <div className="space-y-1 px-1">
+          {visibleItems.map(item => (
+            <CollapsedIconButton
+              key={item.id}
+              item={item}
+              isActive={activeTab === item.id}
+              onClick={() => handleItemClick(item)}
+              unreadCount={item.showBadge ? unreadCount : undefined}
+            />
+          ))}
+        </div>
       </div>
-      <div className="space-y-1 px-1">
-        {category.items.map(item => (
-          <CollapsedIconButton
-            key={item.id}
-            item={item}
-            isActive={activeTab === item.id}
-            onClick={() => handleItemClick(item)}
-            unreadCount={item.showBadge ? unreadCount : undefined}
-          />
-        ))}
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderExpandedCategory = (category: SidebarCategory, index?: number) => {
+    const visibleItems = category.items.filter(i => !i.hidden);
+    // In normal mode, skip categories with no visible items
+    if (!editMode && visibleItems.length === 0) return null;
     const isOpen = openCategories.includes(category.id);
-    const hasActiveItem = category.items.some(item => item.id === activeTab);
+    const hasActiveItem = visibleItems.some(item => item.id === activeTab);
     const CatIcon = getIcon(category.icon);
 
     return (
@@ -433,7 +440,16 @@ export function Sidebar({ activeTab, onTabChange, position = 'left' }: SidebarPr
                             <div {...provided.dragHandleProps} className="p-1 cursor-grab active:cursor-grabbing">
                               <GripVertical className="w-3 h-3 text-muted-foreground" />
                             </div>
-                            <div className="flex-1">{renderMenuItem(item)}</div>
+                            <div className={cn("flex-1", item.hidden && "opacity-40")}>{renderMenuItem(item)}</div>
+                            <button
+                              onClick={() => toggleItemVisibility(category.id, item.id)}
+                              className="p-1 rounded hover:bg-sidebar-accent flex-shrink-0"
+                              title={item.hidden ? 'Mostrar' : 'Ocultar'}
+                            >
+                              {item.hidden
+                                ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+                                : <Eye className="w-3.5 h-3.5 text-muted-foreground" />}
+                            </button>
                           </div>
                         </div>
                       )}
@@ -444,7 +460,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left' }: SidebarPr
               )}
             </Droppable>
           ) : (
-            category.items.map(renderMenuItem)
+            category.items.filter(i => !i.hidden).map(renderMenuItem)
           )}
         </CollapsibleContent>
       </Collapsible>
@@ -706,7 +722,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left' }: SidebarPr
       </button>
       <div className="h-8 w-px bg-sidebar-border mx-1 flex-shrink-0" />
       <nav className="flex items-center gap-0.5 overflow-x-auto flex-1">
-        {categories.flatMap(cat => cat.items).map(item => {
+        {categories.flatMap(cat => cat.items).filter(i => !i.hidden).map(item => {
           const isActive = activeTab === item.id;
           const Icon = getIcon(item.icon);
           return (

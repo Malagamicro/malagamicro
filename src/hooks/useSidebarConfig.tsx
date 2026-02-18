@@ -12,6 +12,7 @@ export interface SidebarItem {
   color: string;
   route?: string;
   showBadge?: boolean;
+  hidden?: boolean;
 }
 
 export interface SidebarCategory {
@@ -265,6 +266,20 @@ export function useSidebarConfig() {
     saveConfig(updated);
   };
 
+  const toggleItemVisibility = (categoryId: string, itemId: string) => {
+    const updated = categories.map(c => {
+      if (c.id !== categoryId) return c;
+      return {
+        ...c,
+        items: c.items.map(i =>
+          i.id === itemId ? { ...i, hidden: !i.hidden } : i
+        ),
+      };
+    });
+    setCategories(updated);
+    saveConfig(updated);
+  };
+
   return {
     categories,
     sidebarPosition,
@@ -280,5 +295,6 @@ export function useSidebarConfig() {
     reorderItems,
     resetToDefault,
     setCategoryBgColor,
+    toggleItemVisibility,
   };
 }
