@@ -35,6 +35,7 @@ interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   position?: SidebarPosition;
+  onPositionChange?: (position: SidebarPosition) => void;
 }
 
 // Icon registry
@@ -196,7 +197,7 @@ function AddCategoryDialog({ onAdd }: { onAdd: (name: string, icon: string, colo
   );
 }
 
-export function Sidebar({ activeTab, onTabChange, position = 'left' }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openCategories, setOpenCategories] = useState<string[]>(['main', 'crm', 'marketing']);
@@ -582,7 +583,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left' }: SidebarPr
           ]).map(({ pos, icon: Icon, label }) => (
             <button
               key={pos}
-              onClick={() => setSidebarPosition(pos)}
+              onClick={() => { setSidebarPosition(pos); onPositionChange?.(pos); }}
               className={cn(
                 "flex flex-col items-center gap-0.5 p-1.5 rounded-md text-[10px] transition-colors",
                 sidebarPosition === pos
@@ -782,7 +783,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left' }: SidebarPr
               ]).map(({ pos, icon: Icon, label }) => (
                 <button
                   key={pos}
-                  onClick={() => setSidebarPosition(pos)}
+                  onClick={() => { setSidebarPosition(pos); onPositionChange?.(pos); }}
                   className={cn(
                     "flex flex-col items-center gap-0.5 p-1.5 rounded-md text-[10px] transition-colors",
                     sidebarPosition === pos
