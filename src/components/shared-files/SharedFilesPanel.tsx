@@ -716,12 +716,12 @@ export function SharedFilesPanel() {
                                     </div>
 
                                     {showPreview && (
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 shrink-0 hidden md:inline-flex" onClick={() => handlePreview(file)} title="Vista previa">
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 shrink-0" onClick={() => handlePreview(file)} title="Vista previa">
                                         <Eye className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                       </Button>
                                     )}
 
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 shrink-0 hidden md:inline-flex" onClick={() => window.open(file.file_path, '_blank')} title="Descargar">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 shrink-0" onClick={() => window.open(file.file_path, '_blank')} title="Descargar">
                                       <Download className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                     </Button>
 
