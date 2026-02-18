@@ -667,7 +667,7 @@ export function SharedFilesPanel() {
                                     snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30'
                                   )}
                                 >
-                                 <div className="flex items-center gap-1 md:gap-4 p-2 md:p-4">
+                                 <div className="flex items-center gap-2 md:gap-4 p-2.5 md:p-4">
                                   {/* Drag handle - hidden on mobile to save space */}
                                   <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing shrink-0 text-muted-foreground hover:text-foreground touch-none hidden md:block">
                                     <GripVertical className="h-4 w-4" />
@@ -694,8 +694,8 @@ export function SharedFilesPanel() {
                                     )} />
                                   </div>
 
-                                  <div className="flex-1 min-w-0 overflow-hidden">
-                                    <p className="font-medium text-xs md:text-base leading-tight truncate">{file.file_name}</p>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-[13px] md:text-base leading-tight truncate max-w-[60vw] md:max-w-none">{file.file_name}</p>
                                     {file.description && (
                                       <p className="text-[10px] md:text-sm text-muted-foreground truncate mt-0.5 hidden sm:block">{file.description}</p>
                                     )}
@@ -706,7 +706,7 @@ export function SharedFilesPanel() {
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-0.5 md:gap-2 shrink-0 ml-auto">
+                                  <div className="flex items-center gap-1 md:gap-2 shrink-0 ml-1 md:ml-auto">
                                     <div className="hidden md:flex items-center gap-2 mr-2">
                                       <Avatar className="h-7 w-7">
                                         {file.uploader?.avatar_url && <AvatarImage src={file.uploader.avatar_url} />}
@@ -727,8 +727,8 @@ export function SharedFilesPanel() {
 
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9">
-                                          <MoreVertical className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9">
+                                          <MoreVertical className="h-4 w-4" />
                                         </Button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">
