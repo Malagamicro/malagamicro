@@ -7,7 +7,8 @@ import {
   Menu, X, Bell, Megaphone, Briefcase, Wrench, MessageCircle,
   ChevronDown, PanelLeftClose, PanelLeft, Sparkles, Pencil,
   GripVertical, Plus, RotateCcw, Trash2, FolderPlus, Check,
-  Calendar as CalendarIcon,
+  Calendar as CalendarIcon, Palette,
+  PanelLeft as PanelLeftIcon, PanelRight, PanelTop, PanelBottom,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,13 +16,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useSidebarConfig, SidebarCategory, SidebarItem } from '@/hooks/useSidebarConfig';
+import { useSidebarConfig, SidebarCategory, SidebarItem, SidebarPosition } from '@/hooks/useSidebarConfig';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import logoFull from '@/assets/logo-full.png';
 import logoIcon from '@/assets/logo-icon.png';
@@ -32,6 +34,7 @@ const APP_BUILD_DATE = '2026-02-16 20:45';
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  position?: SidebarPosition;
 }
 
 // Icon registry
@@ -50,6 +53,12 @@ const COLOR_OPTIONS = [
   'text-lime-500', 'text-green-500', 'text-emerald-500', 'text-teal-500',
   'text-cyan-500', 'text-sky-500', 'text-violet-500', 'text-rose-500',
   'text-slate-400',
+];
+
+const BG_COLOR_OPTIONS = [
+  '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
+  '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4',
+  '#64748b', '#78716c',
 ];
 
 function getIcon(iconName: string): React.ComponentType<{ className?: string }> {
@@ -187,7 +196,7 @@ function AddCategoryDialog({ onAdd }: { onAdd: (name: string, icon: string, colo
   );
 }
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, position = 'left' }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openCategories, setOpenCategories] = useState<string[]>(['main', 'crm', 'marketing']);
@@ -201,6 +210,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const {
     categories, editMode, setEditMode, addCategory, removeCategory,
     renameCategory, reorderCategories, moveItem, reorderItems, resetToDefault,
+    sidebarPosition, setSidebarPosition, setCategoryBgColor,
   } = useSidebarConfig();
 
   useEffect(() => {
@@ -326,7 +336,12 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     const CatIcon = getIcon(category.icon);
 
     return (
-      <Collapsible key={category.id} open={isOpen} onOpenChange={() => toggleCategory(category.id)}>
+      <div
+        key={category.id}
+        className="rounded-lg transition-all"
+        style={category.bgColor ? { backgroundColor: category.bgColor + '20' } : undefined}
+      >
+      <Collapsible open={isOpen} onOpenChange={() => toggleCategory(category.id)}>
         <div className="flex items-center group">
           <CollapsibleTrigger asChild>
             <button className={cn(
@@ -351,8 +366,41 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
               <ChevronDown className={cn("w-4 h-4 transition-transform duration-200", isMobile && "w-3 h-3", isOpen && "rotate-180")} />
             </button>
           </CollapsibleTrigger>
-          {editMode && (
+           {editMode && (
             <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-1">
+              {/* Background color picker */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1 rounded hover:bg-sidebar-accent"
+                  >
+                    <Palette className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="p-2">
+                  <div className="grid grid-cols-6 gap-1">
+                    <button
+                      onClick={() => setCategoryBgColor(category.id, undefined)}
+                      className={cn("w-6 h-6 rounded border border-dashed border-muted-foreground/30 flex items-center justify-center text-[10px]",
+                        !category.bgColor && "ring-2 ring-primary"
+                      )}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    {BG_COLOR_OPTIONS.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setCategoryBgColor(category.id, c)}
+                        className={cn("w-6 h-6 rounded transition-all",
+                          category.bgColor === c ? "ring-2 ring-primary scale-110" : "hover:scale-110"
+                        )}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <button
                 onClick={(e) => { e.stopPropagation(); handleStartRename(category.id, category.label); }}
                 className="p-1 rounded hover:bg-sidebar-accent"
@@ -400,6 +448,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           )}
         </CollapsibleContent>
       </Collapsible>
+      </div>
     );
   };
 
@@ -505,6 +554,32 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         )}
       </Droppable>
       <AddCategoryDialog onAdd={addCategory} />
+      {/* Position selector */}
+      <div className="px-3 py-2">
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Posición del sidebar</label>
+        <div className="grid grid-cols-4 gap-1">
+          {([
+            { pos: 'left' as SidebarPosition, icon: PanelLeftIcon, label: 'Izq' },
+            { pos: 'right' as SidebarPosition, icon: PanelRight, label: 'Der' },
+            { pos: 'top' as SidebarPosition, icon: PanelTop, label: 'Arriba' },
+            { pos: 'bottom' as SidebarPosition, icon: PanelBottom, label: 'Abajo' },
+          ]).map(({ pos, icon: Icon, label }) => (
+            <button
+              key={pos}
+              onClick={() => setSidebarPosition(pos)}
+              className={cn(
+                "flex flex-col items-center gap-0.5 p-1.5 rounded-md text-[10px] transition-colors",
+                sidebarPosition === pos
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-sidebar-accent text-muted-foreground"
+              )}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <button
         onClick={resetToDefault}
         className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent transition-colors"
@@ -620,6 +695,102 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     </>
   );
 
+  // Horizontal sidebar content (top/bottom)
+  const horizontalContent = (
+    <div className="flex items-center h-full w-full px-2 gap-1">
+      <button
+        onClick={() => onTabChange('dashboard')}
+        className="h-9 rounded-lg overflow-hidden flex items-center justify-center bg-white px-2 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0"
+      >
+        <img src={logoFull} alt="MalagaMicro CRM" className="h-7 object-contain" />
+      </button>
+      <div className="h-8 w-px bg-sidebar-border mx-1 flex-shrink-0" />
+      <nav className="flex items-center gap-0.5 overflow-x-auto flex-1">
+        {categories.flatMap(cat => cat.items).map(item => {
+          const isActive = activeTab === item.id;
+          const Icon = getIcon(item.icon);
+          return (
+            <TooltipProvider key={item.id} delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => handleItemClick(item)}
+                    className={cn(
+                      "relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-xs font-medium whitespace-nowrap flex-shrink-0",
+                      "hover:bg-sidebar-accent",
+                      isActive && "bg-sidebar-accent"
+                    )}
+                  >
+                    <Icon className={cn("w-4 h-4", item.color)} />
+                    <span>{item.label}</span>
+                    {item.showBadge && unreadCount > 0 && (
+                      <span className="h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side={position === 'top' ? 'bottom' : 'top'}>{item.label}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        })}
+      </nav>
+      <div className="h-8 w-px bg-sidebar-border mx-1 flex-shrink-0" />
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        <button onClick={toggleTheme} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors">
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+        <button onClick={() => setEditMode(!editMode)} className={cn("w-8 h-8 flex items-center justify-center rounded-lg transition-colors", editMode ? "bg-primary/10 text-primary" : "hover:bg-sidebar-accent")}>
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button onClick={() => handleTabChange('settings')} className={cn("w-8 h-8 flex items-center justify-center rounded-lg transition-colors", activeTab === 'settings' && "bg-sidebar-accent")}>
+          <Settings className="w-4 h-4" />
+        </button>
+        <button onClick={handleSignOut} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-sidebar-accent text-destructive">
+          <LogOut className="w-4 h-4" />
+        </button>
+      </div>
+      {/* Edit mode popover for horizontal */}
+      {editMode && (
+        <div className="fixed top-16 right-4 z-50 bg-sidebar border border-sidebar-border rounded-xl p-4 shadow-xl w-72 space-y-3">
+          <h3 className="font-semibold text-sm">Editar Sidebar</h3>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Posición</label>
+            <div className="grid grid-cols-4 gap-1">
+              {([
+                { pos: 'left' as SidebarPosition, icon: PanelLeftIcon, label: 'Izq' },
+                { pos: 'right' as SidebarPosition, icon: PanelRight, label: 'Der' },
+                { pos: 'top' as SidebarPosition, icon: PanelTop, label: 'Arriba' },
+                { pos: 'bottom' as SidebarPosition, icon: PanelBottom, label: 'Abajo' },
+              ]).map(({ pos, icon: Icon, label }) => (
+                <button
+                  key={pos}
+                  onClick={() => setSidebarPosition(pos)}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 p-1.5 rounded-md text-[10px] transition-colors",
+                    sidebarPosition === pos
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-sidebar-accent text-muted-foreground"
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button onClick={resetToDefault} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent">
+            <RotateCcw className="w-4 h-4" /> Restaurar
+          </button>
+          <button onClick={() => setEditMode(false)} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-sm font-medium">
+            Listo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       {isMobile && (
@@ -637,14 +808,24 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       <aside
         data-sidebar
         className={cn(
-          "bg-sidebar text-sidebar-foreground transition-all duration-300 flex flex-col",
-          !isMobile && "h-screen",
-          !isMobile && (collapsed ? "w-[60px]" : "w-64"),
-          isMobile && "fixed inset-y-0 left-0 z-50 w-60",
+          "bg-sidebar text-sidebar-foreground transition-all duration-300 flex",
+          // Vertical sidebar (left/right)
+          (position === 'left' || position === 'right') && "flex-col",
+          (position === 'left' || position === 'right') && !isMobile && "h-screen",
+          (position === 'left' || position === 'right') && !isMobile && (collapsed ? "w-[60px]" : "w-64"),
+          // Horizontal sidebar (top/bottom)
+          (position === 'top' || position === 'bottom') && !isMobile && "w-full flex-row items-center h-14 overflow-x-auto",
+          // Mobile always left
+          isMobile && "fixed inset-y-0 left-0 z-50 w-60 flex-col",
           isMobile && (mobileOpen ? "translate-x-0" : "-translate-x-full")
         )}
       >
-        {isMobile ? mobileContent : (collapsed ? collapsedContent : expandedContent)}
+        {isMobile
+          ? mobileContent
+          : (position === 'top' || position === 'bottom')
+            ? horizontalContent
+            : (collapsed ? collapsedContent : expandedContent)
+        }
       </aside>
 
       <style>{`
