@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -44,7 +44,8 @@ import { Loader2 } from 'lucide-react';
 
 const IndexContent = () => {
   const navigate = useNavigate();
-  const { sidebarPosition } = useSidebarConfig();
+  const { sidebarPosition, setSidebarPosition } = useSidebarConfig();
+  const [localPosition, setLocalPosition] = useState(sidebarPosition);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -74,6 +75,11 @@ const IndexContent = () => {
     isGeocodingLead,
     isBulkGeocoding,
   } = useLeads();
+
+  // Sync localPosition when sidebarPosition loads from DB
+  useEffect(() => {
+    setLocalPosition(sidebarPosition);
+  }, [sidebarPosition]);
 
   // Session timeout - 30 minutes of inactivity
   const { showWarning, formattedTime, extendSession, logout } = useSessionTimeout({
@@ -321,19 +327,20 @@ const IndexContent = () => {
     }
   };
 
-    const isHorizontal = sidebarPosition === 'top' || sidebarPosition === 'bottom';
+    const isHorizontal = localPosition === 'top' || localPosition === 'bottom';
     
     return (
       <div className={cn(
         "min-h-screen bg-background",
         isHorizontal ? "flex flex-col" : "flex",
-        sidebarPosition === 'right' && "flex-row-reverse",
-        sidebarPosition === 'bottom' && "flex-col-reverse",
+        localPosition === 'right' && "flex-row-reverse",
+        localPosition === 'bottom' && "flex-col-reverse",
       )}>
         <Sidebar 
           activeTab={activeTab === 'lead-detail' ? 'leads' : activeTab} 
           onTabChange={setActiveTab}
-          position={sidebarPosition}
+          position={localPosition}
+          onPositionChange={setLocalPosition}
         />
         <div className="flex-1 flex flex-col overflow-hidden md:ml-0">
           <EmailVerificationBanner />
