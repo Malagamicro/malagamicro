@@ -334,6 +334,87 @@ export async function sendImageMessage(
   return { id: response?.key?.id };
 }
 
+// ============================================
+// CHAT SYNC (Fetch from Evolution API)
+// ============================================
+
+export interface EvolutionChat {
+  id: string;
+  remoteJid: string;
+  name?: string;
+  profilePicUrl?: string;
+  unreadMessages?: number;
+  lastMsgTimestamp?: number;
+}
+
+export interface EvolutionChatMessage {
+  key: {
+    remoteJid: string;
+    fromMe: boolean;
+    id: string;
+  };
+  pushName?: string;
+  message?: {
+    conversation?: string;
+    extendedTextMessage?: { text?: string };
+    imageMessage?: { caption?: string };
+    videoMessage?: { caption?: string };
+    documentMessage?: { title?: string };
+  };
+  messageType?: string;
+  messageTimestamp?: number;
+  status?: number;
+  mediaUrl?: string;
+}
+
+export async function fetchAllChats(): Promise<EvolutionChat[]> {
+  try {
+    const data = await evolutionFetch<EvolutionChat[]>(
+      `/chat/findChats/${INSTANCE_NAME}`,
+      { method: 'POST', body: JSON.stringify({}) }
+    );
+    // Filter only individual chats (not groups)
+    return (data || []).filter(c => c.remoteJid?.endsWith('@s.whatsapp.net'));
+  } catch (error) {
+    console.error('Error fetching chats from Evolution API:', error);
+    return [];
+  }
+}
+
+export async function fetchChatMessages(
+  remoteJid: string, 
+  limit: number = 50
+): Promise<EvolutionChatMessage[]> {
+  try {
+    const data = await evolutionFetch<{ messages?: { records: EvolutionChatMessage[] } }>(
+      `/chat/findMessages/${INSTANCE_NAME}`,
+      { 
+        method: 'POST', 
+        body: JSON.stringify({ 
+          where: { key: { remoteJid } },
+          limit,
+        }) 
+      }
+    );
+    return data?.messages?.records || [];
+  } catch (error) {
+    console.error('Error fetching messages from Evolution API:', error);
+    return [];
+  }
+}
+
+// Extract text content from a fetched message
+export function extractMessageContent(msg: EvolutionChatMessage): string {
+  if (!msg.message) return '';
+  const m = msg.message;
+  return m.conversation
+    || m.extendedTextMessage?.text
+    || m.imageMessage?.caption
+    || m.videoMessage?.caption
+    || m.documentMessage?.title
+    || '';
+}
+
 // Export config for components
 export const evolutionConfig = {
   apiUrl: EVOLUTION_API_URL,

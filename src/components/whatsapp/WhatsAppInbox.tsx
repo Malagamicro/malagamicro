@@ -32,6 +32,7 @@ import {
   FolderPlus,
   Trash2,
   Archive,
+  Download,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -58,6 +59,8 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
     refetchChats, 
     getOrCreateChat,
     updateChatLastMessage,
+    syncFromEvolution,
+    isSyncing,
   } = useWhatsAppChats();
   
   const {
@@ -168,6 +171,15 @@ export function WhatsAppInbox({ onSelectChat, selectedChatId }: WhatsAppInboxPro
                 onClick={() => setIsNewChatOpen(true)}
               >
                 <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => syncFromEvolution()}
+                disabled={isSyncing}
+                title="Sincronizar chats desde Evolution API"
+              >
+                <Download className={`h-4 w-4 ${isSyncing ? 'animate-bounce' : ''}`} />
               </Button>
               <Button
                 variant="outline"
