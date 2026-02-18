@@ -279,14 +279,17 @@ export function useWhatsAppChats() {
       queryFn: async (): Promise<WahaMessage[]> => {
         if (!chatId) return [];
         
-        const { data, error } = await supabase
+      // Load only the last 100 messages to avoid huge conversations
+      const { data, error } = await supabase
           .from('waha_messages')
           .select('*')
           .eq('chat_id', chatId)
-          .order('timestamp', { ascending: true });
+          .order('timestamp', { ascending: false })
+          .limit(100);
 
         if (error) throw error;
-        return (data || []).map(mapMessageRow);
+        // Reverse to show in chronological order
+        return (data || []).reverse().map(mapMessageRow);
       },
       enabled: !!user && !!chatId,
       staleTime: 2000, // Consider messages fresh for 2 seconds
@@ -362,15 +365,6 @@ export function useWhatsAppChats() {
         for (const msg of messages) {
           if (!msg.key?.id) continue;
 
-          // Check if message already exists
-          const { data: existingMsg } = await supabase
-            .from('waha_messages')
-            .select('id')
-            .eq('message_id', msg.key.id)
-            .maybeSingle();
-
-          if (existingMsg) continue;
-
           const content = extractMessageContent(msg);
           const msgType = msg.message?.imageMessage ? 'image'
             : msg.message?.videoMessage ? 'video'
@@ -381,7 +375,8 @@ export function useWhatsAppChats() {
             ? new Date(msg.messageTimestamp * 1000).toISOString()
             : new Date().toISOString();
 
-          await supabase.from('waha_messages').insert({
+          // Use upsert with message_id to prevent duplicates (unique index)
+          const { error: insertError } = await supabase.from('waha_messages').upsert({
             chat_id: chatId,
             content: content || (msgType !== 'text' ? `[${msgType}]` : ''),
             from_me: msg.key.fromMe ?? false,
@@ -390,8 +385,9 @@ export function useWhatsAppChats() {
             message_id: msg.key.id,
             media_url: msg.mediaUrl || null,
             message_type: msgType,
-          });
-          syncedMessages++;
+          }, { onConflict: 'message_id', ignoreDuplicates: true });
+
+          if (!insertError) syncedMessages++;
         }
       }
 

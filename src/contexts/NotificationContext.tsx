@@ -108,6 +108,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user?.id) return;
 
+    let lastNotifiedAt = 0;
+    const THROTTLE_MS = 3000; // Max 1 notification every 3 seconds
+
     const channel = supabase
       .channel(`whatsapp-notifications-${user.id}`)
       .on(
@@ -123,10 +126,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             from_me: boolean; 
             content: string; 
             chat_id: string;
+            timestamp: string;
           };
           
           // Only notify for incoming messages
           if (msg.from_me) return;
+
+          // Skip old messages (e.g. from sync) - only notify if within last 2 minutes
+          const msgAge = Date.now() - new Date(msg.timestamp).getTime();
+          if (msgAge > 2 * 60 * 1000) return;
+
+          // Throttle notifications
+          const now = Date.now();
+          if (now - lastNotifiedAt < THROTTLE_MS) return;
+          lastNotifiedAt = now;
 
           console.log('🔔 New WhatsApp message, triggering notification');
           
