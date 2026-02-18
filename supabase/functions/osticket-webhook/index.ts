@@ -73,11 +73,16 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// MalagaMicro logo URL for WhatsApp image messages
+const MALAGAMICRO_LOGO_URL = "https://malagamicro.lovable.app/favicon.png";
+
 async function sendWhatsAppMessage(phone: string, message: string): Promise<boolean> {
   try {
     const cleanPhone = formatPhoneNumber(phone);
-    const apiUrl = `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`;
-    console.log(`📤 Sending WhatsApp via Evolution API to ${cleanPhone}`);
+    
+    // Send as image message with logo + caption
+    const apiUrl = `${EVOLUTION_API_URL}/message/sendMedia/${INSTANCE_NAME}`;
+    console.log(`📤 Sending WhatsApp image+caption via Evolution API to ${cleanPhone}`);
     console.log(`🔗 Evolution URL: ${apiUrl}`);
     console.log(`🔑 API Key configured: ${EVOLUTION_API_KEY ? "YES (length: " + EVOLUTION_API_KEY.length + ")" : "NO"}`);
 
@@ -89,14 +94,36 @@ async function sendWhatsAppMessage(phone: string, message: string): Promise<bool
       },
       body: JSON.stringify({
         number: cleanPhone,
-        text: message,
+        mediatype: "image",
+        media: MALAGAMICRO_LOGO_URL,
+        caption: message,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Failed to send WhatsApp: ${response.status} - ${errorText}`);
-      return false;
+      console.error(`Failed to send WhatsApp media: ${response.status} - ${errorText}`);
+      
+      // Fallback to text-only if media fails
+      console.log(`🔄 Falling back to text-only message`);
+      const textUrl = `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`;
+      const textResponse = await fetch(textUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": EVOLUTION_API_KEY,
+        },
+        body: JSON.stringify({
+          number: cleanPhone,
+          text: message,
+        }),
+      });
+
+      if (!textResponse.ok) {
+        const textError = await textResponse.text();
+        console.error(`Fallback text also failed: ${textResponse.status} - ${textError}`);
+        return false;
+      }
     }
 
     console.log(`✅ WhatsApp sent successfully to ${phone} via Evolution API`);

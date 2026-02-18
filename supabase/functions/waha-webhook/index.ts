@@ -356,7 +356,10 @@ async function handleMessagesUpsert(supabase: any, body: EvolutionWebhook) {
       ack_status: msg.status !== undefined ? statusMap[msg.status] || 'unknown' : null,
     };
 
-    const { error: insertError } = await supabase.from("waha_messages").insert(insertData);
+    // Use upsert to prevent duplicate message_id constraint violations
+    const { error: insertError } = await supabase
+      .from("waha_messages")
+      .upsert(insertData, { onConflict: 'message_id', ignoreDuplicates: true });
 
     if (insertError) {
       console.error("Error inserting message:", insertError);
