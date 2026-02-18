@@ -415,6 +415,24 @@ export function extractMessageContent(msg: EvolutionChatMessage): string {
     || '';
 }
 
+// Fetch profile picture URL for a contact
+export async function fetchProfilePicture(remoteJid: string): Promise<string | null> {
+  try {
+    const number = remoteJid.replace(/@(s\.whatsapp\.net|c\.us)$/, '');
+    const data = await evolutionFetch<{ profilePictureUrl?: string; wuid?: string }>(
+      `/chat/fetchProfilePictureUrl/${INSTANCE_NAME}`,
+      { 
+        method: 'POST', 
+        body: JSON.stringify({ number }) 
+      }
+    );
+    return data?.profilePictureUrl || null;
+  } catch (error) {
+    // Profile picture may not be available for all contacts
+    return null;
+  }
+}
+
 // Export config for components
 export const evolutionConfig = {
   apiUrl: EVOLUTION_API_URL,

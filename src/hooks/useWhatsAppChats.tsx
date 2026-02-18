@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { fetchAllChats, fetchChatMessages, extractMessageContent, formatPhoneNumber } from '@/services/evolutionService';
+import { fetchAllChats, fetchChatMessages, extractMessageContent, formatPhoneNumber, fetchProfilePicture } from '@/services/evolutionService';
 import { toast } from 'sonner';
 
 export interface WhatsAppChat {
@@ -313,10 +314,19 @@ export function useWhatsAppChats() {
         // Upsert chat
         const { data: existingChat } = await supabase
           .from('whatsapp_chats')
-          .select('id')
+          .select('id, avatar_url')
           .eq('user_id', user.id)
           .eq('chat_id', chatId)
           .maybeSingle();
+
+        // Fetch profile picture if not already set
+        let avatarUrl = existingChat?.avatar_url || chat.profilePicUrl || null;
+        if (!avatarUrl) {
+          try {
+            const picUrl = await fetchProfilePicture(chatId);
+            if (picUrl) avatarUrl = picUrl;
+          } catch { /* ignore */ }
+        }
 
         if (!existingChat) {
           await supabase.from('whatsapp_chats').insert({
@@ -324,21 +334,26 @@ export function useWhatsAppChats() {
             chat_id: chatId,
             phone,
             custom_name: chat.name || null,
+            avatar_url: avatarUrl,
             last_message_at: chat.lastMsgTimestamp
               ? new Date(chat.lastMsgTimestamp * 1000).toISOString()
               : new Date().toISOString(),
             unread_count: chat.unreadMessages || 0,
           });
           syncedChats++;
-        } else if (chat.name) {
-          // Update name if we have one and chat exists
-          await supabase
-            .from('whatsapp_chats')
-            .update({ 
-              custom_name: chat.name,
-              unread_count: chat.unreadMessages || 0,
-            })
-            .eq('id', existingChat.id);
+        } else {
+          // Update name, avatar & unread if we have new data
+          const updates: any = {};
+          if (chat.name) updates.custom_name = chat.name;
+          if (avatarUrl && !existingChat.avatar_url) updates.avatar_url = avatarUrl;
+          if (chat.unreadMessages !== undefined) updates.unread_count = chat.unreadMessages;
+          
+          if (Object.keys(updates).length > 0) {
+            await supabase
+              .from('whatsapp_chats')
+              .update(updates)
+              .eq('id', existingChat.id);
+          }
         }
 
         // Fetch and sync last messages for this chat
@@ -391,6 +406,45 @@ export function useWhatsAppChats() {
       toast.error(`Error al sincronizar: ${error.message}`);
     },
   });
+
+  // Auto-sync every 5 minutes in the background
+  const autoSyncRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    // Initial silent sync after 10 seconds
+    const initialTimeout = setTimeout(() => {
+      syncFromEvolution.mutate(undefined, {
+        onSuccess: (result) => {
+          // Silent - no toast for auto-sync, only log
+          console.log(`🔄 Auto-sync: ${result.synced} chats, ${result.messages} messages`);
+          queryClient.invalidateQueries({ queryKey: ['whatsapp-chats'] });
+          queryClient.invalidateQueries({ queryKey: ['whatsapp-messages'] });
+        },
+        onError: () => { /* silent */ },
+      });
+    }, 10000);
+
+    // Then every 5 minutes
+    autoSyncRef.current = setInterval(() => {
+      if (!syncFromEvolution.isPending) {
+        syncFromEvolution.mutate(undefined, {
+          onSuccess: (result) => {
+            console.log(`🔄 Auto-sync: ${result.synced} chats, ${result.messages} messages`);
+            queryClient.invalidateQueries({ queryKey: ['whatsapp-chats'] });
+            queryClient.invalidateQueries({ queryKey: ['whatsapp-messages'] });
+          },
+          onError: () => { /* silent */ },
+        });
+      }
+    }, 5 * 60 * 1000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      if (autoSyncRef.current) clearInterval(autoSyncRef.current);
+    };
+  }, [user?.id]);
 
   // NOTE: Realtime subscriptions are now handled by useRealtimeConnection hook
   // This prevents duplicate subscriptions and provides centralized connection management

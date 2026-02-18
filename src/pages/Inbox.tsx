@@ -28,6 +28,7 @@ import {
   Clock,
   Bell,
   BellOff,
+  Download,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -89,6 +90,8 @@ export default function Inbox() {
     updateChat,
     uploadAvatar,
     updateChatLastMessage,
+    syncFromEvolution,
+    isSyncing,
   } = useWhatsAppChats();
   
   
@@ -404,6 +407,22 @@ export default function Inbox() {
                     ? 'Notificaciones activadas' 
                     : 'Activar notificaciones'}
                 </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => syncFromEvolution()}
+                    disabled={isSyncing}
+                    title="Sincronizar desde Evolution API"
+                  >
+                    <Download className={cn("w-4 h-4", isSyncing && "animate-bounce")} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Sincronizar chats desde WhatsApp</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <Button
