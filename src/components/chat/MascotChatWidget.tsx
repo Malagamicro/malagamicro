@@ -185,7 +185,7 @@ export function MascotChatWidget() {
       style={{ left: position.x, top: position.y, position: 'fixed' }}
       className={cn(
         'z-50',
-        'w-[360px] max-w-[calc(100vw-2rem)] h-[500px] max-h-[calc(100vh-6rem)]',
+        'w-[300px] max-w-[calc(100vw-2rem)] h-[400px] max-h-[calc(100vh-6rem)]',
         'bg-background rounded-2xl shadow-2xl border',
         'flex flex-col overflow-hidden'
       )}
