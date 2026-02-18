@@ -11,6 +11,7 @@ import { ThemeSyncProvider } from "@/components/ThemeSyncProvider";
 import { MascotChatWidget } from "@/components/chat/MascotChatWidget";
 import { GlobalCallListener } from "@/components/internal-chat/GlobalCallListener";
 import { EventReminderMonitor } from "@/components/calendar/EventReminderMonitor";
+import { VersionChecker } from "@/components/VersionChecker";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -109,6 +110,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <VersionChecker />
             <MascotChatWidget />
             <GlobalCallListener />
             <EventReminderMonitor />
