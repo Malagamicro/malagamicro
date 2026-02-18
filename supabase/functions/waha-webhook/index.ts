@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
   }
 
   // Authenticate webhook request
-  const webhookSecret = Deno.env.get("WAHA_WEBHOOK_SECRET");
+  const webhookSecret = Deno.env.get("EVOLUTION_WEBHOOK_SECRET") || Deno.env.get("WAHA_WEBHOOK_SECRET");
   const providedKey = req.headers.get("x-api-key") ||
     req.headers.get("authorization")?.replace("Bearer ", "") ||
     new URL(req.url).searchParams.get("api_key");

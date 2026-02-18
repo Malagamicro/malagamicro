@@ -53,9 +53,9 @@ Deno.serve(async (req) => {
     console.log(`Sending WhatsApp message via Evolution API to ${cleanPhone} for lead: ${leadName || 'unknown'}`);
 
     // Evolution API configuration
-    const evolutionApiUrl = Deno.env.get('WAHA_API_URL') || 'https://evolutionapi.malagamicro.com';
-    const evolutionApiKey = Deno.env.get('WAHA_API_KEY') || '';
-    const instanceName = 'CRM';
+    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL') || Deno.env.get('WAHA_API_URL') || 'https://evolutionapi.malagamicro.com';
+    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY') || Deno.env.get('WAHA_API_KEY') || '';
+    const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME') || 'CRM';
     
     const response = await fetch(`${evolutionApiUrl}/message/sendText/${instanceName}`, {
       method: 'POST',
