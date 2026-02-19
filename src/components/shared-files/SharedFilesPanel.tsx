@@ -293,7 +293,7 @@ export function SharedFilesPanel() {
   const [selectedFolder, setSelectedFolder] = useState<SharedFolder | null>(null);
   const [description, setDescription] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
-  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
+  const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isLoading = filesLoading || foldersLoading;
@@ -373,22 +373,38 @@ export function SharedFilesPanel() {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 50 * 1024 * 1024) { toast.error('El archivo es demasiado grande (máx. 50MB)'); return; }
-    setSelectedUploadFile(file);
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    const validFiles: File[] = [];
+    for (let i = 0; i < fileList.length; i++) {
+      if (fileList[i].size > 50 * 1024 * 1024) {
+        toast.error(`"${fileList[i].name}" es demasiado grande (máx. 50MB)`);
+      } else {
+        validFiles.push(fileList[i]);
+      }
+    }
+    if (validFiles.length === 0) return;
+    setSelectedUploadFiles(validFiles);
     setDescription('');
     setUploadDialogOpen(true);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const handleUpload = async () => {
-    if (!selectedUploadFile) return;
+    if (selectedUploadFiles.length === 0) return;
     try {
-      await uploadFile.mutateAsync({ file: selectedUploadFile, description: description || undefined, folderId: currentFolderId });
+      setUploadProgress(0);
+      for (let i = 0; i < selectedUploadFiles.length; i++) {
+        await uploadFile.mutateAsync({ file: selectedUploadFiles[i], description: selectedUploadFiles.length === 1 ? (description || undefined) : undefined, folderId: currentFolderId });
+        setUploadProgress(i + 1);
+      }
       setUploadDialogOpen(false);
-      setSelectedUploadFile(null);
+      setSelectedUploadFiles([]);
       setDescription('');
+      setUploadProgress(0);
+      if (selectedUploadFiles.length > 1) toast.success(`${selectedUploadFiles.length} archivos subidos`);
     } catch (error) { console.error(error); }
   };
 
@@ -586,7 +602,7 @@ export function SharedFilesPanel() {
         </CardHeader>
 
         <CardContent className="flex-1 overflow-hidden px-2 md:px-6 pb-2 md:pb-6">
-          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} accept="*/*" />
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} accept="*/*" multiple />
 
           {isLoading ? (
             <div className="flex items-center justify-center h-48">
@@ -799,27 +815,41 @@ export function SharedFilesPanel() {
       {/* Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Subir Archivo</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Subir {selectedUploadFiles.length > 1 ? `${selectedUploadFiles.length} Archivos` : 'Archivo'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            {selectedUploadFile && (
-              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                <FileText className="h-8 w-8 text-muted-foreground" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{selectedUploadFile.name}</p>
-                  <p className="text-sm text-muted-foreground">{formatFileSize(selectedUploadFile.size)}</p>
-                </div>
+            <ScrollArea className={selectedUploadFiles.length > 3 ? 'max-h-48' : ''}>
+              <div className="space-y-2">
+                {selectedUploadFiles.map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate text-sm">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setSelectedUploadFiles(prev => prev.filter((_, i) => i !== idx))}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {selectedUploadFiles.length === 1 && (
+              <div>
+                <label className="text-sm font-medium">Descripción (opcional)</label>
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Añade una descripción para el archivo..." className="mt-1.5" />
               </div>
             )}
-            <div>
-              <label className="text-sm font-medium">Descripción (opcional)</label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Añade una descripción para el archivo..." className="mt-1.5" />
-            </div>
+            {uploadFile.isPending && selectedUploadFiles.length > 1 && (
+              <div className="text-xs text-muted-foreground">
+                Subiendo {uploadProgress} de {selectedUploadFiles.length}...
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleUpload} disabled={uploadFile.isPending}>
+            <Button onClick={handleUpload} disabled={uploadFile.isPending || selectedUploadFiles.length === 0}>
               {uploadFile.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-              Subir
+              Subir {selectedUploadFiles.length > 1 ? `(${selectedUploadFiles.length})` : ''}
             </Button>
           </DialogFooter>
         </DialogContent>
