@@ -269,15 +269,16 @@ const IndexContent = () => {
       case 'correo':
         return <EmailModule />;
       case 'osticket':
+      case 'ticket-editor':
         return (
-          <div className="flex flex-col h-full animate-fade-in overflow-hidden">
-            <div className="px-4 sm:px-8 py-4 border-b bg-card flex-shrink-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Tickets osTicket</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                Gestiona y responde los tickets con mensajes de WhatsApp personalizados
+          <div className="flex flex-col overflow-hidden animate-fade-in" style={{ height: '100%' }}>
+            <div className="px-4 sm:px-8 py-3 border-b bg-card flex-shrink-0">
+              <h1 className="text-lg sm:text-2xl font-bold text-foreground">Tickets osTicket</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Gestiona y responde tickets con mensajes de WhatsApp personalizados
               </p>
             </div>
-            <div className="flex-1 overflow-hidden">
+            <div style={{ flex: 1, minHeight: 0 }}>
               <OsTicketPanel />
             </div>
           </div>
@@ -345,10 +346,12 @@ const IndexContent = () => {
           position={localPosition}
           onPositionChange={setLocalPosition}
         />
-        <div className="flex-1 flex flex-col overflow-hidden md:ml-0">
+        <div className="flex-1 flex flex-col overflow-hidden md:ml-0" style={{ minHeight: 0 }}>
           <EmailVerificationBanner />
-          <main className="flex-1 overflow-auto pt-14 md:pt-0 h-full">
-            {renderContent()}
+          <main className="flex-1 overflow-auto pt-14 md:pt-0" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              {renderContent()}
+            </div>
           </main>
         </div>
 
