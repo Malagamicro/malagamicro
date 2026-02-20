@@ -48,8 +48,8 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
   
   const [isSending, setIsSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState(avatarUrl);
   const [currentName, setCurrentName] = useState(chatName);
@@ -126,101 +126,90 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
     }
   }, [newMessage]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('La imagen no puede superar 5MB');
-        return;
-      }
-      setSelectedImage(file);
+  const addImagesToQueue = (files: File[]) => {
+    files.forEach(file => {
+      if (file.size > 10 * 1024 * 1024) { toast.error(`${file.name}: máx. 10MB`); return; }
+      setSelectedImages(prev => [...prev, file]);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
+      reader.onloadend = () => { setImagePreviews(prev => [...prev, reader.result as string]); };
       reader.readAsDataURL(file);
-    }
+    });
   };
 
-  const removeImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) addImagesToQueue(files);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(e.clipboardData.items);
+    const imageItems = items.filter(item => item.type.startsWith('image/'));
+    if (imageItems.length > 0) {
+      e.preventDefault();
+      const files = imageItems.map(item => item.getAsFile()).filter(Boolean) as File[];
+      addImagesToQueue(files);
+    }
+  }, []);
 
   const sendMessage = async () => {
-    if (!newMessage.trim() && !selectedImage) return;
+    if (!newMessage.trim() && selectedImages.length === 0) return;
     if (!user?.id) return;
 
     const messageContent = newMessage.trim();
     setIsSending(true);
-    
-    // Optimistic update - add message immediately
-    const optimisticId = `temp-${Date.now()}`;
-    const optimisticMessage: WahaMessage = {
-      id: optimisticId,
-      chatId,
-      content: messageContent,
-      fromMe: true,
-      timestamp: new Date(),
-      leadId: null,
-      userId: user.id,
-      messageId: null,
-      mediaUrl: imagePreview,
-      messageType: selectedImage ? 'image' : 'text',
-      ackStatus: 'pending',
-      reaction: null,
-      isRevoked: false,
-      isEdited: false,
-      replyToId: null,
-      createdAt: new Date(),
-    };
 
-    // Clear input immediately for better UX
+    // Clear input immediately
     setNewMessage('');
-    const savedImage = selectedImage;
-    const savedPreview = imagePreview;
-    removeImage();
-
-    // Optimistic update - add message to query cache immediately
-    queryClient.setQueryData<WahaMessage[]>(['whatsapp-messages', chatId], (old = []) => {
-      return [...old, optimisticMessage];
-    });
-
-    // Scroll to bottom immediately
-    setTimeout(() => {
-      scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 50);
+    const savedImages = [...selectedImages];
+    const savedPreviews = [...imagePreviews];
+    setSelectedImages([]);
+    setImagePreviews([]);
 
     try {
-      let wahaResponse;
-      
-      if (savedImage && savedPreview) {
-        const base64Data = savedPreview.split(',')[1];
-        wahaResponse = await sendImageMessage(chatId, base64Data, savedImage.type, savedImage.name, messageContent);
+      if (savedImages.length > 0) {
+        // Send each image
+        for (let i = 0; i < savedImages.length; i++) {
+          const base64Data = savedPreviews[i].split(',')[1];
+          const wahaResponse = await sendImageMessage(chatId, base64Data, savedImages[i].type, savedImages[i].name, i === 0 ? messageContent : '');
+          await supabase.from('waha_messages').insert({
+            chat_id: chatId,
+            content: i === 0 ? messageContent : '',
+            from_me: true,
+            user_id: user.id,
+            timestamp: new Date().toISOString(),
+            message_id: wahaResponse?.id || null,
+            media_url: savedPreviews[i] || null,
+            message_type: 'image',
+            ack_status: 'sent',
+          });
+        }
       } else {
-        wahaResponse = await sendTextMessage(chatId, messageContent);
+        const wahaResponse = await sendTextMessage(chatId, messageContent);
+        await supabase.from('waha_messages').insert({
+          chat_id: chatId,
+          content: messageContent,
+          from_me: true,
+          user_id: user.id,
+          timestamp: new Date().toISOString(),
+          message_id: wahaResponse?.id || null,
+          media_url: null,
+          message_type: 'text',
+          ack_status: 'sent',
+        });
       }
 
-      // Save to database
-      await supabase.from('waha_messages').insert({
-        chat_id: chatId,
-        content: messageContent,
-        from_me: true,
-        user_id: user.id,
-        timestamp: new Date().toISOString(),
-        message_id: wahaResponse?.id || null,
-        media_url: savedPreview || null,
-        message_type: savedImage ? 'image' : 'text',
-        ack_status: 'sent',
-      });
+      if (messageContent && savedImages.length > 0) {
+        // If there were images AND text, the text was attached to first image
+        // No extra text-only message needed
+      }
 
-      // Update chat last message
       await updateChatLastMessage({ chatId });
-
-      // Refetch to replace optimistic message with real data
       queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', chatId] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-chats'] });
     } catch (err) {
@@ -228,6 +217,7 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
       toast.error('Error al enviar el mensaje');
     } finally {
       setIsSending(false);
+      setTimeout(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 50);
     }
   };
 
@@ -421,24 +411,25 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
             </Button>
           )}
           
-          {/* Image preview */}
-          {imagePreview && (
-            <div className="px-4 py-2 border-t">
-              <div className="relative inline-block">
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="h-20 rounded-lg object-cover"
-                />
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-2 -right-2 h-6 w-6"
-                  onClick={removeImage}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
+          
+          {/* Images preview */}
+          {imagePreviews.length > 0 && (
+            <div className="px-4 py-2 border-t flex flex-wrap gap-2">
+              {imagePreviews.map((preview, idx) => (
+                <div key={idx} className="relative group">
+                  <img
+                    src={preview}
+                    alt={`Preview ${idx + 1}`}
+                    className="h-20 w-20 object-cover rounded-lg border"
+                  />
+                  <button
+                    className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => removeImage(idx)}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
           
@@ -449,6 +440,7 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleImageSelect}
                 className="hidden"
               />
@@ -463,10 +455,11 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
               </Button>
               <Textarea
                 ref={textareaRef}
-                placeholder="Escribe un mensaje..."
+                placeholder="Escribe un mensaje... (pega con Ctrl+V)"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
+                onPaste={handlePaste}
                 disabled={isSending}
                 className="flex-1 min-h-[40px] max-h-[120px] resize-none"
                 rows={1}
@@ -474,7 +467,7 @@ export function WhatsAppChat({ chatId, chatName, phone, onBack, avatarUrl }: Wha
               <Button
                 className="shrink-0"
                 onClick={sendMessage}
-                disabled={isSending || (!newMessage.trim() && !selectedImage)}
+                disabled={isSending || (!newMessage.trim() && selectedImages.length === 0)}
               >
                 <Send className="h-4 w-4" />
               </Button>

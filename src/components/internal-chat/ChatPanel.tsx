@@ -50,6 +50,8 @@ export function ChatPanel({
   const { initiateCall } = useActiveCalls();
   const [input, setInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingPreviews, setPendingPreviews] = useState<{ name: string; url: string; isImage: boolean }[]>([]);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
   const [isVideoCall, setIsVideoCall] = useState(false);
@@ -61,6 +63,7 @@ export function ChatPanel({
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -118,10 +121,55 @@ export function ChatPanel({
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
-  const handleSend = () => {
-    if (!input.trim() || isSending) return;
-    onSendMessage(input.trim());
-    setInput('');
+  const addFilesToPending = (files: File[]) => {
+    const valid = files.filter(f => {
+      if (f.size > 10 * 1024 * 1024) { toast.error(`${f.name}: máx. 10MB`); return false; }
+      return true;
+    });
+    setPendingFiles(prev => [...prev, ...valid]);
+    valid.forEach(file => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPendingPreviews(prev => [...prev, { name: file.name, url: reader.result as string, isImage: true }]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setPendingPreviews(prev => [...prev, { name: file.name, url: '', isImage: false }]);
+      }
+    });
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+    setPendingPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() && pendingFiles.length === 0) return;
+    if (isSending) return;
+
+    // Send text first if any
+    if (input.trim()) {
+      onSendMessage(input.trim());
+      setInput('');
+    }
+
+    // Send each file
+    if (pendingFiles.length > 0) {
+      setIsUploading(true);
+      for (const file of pendingFiles) {
+        try {
+          const uploaded = await onUploadFile(file);
+          const messageType = file.type.startsWith('image/') ? 'image' : 'file';
+          onSendMessage(undefined, { ...uploaded, messageType } as any);
+        } catch { toast.error(`Error al subir ${file.name}`); }
+      }
+      setPendingFiles([]);
+      setPendingPreviews([]);
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -138,17 +186,21 @@ export function ChatPanel({
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { toast.error('El archivo es demasiado grande (máx. 10MB)'); return; }
-    setIsUploading(true);
-    try {
-      const uploaded = await onUploadFile(file);
-      const messageType = file.type.startsWith('image/') ? 'image' : 'file';
-      onSendMessage(undefined, { ...uploaded, messageType } as any);
-    } catch { toast.error('Error al subir archivo'); }
-    finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(e.clipboardData.items);
+    const imageItems = items.filter(item => item.type.startsWith('image/'));
+    if (imageItems.length > 0) {
+      e.preventDefault();
+      const files = imageItems.map(item => item.getAsFile()).filter(Boolean) as File[];
+      addFilesToPending(files);
+    }
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    addFilesToPending(files);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const getConversationName = () => {
@@ -397,10 +449,34 @@ export function ChatPanel({
         )}
       </ScrollArea>
 
+      {/* Pending files preview */}
+      {pendingPreviews.length > 0 && (
+        <div className="px-3 sm:px-4 pt-2 pb-1 border-t bg-card flex flex-wrap gap-2">
+          {pendingPreviews.map((preview, idx) => (
+            <div key={idx} className="relative group">
+              {preview.isImage ? (
+                <img src={preview.url} alt={preview.name} className="h-16 w-16 object-cover rounded-md border" />
+              ) : (
+                <div className="h-16 w-20 flex flex-col items-center justify-center rounded-md border bg-muted gap-1 px-1">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-[9px] text-muted-foreground truncate w-full text-center">{preview.name}</span>
+                </div>
+              )}
+              <button
+                onClick={() => removePendingFile(idx)}
+                className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-3 sm:p-4 border-t bg-card">
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
+          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
           <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
             {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
           </Button>
@@ -416,16 +492,18 @@ export function ChatPanel({
             <EmojiStickerPicker onSelect={(emoji) => setInput(prev => prev + emoji)} />
           </div>
           <textarea
+            ref={textareaRef}
             value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
-            placeholder={isRecordingAudio ? "🎙️ Grabando..." : "Mensaje..."}
+            onPaste={handlePaste}
+            placeholder={isRecordingAudio ? "🎙️ Grabando..." : "Mensaje... (pega imágenes con Ctrl+V)"}
             disabled={isSending || isRecordingAudio}
             rows={1}
             className="flex-1 min-w-0 min-h-[36px] max-h-[120px] resize-none text-sm rounded-md border border-input bg-background px-3 py-2 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ height: 'auto', overflow: 'hidden' }}
             onInput={(e) => { const t = e.currentTarget; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 120) + 'px'; }}
           />
-          <Button onClick={handleSend} disabled={!input.trim() || isSending || isRecordingAudio} size="icon" className="h-9 w-9 shrink-0">
-            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          <Button onClick={handleSend} disabled={(!input.trim() && pendingFiles.length === 0) || isSending || isRecordingAudio} size="icon" className="h-9 w-9 shrink-0">
+            {isSending || isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
       </div>
