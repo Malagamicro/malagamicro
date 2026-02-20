@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { useOsTicketConfig } from '@/hooks/useOsTicketConfig';
 import {
   Ticket,
@@ -19,7 +18,8 @@ import {
   MessageSquare,
   Image as ImageIcon,
   Smartphone,
-  RefreshCw,
+  Upload,
+  X,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
@@ -69,6 +69,8 @@ export function OsTicketConfigCard() {
   const [sendImage, setSendImage] = useState(true);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showVars, setShowVars] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/osticket-webhook`;
 
@@ -98,6 +100,31 @@ export function OsTicketConfigCard() {
       image_url: imageUrl,
       send_image: sendImage,
     });
+  };
+
+  const handleUploadImage = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Solo se permiten imágenes');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no puede superar 5MB');
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `ticket-header/${Date.now()}.${ext}`;
+      const { data, error } = await supabase.storage.from('ticket-files').upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('ticket-files').getPublicUrl(data.path);
+      setImageUrl(urlData.publicUrl);
+      toast.success('Imagen subida correctamente');
+    } catch (err: any) {
+      toast.error(`Error al subir imagen: ${err.message}`);
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const insertVariable = (variable: string) => {
@@ -239,23 +266,58 @@ export function OsTicketConfigCard() {
             </div>
 
             {sendImage && (
-              <div className="flex gap-3 items-start">
-                <div className="flex-1 space-y-1">
+              <div className="space-y-2">
+                <div className="flex gap-2">
                   <Input
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
                     placeholder="https://... URL de la imagen"
-                    className="text-sm"
+                    className="text-sm flex-1"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    URL pública de la imagen que se enviará como cabecera del mensaje
-                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                  >
+                    {uploadingImage ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    Subir
+                  </Button>
+                  {imageUrl && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => setImageUrl('')}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUploadImage(file);
+                    e.target.value = '';
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Pega una URL o sube una imagen desde tu ordenador (máx. 5MB)
+                </p>
                 {imageUrl && (
-                  <div className="w-16 h-16 rounded-lg border overflow-hidden bg-muted flex-shrink-0">
+                  <div className="w-full h-28 rounded-lg border overflow-hidden bg-muted">
                     <img
                       src={imageUrl}
-                      alt="Preview"
+                      alt="Preview cabecera"
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
