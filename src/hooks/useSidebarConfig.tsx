@@ -69,6 +69,7 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
       { id: 'correo', label: 'Correo', icon: 'Mail', color: 'text-blue-500' },
       { id: 'mensajes', label: 'Chat Interno', icon: 'MessagesSquare', color: 'text-sky-500' },
       { id: 'osticket', label: 'Tickets', icon: 'Ticket', color: 'text-yellow-500' },
+      { id: 'ticket-editor', label: 'Editor Tickets', icon: 'MessageSquare', color: 'text-orange-500' },
     ]
   },
   {
