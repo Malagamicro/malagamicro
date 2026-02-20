@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useActiveCalls } from '@/hooks/useActiveCalls';
+import { useActiveCalls } from '@/contexts/ActiveCallsContext';
 import { IncomingCallDialog } from './IncomingCallDialog';
 import { VideoCallModal } from './VideoCallModal';
 import { useAuth } from '@/hooks/useAuth';

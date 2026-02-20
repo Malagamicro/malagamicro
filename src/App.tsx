@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { ActiveCallsProvider } from "@/contexts/ActiveCallsContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeSyncProvider } from "@/components/ThemeSyncProvider";
@@ -25,13 +26,29 @@ import GeneralReminders from "./pages/GeneralReminders";
 import SeoGenerator from "./pages/SeoGenerator";
 import NotFound from "./pages/NotFound";
 import DocumentEditorPage from "./pages/DocumentEditorPage";
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Data is considered fresh for 60s — avoids unnecessary refetches on tab focus/remount
+      staleTime: 60_000,
+      // Keep unused cache for 5 minutes
+      gcTime: 5 * 60_000,
+      // Don't retry on 4xx client errors
+      retry: (failureCount, error: unknown) => {
+        const status = (error as { status?: number })?.status;
+        if (status && status >= 400 && status < 500) return false;
+        return failureCount < 2;
+      },
+    },
+  },
+});
 
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <NotificationProvider>
+          <ActiveCallsProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -116,6 +133,7 @@ const App = () => (
             <EventReminderMonitor />
           </BrowserRouter>
           </TooltipProvider>
+          </ActiveCallsProvider>
         </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
