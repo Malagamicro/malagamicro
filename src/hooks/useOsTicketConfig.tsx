@@ -11,6 +11,8 @@ export interface OsTicketConfig {
   notification_numbers: string[];
   message_template: string;
   is_enabled: boolean;
+  image_url?: string;
+  send_image?: boolean;
   created_at: string;
   updated_at: string;
 }
