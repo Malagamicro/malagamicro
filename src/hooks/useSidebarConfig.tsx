@@ -11,6 +11,7 @@ export interface SidebarItem {
   icon: string;
   color: string;
   route?: string;
+  isExternal?: boolean;
   showBadge?: boolean;
   hidden?: boolean;
 }
@@ -197,6 +198,22 @@ export function useSidebarConfig() {
     saveConfig(updated);
   };
 
+  const addLinkItem = (categoryId: string, label: string, url: string, icon: string, color: string) => {
+    const newItem: SidebarItem = {
+      id: `link-${Date.now()}`,
+      label,
+      icon,
+      color,
+      route: url,
+      isExternal: true,
+    };
+    const updated = categories.map(c =>
+      c.id === categoryId ? { ...c, items: [...c.items, newItem] } : c
+    );
+    setCategories(updated);
+    saveConfig(updated);
+  };
+
   const removeCategory = (categoryId: string) => {
     const updated = categories.filter(c => c.id !== categoryId);
     setCategories(updated);
@@ -288,6 +305,7 @@ export function useSidebarConfig() {
     editMode,
     setEditMode,
     addCategory,
+    addLinkItem,
     removeCategory,
     renameCategory,
     reorderCategories,
