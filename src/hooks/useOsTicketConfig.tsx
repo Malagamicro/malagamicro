@@ -21,6 +21,8 @@ export interface OsTicketConfigInput {
   notification_numbers: string[];
   message_template: string;
   is_enabled: boolean;
+  image_url?: string;
+  send_image?: boolean;
 }
 
 const DEFAULT_TEMPLATE = `🎫 *Nuevo Ticket de Soporte*

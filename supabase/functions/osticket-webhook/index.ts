@@ -27,6 +27,8 @@ interface OsTicketConfig {
   notification_numbers: string[];
   message_template: string;
   is_enabled: boolean;
+  image_url?: string;
+  send_image?: boolean;
 }
 
 // Evolution API configuration
@@ -73,41 +75,20 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-// MalagaMicro logo URL for WhatsApp image messages
-const MALAGAMICRO_LOGO_URL = "https://malagamicro.lovable.app/images/nuevo-ticket.png";
+// MalagaMicro logo URL for WhatsApp image messages (default fallback)
+const DEFAULT_IMAGE_URL = "https://malagamicro.lovable.app/images/nuevo-ticket.png";
 
-async function sendWhatsAppMessage(phone: string, message: string): Promise<boolean> {
+async function sendWhatsAppMessage(phone: string, message: string, imageUrl?: string, sendImage = true): Promise<boolean> {
   try {
     const cleanPhone = formatPhoneNumber(phone);
+    const effectiveImageUrl = imageUrl || DEFAULT_IMAGE_URL;
     
-    // Send as image message with logo + caption
-    const apiUrl = `${EVOLUTION_API_URL}/message/sendMedia/${INSTANCE_NAME}`;
-    console.log(`📤 Sending WhatsApp image+caption via Evolution API to ${cleanPhone}`);
-    console.log(`🔗 Evolution URL: ${apiUrl}`);
-    console.log(`🔑 API Key configured: ${EVOLUTION_API_KEY ? "YES (length: " + EVOLUTION_API_KEY.length + ")" : "NO"}`);
+    if (sendImage && effectiveImageUrl) {
+      // Send as image message with caption
+      const apiUrl = `${EVOLUTION_API_URL}/message/sendMedia/${INSTANCE_NAME}`;
+      console.log(`📤 Sending WhatsApp image+caption via Evolution API to ${cleanPhone}`);
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": EVOLUTION_API_KEY,
-      },
-      body: JSON.stringify({
-        number: cleanPhone,
-        mediatype: "image",
-        media: MALAGAMICRO_LOGO_URL,
-        caption: message,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Failed to send WhatsApp media: ${response.status} - ${errorText}`);
-      
-      // Fallback to text-only if media fails
-      console.log(`🔄 Falling back to text-only message`);
-      const textUrl = `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`;
-      const textResponse = await fetch(textUrl, {
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -115,15 +96,21 @@ async function sendWhatsAppMessage(phone: string, message: string): Promise<bool
         },
         body: JSON.stringify({
           number: cleanPhone,
-          text: message,
+          mediatype: "image",
+          media: effectiveImageUrl,
+          caption: message,
         }),
       });
 
-      if (!textResponse.ok) {
-        const textError = await textResponse.text();
-        console.error(`Fallback text also failed: ${textResponse.status} - ${textError}`);
-        return false;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Failed to send WhatsApp media: ${response.status} - ${errorText}`);
+        // Fallback to text-only
+        console.log(`🔄 Falling back to text-only message`);
+        return await sendTextMessage(cleanPhone, message);
       }
+    } else {
+      return await sendTextMessage(cleanPhone, message);
     }
 
     console.log(`✅ WhatsApp sent successfully to ${phone} via Evolution API`);
@@ -132,6 +119,28 @@ async function sendWhatsAppMessage(phone: string, message: string): Promise<bool
     console.error(`Error sending WhatsApp to ${phone}:`, error);
     return false;
   }
+}
+
+async function sendTextMessage(cleanPhone: string, message: string): Promise<boolean> {
+  const textUrl = `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`;
+  const textResponse = await fetch(textUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": EVOLUTION_API_KEY,
+    },
+    body: JSON.stringify({
+      number: cleanPhone,
+      text: message,
+    }),
+  });
+
+  if (!textResponse.ok) {
+    const textError = await textResponse.text();
+    console.error(`Text message failed: ${textResponse.status} - ${textError}`);
+    return false;
+  }
+  return true;
 }
 
 function renderTemplate(template: string, data: OsTicketPayload, osticketUrl: string): string {
@@ -308,7 +317,12 @@ serve(async (req) => {
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
 
-        const success = await sendWhatsAppMessage(phone, message);
+        const success = await sendWhatsAppMessage(
+          phone,
+          message,
+          config.image_url,
+          config.send_image !== false,
+        );
 
         if (success) {
           totalSent++;
