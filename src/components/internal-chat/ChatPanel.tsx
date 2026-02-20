@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 import { BudgetApprovalMessage } from './BudgetApprovalMessage';
 import { EmojiStickerPicker } from './EmojiStickerPicker';
 import { VideoCallModal } from './VideoCallModal';
-import { useActiveCalls } from '@/hooks/useActiveCalls';
+import { useActiveCalls } from '@/contexts/ActiveCallsContext';
 
 interface ChatPanelProps {
   conversation: Conversation | null;
