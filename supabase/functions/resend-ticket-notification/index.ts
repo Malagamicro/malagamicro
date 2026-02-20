@@ -111,9 +111,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    const message = renderTemplate(config.message_template, body, config.osticket_url);
-    const imageUrl = (config as any).image_url || DEFAULT_IMAGE_URL;
-    const sendImage = (config as any).send_image !== false;
+    // Support custom_message for manual sends from the panel
+    const message = body.custom_message
+      ? body.custom_message
+      : renderTemplate(config.message_template, body, config.osticket_url);
+
+    // Support custom_image_url override (null = no image)
+    const imageUrl = body.custom_image_url !== undefined
+      ? (body.custom_image_url || '')
+      : ((config as any).image_url || DEFAULT_IMAGE_URL);
+    const sendImage = body.custom_image_url !== undefined
+      ? !!body.custom_image_url
+      : (config as any).send_image !== false;
 
     let sent = 0, failed = 0;
     for (const phone of config.notification_numbers) {

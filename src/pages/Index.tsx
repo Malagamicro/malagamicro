@@ -35,6 +35,7 @@ import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
 import { DocumentEditor } from '@/components/editor/DocumentEditor';
 import { EmailModule } from '@/components/email/EmailModule';
 import { OsTicketHistory } from '@/components/osticket/OsTicketHistory';
+import { OsTicketPanel } from '@/components/osticket/OsTicketPanel';
 import { CalendarModule } from '@/components/calendar/CalendarModule';
 import { ReportsModule } from '@/components/reports/ReportsModule';
 import { useLeads } from '@/hooks/useLeads';
@@ -269,14 +270,16 @@ const IndexContent = () => {
         return <EmailModule />;
       case 'osticket':
         return (
-          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Historial de Tickets</h1>
-              <p className="text-xs sm:text-base text-muted-foreground mt-1">
-                Tickets recibidos desde osTicket
+          <div className="flex flex-col h-full animate-fade-in overflow-hidden">
+            <div className="px-4 sm:px-8 py-4 border-b bg-card flex-shrink-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Tickets osTicket</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                Gestiona y responde los tickets con mensajes de WhatsApp personalizados
               </p>
             </div>
-            <OsTicketHistory />
+            <div className="flex-1 overflow-hidden">
+              <OsTicketPanel />
+            </div>
           </div>
         );
       case 'calendario':
@@ -344,7 +347,7 @@ const IndexContent = () => {
         />
         <div className="flex-1 flex flex-col overflow-hidden md:ml-0">
           <EmailVerificationBanner />
-          <main className="flex-1 overflow-auto pt-14 md:pt-0">
+          <main className="flex-1 overflow-auto pt-14 md:pt-0 h-full">
             {renderContent()}
           </main>
         </div>
