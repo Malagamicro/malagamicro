@@ -9,6 +9,7 @@ import {
   GripVertical, Plus, RotateCcw, Trash2, FolderPlus, Check,
   Calendar as CalendarIcon, Palette, Eye, EyeOff,
   PanelLeft as PanelLeftIcon, PanelRight, PanelTop, PanelBottom,
+  ExternalLink, Link,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +45,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   MapPin, Settings, Kanban, BarChart3, Inbox, FileText, Globe,
   Ticket, FolderOpen, Bot, Cloud, Calculator, Bell, Megaphone,
   Briefcase, Wrench, MessageCircle, Sparkles, FolderPlus, Calendar: CalendarIcon,
+  ExternalLink, Link,
 };
 
 const ICON_OPTIONS = Object.keys(ICON_MAP);
@@ -197,6 +199,109 @@ function AddCategoryDialog({ onAdd }: { onAdd: (name: string, icon: string, colo
   );
 }
 
+// Add External Link Dialog
+function AddLinkDialog({ categories, onAdd }: {
+  categories: SidebarCategory[];
+  onAdd: (categoryId: string, label: string, url: string, icon: string, color: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState('');
+  const [url, setUrl] = useState('');
+  const [icon, setIcon] = useState('ExternalLink');
+  const [color, setColor] = useState('text-blue-500');
+  const [categoryId, setCategoryId] = useState('');
+
+  const handleAdd = () => {
+    if (!label.trim() || !url.trim() || !categoryId) return;
+    let finalUrl = url.trim();
+    if (!/^https?:\/\//i.test(finalUrl)) finalUrl = 'https://' + finalUrl;
+    onAdd(categoryId, label.trim(), finalUrl, icon, color);
+    setLabel('');
+    setUrl('');
+    setIcon('ExternalLink');
+    setColor('text-blue-500');
+    setCategoryId('');
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent transition-colors">
+          <Link className="w-4 h-4" />
+          <span>Añadir enlace externo</span>
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[380px] bg-background">
+        <DialogHeader><DialogTitle>Añadir enlace externo</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Carpeta destino</label>
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona una carpeta..." />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map(cat => (
+                  <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Nombre del enlace</label>
+            <Input value={label} onChange={e => setLabel(e.target.value)} placeholder="Ej: Google, Panel de control..." />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">URL de destino</label>
+            <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://ejemplo.com" />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Icono</label>
+            <div className="grid grid-cols-8 gap-1.5 max-h-32 overflow-y-auto p-1">
+              {['ExternalLink', 'Link', 'Globe', 'Briefcase', 'FileText', 'MessageSquare', 'Mail', 'Bot', 'Sparkles', 'Cloud', 'Settings', 'Calculator', 'Bell', 'Search', 'Wrench', 'FolderOpen'].map(ic => {
+                const Ic = ICON_MAP[ic] || ExternalLink;
+                return (
+                  <button
+                    key={ic}
+                    onClick={() => setIcon(ic)}
+                    className={cn("w-8 h-8 flex items-center justify-center rounded-md transition-colors",
+                      icon === ic ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                    )}
+                  >
+                    <Ic className="w-4 h-4" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Color</label>
+            <div className="grid grid-cols-8 gap-1.5">
+              {COLOR_OPTIONS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={cn("w-8 h-8 rounded-full transition-all", c.replace('text-', 'bg-'),
+                    color === c ? "ring-2 ring-offset-2 ring-primary" : "hover:scale-110"
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+          <Button
+            className="w-full"
+            onClick={handleAdd}
+            disabled={!label.trim() || !url.trim() || !categoryId}
+          >
+            <ExternalLink className="w-4 h-4 mr-2" /> Añadir enlace
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -209,7 +314,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   const { unreadCount } = useNotificationContext();
   const isMobile = useIsMobile();
   const {
-    categories, editMode, setEditMode, addCategory, removeCategory,
+    categories, editMode, setEditMode, addCategory, addLinkItem, removeCategory,
     renameCategory, reorderCategories, moveItem, reorderItems, resetToDefault,
     sidebarPosition, setSidebarPosition, setCategoryBgColor, toggleItemVisibility,
   } = useSidebarConfig();
@@ -248,8 +353,19 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
     );
   };
   const handleItemClick = (item: SidebarItem) => {
-    if (item.route) { navigate(item.route); if (isMobile) setMobileOpen(false); }
-    else { handleTabChange(item.id); }
+    if (item.isExternal && item.route) {
+      window.open(item.route, '_blank', 'noopener,noreferrer');
+      if (isMobile) setMobileOpen(false);
+    } else if (item.route) {
+      navigate(item.route);
+      if (isMobile) setMobileOpen(false);
+    } else {
+      handleTabChange(item.id);
+    }
+  };
+
+  const handleAddLink = (categoryId: string, label: string, url: string, icon: string, color: string) => {
+    addLinkItem(categoryId, label, url, icon, color);
   };
 
   const handleStartRename = (catId: string, currentName: string) => {
@@ -303,6 +419,9 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           <Icon className={cn("w-4 h-4 flex-shrink-0", isMobile && "w-3.5 h-3.5", item.color)} />
         </div>
         <span className={cn("text-sm font-medium animate-fade-in flex-1 text-left", isMobile && "text-xs")}>{item.label}</span>
+        {item.isExternal && (
+          <ExternalLink className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
+        )}
         {item.showBadge && unreadCount > 0 && (
           <Badge variant="destructive" className={cn("h-5 min-w-[20px] flex items-center justify-center text-xs px-1.5", isMobile && "h-4 min-w-[16px] text-[10px] px-1")}>
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -571,6 +690,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         )}
       </Droppable>
       <AddCategoryDialog onAdd={addCategory} />
+      <AddLinkDialog categories={categories} onAdd={handleAddLink} />
       {/* Position selector */}
       <div className="px-3 py-2">
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Posición del sidebar</label>
