@@ -78,12 +78,8 @@ export function OsTicketConfigCard() {
       setApiKey(config.api_key || '');
       setNotificationNumbers(config.notification_numbers?.join('\n') || '');
       setMessageTemplate(config.message_template || defaultTemplate);
-      // Load image settings from metadata if stored
-      const meta = (config as any).metadata;
-      if (meta) {
-        if (meta.image_url !== undefined) setImageUrl(meta.image_url || '');
-        if (meta.send_image !== undefined) setSendImage(meta.send_image);
-      }
+      setImageUrl(config.image_url || 'https://malagamicro.lovable.app/images/nuevo-ticket.png');
+      setSendImage(config.send_image !== false);
     }
   }, [config, defaultTemplate]);
 

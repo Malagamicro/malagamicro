@@ -1255,10 +1255,12 @@ export type Database = {
           api_key: string
           created_at: string
           id: string
+          image_url: string | null
           is_enabled: boolean
           message_template: string
           notification_numbers: string[]
           osticket_url: string
+          send_image: boolean
           updated_at: string
           user_id: string
         }
@@ -1266,10 +1268,12 @@ export type Database = {
           api_key?: string
           created_at?: string
           id?: string
+          image_url?: string | null
           is_enabled?: boolean
           message_template?: string
           notification_numbers?: string[]
           osticket_url?: string
+          send_image?: boolean
           updated_at?: string
           user_id: string
         }
@@ -1277,10 +1281,12 @@ export type Database = {
           api_key?: string
           created_at?: string
           id?: string
+          image_url?: string | null
           is_enabled?: boolean
           message_template?: string
           notification_numbers?: string[]
           osticket_url?: string
+          send_image?: boolean
           updated_at?: string
           user_id?: string
         }
