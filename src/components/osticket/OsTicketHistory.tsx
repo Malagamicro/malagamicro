@@ -14,7 +14,11 @@ import {
   User,
   Building2,
   Clock,
+  Send,
+  Loader2,
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +58,7 @@ export function OsTicketHistory() {
 
   const [search, setSearch] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<OsTicketRecord | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   // Parse customer_email which may be stored as JSON, stringified JSON, or plain text
   const parseEmail = (raw: string | null): string => {
@@ -100,6 +105,31 @@ export function OsTicketHistory() {
       parseEmail(t.customer_email).toLowerCase().includes(search.toLowerCase()) ||
       t.ticket_number?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleResend = async (ticket: OsTicketRecord) => {
+    setResendingId(ticket.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke('resend-ticket-notification', {
+        body: {
+          ticket_id: ticket.ticket_id,
+          number: ticket.ticket_number,
+          subject: ticket.subject,
+          name: ticket.customer_name,
+          email: ticket.customer_email,
+          department: ticket.department,
+          priority: ticket.priority,
+          message: ticket.message,
+        },
+      });
+      if (res.error) throw new Error(res.error.message);
+      toast.success('Notificación reenviada correctamente');
+    } catch (err: any) {
+      toast.error(`Error al reenviar: ${err.message}`);
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const getPriorityColor = (priority: string | null) => {
     switch (priority?.toLowerCase()) {
@@ -316,6 +346,23 @@ export function OsTicketHistory() {
                             locale: es,
                           })}
                         </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+                          title="Reenviar notificación de WhatsApp"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleResend(ticket);
+                          }}
+                          disabled={resendingId === ticket.id}
+                        >
+                          {resendingId === ticket.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
