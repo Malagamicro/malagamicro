@@ -12,6 +12,11 @@ export interface GeneralReminder {
   is_completed: boolean;
   priority: 'low' | 'normal' | 'high' | 'urgent';
   category: string | null;
+  recurrence_type: string;
+  snooze_until: string | null;
+  linked_entity_type: string | null;
+  linked_entity_id: string | null;
+  note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -22,6 +27,10 @@ interface CreateReminderData {
   reminderDate: Date;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   category?: string;
+  recurrence_type?: string;
+  linked_entity_type?: string;
+  linked_entity_id?: string;
+  note?: string;
 }
 
 interface UpdateReminderData {
@@ -32,6 +41,11 @@ interface UpdateReminderData {
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   category?: string;
   is_completed?: boolean;
+  recurrence_type?: string;
+  snooze_until?: string | null;
+  linked_entity_type?: string | null;
+  linked_entity_id?: string | null;
+  note?: string | null;
 }
 
 export function useGeneralReminders() {
@@ -44,22 +58,28 @@ export function useGeneralReminders() {
     queryFn: async () => {
       if (!user?.id) return [];
       
-      // Fetch all reminders (visible to everyone)
       const { data, error } = await supabase
         .from('general_reminders')
         .select('*')
         .order('reminder_date', { ascending: true });
 
       if (error) throw error;
-      return data as GeneralReminder[];
+      return data as unknown as GeneralReminder[];
     },
     enabled: !!user?.id,
   });
 
-  const pendingReminders = reminders.filter(r => !r.is_completed);
+  const now = new Date();
+  const pendingReminders = reminders.filter(r => {
+    if (r.is_completed) return false;
+    // If snoozed, hide until snooze expires
+    if (r.snooze_until && new Date(r.snooze_until) > now) return false;
+    return true;
+  });
+  const snoozedReminders = reminders.filter(r => !r.is_completed && r.snooze_until && new Date(r.snooze_until) > now);
   const completedReminders = reminders.filter(r => r.is_completed);
-  const upcomingReminders = pendingReminders.filter(r => new Date(r.reminder_date) >= new Date());
-  const overdueReminders = pendingReminders.filter(r => new Date(r.reminder_date) < new Date());
+  const upcomingReminders = pendingReminders.filter(r => new Date(r.reminder_date) >= now);
+  const overdueReminders = pendingReminders.filter(r => new Date(r.reminder_date) < now);
 
   const addReminderMutation = useMutation({
     mutationFn: async (data: CreateReminderData) => {
@@ -72,40 +92,41 @@ export function useGeneralReminders() {
         reminder_date: data.reminderDate.toISOString(),
         priority: data.priority || 'normal',
         category: data.category || 'general',
-      });
+        recurrence_type: data.recurrence_type || 'once',
+        linked_entity_type: data.linked_entity_type || null,
+        linked_entity_id: data.linked_entity_id || null,
+        note: data.note || null,
+      } as any);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['general-reminders'] });
-      toast({
-        title: 'Recordatorio creado',
-        description: 'El recordatorio se ha programado correctamente.',
-      });
+      toast({ title: 'Recordatorio creado', description: 'El recordatorio se ha programado correctamente.' });
     },
     onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
 
   const updateReminderMutation = useMutation({
     mutationFn: async (data: UpdateReminderData) => {
       const updateData: Record<string, unknown> = {};
-      
       if (data.title !== undefined) updateData.title = data.title;
       if (data.description !== undefined) updateData.description = data.description;
       if (data.reminderDate !== undefined) updateData.reminder_date = data.reminderDate.toISOString();
       if (data.priority !== undefined) updateData.priority = data.priority;
       if (data.category !== undefined) updateData.category = data.category;
       if (data.is_completed !== undefined) updateData.is_completed = data.is_completed;
+      if (data.recurrence_type !== undefined) updateData.recurrence_type = data.recurrence_type;
+      if (data.snooze_until !== undefined) updateData.snooze_until = data.snooze_until;
+      if (data.linked_entity_type !== undefined) updateData.linked_entity_type = data.linked_entity_type;
+      if (data.linked_entity_id !== undefined) updateData.linked_entity_id = data.linked_entity_id;
+      if (data.note !== undefined) updateData.note = data.note;
 
       const { error } = await supabase
         .from('general_reminders')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', data.id);
 
       if (error) throw error;
@@ -114,36 +135,28 @@ export function useGeneralReminders() {
       queryClient.invalidateQueries({ queryKey: ['general-reminders'] });
     },
     onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
 
+  const snoozeReminder = (id: string, minutes: number) => {
+    const snoozeUntil = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+    updateReminderMutation.mutate({ id, snooze_until: snoozeUntil });
+    const label = minutes < 60 ? `${minutes} min` : minutes === 60 ? '1 hora' : 'mañana';
+    toast({ title: 'Pospuesto', description: `Recordatorio pospuesto ${label}.` });
+  };
+
   const deleteReminderMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('general_reminders')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('general_reminders').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['general-reminders'] });
-      toast({
-        title: 'Recordatorio eliminado',
-        description: 'El recordatorio se ha eliminado correctamente.',
-      });
+      toast({ title: 'Recordatorio eliminado' });
     },
     onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -157,6 +170,7 @@ export function useGeneralReminders() {
     completedReminders,
     upcomingReminders,
     overdueReminders,
+    snoozedReminders,
     isLoading,
     addReminder: addReminderMutation.mutate,
     isAddingReminder: addReminderMutation.isPending,
@@ -164,6 +178,7 @@ export function useGeneralReminders() {
     isUpdatingReminder: updateReminderMutation.isPending,
     deleteReminder: deleteReminderMutation.mutate,
     isDeletingReminder: deleteReminderMutation.isPending,
+    snoozeReminder,
     toggleComplete,
   };
 }

@@ -860,8 +860,13 @@ export type Database = {
           description: string | null
           id: string
           is_completed: boolean
+          linked_entity_id: string | null
+          linked_entity_type: string | null
+          note: string | null
           priority: string
+          recurrence_type: string
           reminder_date: string
+          snooze_until: string | null
           title: string
           updated_at: string
           user_id: string
@@ -872,8 +877,13 @@ export type Database = {
           description?: string | null
           id?: string
           is_completed?: boolean
+          linked_entity_id?: string | null
+          linked_entity_type?: string | null
+          note?: string | null
           priority?: string
+          recurrence_type?: string
           reminder_date: string
+          snooze_until?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -884,8 +894,13 @@ export type Database = {
           description?: string | null
           id?: string
           is_completed?: boolean
+          linked_entity_id?: string | null
+          linked_entity_type?: string | null
+          note?: string | null
           priority?: string
+          recurrence_type?: string
           reminder_date?: string
+          snooze_until?: string | null
           title?: string
           updated_at?: string
           user_id?: string
