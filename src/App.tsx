@@ -25,6 +25,7 @@ import GeneralReminders from "./pages/GeneralReminders";
 
 import SeoGenerator from "./pages/SeoGenerator";
 import NotFound from "./pages/NotFound";
+import DocumentEditorPage from "./pages/DocumentEditorPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -105,6 +106,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <SeoGenerator />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/tools/editor"
+                  element={
+                    <ProtectedRoute>
+                      <DocumentEditorPage />
                     </ProtectedRoute>
                   }
                 />
