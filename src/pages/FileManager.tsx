@@ -359,14 +359,6 @@ export default function FileManager() {
             >
               <Clipboard className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/tools/scraper")}
-              title="Ir al Scraper"
-            >
-              <Globe className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </div>
@@ -451,16 +443,8 @@ export default function FileManager() {
                 <FileText className="h-16 w-16 mx-auto mb-4 opacity-30" />
                 <p className="text-lg font-medium">No hay archivos</p>
                 <p className="text-sm mt-1">
-                  Exporta contactos desde el Scraper para verlos aquí
+                  Sube archivos o crea carpetas para organizar tu contenido
                 </p>
-                <Button
-                  variant="outline"
-                  className="mt-4 gap-2"
-                  onClick={() => navigate("/tools/scraper")}
-                >
-                  <Globe className="h-4 w-4" />
-                  Ir al Scraper
-                </Button>
               </div>
             </div>
           ) : (

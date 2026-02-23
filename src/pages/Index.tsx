@@ -10,7 +10,7 @@ import { LeadKanban } from '@/components/leads/LeadKanban';
 import { LeadMap } from '@/components/leads/LeadMap';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadImportModal } from '@/components/leads/LeadImportModal';
-import { ProspectingPanel } from '@/components/prospecting/ProspectingPanel';
+
 import { EmailCampaigns } from '@/components/campaigns/EmailCampaigns';
 import { ReportsDashboard } from '@/components/reports/ReportsDashboard';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
@@ -194,7 +194,7 @@ const IndexContent = () => {
           />
         );
       case 'prospeccion':
-        return <ProspectingPanel />;
+        return <div className="p-8 text-center text-muted-foreground">Módulo no disponible</div>;
       case 'pipeline':
         return (
           <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">

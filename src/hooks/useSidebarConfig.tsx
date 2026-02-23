@@ -93,7 +93,7 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
       { id: 'chat-ai', label: 'Chat IA', icon: 'Bot', color: 'text-violet-500' },
       { id: 'editor', label: 'Editor IA', icon: 'FileEdit', color: 'text-emerald-500', route: '/tools/editor' },
       { id: 'seo-generator', label: 'Generador SEO', icon: 'Sparkles', color: 'text-amber-500', route: '/tools/seo' },
-      { id: 'scraper', label: 'Scraper', icon: 'Globe', color: 'text-lime-500', route: '/tools/scraper' },
+      
       
     ]
   },
