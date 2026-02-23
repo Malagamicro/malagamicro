@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-export type ColorPreset = 'default' | 'ocean' | 'forest' | 'sunset' | 'berry' | 'slate' | 'midnight' | 'copper' | 'rose' | 'emerald';
+export type ColorPreset = 'default' | 'ocean' | 'forest' | 'sunset' | 'berry' | 'slate' | 'midnight' | 'copper' | 'rose' | 'emerald' | 'custom';
 export type BackgroundPattern = 'none' | 'dots' | 'grid' | 'diagonal' | 'waves' | 'cross' | 'noise' | 'gradient-radial';
 export type FontFamily = 'dm-sans' | 'inter' | 'poppins' | 'nunito' | 'outfit' | 'work-sans' | 'space-grotesk' | 'raleway' | 'plus-jakarta' | 'manrope';
 export type BorderRadiusSize = 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
@@ -10,6 +10,26 @@ export type FontSizeScale = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 export type UIDensity = 'compact' | 'comfortable' | 'spacious';
 export type SidebarStyle = 'solid' | 'glass' | 'transparent';
 export type AnimationSpeed = 'none' | 'reduced' | 'normal' | 'smooth';
+
+export interface CustomColors {
+  primary?: string;
+  primaryForeground?: string;
+  secondary?: string;
+  secondaryForeground?: string;
+  accent?: string;
+  accentForeground?: string;
+  background?: string;
+  foreground?: string;
+  card?: string;
+  cardForeground?: string;
+  muted?: string;
+  mutedForeground?: string;
+  border?: string;
+  sidebarBackground?: string;
+  sidebarForeground?: string;
+  sidebarAccent?: string;
+  sidebarBorder?: string;
+}
 
 export interface CustomTheme {
   colorPreset: ColorPreset;
@@ -21,6 +41,7 @@ export interface CustomTheme {
   sidebarStyle: SidebarStyle;
   animationSpeed: AnimationSpeed;
   highContrast: boolean;
+  customColors?: CustomColors;
 }
 
 const DEFAULT_THEME: CustomTheme = {
@@ -33,6 +54,7 @@ const DEFAULT_THEME: CustomTheme = {
   sidebarStyle: 'solid',
   animationSpeed: 'normal',
   highContrast: false,
+  customColors: undefined,
 };
 
 // Full color system per preset - ALL variables covered
@@ -411,6 +433,40 @@ export const COLOR_PRESETS: Record<ColorPreset, {
       sidebarBorder: '160 30% 12%',
     },
   },
+  custom: {
+    label: 'Personalizado',
+    preview: '#6366f1',
+    light: {
+      background: '0 0% 98%', foreground: '222 47% 20%',
+      card: '0 0% 100%', cardForeground: '222 47% 20%',
+      popover: '0 0% 100%', popoverForeground: '222 47% 20%',
+      primary: '224 40% 39%', primaryForeground: '0 0% 100%',
+      secondary: '232 23% 58%', secondaryForeground: '0 0% 100%',
+      muted: '220 14% 96%', mutedForeground: '220 9% 46%',
+      accent: '25 95% 53%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '220 13% 91%', input: '220 13% 91%', ring: '224 40% 39%',
+      sidebarBackground: '224 40% 39%', sidebarForeground: '0 0% 100%',
+      sidebarPrimary: '0 0% 100%', sidebarPrimaryForeground: '224 40% 39%',
+      sidebarAccent: '224 40% 45%', sidebarAccentForeground: '0 0% 100%',
+      sidebarBorder: '224 40% 45%',
+    },
+    dark: {
+      background: '222 47% 11%', foreground: '0 0% 98%',
+      card: '222 47% 14%', cardForeground: '0 0% 98%',
+      popover: '222 47% 14%', popoverForeground: '0 0% 98%',
+      primary: '224 50% 55%', primaryForeground: '0 0% 100%',
+      secondary: '232 23% 45%', secondaryForeground: '0 0% 100%',
+      muted: '222 47% 18%', mutedForeground: '220 14% 65%',
+      accent: '25 95% 53%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '222 47% 20%', input: '222 47% 20%', ring: '224 50% 55%',
+      sidebarBackground: '222 47% 8%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '224 50% 55%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '222 47% 14%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '222 47% 18%',
+    },
+  },
 };
 
 export const BACKGROUND_PATTERNS: Record<BackgroundPattern, { label: string; css: string }> = {
@@ -545,14 +601,19 @@ const CSS_VAR_MAP: Record<keyof ColorSystem, string> = {
   sidebarBorder: '--sidebar-border',
 };
 
-function applyColorPreset(preset: ColorPreset, isDark: boolean) {
+function applyColorPreset(preset: ColorPreset, isDark: boolean, customColors?: CustomColors) {
   const config = COLOR_PRESETS[preset];
   if (!config) return;
   const mode = isDark ? config.dark : config.light;
   const root = document.documentElement;
   for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
-    const value = mode[key as keyof ColorSystem];
-    if (value) root.style.setProperty(cssVar, value);
+    // If preset is 'custom' and we have custom colors for this key, use them
+    if (preset === 'custom' && customColors && customColors[key as keyof CustomColors]) {
+      root.style.setProperty(cssVar, customColors[key as keyof CustomColors]!);
+    } else {
+      const value = mode[key as keyof ColorSystem];
+      if (value) root.style.setProperty(cssVar, value);
+    }
   }
 }
 
@@ -682,7 +743,7 @@ export function useCustomTheme() {
   useEffect(() => {
     if (!initialized.current) return;
     const isDark = document.documentElement.classList.contains('dark');
-    applyColorPreset(customTheme.colorPreset, isDark);
+    applyColorPreset(customTheme.colorPreset, isDark, customTheme.customColors);
     applyBackgroundPattern(customTheme.backgroundPattern);
     applyFont(customTheme.fontFamily);
     applyBorderRadius(customTheme.borderRadius);
@@ -696,7 +757,7 @@ export function useCustomTheme() {
   useEffect(() => {
     const observer = new MutationObserver(() => {
       const isDark = document.documentElement.classList.contains('dark');
-      applyColorPreset(customTheme.colorPreset, isDark);
+      applyColorPreset(customTheme.colorPreset, isDark, customTheme.customColors);
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
