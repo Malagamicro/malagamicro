@@ -17,7 +17,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import WhatsAppTest from "./pages/WhatsAppTest";
-import Scraper from "./pages/Scraper";
+
 
 import Install from "./pages/Install";
 import AdminUsers from "./pages/AdminUsers";
@@ -70,14 +70,6 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <WhatsAppTest />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/tools/scraper"
-                  element={
-                    <ProtectedRoute>
-                      <Scraper />
                     </ProtectedRoute>
                   }
                 />
