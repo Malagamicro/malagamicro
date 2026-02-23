@@ -9,6 +9,7 @@ export interface MessageTemplate {
   name: string;
   content: string;
   category: string;
+  isAdminOnly: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -20,6 +21,7 @@ function mapRowToTemplate(row: any): MessageTemplate {
     name: row.name,
     content: row.content,
     category: row.category || 'general',
+    isAdminOnly: row.is_admin_only || false,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -46,7 +48,7 @@ export function useMessageTemplates() {
   });
 
   const createTemplate = useMutation({
-    mutationFn: async ({ name, content, category }: { name: string; content: string; category?: string }) => {
+    mutationFn: async ({ name, content, category, is_admin_only }: { name: string; content: string; category?: string; is_admin_only?: boolean }) => {
       if (!user?.id) throw new Error('User not authenticated');
 
       const { error } = await (supabase as any).from('message_templates').insert({
@@ -54,6 +56,7 @@ export function useMessageTemplates() {
         name,
         content,
         category: category || 'general',
+        is_admin_only: is_admin_only || false,
       });
 
       if (error) throw error;
@@ -75,10 +78,10 @@ export function useMessageTemplates() {
   });
 
   const updateTemplate = useMutation({
-    mutationFn: async ({ id, name, content, category }: { id: string; name: string; content: string; category?: string }) => {
+    mutationFn: async ({ id, name, content, category, is_admin_only }: { id: string; name: string; content: string; category?: string; is_admin_only?: boolean }) => {
       const { error } = await (supabase as any)
         .from('message_templates')
-        .update({ name, content, category: category || 'general' })
+        .update({ name, content, category: category || 'general', is_admin_only: is_admin_only ?? false })
         .eq('id', id);
 
       if (error) throw error;

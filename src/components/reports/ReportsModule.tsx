@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { FileText, Plus, Trash2, Download, Loader2, Calendar, Clock, User, Users, Filter } from 'lucide-react';
@@ -11,12 +11,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useExitRecords } from '@/hooks/useExitRecords';
 import { useReports, Report } from '@/hooks/useReports';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+
+interface UserProfile {
+  user_id: string;
+  full_name: string | null;
+}
 
 function exportReportToPdf(report: Report) {
   const doc = new jsPDF();
@@ -24,14 +31,12 @@ function exportReportToPdf(report: Report) {
   const pageWidth = doc.internal.pageSize.getWidth() - margin * 2;
   let y = margin;
 
-  // Title
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   const titleLines = doc.splitTextToSize(report.title, pageWidth);
   doc.text(titleLines, margin, y);
   y += titleLines.length * 8 + 5;
 
-  // Metadata
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(120);
@@ -43,12 +48,10 @@ function exportReportToPdf(report: Report) {
   }
   y += 4;
 
-  // Separator
   doc.setDrawColor(200);
   doc.line(margin, y, margin + pageWidth, y);
   y += 8;
 
-  // Content
   doc.setTextColor(40);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
@@ -74,6 +77,9 @@ export function ReportsModule() {
   const [showExitForm, setShowExitForm] = useState(false);
   const [showReportViewer, setShowReportViewer] = useState<string | null>(null);
   const [reportTypeFilter, setReportTypeFilter] = useState<string>('all');
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [showUserPicker, setShowUserPicker] = useState(false);
   const [exitForm, setExitForm] = useState({
     student_name: '',
     exit_date: format(new Date(), 'yyyy-MM-dd'),
@@ -85,6 +91,22 @@ export function ReportsModule() {
   });
   const [weekStart, setWeekStart] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
   const [weekEnd, setWeekEnd] = useState(format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+
+  // Fetch users for multi-user selector
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('user_id, full_name')
+      .then(({ data }) => {
+        if (data) setAllUsers(data as UserProfile[]);
+      });
+  }, []);
+
+  const toggleUser = (userId: string) => {
+    setSelectedUserIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
 
   const handleAddExit = async () => {
     if (!exitForm.student_name.trim() || !exitForm.reason.trim()) return;
@@ -256,8 +278,71 @@ export function ReportsModule() {
           <DialogHeader><DialogTitle>Registrar salida</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Nombre alumno/empleado *</Label>
-              <Input value={exitForm.student_name} onChange={e => setExitForm(p => ({ ...p, student_name: e.target.value }))} />
+              <Label className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                Usuario *
+              </Label>
+              <div className="space-y-2 mt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start text-sm h-9"
+                  onClick={() => setShowUserPicker(!showUserPicker)}
+                >
+                  {selectedUserIds.length > 0
+                    ? `${selectedUserIds.length} usuario(s) seleccionado(s)`
+                    : exitForm.student_name || 'Seleccionar usuarios...'}
+                </Button>
+                {showUserPicker && (
+                  <ScrollArea className="max-h-32 rounded-lg border p-2">
+                    <div className="space-y-1">
+                      {allUsers.map(u => (
+                        <label key={u.user_id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-accent/50 cursor-pointer text-sm">
+                          <Checkbox
+                            checked={selectedUserIds.includes(u.user_id)}
+                            onCheckedChange={() => {
+                              toggleUser(u.user_id);
+                              // Also set student_name for backward compat
+                              const names = [...selectedUserIds, u.user_id]
+                                .filter((id, i, arr) => {
+                                  if (selectedUserIds.includes(u.user_id)) {
+                                    return id !== u.user_id;
+                                  }
+                                  return arr.indexOf(id) === i;
+                                })
+                                .map(id => allUsers.find(au => au.user_id === id)?.full_name || 'Usuario')
+                                .join(', ');
+                              setExitForm(p => ({ ...p, student_name: names }));
+                            }}
+                          />
+                          {u.full_name || 'Sin nombre'}
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+                {selectedUserIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {selectedUserIds.map(uid => {
+                      const u = allUsers.find(u => u.user_id === uid);
+                      return (
+                        <Badge key={uid} variant="secondary" className="text-xs">
+                          {u?.full_name || 'Usuario'}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+                {!showUserPicker && selectedUserIds.length === 0 && (
+                  <Input 
+                    placeholder="O escribe un nombre manualmente..." 
+                    value={exitForm.student_name} 
+                    onChange={e => setExitForm(p => ({ ...p, student_name: e.target.value }))} 
+                    className="h-9 text-sm"
+                  />
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Fecha</Label><Input type="date" value={exitForm.exit_date} onChange={e => setExitForm(p => ({ ...p, exit_date: e.target.value }))} /></div>

@@ -31,6 +31,7 @@ interface CreateReminderData {
   linked_entity_type?: string;
   linked_entity_id?: string;
   note?: string;
+  target_user_ids?: string[];
 }
 
 interface UpdateReminderData {
@@ -96,6 +97,7 @@ export function useGeneralReminders() {
         linked_entity_type: data.linked_entity_type || null,
         linked_entity_id: data.linked_entity_id || null,
         note: data.note || null,
+        target_user_ids: data.target_user_ids || [],
       } as any);
 
       if (error) throw error;

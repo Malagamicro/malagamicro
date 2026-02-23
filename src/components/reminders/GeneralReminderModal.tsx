@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CalendarIcon, Clock, Repeat, StickyNote } from 'lucide-react';
+import { CalendarIcon, Clock, Repeat, StickyNote, Users } from 'lucide-react';
 import { useGeneralReminders } from '@/hooks/useGeneralReminders';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -13,6 +14,9 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface GeneralReminderModalProps {
@@ -44,6 +48,11 @@ const recurrenceOptions = [
   { value: 'monthly', label: 'Mensual' },
 ];
 
+interface UserProfile {
+  user_id: string;
+  full_name: string | null;
+}
+
 export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -53,8 +62,22 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
   const [category, setCategory] = useState('general');
   const [recurrence, setRecurrence] = useState('once');
   const [note, setNote] = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [showUserPicker, setShowUserPicker] = useState(false);
 
   const { addReminder, isAddingReminder } = useGeneralReminders();
+
+  // Fetch all users for the picker
+  useEffect(() => {
+    if (!open) return;
+    supabase
+      .from('profiles')
+      .select('user_id, full_name')
+      .then(({ data }) => {
+        if (data) setAllUsers(data as UserProfile[]);
+      });
+  }, [open]);
 
   const handleSubmit = () => {
     if (!date || !title.trim()) return;
@@ -72,6 +95,7 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
         category,
         recurrence_type: recurrence,
         note: note.trim() || undefined,
+        target_user_ids: selectedUserIds.length > 0 ? selectedUserIds : undefined,
       },
       { onSuccess: () => { onOpenChange(false); resetForm(); } }
     );
@@ -80,6 +104,13 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
   const resetForm = () => {
     setTitle(''); setDescription(''); setDate(undefined); setTime('09:00');
     setPriority('normal'); setCategory('general'); setRecurrence('once'); setNote('');
+    setSelectedUserIds([]); setShowUserPicker(false);
+  };
+
+  const toggleUser = (userId: string) => {
+    setSelectedUserIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
   };
 
   const timeOptions = [];
@@ -91,7 +122,7 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nuevo Recordatorio</DialogTitle>
           <DialogDescription>Programa un recordatorio general para la empresa.</DialogDescription>
@@ -149,6 +180,46 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
                 <SelectContent className="bg-popover">{recurrenceOptions.map((r) => (<SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>))}</SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* User Selector */}
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-1"><Users className="h-3 w-3" /> Destinatarios</Label>
+              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowUserPicker(!showUserPicker)}>
+                {showUserPicker ? 'Ocultar' : 'Seleccionar usuarios'}
+              </Button>
+            </div>
+            {selectedUserIds.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {selectedUserIds.map(uid => {
+                  const u = allUsers.find(u => u.user_id === uid);
+                  return (
+                    <Badge key={uid} variant="secondary" className="text-xs cursor-pointer" onClick={() => toggleUser(uid)}>
+                      {u?.full_name || 'Usuario'} ×
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
+            {selectedUserIds.length === 0 && !showUserPicker && (
+              <p className="text-xs text-muted-foreground">Todos los usuarios (por defecto)</p>
+            )}
+            {showUserPicker && (
+              <ScrollArea className="max-h-32 rounded-lg border p-2">
+                <div className="space-y-1">
+                  {allUsers.map(u => (
+                    <label key={u.user_id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-accent/50 cursor-pointer text-sm">
+                      <Checkbox
+                        checked={selectedUserIds.includes(u.user_id)}
+                        onCheckedChange={() => toggleUser(u.user_id)}
+                      />
+                      {u.full_name || 'Sin nombre'}
+                    </label>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
           </div>
 
           <div className="grid gap-2">
