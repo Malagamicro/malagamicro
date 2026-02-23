@@ -8,6 +8,7 @@ import {
   FileDown, Plus, Table, FileSpreadsheet, StickyNote,
   Upload, Share2, Eye, EyeOff, Columns2,
   Zap, MessageCircle, Mail, Play, MoreHorizontal,
+  Search, Filter,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -513,10 +514,32 @@ interface RowAction {
 }
 
 const ROW_ACTIONS: RowAction[] = [
-  { id: 'n8n', label: 'Enviar a n8n', icon: Zap, action: 'send_to_n8n', color: 'text-orange-500' },
-  { id: 'whatsapp', label: 'Enviar WhatsApp', icon: MessageCircle, action: 'send_whatsapp', color: 'text-green-500' },
-  { id: 'email', label: 'Enviar recordatorio', icon: Mail, action: 'send_email_reminder', color: 'text-blue-500' },
+  { id: 'n8n', label: 'Enviar a n8n', icon: Zap, action: 'send_to_n8n', color: 'text-accent' },
+  { id: 'whatsapp', label: 'Enviar WhatsApp', icon: MessageCircle, action: 'send_whatsapp', color: 'text-emerald-500' },
+  { id: 'email', label: 'Enviar recordatorio', icon: Mail, action: 'send_email_reminder', color: 'text-primary' },
 ];
+
+// NLP filter types
+interface NlpFilter {
+  column: string;
+  operator: string;
+  value: string;
+}
+
+interface NlpFilterResult {
+  filters: NlpFilter[];
+  sort: { column: string; direction: 'asc' | 'desc' } | null;
+  visibleColumns: string[] | null;
+}
+
+// Magic column definition
+interface MagicColumn {
+  id: string;
+  name: string;
+  prompt: string;
+  results: Record<number, string>; // rowIndex -> result
+  loading: Set<number>;
+}
 
 function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onChange: (d: SpreadsheetCell[][]) => void }) {
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null);
@@ -524,12 +547,178 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
   const [editValue, setEditValue] = useState('');
   const [actionLoading, setActionLoading] = useState<{ row: number; action: string } | null>(null);
   const formulaBarRef = useRef<HTMLInputElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  // NLP Search state
+  const [nlpQuery, setNlpQuery] = useState('');
+  const [nlpLoading, setNlpLoading] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<NlpFilterResult | null>(null);
+  const [filterDescription, setFilterDescription] = useState('');
+
+  // Magic Columns state
+  const [magicColumns, setMagicColumns] = useState<MagicColumn[]>([]);
+  const [showMagicDialog, setShowMagicDialog] = useState(false);
+  const [newMagicName, setNewMagicName] = useState('');
+  const [newMagicPrompt, setNewMagicPrompt] = useState('');
+  const [magicProcessing, setMagicProcessing] = useState(false);
 
   // Extract headers from first row for structured data
   const headerRow = useMemo(() => {
     if (data.length === 0) return [];
     return data[0].map(c => c.formula ? evaluateFormula(c.formula, data) : c.value);
   }, [data]);
+
+  // Apply NLP filters to data
+  const filteredRowIndices = useMemo(() => {
+    if (!activeFilters?.filters?.length) return data.map((_, i) => i);
+    
+    return data.map((_, i) => i).filter(ri => {
+      if (ri === 0) return true; // Always show header row
+      const row = data[ri];
+      return activeFilters.filters.every(f => {
+        const colIdx = headerRow.findIndex(h => h.toLowerCase() === f.column.toLowerCase());
+        if (colIdx === -1) return true;
+        const cellVal = getCellDisplay(data, ri, colIdx).toLowerCase();
+        const filterVal = f.value.toLowerCase();
+        switch (f.operator) {
+          case 'contains': return cellVal.includes(filterVal);
+          case 'equals': return cellVal === filterVal;
+          case 'not_equals': return cellVal !== filterVal;
+          case 'gt': return parseFloat(cellVal) > parseFloat(filterVal);
+          case 'lt': return parseFloat(cellVal) < parseFloat(filterVal);
+          case 'gte': return parseFloat(cellVal) >= parseFloat(filterVal);
+          case 'lte': return parseFloat(cellVal) <= parseFloat(filterVal);
+          case 'starts_with': return cellVal.startsWith(filterVal);
+          case 'ends_with': return cellVal.endsWith(filterVal);
+          default: return cellVal.includes(filterVal);
+        }
+      });
+    });
+  }, [data, activeFilters, headerRow]);
+
+  // Sort filtered data
+  const sortedFilteredIndices = useMemo(() => {
+    if (!activeFilters?.sort) return filteredRowIndices;
+    const { column, direction } = activeFilters.sort;
+    const colIdx = headerRow.findIndex(h => h.toLowerCase() === column.toLowerCase());
+    if (colIdx === -1) return filteredRowIndices;
+    
+    const headerIdx = filteredRowIndices[0] === 0 ? 0 : -1;
+    const dataIndices = filteredRowIndices.filter(i => i !== 0);
+    
+    dataIndices.sort((a, b) => {
+      const va = getCellDisplay(data, a, colIdx);
+      const vb = getCellDisplay(data, b, colIdx);
+      const na = parseFloat(va), nb = parseFloat(vb);
+      const cmp = (!isNaN(na) && !isNaN(nb)) ? na - nb : va.localeCompare(vb);
+      return direction === 'desc' ? -cmp : cmp;
+    });
+
+    return headerIdx === 0 ? [0, ...dataIndices] : dataIndices;
+  }, [filteredRowIndices, activeFilters, headerRow, data]);
+
+  // NLP search handler
+  const handleNlpSearch = async () => {
+    if (!nlpQuery.trim()) { clearFilters(); return; }
+    setNlpLoading(true);
+    try {
+      const sampleRows = data.slice(1, 4).map(row => 
+        row.map((c, ci) => getCellDisplay(data, data.indexOf(row), ci))
+      );
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spreadsheet-nlp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          query: nlpQuery,
+          headers: headerRow,
+          sampleRows,
+          mode: 'filter',
+        }),
+      });
+      const result = await resp.json();
+      if (result.success && result.result) {
+        setActiveFilters(result.result);
+        setFilterDescription(nlpQuery);
+        toast.success('Filtros aplicados');
+      } else {
+        toast.error(result.error || 'No se pudieron interpretar los filtros');
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar búsqueda');
+    } finally {
+      setNlpLoading(false);
+    }
+  };
+
+  const clearFilters = () => {
+    setActiveFilters(null);
+    setFilterDescription('');
+    setNlpQuery('');
+  };
+
+  // Magic column handlers
+  const addMagicColumn = () => {
+    if (!newMagicName.trim() || !newMagicPrompt.trim()) return;
+    const col: MagicColumn = {
+      id: `magic_${Date.now()}`,
+      name: newMagicName,
+      prompt: newMagicPrompt,
+      results: {},
+      loading: new Set(),
+    };
+    setMagicColumns(prev => [...prev, col]);
+    setShowMagicDialog(false);
+    setNewMagicName('');
+    setNewMagicPrompt('');
+    // Auto-process all rows
+    processMagicColumn(col, data);
+  };
+
+  const processMagicColumn = async (col: MagicColumn, currentData: SpreadsheetCell[][]) => {
+    setMagicProcessing(true);
+    const newResults: Record<number, string> = { ...col.results };
+
+    for (let ri = 1; ri < currentData.length; ri++) {
+      const rowValues: Record<string, string> = {};
+      headerRow.forEach((h, ci) => {
+        if (h) rowValues[h] = getCellDisplay(currentData, ri, ci);
+      });
+      
+      // Skip empty rows
+      if (Object.values(rowValues).every(v => !v.trim())) continue;
+
+      try {
+        const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spreadsheet-nlp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            query: col.prompt,
+            headers: headerRow,
+            sampleRows: rowValues,
+            mode: 'magic_column',
+          }),
+        });
+        const result = await resp.json();
+        newResults[ri] = result.success ? result.result : '⚠️';
+      } catch {
+        newResults[ri] = '⚠️';
+      }
+    }
+
+    setMagicColumns(prev => prev.map(c => c.id === col.id ? { ...c, results: newResults, loading: new Set() } : c));
+    setMagicProcessing(false);
+    toast.success(`Columna "${col.name}" procesada`);
+  };
+
+  const removeMagicColumn = (colId: string) => {
+    setMagicColumns(prev => prev.filter(c => c.id !== colId));
+  };
 
   const executeRowAction = async (rowIndex: number, action: string) => {
     const row = data[rowIndex];
@@ -590,8 +779,53 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
     setEditValue(cell?.formula ? `=${cell.formula}` : cell?.value || '');
   };
 
+  // Keyboard navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!selectedCell || editingCell) return;
+    const [r, c] = selectedCell;
+    let newR = r, newC = c;
+
+    switch (e.key) {
+      case 'ArrowUp': newR = Math.max(0, r - 1); break;
+      case 'ArrowDown': newR = Math.min(data.length - 1, r + 1); break;
+      case 'ArrowLeft': newC = Math.max(0, c - 1); break;
+      case 'ArrowRight': newC = Math.min((data[0]?.length || 1) - 1, c + 1); break;
+      case 'Tab':
+        e.preventDefault();
+        if (e.shiftKey) newC = Math.max(0, c - 1);
+        else newC = Math.min((data[0]?.length || 1) - 1, c + 1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (e.shiftKey) newR = Math.max(0, r - 1);
+        else startEdit(r, c);
+        return;
+      case 'Delete': case 'Backspace':
+        e.preventDefault();
+        updateCell(r, c, '');
+        return;
+      case 'F2':
+        e.preventDefault();
+        startEdit(r, c);
+        return;
+      case 'Escape':
+        setSelectedCell(null);
+        return;
+      default:
+        // Start typing to edit
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+          startEdit(r, c);
+          setEditValue(e.key);
+          return;
+        }
+        return;
+    }
+    e.preventDefault();
+    setSelectedCell([newR, newC]);
+  }, [selectedCell, editingCell, data]);
+
   const cellLabel = selectedCell
-    ? `${String.fromCharCode(65 + (selectedCell[1] % 26))}${selectedCell[0] + 1}`
+    ? `${indexToCol(selectedCell[1])}${selectedCell[0] + 1}`
     : '';
 
   const selectedCellRaw = selectedCell
@@ -608,15 +842,60 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
   const deleteRow = (idx: number) => { if (data.length > 1) onChange(data.filter((_, i) => i !== idx)); };
   const deleteCol = (idx: number) => { if ((data[0]?.length || 0) > 1) onChange(data.map(r => r.filter((_, i) => i !== idx))); };
 
+  const totalCols = data[0]?.length || 0;
+
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" onKeyDown={handleKeyDown} tabIndex={0}>
+      {/* NLP Search Bar */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-card/50 backdrop-blur-sm">
+        <div className="relative flex-1 max-w-2xl">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            className="w-full h-8 pl-9 pr-4 text-sm bg-muted/50 border border-border/50 rounded-lg outline-none focus:ring-2 ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/60 transition-all"
+            value={nlpQuery}
+            onChange={e => setNlpQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); handleNlpSearch(); } }}
+            placeholder='Busca con lenguaje natural: "Clientes de Málaga con más de 50€" ...'
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs gap-1.5"
+          onClick={handleNlpSearch}
+          disabled={nlpLoading}
+        >
+          {nlpLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+          Filtrar con IA
+        </Button>
+        {activeFilters && (
+          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground" onClick={clearFilters}>
+            <X className="h-3 w-3" />
+            Limpiar
+          </Button>
+        )}
+      </div>
+
+      {/* Active filters indicator */}
+      {activeFilters && filterDescription && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/5 border-b border-primary/10">
+          <Badge variant="secondary" className="text-[10px] gap-1 bg-primary/10 text-primary border-primary/20">
+            <Filter className="h-2.5 w-2.5" />
+            {filterDescription}
+          </Badge>
+          <span className="text-[10px] text-muted-foreground">
+            {sortedFilteredIndices.length - (sortedFilteredIndices.includes(0) ? 1 : 0)} resultados
+          </span>
+        </div>
+      )}
+
       {/* Formula bar */}
-      <div className="flex items-center gap-1 px-2 py-1 border-b bg-muted/30">
-        <span className="text-xs font-mono w-10 text-center text-muted-foreground font-semibold">{cellLabel}</span>
-        <span className="text-muted-foreground text-xs">ƒx</span>
+      <div className="flex items-center gap-1 px-2 py-1 border-b bg-muted/20">
+        <span className="text-[10px] font-mono w-10 text-center text-muted-foreground font-semibold tracking-wider">{cellLabel}</span>
+        <span className="text-muted-foreground text-[10px] font-bold">ƒx</span>
         <input
           ref={formulaBarRef}
-          className="flex-1 h-7 px-2 text-sm bg-background border rounded outline-none focus:ring-1 ring-primary font-mono"
+          className="flex-1 h-7 px-2 text-sm bg-background/80 border border-border/30 rounded-md outline-none focus:ring-1 ring-primary/40 font-mono text-foreground"
           value={editingCell ? editValue : selectedCellRaw}
           onChange={e => {
             if (editingCell) setEditValue(e.target.value);
@@ -633,103 +912,161 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
           placeholder="Introduce valor o fórmula (=SUM, =AVERAGE, =IF...)"
         />
       </div>
+
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-muted/20">
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addRow}>
-          <Plus className="h-3 w-3 mr-1" /> Fila
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b bg-card/30">
+        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover:bg-primary/10" onClick={addRow}>
+          <Plus className="h-3 w-3" /> Fila
         </Button>
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addCol}>
-          <Plus className="h-3 w-3 mr-1" /> Columna
+        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 hover:bg-primary/10" onClick={addCol}>
+          <Plus className="h-3 w-3" /> Columna
+        </Button>
+        <Separator orientation="vertical" className="h-4" />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs gap-1 hover:bg-accent/10 text-accent"
+          onClick={() => setShowMagicDialog(true)}
+        >
+          <Sparkles className="h-3 w-3" /> Columna Mágica
         </Button>
         {selectedCell && (
           <>
             <Separator orientation="vertical" className="h-4" />
-            <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => deleteRow(selectedCell[0])}>
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => deleteRow(selectedCell[0])}>
               Eliminar fila
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => deleteCol(selectedCell[1])}>
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => deleteCol(selectedCell[1])}>
               Eliminar columna
             </Button>
           </>
         )}
-        <div className="ml-auto text-[10px] text-muted-foreground hidden md:block">
-          =SUM =AVERAGE =COUNT =IF =VLOOKUP =COUNTIF =SUMIF · Aritmética: =A1+B2*3
+        <div className="ml-auto text-[10px] text-muted-foreground/50 hidden md:flex items-center gap-2">
+          <kbd className="px-1 py-0.5 rounded bg-muted/50 border border-border/30 font-mono">Tab</kbd> navegar
+          <kbd className="px-1 py-0.5 rounded bg-muted/50 border border-border/30 font-mono">Enter</kbd> editar
+          <kbd className="px-1 py-0.5 rounded bg-muted/50 border border-border/30 font-mono">Esc</kbd> salir
+          <kbd className="px-1 py-0.5 rounded bg-muted/50 border border-border/30 font-mono">F2</kbd> fórmula
         </div>
       </div>
-      <ScrollArea className="flex-1">
-        <div className="overflow-auto">
-          <table className="border-collapse w-full min-w-max">
-            <thead>
-              <tr>
-                <th className="w-10 bg-muted/50 border text-xs text-center text-muted-foreground p-1 sticky left-0 z-10">#</th>
-                {data[0]?.map((_, ci) => (
-                  <th key={ci} className="bg-muted/50 border text-xs text-center text-muted-foreground p-1 min-w-[100px]">
-                    {String.fromCharCode(65 + (ci % 26))}
-                    {ci >= 26 ? String.fromCharCode(65 + Math.floor(ci / 26) - 1) : ''}
-                  </th>
-                ))}
-                <th className="bg-muted/50 border text-xs text-center text-muted-foreground p-1 min-w-[44px] sticky right-0 z-10">
-                  <Zap className="h-3 w-3 mx-auto" />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row, ri) => {
-                const isLoadingRow = actionLoading?.row === ri;
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto" ref={tableRef}>
+        <table className="border-collapse w-full min-w-max">
+          <thead className="sticky top-0 z-20">
+            <tr>
+              <th className="w-10 bg-muted/80 backdrop-blur-sm border-b border-r border-border/30 text-[10px] text-center text-muted-foreground p-1 sticky left-0 z-30">#</th>
+              {data[0]?.map((_, ci) => {
+                const colName = headerRow[ci]?.toLowerCase() || '';
+                const isHidden = activeFilters?.visibleColumns && !activeFilters.visibleColumns.some(vc => vc.toLowerCase() === colName);
+                if (isHidden) return null;
                 return (
-                  <tr key={ri}>
-                    <td className="bg-muted/30 border text-xs text-center text-muted-foreground p-1 select-none sticky left-0 z-10">{ri + 1}</td>
-                    {row.map((cell, ci) => {
-                      const isEditing = editingCell?.[0] === ri && editingCell?.[1] === ci;
-                      const isSelected = selectedCell?.[0] === ri && selectedCell?.[1] === ci;
-                      const displayVal = cell.formula ? evaluateFormula(cell.formula, data) : cell.value;
-                      const hasFormula = !!cell.formula;
-                      return (
-                        <td
-                          key={ci}
-                          className={cn(
-                            "border p-0 relative",
-                            isSelected && "ring-2 ring-primary ring-inset",
-                            hasFormula && !isEditing && "bg-blue-50/50 dark:bg-blue-950/20"
-                          )}
-                          onClick={() => { setSelectedCell([ri, ci]); if (!isEditing) setEditingCell(null); }}
-                          onDoubleClick={() => startEdit(ri, ci)}
-                        >
-                          {isEditing ? (
-                            <input
-                              autoFocus
-                              className="w-full h-full px-2 py-1.5 text-xs bg-background border-none outline-none font-mono"
-                              value={editValue}
-                              onChange={e => setEditValue(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') { commitEdit(); e.preventDefault(); }
-                                if (e.key === 'Escape') setEditingCell(null);
-                                if (e.key === 'Tab') { e.preventDefault(); commitEdit(); const nc = ci + 1; if (nc < row.length) { setSelectedCell([ri, nc]); startEdit(ri, nc); } }
-                              }}
-                              onBlur={commitEdit}
-                            />
-                          ) : (
-                            <div
-                              className={cn(
-                                "w-full px-2 py-1.5 text-xs min-h-[28px] cursor-cell",
-                                displayVal.startsWith('#') && "text-destructive font-semibold"
-                              )}
-                            >
-                              {displayVal}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                    {/* Actions column */}
-                    <td className="border p-0 sticky right-0 z-10 bg-card">
+                  <th key={ci} className="bg-muted/80 backdrop-blur-sm border-b border-r border-border/30 text-[10px] text-center text-muted-foreground p-1.5 min-w-[120px] font-medium tracking-wider uppercase">
+                    {indexToCol(ci)}
+                  </th>
+                );
+              })}
+              {/* Magic columns headers */}
+              {magicColumns.map(mc => (
+                <th key={mc.id} className="bg-accent/5 backdrop-blur-sm border-b border-r border-accent/20 text-[10px] text-center p-1.5 min-w-[140px]">
+                  <div className="flex items-center justify-center gap-1">
+                    <Sparkles className="h-2.5 w-2.5 text-accent" />
+                    <span className="text-accent font-medium truncate">{mc.name}</span>
+                    <button onClick={() => removeMagicColumn(mc.id)} className="ml-1 hover:text-destructive">
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                </th>
+              ))}
+              <th className="bg-muted/80 backdrop-blur-sm border-b border-border/30 text-[10px] text-center text-muted-foreground p-1 min-w-[40px] sticky right-0 z-30">
+                <Zap className="h-3 w-3 mx-auto" />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedFilteredIndices.map(ri => {
+              const row = data[ri];
+              const isLoadingRow = actionLoading?.row === ri;
+              const isHeaderRow = ri === 0;
+              return (
+                <tr key={ri} className={cn(
+                  "group transition-colors duration-75",
+                  isHeaderRow ? "bg-muted/30" : "hover:bg-muted/20",
+                )}>
+                  <td className={cn(
+                    "border-b border-r border-border/20 text-[10px] text-center text-muted-foreground/60 p-1 select-none sticky left-0 z-10",
+                    isHeaderRow ? "bg-muted/40 font-semibold" : "bg-card/80"
+                  )}>{ri + 1}</td>
+                  {row.map((cell, ci) => {
+                    const colName = headerRow[ci]?.toLowerCase() || '';
+                    const isHidden = activeFilters?.visibleColumns && !activeFilters.visibleColumns.some(vc => vc.toLowerCase() === colName);
+                    if (isHidden) return null;
+                    
+                    const isEditing = editingCell?.[0] === ri && editingCell?.[1] === ci;
+                    const isSelected = selectedCell?.[0] === ri && selectedCell?.[1] === ci;
+                    const displayVal = cell.formula ? evaluateFormula(cell.formula, data) : cell.value;
+                    const hasFormula = !!cell.formula;
+                    return (
+                      <td
+                        key={ci}
+                        className={cn(
+                          "border-b border-r border-border/20 p-0 relative transition-all duration-75",
+                          isSelected && "ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.3)]",
+                          hasFormula && !isEditing && "bg-primary/[0.03]",
+                          isHeaderRow && "font-semibold bg-muted/20",
+                        )}
+                        onClick={() => { setSelectedCell([ri, ci]); if (!isEditing) setEditingCell(null); }}
+                        onDoubleClick={() => startEdit(ri, ci)}
+                      >
+                        {isEditing ? (
+                          <input
+                            autoFocus
+                            className="w-full h-full px-2.5 py-1.5 text-xs bg-background border-none outline-none font-mono"
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { commitEdit(); e.preventDefault(); const nr = ri + 1; if (nr < data.length) setSelectedCell([nr, ci]); }
+                              if (e.key === 'Escape') setEditingCell(null);
+                              if (e.key === 'Tab') { e.preventDefault(); commitEdit(); const nc = e.shiftKey ? Math.max(0, ci - 1) : Math.min(row.length - 1, ci + 1); setSelectedCell([ri, nc]); startEdit(ri, nc); }
+                            }}
+                            onBlur={commitEdit}
+                          />
+                        ) : (
+                          <div className={cn(
+                            "w-full px-2.5 py-1.5 text-xs min-h-[30px] cursor-cell flex items-center",
+                            displayVal.startsWith('#') && "text-destructive font-semibold"
+                          )}>
+                            {displayVal}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  {/* Magic column values */}
+                  {magicColumns.map(mc => (
+                    <td key={mc.id} className="border-b border-r border-accent/10 p-0 bg-accent/[0.02]">
+                      <div className="px-2.5 py-1.5 text-xs min-h-[30px] flex items-center text-muted-foreground">
+                        {isHeaderRow ? (
+                          <span className="font-medium text-accent">{mc.name}</span>
+                        ) : mc.results[ri] !== undefined ? (
+                          mc.results[ri]
+                        ) : magicProcessing ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-accent/50" />
+                        ) : (
+                          <span className="text-muted-foreground/30">—</span>
+                        )}
+                      </div>
+                    </td>
+                  ))}
+                  {/* Actions column */}
+                  <td className="border-b border-border/20 p-0 sticky right-0 z-10 bg-card/90 backdrop-blur-sm">
+                    {!isHeaderRow && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="w-full h-full flex items-center justify-center p-1.5 hover:bg-muted/50 transition-colors" disabled={isLoadingRow}>
+                          <button className="w-full h-full flex items-center justify-center p-1.5 opacity-0 group-hover:opacity-100 transition-opacity" disabled={isLoadingRow}>
                             {isLoadingRow ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                             ) : (
-                              <Play className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                              <Play className="h-3 w-3 text-muted-foreground/50 hover:text-foreground transition-colors" />
                             )}
                           </button>
                         </DropdownMenuTrigger>
@@ -739,21 +1076,86 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
                               key={act.id}
                               onClick={() => executeRowAction(ri, act.action)}
                               disabled={isLoadingRow}
+                              className="gap-2"
                             >
-                              <act.icon className={cn("h-4 w-4 mr-2", act.color)} />
+                              <act.icon className={cn("h-4 w-4", act.color)} />
                               {act.label}
                             </DropdownMenuItem>
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </ScrollArea>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Status bar */}
+      <div className="flex items-center justify-between px-3 py-1 border-t bg-muted/10 text-[10px] text-muted-foreground/60">
+        <span>{data.length} filas × {totalCols} cols{activeFilters ? ` · ${sortedFilteredIndices.length - 1} visibles` : ''}</span>
+        {magicColumns.length > 0 && (
+          <span className="flex items-center gap-1">
+            <Sparkles className="h-2.5 w-2.5 text-accent" />
+            {magicColumns.length} columna{magicColumns.length > 1 ? 's' : ''} mágica{magicColumns.length > 1 ? 's' : ''}
+          </span>
+        )}
+        <span>
+          {selectedCell ? `${cellLabel}: ${selectedCellRaw || 'vacía'}` : 'Selecciona una celda'}
+        </span>
+      </div>
+
+      {/* Magic Column Dialog */}
+      <Dialog open={showMagicDialog} onOpenChange={setShowMagicDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-accent" />
+              Nueva Columna Mágica
+            </DialogTitle>
+            <DialogDescription>
+              Crea una columna que usa IA para extraer, categorizar o transformar datos automáticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Nombre de la columna</label>
+              <Input
+                value={newMagicName}
+                onChange={e => setNewMagicName(e.target.value)}
+                placeholder="Ej: Sentimiento, Teléfono extraído, Categoría..."
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Instrucción IA (prompt)</label>
+              <Textarea
+                value={newMagicPrompt}
+                onChange={e => setNewMagicPrompt(e.target.value)}
+                placeholder="Ej: Extrae el número de teléfono del campo Email. / Clasifica el tono como Positivo, Negativo o Neutro. / Resume en 5 palabras."
+                className="text-sm min-h-[80px]"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {['Extrae el teléfono', 'Clasifica el sentimiento', 'Extrae el nombre de empresa', 'Resume en 3 palabras'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => { setNewMagicPrompt(s); if (!newMagicName) setNewMagicName(s.split(' ').slice(0, 2).join(' ')); }}
+                  className="text-[10px] px-2 py-1 rounded-full border border-border/50 hover:bg-muted transition-colors"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <Button onClick={addMagicColumn} disabled={!newMagicName.trim() || !newMagicPrompt.trim()} className="w-full gap-2">
+              <Sparkles className="h-4 w-4" />
+              Crear columna mágica
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
