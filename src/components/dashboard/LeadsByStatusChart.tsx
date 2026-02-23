@@ -6,11 +6,17 @@ interface LeadsByStatusChartProps {
 }
 
 export function LeadsByStatusChart({ stats }: LeadsByStatusChartProps) {
+  // Read theme colors from CSS variables
+  const getHslColor = (cssVar: string, fallback: string) => {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+    return value ? `hsl(${value})` : fallback;
+  };
+
   const data = [
-    { name: 'Nuevos', value: stats.newLeads, color: 'hsl(210, 100%, 50%)' },
-    { name: 'Contactados', value: stats.contactedLeads, color: 'hsl(45, 93%, 47%)' },
-    { name: 'Interesados', value: stats.interestedLeads, color: 'hsl(142, 71%, 45%)' },
-    { name: 'Clientes', value: stats.clients, color: 'hsl(224, 40%, 39%)' },
+    { name: 'Nuevos', value: stats.newLeads, color: getHslColor('--primary', 'hsl(210, 100%, 50%)') },
+    { name: 'Contactados', value: stats.contactedLeads, color: getHslColor('--accent', 'hsl(45, 93%, 47%)') },
+    { name: 'Interesados', value: stats.interestedLeads, color: getHslColor('--secondary', 'hsl(142, 71%, 45%)') },
+    { name: 'Clientes', value: stats.clients, color: getHslColor('--muted-foreground', 'hsl(224, 40%, 39%)') },
   ];
 
   return (
