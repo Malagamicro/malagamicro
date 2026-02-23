@@ -32,7 +32,7 @@ import { GoogleSheetsImportModal } from '@/components/leads/GoogleSheetsImportMo
 import { PerplexityChatbot } from '@/components/chat/PerplexityChatbot';
 import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
 import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
-
+import { DocumentEditor } from '@/components/editor/DocumentEditor';
 import { EmailModule } from '@/components/email/EmailModule';
 import { OsTicketHistory } from '@/components/osticket/OsTicketHistory';
 import { OsTicketPanel } from '@/components/osticket/OsTicketPanel';
@@ -286,6 +286,12 @@ const IndexContent = () => {
         return (
           <div className="p-2 sm:p-4 md:p-8 h-full animate-fade-in">
             <SharedFilesPanel />
+          </div>
+        );
+      case 'editor':
+        return (
+          <div className="h-full animate-fade-in">
+            <DocumentEditor />
           </div>
         );
       case 'correo':
