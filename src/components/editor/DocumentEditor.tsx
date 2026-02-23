@@ -728,11 +728,16 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
     try {
       const rowValues = row.map((c, ci) => getCellDisplay(data, rowIndex, ci));
       
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error('No hay sesión activa. Inicia sesión de nuevo.');
+
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spreadsheet-action`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({
           action,
