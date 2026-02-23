@@ -8,7 +8,7 @@ import {
   FileDown, Plus, Table, FileSpreadsheet, StickyNote,
   Upload, Share2, Eye, EyeOff, Columns2,
   Zap, MessageCircle, Mail, Play, MoreHorizontal,
-  Search, Filter,
+  Search, Filter, Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -562,6 +562,10 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
   const [newMagicPrompt, setNewMagicPrompt] = useState('');
   const [magicProcessing, setMagicProcessing] = useState(false);
 
+  // Webhook config state
+  const [webhookUrl, setWebhookUrl] = useState(() => localStorage.getItem('spreadsheet_webhook_url') || '');
+  const [showWebhookConfig, setShowWebhookConfig] = useState(false);
+
   // Extract headers from first row for structured data
   const headerRow = useMemo(() => {
     if (data.length === 0) return [];
@@ -744,6 +748,7 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
           rowData: rowValues,
           rowIndex,
           headers: headerRow,
+          customWebhookUrl: webhookUrl || undefined,
         }),
       });
 
@@ -934,6 +939,14 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
           onClick={() => setShowMagicDialog(true)}
         >
           <Sparkles className="h-3 w-3" /> Columna Mágica
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs gap-1 hover:bg-muted/50"
+          onClick={() => setShowWebhookConfig(true)}
+        >
+          <Settings className="h-3 w-3" /> Webhook
         </Button>
         {selectedCell && (
           <>
@@ -1157,6 +1170,47 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
             <Button onClick={addMagicColumn} disabled={!newMagicName.trim() || !newMagicPrompt.trim()} className="w-full gap-2">
               <Sparkles className="h-4 w-4" />
               Crear columna mágica
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Webhook Config Dialog */}
+      <Dialog open={showWebhookConfig} onOpenChange={setShowWebhookConfig}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Configurar Webhook
+            </DialogTitle>
+            <DialogDescription>
+              Configura la URL del webhook para las acciones de fila (n8n, Make, Zapier, etc.)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">URL del Webhook</label>
+              <Input
+                value={webhookUrl}
+                onChange={e => setWebhookUrl(e.target.value)}
+                placeholder="https://tu-n8n.ejemplo.com/webhook/..."
+                className="text-sm font-mono"
+                type="url"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                Esta URL se usará para las acciones "Enviar a n8n" y "Enviar recordatorio". Si se deja vacía se usará la URL configurada en el servidor.
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                localStorage.setItem('spreadsheet_webhook_url', webhookUrl);
+                toast.success('Webhook configurado correctamente');
+                setShowWebhookConfig(false);
+              }}
+              className="w-full gap-2"
+            >
+              <Zap className="h-4 w-4" />
+              Guardar configuración
             </Button>
           </div>
         </DialogContent>

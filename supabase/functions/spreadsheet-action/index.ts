@@ -111,9 +111,7 @@ Deno.serve(async (req) => {
 
       case 'send_to_n8n':
       case 'custom_webhook': {
-        const webhookUrl = action === 'custom_webhook' && customWebhookUrl 
-          ? customWebhookUrl 
-          : N8N_WEBHOOK_URL;
+        const webhookUrl = customWebhookUrl || N8N_WEBHOOK_URL;
         
         if (!webhookUrl) {
           throw new Error('No hay URL de webhook configurada');
@@ -136,8 +134,8 @@ Deno.serve(async (req) => {
       }
 
       case 'send_email_reminder': {
-        // Forward to n8n with specific action type
-        if (!N8N_WEBHOOK_URL) throw new Error('N8N no configurado');
+        const reminderWebhookUrl = customWebhookUrl || N8N_WEBHOOK_URL;
+        if (!reminderWebhookUrl) throw new Error('No hay URL de webhook configurada. Configúrala en el panel de Webhook.');
         
         const emailPayload = {
           ...payload,
@@ -146,14 +144,14 @@ Deno.serve(async (req) => {
           name: findValueByKey(structuredRow, ['nombre', 'name', 'cliente', 'contacto']),
         };
 
-        const emailResp = await fetch(N8N_WEBHOOK_URL, {
+        const emailResp = await fetch(reminderWebhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(emailPayload),
         });
 
         if (!emailResp.ok) throw new Error('Error al enviar recordatorio');
-        result = { success: true, message: 'Recordatorio enviado vía n8n' };
+        result = { success: true, message: 'Recordatorio enviado vía webhook' };
         break;
       }
 
