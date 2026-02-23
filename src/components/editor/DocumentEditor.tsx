@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FileText, Save, Download, Sparkles, Send, Loader2, X,
@@ -7,6 +7,7 @@ import {
   PanelRightOpen, PanelRightClose, Cloud, ArrowLeft,
   FileDown, Plus, Table, FileSpreadsheet, StickyNote,
   Upload, Share2, Eye, EyeOff, Columns2,
+  Zap, MessageCircle, Mail, Play, MoreHorizontal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -502,12 +503,66 @@ function evaluateFormula(formula: string, data: SpreadsheetCell[][]): string {
   return evalFormula(formula, data);
 }
 
-// ── Spreadsheet Component ──────────────────────────
+// Row action types
+interface RowAction {
+  id: string;
+  label: string;
+  icon: typeof Zap;
+  action: string;
+  color: string;
+}
+
+const ROW_ACTIONS: RowAction[] = [
+  { id: 'n8n', label: 'Enviar a n8n', icon: Zap, action: 'send_to_n8n', color: 'text-orange-500' },
+  { id: 'whatsapp', label: 'Enviar WhatsApp', icon: MessageCircle, action: 'send_whatsapp', color: 'text-green-500' },
+  { id: 'email', label: 'Enviar recordatorio', icon: Mail, action: 'send_email_reminder', color: 'text-blue-500' },
+];
+
 function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onChange: (d: SpreadsheetCell[][]) => void }) {
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null);
   const [editingCell, setEditingCell] = useState<[number, number] | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [actionLoading, setActionLoading] = useState<{ row: number; action: string } | null>(null);
   const formulaBarRef = useRef<HTMLInputElement>(null);
+
+  // Extract headers from first row for structured data
+  const headerRow = useMemo(() => {
+    if (data.length === 0) return [];
+    return data[0].map(c => c.formula ? evaluateFormula(c.formula, data) : c.value);
+  }, [data]);
+
+  const executeRowAction = async (rowIndex: number, action: string) => {
+    const row = data[rowIndex];
+    if (!row) return;
+    
+    setActionLoading({ row: rowIndex, action });
+    try {
+      const rowValues = row.map((c, ci) => getCellDisplay(data, rowIndex, ci));
+      
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spreadsheet-action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          action,
+          rowData: rowValues,
+          rowIndex,
+          headers: headerRow,
+        }),
+      });
+
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || 'Error al ejecutar acción');
+      toast.success(result.message || 'Acción ejecutada correctamente');
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || 'Error al ejecutar la acción');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const updateCell = (row: number, col: number, rawValue: string) => {
     const isFormula = rawValue.startsWith('=');
@@ -597,8 +652,8 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
             </Button>
           </>
         )}
-        <div className="ml-auto text-[10px] text-muted-foreground">
-          =SUM =AVERAGE =COUNT =MIN =MAX =IF =VLOOKUP =COUNTIF =SUMIF =ROUND =MOD =SQRT =IFERROR · Aritmética: =A1+B2*3
+        <div className="ml-auto text-[10px] text-muted-foreground hidden md:block">
+          =SUM =AVERAGE =COUNT =IF =VLOOKUP =COUNTIF =SUMIF · Aritmética: =A1+B2*3
         </div>
       </div>
       <ScrollArea className="flex-1">
@@ -613,56 +668,88 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
                     {ci >= 26 ? String.fromCharCode(65 + Math.floor(ci / 26) - 1) : ''}
                   </th>
                 ))}
+                <th className="bg-muted/50 border text-xs text-center text-muted-foreground p-1 min-w-[44px] sticky right-0 z-10">
+                  <Zap className="h-3 w-3 mx-auto" />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {data.map((row, ri) => (
-                <tr key={ri}>
-                  <td className="bg-muted/30 border text-xs text-center text-muted-foreground p-1 select-none sticky left-0 z-10">{ri + 1}</td>
-                  {row.map((cell, ci) => {
-                    const isEditing = editingCell?.[0] === ri && editingCell?.[1] === ci;
-                    const isSelected = selectedCell?.[0] === ri && selectedCell?.[1] === ci;
-                    const displayVal = cell.formula ? evaluateFormula(cell.formula, data) : cell.value;
-                    const hasFormula = !!cell.formula;
-                    return (
-                      <td
-                        key={ci}
-                        className={cn(
-                          "border p-0 relative",
-                          isSelected && "ring-2 ring-primary ring-inset",
-                          hasFormula && !isEditing && "bg-blue-50/50 dark:bg-blue-950/20"
-                        )}
-                        onClick={() => { setSelectedCell([ri, ci]); if (!isEditing) setEditingCell(null); }}
-                        onDoubleClick={() => startEdit(ri, ci)}
-                      >
-                        {isEditing ? (
-                          <input
-                            autoFocus
-                            className="w-full h-full px-2 py-1.5 text-xs bg-background border-none outline-none font-mono"
-                            value={editValue}
-                            onChange={e => setEditValue(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') { commitEdit(); e.preventDefault(); }
-                              if (e.key === 'Escape') setEditingCell(null);
-                              if (e.key === 'Tab') { e.preventDefault(); commitEdit(); const nc = ci + 1; if (nc < row.length) { setSelectedCell([ri, nc]); startEdit(ri, nc); } }
-                            }}
-                            onBlur={commitEdit}
-                          />
-                        ) : (
-                          <div
-                            className={cn(
-                              "w-full px-2 py-1.5 text-xs min-h-[28px] cursor-cell",
-                              displayVal.startsWith('#') && "text-destructive font-semibold"
+              {data.map((row, ri) => {
+                const isLoadingRow = actionLoading?.row === ri;
+                return (
+                  <tr key={ri}>
+                    <td className="bg-muted/30 border text-xs text-center text-muted-foreground p-1 select-none sticky left-0 z-10">{ri + 1}</td>
+                    {row.map((cell, ci) => {
+                      const isEditing = editingCell?.[0] === ri && editingCell?.[1] === ci;
+                      const isSelected = selectedCell?.[0] === ri && selectedCell?.[1] === ci;
+                      const displayVal = cell.formula ? evaluateFormula(cell.formula, data) : cell.value;
+                      const hasFormula = !!cell.formula;
+                      return (
+                        <td
+                          key={ci}
+                          className={cn(
+                            "border p-0 relative",
+                            isSelected && "ring-2 ring-primary ring-inset",
+                            hasFormula && !isEditing && "bg-blue-50/50 dark:bg-blue-950/20"
+                          )}
+                          onClick={() => { setSelectedCell([ri, ci]); if (!isEditing) setEditingCell(null); }}
+                          onDoubleClick={() => startEdit(ri, ci)}
+                        >
+                          {isEditing ? (
+                            <input
+                              autoFocus
+                              className="w-full h-full px-2 py-1.5 text-xs bg-background border-none outline-none font-mono"
+                              value={editValue}
+                              onChange={e => setEditValue(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') { commitEdit(); e.preventDefault(); }
+                                if (e.key === 'Escape') setEditingCell(null);
+                                if (e.key === 'Tab') { e.preventDefault(); commitEdit(); const nc = ci + 1; if (nc < row.length) { setSelectedCell([ri, nc]); startEdit(ri, nc); } }
+                              }}
+                              onBlur={commitEdit}
+                            />
+                          ) : (
+                            <div
+                              className={cn(
+                                "w-full px-2 py-1.5 text-xs min-h-[28px] cursor-cell",
+                                displayVal.startsWith('#') && "text-destructive font-semibold"
+                              )}
+                            >
+                              {displayVal}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                    {/* Actions column */}
+                    <td className="border p-0 sticky right-0 z-10 bg-card">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="w-full h-full flex items-center justify-center p-1.5 hover:bg-muted/50 transition-colors" disabled={isLoadingRow}>
+                            {isLoadingRow ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                            ) : (
+                              <Play className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                             )}
-                          >
-                            {displayVal}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-[180px]">
+                          {ROW_ACTIONS.map(act => (
+                            <DropdownMenuItem
+                              key={act.id}
+                              onClick={() => executeRowAction(ri, act.action)}
+                              disabled={isLoadingRow}
+                            >
+                              <act.icon className={cn("h-4 w-4 mr-2", act.color)} />
+                              {act.label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
