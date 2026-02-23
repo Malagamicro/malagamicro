@@ -104,3 +104,6 @@ verify_jwt = false
 
 [functions.generate-exit-report]
 verify_jwt = false
+
+[functions.spreadsheet-action]
+verify_jwt = false
