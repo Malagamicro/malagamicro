@@ -1,96 +1,66 @@
+# Plan de Mejoras CRM — 5 Fases
 
-
-# Fix: Llamadas - Audio/Video no llega + Notificaciones en movil
-
-## Problemas identificados
-
-### 1. No se escucha ni se ve al otro usuario
-Hay varios fallos en la logica WebRTC actual:
-
-- **Ofertas sin reintento**: El peer "impolite" envia una sola oferta SDP. Si el mensaje broadcast se pierde (cosa comun en Supabase Realtime), no hay mecanismo de reintento. Antes ambos peers enviaban ofertas, asi que al menos una llegaba.
-- **`createPeerConnection` con cache problematica**: Si ya existe un PC para un peer, devuelve el viejo sin verificar su estado. Si ese PC esta en estado `'new'` o `'failed'`, no se recrea.
-- **Sin verificacion de conexion exitosa**: No hay logica que detecte "llevo X segundos sin conectar" y reintente la negociacion.
-
-### 2. En movil no llega la notificacion de llamada entrante
-- `useActiveCalls` usa `postgres_changes` que depende de un WebSocket activo. En movil, si la app esta en segundo plano o la pantalla apagada, el WebSocket se desconecta.
-- El `checkExistingCalls` solo se ejecuta al montar el componente, no cuando la app vuelve al primer plano (visibility change).
+## Orden de Ejecución: FASE 1 → FASE 2 → FASE 3 → FASE 5 → FASE 4
 
 ---
 
-## Plan de implementacion
+## FASE 1 — UI/UX Base y Recordatorios ⬅️ ACTUAL
 
-### Paso 1: Arreglar VideoCallModal - Negociacion WebRTC robusta
+### 1.1 · Identidad Visual por Defecto
+- [ ] Paleta de 3 colores corporativos precargados (primario, acento, neutro)
+- [ ] Tipografía moderna (Inter/Geist para UI, Sora para títulos)
+- [ ] Textos de cabeceras, botones y etiquetas en MAYÚSCULAS con letter-spacing amplio
+- [ ] Variables CSS globales para cambio de tema instantáneo
 
-**Archivo**: `src/components/internal-chat/VideoCallModal.tsx`
+### 1.2 · OsTickets — Apertura directa
+- [ ] Reemplazar acción del botón "Abrir en OsTickets" por window.open() con URL directa
+- [ ] Verificar mapeo de osticket_id en la base de datos
 
-Cambios en `createPeerConnection`:
-- Eliminar el cache que devuelve PCs viejos. Si ya existe un PC para un peer, cerrarlo y crear uno nuevo (salvo si esta `connected`).
-- Anadir un handler `onnegotiationneeded` para renegociacion automatica.
+### 1.3 · Módulo de Recordatorios — Rediseño completo
+**Visual:**
+- [ ] Cards con gradiente suave, iconos de tipo
+- [ ] Timeline lateral con próximos recordatorios del día
+- [ ] Badge de urgencia: 🔴 Hoy / 🟡 Esta semana / 🟢 Futuro
 
-Cambios en el handler `peer-join`:
-- Eliminar la logica de "polite/impolite" que impide que ambos peers negocien. En su lugar, usar un enfoque mas simple: **ambos peers crean un PC al ver al otro, pero solo el que tenga el peerId mas bajo envia la oferta inicial** con logica de reintento.
-- Si despues de 5 segundos no hay `ontrack` (no llego stream remoto), reenviar la oferta SDP.
-
-Cambios en el handler `sdp-offer`:
-- Si llega una oferta y ya tenemos un PC en estado `stable` con streams, ignorarla (ya estamos conectados).
-- Si llega y no tenemos stream remoto, aceptarla normalmente.
-
-Anadir temporizador de reconexion:
-- Si despues de 8 segundos `remotePeers` sigue vacio, forzar un nuevo ciclo de anuncio + oferta limpiando el PC anterior.
-
-### Paso 2: Arreglar notificaciones de llamada en movil
-
-**Archivo**: `src/hooks/useActiveCalls.tsx`
-
-- Anadir un listener de `visibilitychange`: cuando el documento vuelve a ser visible, re-ejecutar `checkExistingCalls` para detectar llamadas perdidas mientras la pantalla estaba apagada.
-- Anadir un intervalo de polling cada 5 segundos como backup: si hay llamadas en estado `ringing` donde el usuario es participante y no es el caller, mostrar la notificacion.
-- Limpiar el polling cuando el componente se desmonte.
-
-### Paso 3: Mejorar GlobalCallListener para movil
-
-**Archivo**: `src/components/internal-chat/GlobalCallListener.tsx`
-
-- Anadir vibracion continua cuando hay `incomingCall` activa (como backup al IncomingCallDialog que puede no mostrarse en movil).
+**Funciones nuevas:**
+- [ ] Destinatarios múltiples
+- [ ] Recurrencia (única, diaria, semanal, mensual)
+- [ ] Snooze inteligente (15 min / 1h / mañana)
+- [ ] Recordatorio vinculado a entidad
+- [ ] Prioridad ajustable con color dinámico
+- [ ] Nota rápida
 
 ---
 
-## Detalles tecnicos
+## FASE 2 — Permisos, Limpieza y Inbox CSV
 
-### Flujo WebRTC corregido
+### 2.1 · Eliminar el Scrapper
+### 2.2 · Control de Acceso por Roles (Admin/Usuario)
+### 2.3 · Inbox — Importación de Contactos por CSV
+### 2.4 · Simplificación Visual General
 
-```text
-Caller                          Receiver
-  |                                |
-  |--- peer-join (broadcast) ----->|
-  |                                |
-  |     (receiver accepts call)    |
-  |                                |
-  |<--- peer-join (broadcast) ----|
-  |                                |
-  | (ambos crean PC, solo el de   |
-  |  peerId mas bajo envia offer) |
-  |                                |
-  |--- sdp-offer ----------------->|
-  |<-- sdp-answer -----------------|
-  |<-> ice-candidates <---------->|
-  |                                |
-  | [5s timeout: no ontrack?]     |
-  | [-> cerrar PC, recrear,       |
-  |    reenviar offer]            |
-```
+---
 
-### Polling de llamadas movil
+## FASE 3 — Comunicación Interna en Tickets y WhatsApp
 
-```text
-Cada 5 segundos:
-  1. SELECT * FROM active_calls WHERE status = 'ringing' AND created_at > now() - 30s
-  2. Para cada llamada, verificar si el usuario es participante
-  3. Si hay llamada pendiente y no se esta mostrando, mostrarla
-  4. Al volver de background (visibilitychange), ejecutar inmediatamente
-```
+### 3.1 · Chat interno por Ticket
+### 3.2 · Menciones con @usuario
+### 3.3 · Envío a WhatsApp con contexto del ticket
 
-### Archivos a modificar
-- `src/components/internal-chat/VideoCallModal.tsx` - Logica WebRTC robusta con reintentos
-- `src/hooks/useActiveCalls.tsx` - Polling + visibilitychange para movil
-- `src/components/internal-chat/GlobalCallListener.tsx` - Vibracion backup en movil
+---
 
+## FASE 5 — Sistema de Archivos e Informes (antes de Fase 4)
+
+### 5.1 · Drag & Drop de Archivos
+### 5.2 · Sistema de Archivos Raíz
+### 5.3 · Módulo de Informes — Correcciones
+
+---
+
+## FASE 4 — Correo Realtime, IA con Herramientas y Calendario Inteligente
+
+### 4.1 · Correo en Tiempo Real
+### 4.2 · Editor de Tickets — Unificar
+### 4.3 · Calendario con IA Autónoma
+### 4.4 · Multitarea de la IA
+### 4.5 · IA con Acceso Total al CRM
