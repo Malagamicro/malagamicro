@@ -41,13 +41,15 @@ import { ReportsModule } from '@/components/reports/ReportsModule';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const IndexContent = () => {
   const navigate = useNavigate();
   const { sidebarPosition, setSidebarPosition } = useSidebarConfig();
+  const { isAdmin, roleLoading } = useUserRole();
   const [localPosition, setLocalPosition] = useState(sidebarPosition);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(roleLoading ? '' : (isAdmin ? 'dashboard' : 'correo'));
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -76,6 +78,13 @@ const IndexContent = () => {
     isGeocodingLead,
     isBulkGeocoding,
   } = useLeads();
+
+  // Set default tab based on role once loaded
+  useEffect(() => {
+    if (!roleLoading && activeTab === '') {
+      setActiveTab(isAdmin ? 'dashboard' : 'correo');
+    }
+  }, [roleLoading, isAdmin]);
 
   // Sync localPosition when sidebarPosition loads from DB
   useEffect(() => {
@@ -153,13 +162,32 @@ const IndexContent = () => {
 
   const selectedLead = leads.find(l => l.id === selectedLeadId);
 
+  const ADMIN_ONLY_TABS = ['dashboard', 'leads', 'lead-detail', 'pipeline', 'campaigns'];
+
+  const renderAccessDenied = () => (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="text-center space-y-3">
+        <ShieldAlert className="w-16 h-16 mx-auto text-muted-foreground/40" />
+        <h2 className="text-xl font-semibold text-foreground">Acceso restringido</h2>
+        <p className="text-muted-foreground text-sm max-w-sm">
+          No tienes permisos para acceder a este módulo. Contacta con un administrador.
+        </p>
+      </div>
+    </div>
+  );
+
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading || roleLoading) {
       return (
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       );
+    }
+
+    // Block non-admins from restricted tabs
+    if (!isAdmin && ADMIN_ONLY_TABS.includes(activeTab)) {
+      return renderAccessDenied();
     }
 
     if (activeTab === 'lead-detail' && selectedLead) {
