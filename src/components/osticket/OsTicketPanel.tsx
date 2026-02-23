@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { sanitizeBasicHtml } from '@/lib/sanitize';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -49,9 +49,12 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useOsTicketHistory, OsTicketRecord } from '@/hooks/useOsTicketHistory';
 import { useOsTicketConfig } from '@/hooks/useOsTicketConfig';
+import { useTicketNotes } from '@/hooks/useTicketNotes';
+import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 /* ─── helpers ─── */
 const parseEmail = (raw: string | null): string => {
@@ -509,6 +512,130 @@ function WhatsAppEditor({
   );
 }
 
+/* ─── Ticket Notes Chat ─── */
+function TicketNotesChat({ ticketId }: { ticketId: string }) {
+  const { notes, isLoading, isAdding, addNote, deleteNote } = useTicketNotes(ticketId);
+  const { user } = useAuth();
+  const [newNote, setNewNote] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [notes.length]);
+
+  const handleSubmit = async () => {
+    if (!newNote.trim()) return;
+    await addNote(newNote);
+    setNewNote('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  };
+
+  const getAvatarColor = (userId: string) => {
+    const colors = [
+      'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500',
+      'bg-pink-500', 'bg-cyan-500', 'bg-orange-500', 'bg-indigo-500',
+    ];
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded-full bg-blue-500/15 flex items-center justify-center flex-shrink-0">
+          <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
+        </div>
+        <h3 className="font-semibold text-sm">Notas internas del equipo</h3>
+        <Badge variant="outline" className="text-[10px] ml-auto">{notes.length}</Badge>
+      </div>
+
+      {/* Notes thread */}
+      <div
+        ref={scrollRef}
+        className="max-h-48 overflow-y-auto space-y-2 rounded-lg border bg-muted/20 p-2"
+      >
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : notes.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-4">
+            Sin notas. Añade una nota para el equipo.
+          </p>
+        ) : (
+          notes.map((note) => {
+            const isOwn = note.user_id === user?.id;
+            return (
+              <div key={note.id} className={cn("flex gap-2 group", isOwn && "flex-row-reverse")}>
+                <Avatar className="h-6 w-6 flex-shrink-0">
+                  <AvatarFallback className={cn("text-[10px] text-white", getAvatarColor(note.user_id))}>
+                    {getInitials(note.user_name || 'U')}
+                  </AvatarFallback>
+                </Avatar>
+                <div className={cn("max-w-[80%] space-y-0.5", isOwn && "items-end")}>
+                  <div className={cn(
+                    "rounded-lg px-2.5 py-1.5 text-xs leading-relaxed",
+                    isOwn ? "bg-primary text-primary-foreground" : "bg-background border"
+                  )}>
+                    {!isOwn && <p className="font-semibold text-[10px] mb-0.5 opacity-70">{note.user_name}</p>}
+                    <p className="whitespace-pre-wrap">{note.content}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-1">
+                    <span className="text-[9px] text-muted-foreground">
+                      {format(new Date(note.created_at), 'd MMM HH:mm', { locale: es })}
+                    </span>
+                    {isOwn && (
+                      <button
+                        onClick={() => deleteNote(note.id)}
+                        className="text-[9px] text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Input */}
+      <div className="flex gap-2">
+        <Textarea
+          value={newNote}
+          onChange={(e) => setNewNote(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Escribe una nota para el equipo..."
+          className="text-xs min-h-[36px] max-h-20 resize-none flex-1"
+          rows={1}
+        />
+        <Button
+          size="icon"
+          className="h-9 w-9 flex-shrink-0"
+          onClick={handleSubmit}
+          disabled={isAdding || !newNote.trim()}
+        >
+          {isAdding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Ticket Detail Panel ─── */
 function TicketDetail({
   ticket,
@@ -691,6 +818,11 @@ function TicketDetail({
               </div>
             )}
           </div>
+
+          <Separator />
+
+          {/* Internal Team Notes */}
+          <TicketNotesChat ticketId={ticket.ticket_id || ticket.id} />
 
           <Separator />
 
