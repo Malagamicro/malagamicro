@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -43,6 +43,8 @@ export interface EmailAttachment {
   created_at: string;
 }
 
+const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
 export function useEmailMessages(profileId?: string) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<EmailMessage[]>([]);
@@ -52,6 +54,8 @@ export function useEmailMessages(profileId?: string) {
   const [attachments, setAttachments] = useState<EmailAttachment[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | 'starred'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const prevMessageIdsRef = useRef<Set<string>>(new Set());
+  const isFirstLoadRef = useRef(true);
 
   const fetchMessages = useCallback(async () => {
     if (!user) return;
@@ -69,7 +73,25 @@ export function useEmailMessages(profileId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      setMessages((data as any[]) || []);
+      const newMessages = (data as any[]) || [];
+      
+      // Detect new emails for notifications
+      if (!isFirstLoadRef.current && newMessages.length > 0) {
+        const currentIds = new Set(newMessages.map(m => m.id));
+        const newEmailIds = newMessages.filter(m => !prevMessageIdsRef.current.has(m.id) && !m.is_read);
+        
+        if (newEmailIds.length > 0) {
+          const latestNew = newEmailIds[0];
+          toast.info(`📧 ${newEmailIds.length} correo(s) nuevo(s)`, {
+            description: latestNew.subject || latestNew.from_address,
+            duration: 5000,
+          });
+        }
+      }
+
+      prevMessageIdsRef.current = new Set(newMessages.map(m => m.id));
+      isFirstLoadRef.current = false;
+      setMessages(newMessages);
     } catch (err) {
       console.error('Error fetching emails:', err);
     } finally {
@@ -79,7 +101,7 @@ export function useEmailMessages(profileId?: string) {
 
   useEffect(() => { if (user) fetchMessages(); }, [user, fetchMessages]);
 
-  // Realtime
+  // Realtime subscription
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -89,12 +111,45 @@ export function useEmailMessages(profileId?: string) {
     return () => { supabase.removeChannel(channel); };
   }, [user, fetchMessages]);
 
+  // Auto-sync every 2 minutes
+  useEffect(() => {
+    if (!user) return;
+
+    const doAutoSync = async () => {
+      try {
+        const { data: allProfiles } = await supabase
+          .from('email_profiles')
+          .select('id, imap_host, imap_user, imap_password')
+          .not('imap_host', 'is', null)
+          .not('imap_user', 'is', null)
+          .not('imap_password', 'is', null);
+        
+        const validProfiles = (allProfiles || []).filter(
+          p => p.imap_host?.trim() && p.imap_user?.trim() && p.imap_password?.trim()
+        );
+
+        if (validProfiles.length === 0) return;
+
+        for (const p of validProfiles) {
+          try {
+            await supabase.functions.invoke('imap-check', {
+              body: { profile_id: p.id, action: 'sync' }
+            });
+          } catch { /* silent */ }
+        }
+        await fetchMessages();
+      } catch { /* silent */ }
+    };
+
+    const interval = setInterval(doAutoSync, AUTO_SYNC_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [user, fetchMessages]);
+
   const syncInbox = async (pId?: string) => {
     setSyncing(true);
     try {
       const targetProfileId = pId || profileId;
       if (!targetProfileId) {
-        // Sync all profiles one by one
         const { data: allProfiles } = await supabase
           .from('email_profiles')
           .select('id, profile_name, imap_host, imap_user, imap_password')
@@ -102,7 +157,6 @@ export function useEmailMessages(profileId?: string) {
           .not('imap_user', 'is', null)
           .not('imap_password', 'is', null);
         
-        // Filter out profiles with empty strings
         const validProfiles = (allProfiles || []).filter(
           p => p.imap_host?.trim() && p.imap_user?.trim() && p.imap_password?.trim()
         );
