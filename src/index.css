@@ -130,6 +130,15 @@
     background-size: var(--custom-bg-size, auto);
   }
 
+  /* Apply pattern to cards and surfaces */
+  .bg-card,
+  [class*="bg-card"],
+  main,
+  [role="main"] {
+    background-image: var(--custom-bg-pattern, none);
+    background-size: var(--custom-bg-size, auto);
+  }
+
   /* Sora for all headings */
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading, 'Space Grotesk', 'DM Sans', system-ui, sans-serif);
