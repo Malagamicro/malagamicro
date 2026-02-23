@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { DocumentEditor } from '@/components/editor/DocumentEditor';
 import { FileTreeSidebar } from '@/components/editor/FileTreeSidebar';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,35 +52,37 @@ const DocumentEditorPage = () => {
     }
   }, []);
 
-  // When editing a shared file, save overwrites the existing file
-  const handleSaveToCloud = fileId ? async (title: string, content: string) => {
-    if (!user) return;
-    const safeName = sanitizeFileName(title || 'documento');
-    const fileName = `${safeName}.md`;
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const file = new File([blob], fileName, { type: 'text/markdown' });
-    const filePath = `${user.id}/${Date.now()}-${fileName}`;
+  const handleSaveToCloud = useMemo(() => {
+    if (!fileId) return undefined;
+    return async (title: string, content: string) => {
+      if (!user) return;
+      const safeName = sanitizeFileName(title || 'documento');
+      const fileName = `${safeName}.md`;
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const file = new File([blob], fileName, { type: 'text/markdown' });
+      const filePath = `${user.id}/${Date.now()}-${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('shared-files')
-      .upload(filePath, file);
-    if (uploadError) throw uploadError;
+      const { error: uploadError } = await supabase.storage
+        .from('shared-files')
+        .upload(filePath, file);
+      if (uploadError) throw uploadError;
 
-    const { data: urlData } = supabase.storage
-      .from('shared-files')
-      .getPublicUrl(filePath);
+      const { data: urlData } = supabase.storage
+        .from('shared-files')
+        .getPublicUrl(filePath);
 
-    const { error: dbError } = await supabase
-      .from('shared_files')
-      .update({
-        file_name: `${title || 'documento'}.md`,
-        file_path: urlData.publicUrl,
-        file_size: blob.size,
-      })
-      .eq('id', fileId);
-    if (dbError) throw dbError;
-    toast.success('Archivo actualizado en Cloud');
-  } : undefined;
+      const { error: dbError } = await supabase
+        .from('shared_files')
+        .update({
+          file_name: `${title || 'documento'}.md`,
+          file_path: urlData.publicUrl,
+          file_size: blob.size,
+        })
+        .eq('id', fileId);
+      if (dbError) throw dbError;
+      toast.success('Archivo actualizado en Cloud');
+    };
+  }, [fileId, user]);
 
   if (!ready) return null;
 
