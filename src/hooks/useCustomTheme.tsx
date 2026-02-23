@@ -2,153 +2,506 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-export type ColorPreset = 'default' | 'ocean' | 'forest' | 'sunset' | 'berry' | 'slate' | 'midnight' | 'copper';
-export type BackgroundPattern = 'none' | 'dots' | 'grid' | 'diagonal' | 'waves' | 'cross';
-export type FontFamily = 'dm-sans' | 'inter' | 'poppins' | 'nunito' | 'outfit' | 'work-sans' | 'space-grotesk' | 'raleway';
+export type ColorPreset = 'default' | 'ocean' | 'forest' | 'sunset' | 'berry' | 'slate' | 'midnight' | 'copper' | 'rose' | 'emerald';
+export type BackgroundPattern = 'none' | 'dots' | 'grid' | 'diagonal' | 'waves' | 'cross' | 'noise' | 'gradient-radial';
+export type FontFamily = 'dm-sans' | 'inter' | 'poppins' | 'nunito' | 'outfit' | 'work-sans' | 'space-grotesk' | 'raleway' | 'plus-jakarta' | 'manrope';
+export type BorderRadiusSize = 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
 
 export interface CustomTheme {
   colorPreset: ColorPreset;
   backgroundPattern: BackgroundPattern;
   fontFamily: FontFamily;
+  borderRadius: BorderRadiusSize;
 }
 
 const DEFAULT_THEME: CustomTheme = {
   colorPreset: 'default',
   backgroundPattern: 'none',
   fontFamily: 'dm-sans',
+  borderRadius: 'lg',
 };
 
-// Color presets with HSL values for light and dark modes
-export const COLOR_PRESETS: Record<ColorPreset, { 
-  label: string; 
+// Full color system per preset - ALL variables covered
+interface ColorSystem {
+  background: string;
+  foreground: string;
+  card: string;
+  cardForeground: string;
+  popover: string;
+  popoverForeground: string;
+  primary: string;
+  primaryForeground: string;
+  secondary: string;
+  secondaryForeground: string;
+  muted: string;
+  mutedForeground: string;
+  accent: string;
+  accentForeground: string;
+  destructive: string;
+  destructiveForeground: string;
+  border: string;
+  input: string;
+  ring: string;
+  sidebarBackground: string;
+  sidebarForeground: string;
+  sidebarPrimary: string;
+  sidebarPrimaryForeground: string;
+  sidebarAccent: string;
+  sidebarAccentForeground: string;
+  sidebarBorder: string;
+}
+
+export const COLOR_PRESETS: Record<ColorPreset, {
+  label: string;
   preview: string;
-  light: { primary: string; accent: string; sidebar: string };
-  dark: { primary: string; accent: string; sidebar: string };
+  light: ColorSystem;
+  dark: ColorSystem;
 }> = {
   default: {
     label: 'MalagaMicro',
     preview: '#3C4E8C',
-    light: { primary: '224 40% 39%', accent: '25 95% 53%', sidebar: '224 40% 39%' },
-    dark: { primary: '224 50% 55%', accent: '25 95% 53%', sidebar: '222 47% 8%' },
+    light: {
+      background: '0 0% 98%', foreground: '222 47% 20%',
+      card: '0 0% 100%', cardForeground: '222 47% 20%',
+      popover: '0 0% 100%', popoverForeground: '222 47% 20%',
+      primary: '224 40% 39%', primaryForeground: '0 0% 100%',
+      secondary: '232 23% 58%', secondaryForeground: '0 0% 100%',
+      muted: '220 14% 96%', mutedForeground: '220 9% 46%',
+      accent: '25 95% 53%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '220 13% 91%', input: '220 13% 91%', ring: '224 40% 39%',
+      sidebarBackground: '224 40% 39%', sidebarForeground: '0 0% 100%',
+      sidebarPrimary: '0 0% 100%', sidebarPrimaryForeground: '224 40% 39%',
+      sidebarAccent: '224 40% 45%', sidebarAccentForeground: '0 0% 100%',
+      sidebarBorder: '224 40% 45%',
+    },
+    dark: {
+      background: '222 47% 11%', foreground: '0 0% 98%',
+      card: '222 47% 14%', cardForeground: '0 0% 98%',
+      popover: '222 47% 14%', popoverForeground: '0 0% 98%',
+      primary: '224 50% 55%', primaryForeground: '0 0% 100%',
+      secondary: '232 23% 45%', secondaryForeground: '0 0% 100%',
+      muted: '222 47% 18%', mutedForeground: '220 14% 65%',
+      accent: '25 95% 53%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '222 47% 20%', input: '222 47% 20%', ring: '224 50% 55%',
+      sidebarBackground: '222 47% 8%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '224 50% 55%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '222 47% 14%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '222 47% 18%',
+    },
   },
   ocean: {
     label: 'Océano',
     preview: '#0891b2',
-    light: { primary: '192 91% 37%', accent: '172 66% 50%', sidebar: '192 91% 25%' },
-    dark: { primary: '192 75% 50%', accent: '172 66% 50%', sidebar: '192 91% 8%' },
+    light: {
+      background: '195 20% 97%', foreground: '195 50% 15%',
+      card: '0 0% 100%', cardForeground: '195 50% 15%',
+      popover: '0 0% 100%', popoverForeground: '195 50% 15%',
+      primary: '192 91% 37%', primaryForeground: '0 0% 100%',
+      secondary: '187 40% 50%', secondaryForeground: '0 0% 100%',
+      muted: '195 20% 95%', mutedForeground: '195 15% 45%',
+      accent: '172 66% 42%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '195 15% 90%', input: '195 15% 90%', ring: '192 91% 37%',
+      sidebarBackground: '195 60% 18%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '192 91% 50%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '195 50% 25%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '195 40% 25%',
+    },
+    dark: {
+      background: '195 50% 8%', foreground: '195 10% 95%',
+      card: '195 45% 12%', cardForeground: '195 10% 95%',
+      popover: '195 45% 12%', popoverForeground: '195 10% 95%',
+      primary: '192 75% 50%', primaryForeground: '0 0% 100%',
+      secondary: '187 35% 40%', secondaryForeground: '0 0% 100%',
+      muted: '195 40% 16%', mutedForeground: '195 15% 60%',
+      accent: '172 66% 45%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '195 40% 18%', input: '195 40% 18%', ring: '192 75% 50%',
+      sidebarBackground: '195 55% 6%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '192 75% 50%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '195 45% 12%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '195 40% 15%',
+    },
   },
   forest: {
     label: 'Bosque',
     preview: '#16a34a',
-    light: { primary: '142 72% 37%', accent: '84 81% 44%', sidebar: '142 72% 22%' },
-    dark: { primary: '142 60% 50%', accent: '84 81% 44%', sidebar: '142 72% 8%' },
+    light: {
+      background: '140 15% 97%', foreground: '150 40% 15%',
+      card: '0 0% 100%', cardForeground: '150 40% 15%',
+      popover: '0 0% 100%', popoverForeground: '150 40% 15%',
+      primary: '142 72% 32%', primaryForeground: '0 0% 100%',
+      secondary: '152 35% 48%', secondaryForeground: '0 0% 100%',
+      muted: '140 15% 95%', mutedForeground: '140 10% 45%',
+      accent: '84 70% 42%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '140 12% 90%', input: '140 12% 90%', ring: '142 72% 32%',
+      sidebarBackground: '150 50% 15%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '142 72% 45%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '150 40% 22%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '150 35% 22%',
+    },
+    dark: {
+      background: '150 40% 7%', foreground: '140 10% 95%',
+      card: '150 35% 11%', cardForeground: '140 10% 95%',
+      popover: '150 35% 11%', popoverForeground: '140 10% 95%',
+      primary: '142 60% 45%', primaryForeground: '0 0% 100%',
+      secondary: '152 30% 38%', secondaryForeground: '0 0% 100%',
+      muted: '150 30% 15%', mutedForeground: '140 10% 60%',
+      accent: '84 70% 42%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '150 30% 16%', input: '150 30% 16%', ring: '142 60% 45%',
+      sidebarBackground: '150 45% 5%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '142 60% 45%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '150 35% 11%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '150 30% 13%',
+    },
   },
   sunset: {
     label: 'Atardecer',
     preview: '#ea580c',
-    light: { primary: '21 90% 48%', accent: '346 77% 50%', sidebar: '21 90% 28%' },
-    dark: { primary: '21 80% 55%', accent: '346 77% 50%', sidebar: '21 90% 8%' },
+    light: {
+      background: '30 20% 97%', foreground: '20 50% 15%',
+      card: '0 0% 100%', cardForeground: '20 50% 15%',
+      popover: '0 0% 100%', popoverForeground: '20 50% 15%',
+      primary: '21 90% 48%', primaryForeground: '0 0% 100%',
+      secondary: '35 60% 50%', secondaryForeground: '0 0% 100%',
+      muted: '30 20% 95%', mutedForeground: '20 10% 45%',
+      accent: '346 77% 50%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '30 15% 90%', input: '30 15% 90%', ring: '21 90% 48%',
+      sidebarBackground: '15 55% 22%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '21 90% 55%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '15 45% 28%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '15 40% 28%',
+    },
+    dark: {
+      background: '15 40% 7%', foreground: '30 10% 95%',
+      card: '15 35% 11%', cardForeground: '30 10% 95%',
+      popover: '15 35% 11%', popoverForeground: '30 10% 95%',
+      primary: '21 80% 55%', primaryForeground: '0 0% 100%',
+      secondary: '35 50% 42%', secondaryForeground: '0 0% 100%',
+      muted: '15 30% 15%', mutedForeground: '20 10% 60%',
+      accent: '346 77% 55%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '15 30% 16%', input: '15 30% 16%', ring: '21 80% 55%',
+      sidebarBackground: '15 45% 5%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '21 80% 55%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '15 35% 11%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '15 30% 13%',
+    },
   },
   berry: {
     label: 'Frutos',
     preview: '#9333ea',
-    light: { primary: '271 81% 56%', accent: '330 81% 60%', sidebar: '271 81% 30%' },
-    dark: { primary: '271 70% 65%', accent: '330 81% 60%', sidebar: '271 81% 8%' },
+    light: {
+      background: '270 15% 97%', foreground: '270 40% 15%',
+      card: '0 0% 100%', cardForeground: '270 40% 15%',
+      popover: '0 0% 100%', popoverForeground: '270 40% 15%',
+      primary: '271 81% 50%', primaryForeground: '0 0% 100%',
+      secondary: '290 40% 55%', secondaryForeground: '0 0% 100%',
+      muted: '270 15% 95%', mutedForeground: '270 10% 45%',
+      accent: '330 81% 55%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '270 12% 90%', input: '270 12% 90%', ring: '271 81% 50%',
+      sidebarBackground: '271 55% 25%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '271 81% 60%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '271 45% 32%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '271 40% 32%',
+    },
+    dark: {
+      background: '271 45% 7%', foreground: '270 10% 95%',
+      card: '271 40% 11%', cardForeground: '270 10% 95%',
+      popover: '271 40% 11%', popoverForeground: '270 10% 95%',
+      primary: '271 70% 60%', primaryForeground: '0 0% 100%',
+      secondary: '290 35% 45%', secondaryForeground: '0 0% 100%',
+      muted: '271 35% 15%', mutedForeground: '270 10% 60%',
+      accent: '330 81% 55%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '271 35% 17%', input: '271 35% 17%', ring: '271 70% 60%',
+      sidebarBackground: '271 50% 5%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '271 70% 60%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '271 40% 11%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '271 35% 14%',
+    },
   },
   slate: {
     label: 'Pizarra',
     preview: '#475569',
-    light: { primary: '215 19% 35%', accent: '210 40% 52%', sidebar: '215 19% 25%' },
-    dark: { primary: '215 19% 55%', accent: '210 40% 52%', sidebar: '215 19% 8%' },
+    light: {
+      background: '210 15% 97%', foreground: '215 25% 20%',
+      card: '0 0% 100%', cardForeground: '215 25% 20%',
+      popover: '0 0% 100%', popoverForeground: '215 25% 20%',
+      primary: '215 19% 35%', primaryForeground: '0 0% 100%',
+      secondary: '210 15% 50%', secondaryForeground: '0 0% 100%',
+      muted: '210 15% 95%', mutedForeground: '215 10% 45%',
+      accent: '210 40% 52%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '210 12% 90%', input: '210 12% 90%', ring: '215 19% 35%',
+      sidebarBackground: '215 25% 20%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '210 40% 52%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '215 20% 27%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '215 18% 27%',
+    },
+    dark: {
+      background: '215 25% 8%', foreground: '210 10% 95%',
+      card: '215 22% 12%', cardForeground: '210 10% 95%',
+      popover: '215 22% 12%', popoverForeground: '210 10% 95%',
+      primary: '215 19% 55%', primaryForeground: '0 0% 100%',
+      secondary: '210 15% 42%', secondaryForeground: '0 0% 100%',
+      muted: '215 20% 16%', mutedForeground: '210 10% 58%',
+      accent: '210 40% 52%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '215 20% 17%', input: '215 20% 17%', ring: '215 19% 55%',
+      sidebarBackground: '215 28% 6%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '215 19% 55%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '215 22% 12%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '215 20% 14%',
+    },
   },
   midnight: {
     label: 'Medianoche',
     preview: '#1e1b4b',
-    light: { primary: '244 47% 20%', accent: '262 83% 58%', sidebar: '244 47% 15%' },
-    dark: { primary: '244 47% 55%', accent: '262 83% 58%', sidebar: '244 47% 6%' },
+    light: {
+      background: '244 15% 97%', foreground: '244 40% 18%',
+      card: '0 0% 100%', cardForeground: '244 40% 18%',
+      popover: '0 0% 100%', popoverForeground: '244 40% 18%',
+      primary: '244 47% 30%', primaryForeground: '0 0% 100%',
+      secondary: '250 30% 50%', secondaryForeground: '0 0% 100%',
+      muted: '244 15% 95%', mutedForeground: '244 10% 45%',
+      accent: '262 83% 58%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '244 12% 90%', input: '244 12% 90%', ring: '244 47% 30%',
+      sidebarBackground: '244 47% 15%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '262 83% 58%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '244 40% 22%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '244 35% 22%',
+    },
+    dark: {
+      background: '244 45% 6%', foreground: '244 10% 95%',
+      card: '244 40% 10%', cardForeground: '244 10% 95%',
+      popover: '244 40% 10%', popoverForeground: '244 10% 95%',
+      primary: '244 47% 55%', primaryForeground: '0 0% 100%',
+      secondary: '250 30% 42%', secondaryForeground: '0 0% 100%',
+      muted: '244 35% 14%', mutedForeground: '244 10% 58%',
+      accent: '262 83% 58%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '244 35% 15%', input: '244 35% 15%', ring: '244 47% 55%',
+      sidebarBackground: '244 50% 4%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '244 47% 55%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '244 40% 10%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '244 35% 12%',
+    },
   },
   copper: {
     label: 'Cobre',
     preview: '#b45309',
-    light: { primary: '32 95% 37%', accent: '15 75% 48%', sidebar: '32 60% 25%' },
-    dark: { primary: '32 80% 52%', accent: '15 75% 48%', sidebar: '32 60% 8%' },
+    light: {
+      background: '35 20% 97%', foreground: '32 50% 15%',
+      card: '0 0% 100%', cardForeground: '32 50% 15%',
+      popover: '0 0% 100%', popoverForeground: '32 50% 15%',
+      primary: '32 95% 37%', primaryForeground: '0 0% 100%',
+      secondary: '38 50% 48%', secondaryForeground: '0 0% 100%',
+      muted: '35 18% 95%', mutedForeground: '32 10% 45%',
+      accent: '15 75% 48%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '35 15% 90%', input: '35 15% 90%', ring: '32 95% 37%',
+      sidebarBackground: '32 50% 18%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '32 95% 50%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '32 40% 25%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '32 35% 25%',
+    },
+    dark: {
+      background: '32 40% 6%', foreground: '35 10% 95%',
+      card: '32 35% 10%', cardForeground: '35 10% 95%',
+      popover: '32 35% 10%', popoverForeground: '35 10% 95%',
+      primary: '32 80% 50%', primaryForeground: '0 0% 100%',
+      secondary: '38 40% 40%', secondaryForeground: '0 0% 100%',
+      muted: '32 30% 14%', mutedForeground: '32 10% 58%',
+      accent: '15 75% 48%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '32 30% 15%', input: '32 30% 15%', ring: '32 80% 50%',
+      sidebarBackground: '32 45% 4%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '32 80% 50%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '32 35% 10%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '32 30% 12%',
+    },
+  },
+  rose: {
+    label: 'Rosa',
+    preview: '#e11d48',
+    light: {
+      background: '350 15% 97%', foreground: '350 40% 15%',
+      card: '0 0% 100%', cardForeground: '350 40% 15%',
+      popover: '0 0% 100%', popoverForeground: '350 40% 15%',
+      primary: '350 89% 50%', primaryForeground: '0 0% 100%',
+      secondary: '340 50% 55%', secondaryForeground: '0 0% 100%',
+      muted: '350 15% 95%', mutedForeground: '350 10% 45%',
+      accent: '330 70% 55%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '350 12% 90%', input: '350 12% 90%', ring: '350 89% 50%',
+      sidebarBackground: '350 55% 22%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '350 89% 60%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '350 45% 28%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '350 40% 28%',
+    },
+    dark: {
+      background: '350 40% 6%', foreground: '350 10% 95%',
+      card: '350 35% 10%', cardForeground: '350 10% 95%',
+      popover: '350 35% 10%', popoverForeground: '350 10% 95%',
+      primary: '350 80% 55%', primaryForeground: '0 0% 100%',
+      secondary: '340 40% 42%', secondaryForeground: '0 0% 100%',
+      muted: '350 30% 14%', mutedForeground: '350 10% 58%',
+      accent: '330 70% 55%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '350 30% 15%', input: '350 30% 15%', ring: '350 80% 55%',
+      sidebarBackground: '350 45% 4%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '350 80% 55%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '350 35% 10%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '350 30% 12%',
+    },
+  },
+  emerald: {
+    label: 'Esmeralda',
+    preview: '#059669',
+    light: {
+      background: '160 15% 97%', foreground: '160 40% 15%',
+      card: '0 0% 100%', cardForeground: '160 40% 15%',
+      popover: '0 0% 100%', popoverForeground: '160 40% 15%',
+      primary: '160 84% 30%', primaryForeground: '0 0% 100%',
+      secondary: '170 50% 45%', secondaryForeground: '0 0% 100%',
+      muted: '160 15% 95%', mutedForeground: '160 10% 45%',
+      accent: '142 60% 48%', accentForeground: '0 0% 100%',
+      destructive: '0 84% 60%', destructiveForeground: '0 0% 100%',
+      border: '160 12% 90%', input: '160 12% 90%', ring: '160 84% 30%',
+      sidebarBackground: '160 60% 16%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '160 84% 40%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '160 50% 22%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '160 45% 22%',
+    },
+    dark: {
+      background: '160 40% 6%', foreground: '160 10% 95%',
+      card: '160 35% 10%', cardForeground: '160 10% 95%',
+      popover: '160 35% 10%', popoverForeground: '160 10% 95%',
+      primary: '160 70% 42%', primaryForeground: '0 0% 100%',
+      secondary: '170 40% 38%', secondaryForeground: '0 0% 100%',
+      muted: '160 30% 14%', mutedForeground: '160 10% 58%',
+      accent: '142 60% 48%', accentForeground: '0 0% 100%',
+      destructive: '0 62% 50%', destructiveForeground: '0 0% 100%',
+      border: '160 30% 15%', input: '160 30% 15%', ring: '160 70% 42%',
+      sidebarBackground: '160 45% 4%', sidebarForeground: '0 0% 98%',
+      sidebarPrimary: '160 70% 42%', sidebarPrimaryForeground: '0 0% 100%',
+      sidebarAccent: '160 35% 10%', sidebarAccentForeground: '0 0% 98%',
+      sidebarBorder: '160 30% 12%',
+    },
   },
 };
 
 export const BACKGROUND_PATTERNS: Record<BackgroundPattern, { label: string; css: string }> = {
   none: { label: 'Ninguno', css: '' },
-  dots: {
-    label: 'Puntos',
-    css: 'radial-gradient(circle, hsl(var(--foreground) / 0.05) 1px, transparent 1px)',
-  },
-  grid: {
-    label: 'Cuadrícula',
-    css: 'linear-gradient(hsl(var(--foreground) / 0.03) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / 0.03) 1px, transparent 1px)',
-  },
-  diagonal: {
-    label: 'Diagonal',
-    css: 'repeating-linear-gradient(45deg, transparent, transparent 10px, hsl(var(--foreground) / 0.02) 10px, hsl(var(--foreground) / 0.02) 11px)',
-  },
-  waves: {
-    label: 'Ondas',
-    css: 'radial-gradient(ellipse at 50% 0%, hsl(var(--primary) / 0.04) 0%, transparent 60%)',
-  },
-  cross: {
-    label: 'Cruz',
-    css: 'linear-gradient(hsl(var(--foreground) / 0.03) 1.5px, transparent 1.5px), linear-gradient(90deg, hsl(var(--foreground) / 0.03) 1.5px, transparent 1.5px)',
-  },
+  dots: { label: 'Puntos', css: 'radial-gradient(circle, hsl(var(--foreground) / 0.06) 1px, transparent 1px)' },
+  grid: { label: 'Cuadrícula', css: 'linear-gradient(hsl(var(--foreground) / 0.04) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / 0.04) 1px, transparent 1px)' },
+  diagonal: { label: 'Diagonal', css: 'repeating-linear-gradient(45deg, transparent, transparent 10px, hsl(var(--foreground) / 0.03) 10px, hsl(var(--foreground) / 0.03) 11px)' },
+  waves: { label: 'Ondas', css: 'radial-gradient(ellipse at 50% 0%, hsl(var(--primary) / 0.06) 0%, transparent 60%)' },
+  cross: { label: 'Cruz', css: 'linear-gradient(hsl(var(--foreground) / 0.04) 1.5px, transparent 1.5px), linear-gradient(90deg, hsl(var(--foreground) / 0.04) 1.5px, transparent 1.5px)' },
+  noise: { label: 'Ruido', css: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.03\'/%3E%3C/svg%3E")' },
+  'gradient-radial': { label: 'Gradiente', css: 'radial-gradient(ellipse at 30% 20%, hsl(var(--primary) / 0.05) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, hsl(var(--accent) / 0.04) 0%, transparent 50%)' },
 };
 
-export const FONT_FAMILIES: Record<FontFamily, { label: string; import: string; family: string }> = {
+export const FONT_FAMILIES: Record<FontFamily, { label: string; import: string; family: string; heading: string }> = {
   'dm-sans': {
     label: 'DM Sans',
-    import: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap",
+    import: "https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Space+Grotesk:wght@400;500;600;700&display=swap",
     family: "'DM Sans', system-ui, sans-serif",
+    heading: "'Space Grotesk', 'DM Sans', system-ui, sans-serif",
   },
   inter: {
     label: 'Inter',
-    import: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap",
+    import: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap",
     family: "'Inter', system-ui, sans-serif",
+    heading: "'Sora', 'Inter', system-ui, sans-serif",
   },
   poppins: {
     label: 'Poppins',
     import: "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap",
     family: "'Poppins', system-ui, sans-serif",
+    heading: "'Poppins', system-ui, sans-serif",
   },
   nunito: {
     label: 'Nunito',
     import: "https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap",
     family: "'Nunito', system-ui, sans-serif",
+    heading: "'Nunito', system-ui, sans-serif",
   },
   outfit: {
     label: 'Outfit',
     import: "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap",
     family: "'Outfit', system-ui, sans-serif",
+    heading: "'Outfit', system-ui, sans-serif",
   },
   'work-sans': {
     label: 'Work Sans',
     import: "https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700&display=swap",
     family: "'Work Sans', system-ui, sans-serif",
+    heading: "'Work Sans', system-ui, sans-serif",
   },
   'space-grotesk': {
     label: 'Space Grotesk',
     import: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap",
     family: "'Space Grotesk', system-ui, sans-serif",
+    heading: "'Space Grotesk', system-ui, sans-serif",
   },
   raleway: {
     label: 'Raleway',
     import: "https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap",
     family: "'Raleway', system-ui, sans-serif",
+    heading: "'Raleway', system-ui, sans-serif",
+  },
+  'plus-jakarta': {
+    label: 'Plus Jakarta',
+    import: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap",
+    family: "'Plus Jakarta Sans', system-ui, sans-serif",
+    heading: "'Plus Jakarta Sans', system-ui, sans-serif",
+  },
+  manrope: {
+    label: 'Manrope',
+    import: "https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap",
+    family: "'Manrope', system-ui, sans-serif",
+    heading: "'Manrope', system-ui, sans-serif",
   },
 };
 
+export const BORDER_RADIUS_OPTIONS: Record<BorderRadiusSize, { label: string; value: string }> = {
+  none: { label: 'Sin bordes', value: '0rem' },
+  sm: { label: 'Sutil', value: '0.3rem' },
+  md: { label: 'Medio', value: '0.5rem' },
+  lg: { label: 'Grande', value: '0.625rem' },
+  xl: { label: 'Extra', value: '1rem' },
+  full: { label: 'Máximo', value: '1.5rem' },
+};
+
 const PATTERN_SIZES: Record<BackgroundPattern, string> = {
-  none: '',
-  dots: '20px 20px',
-  grid: '24px 24px, 24px 24px',
-  diagonal: '',
-  waves: '',
-  cross: '16px 16px, 16px 16px',
+  none: '', dots: '20px 20px', grid: '24px 24px, 24px 24px',
+  diagonal: '', waves: '', cross: '16px 16px, 16px 16px',
+  noise: '256px 256px', 'gradient-radial': '',
+};
+
+const CSS_VAR_MAP: Record<keyof ColorSystem, string> = {
+  background: '--background', foreground: '--foreground',
+  card: '--card', cardForeground: '--card-foreground',
+  popover: '--popover', popoverForeground: '--popover-foreground',
+  primary: '--primary', primaryForeground: '--primary-foreground',
+  secondary: '--secondary', secondaryForeground: '--secondary-foreground',
+  muted: '--muted', mutedForeground: '--muted-foreground',
+  accent: '--accent', accentForeground: '--accent-foreground',
+  destructive: '--destructive', destructiveForeground: '--destructive-foreground',
+  border: '--border', input: '--input', ring: '--ring',
+  sidebarBackground: '--sidebar-background', sidebarForeground: '--sidebar-foreground',
+  sidebarPrimary: '--sidebar-primary', sidebarPrimaryForeground: '--sidebar-primary-foreground',
+  sidebarAccent: '--sidebar-accent', sidebarAccentForeground: '--sidebar-accent-foreground',
+  sidebarBorder: '--sidebar-border',
 };
 
 function applyColorPreset(preset: ColorPreset, isDark: boolean) {
@@ -156,39 +509,49 @@ function applyColorPreset(preset: ColorPreset, isDark: boolean) {
   if (!config) return;
   const mode = isDark ? config.dark : config.light;
   const root = document.documentElement;
-  root.style.setProperty('--primary', mode.primary);
-  root.style.setProperty('--ring', mode.primary);
-  root.style.setProperty('--accent', mode.accent);
-  root.style.setProperty('--sidebar-background', mode.sidebar);
+  for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
+    const value = mode[key as keyof ColorSystem];
+    if (value) root.style.setProperty(cssVar, value);
+  }
 }
 
 function applyBackgroundPattern(pattern: BackgroundPattern) {
   const config = BACKGROUND_PATTERNS[pattern];
-  const main = document.querySelector('main') || document.body;
+  const root = document.documentElement;
   if (!config.css || pattern === 'none') {
-    (main as HTMLElement).style.backgroundImage = '';
-    (main as HTMLElement).style.backgroundSize = '';
+    root.style.removeProperty('--custom-bg-pattern');
+    root.style.removeProperty('--custom-bg-size');
   } else {
-    (main as HTMLElement).style.backgroundImage = config.css;
+    root.style.setProperty('--custom-bg-pattern', config.css);
     const size = PATTERN_SIZES[pattern];
-    if (size) (main as HTMLElement).style.backgroundSize = size;
+    root.style.setProperty('--custom-bg-size', size || 'auto');
   }
 }
 
 function applyFont(font: FontFamily) {
   const config = FONT_FAMILIES[font];
   if (!config) return;
-
-  // Ensure font is loaded
-  const existingLink = document.querySelector(`link[data-custom-font]`);
+  const existingLink = document.querySelector('link[data-custom-font]');
   if (existingLink) existingLink.remove();
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = config.import;
   link.setAttribute('data-custom-font', 'true');
   document.head.appendChild(link);
-
+  document.documentElement.style.setProperty('--font-body', config.family);
+  document.documentElement.style.setProperty('--font-heading', config.heading);
   document.body.style.fontFamily = config.family;
+  // Apply to all headings
+  const style = document.getElementById('custom-heading-font') || document.createElement('style');
+  style.id = 'custom-heading-font';
+  style.textContent = `h1,h2,h3,h4,h5,h6{font-family:${config.heading} !important;}`;
+  if (!style.parentNode) document.head.appendChild(style);
+}
+
+function applyBorderRadius(size: BorderRadiusSize) {
+  const config = BORDER_RADIUS_OPTIONS[size];
+  if (!config) return;
+  document.documentElement.style.setProperty('--radius', config.value);
 }
 
 export function useCustomTheme() {
@@ -197,7 +560,6 @@ export function useCustomTheme() {
   const initialized = useRef(false);
   const saving = useRef(false);
 
-  // Load from DB
   useEffect(() => {
     if (!user?.id || initialized.current) return;
     const load = async () => {
@@ -217,16 +579,15 @@ export function useCustomTheme() {
     load();
   }, [user?.id]);
 
-  // Apply theme whenever it changes
   useEffect(() => {
     if (!initialized.current) return;
     const isDark = document.documentElement.classList.contains('dark');
     applyColorPreset(customTheme.colorPreset, isDark);
     applyBackgroundPattern(customTheme.backgroundPattern);
     applyFont(customTheme.fontFamily);
+    applyBorderRadius(customTheme.borderRadius);
   }, [customTheme]);
 
-  // Re-apply colors when dark/light mode changes
   useEffect(() => {
     const observer = new MutationObserver(() => {
       const isDark = document.documentElement.classList.contains('dark');
@@ -236,7 +597,6 @@ export function useCustomTheme() {
     return () => observer.disconnect();
   }, [customTheme.colorPreset]);
 
-  // Save to DB
   const saveTheme = useCallback(async (theme: CustomTheme) => {
     if (!user?.id || saving.current) return;
     saving.current = true;
@@ -258,17 +618,21 @@ export function useCustomTheme() {
   const resetTheme = useCallback(() => {
     setCustomTheme(DEFAULT_THEME);
     saveTheme(DEFAULT_THEME);
-    // Reset inline styles
-    document.documentElement.style.removeProperty('--primary');
-    document.documentElement.style.removeProperty('--ring');
-    document.documentElement.style.removeProperty('--accent');
-    document.documentElement.style.removeProperty('--sidebar-background');
-    const main = document.querySelector('main') || document.body;
-    (main as HTMLElement).style.backgroundImage = '';
-    (main as HTMLElement).style.backgroundSize = '';
+    // Remove all inline styles from root
+    const root = document.documentElement;
+    for (const cssVar of Object.values(CSS_VAR_MAP)) {
+      root.style.removeProperty(cssVar);
+    }
+    root.style.removeProperty('--custom-bg-pattern');
+    root.style.removeProperty('--custom-bg-size');
+    root.style.removeProperty('--font-body');
+    root.style.removeProperty('--font-heading');
+    root.style.removeProperty('--radius');
     document.body.style.fontFamily = '';
     const link = document.querySelector('link[data-custom-font]');
     if (link) link.remove();
+    const headingStyle = document.getElementById('custom-heading-font');
+    if (headingStyle) headingStyle.remove();
   }, [saveTheme]);
 
   return { customTheme, updateTheme, resetTheme };

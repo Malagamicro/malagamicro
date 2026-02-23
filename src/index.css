@@ -123,14 +123,16 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'DM Sans', system-ui, sans-serif;
+    font-family: var(--font-body, 'DM Sans', system-ui, sans-serif);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-image: var(--custom-bg-pattern, none);
+    background-size: var(--custom-bg-size, auto);
   }
 
   /* Sora for all headings */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
+    font-family: var(--font-heading, 'Space Grotesk', 'DM Sans', system-ui, sans-serif);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-weight: 700;
