@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
-import { Palette, Type, Wallpaper, RotateCcw, ChevronDown, Circle } from 'lucide-react';
+import { Palette, Type, Wallpaper, RotateCcw, ChevronDown, Circle, TextCursor, Layers, Sparkles, Zap, Eye } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Switch } from '@/components/ui/switch';
 import { useState } from 'react';
 import {
   useCustomTheme,
@@ -8,11 +9,28 @@ import {
   BACKGROUND_PATTERNS,
   FONT_FAMILIES,
   BORDER_RADIUS_OPTIONS,
+  FONT_SIZE_OPTIONS,
+  UI_DENSITY_OPTIONS,
+  SIDEBAR_STYLE_OPTIONS,
+  ANIMATION_SPEED_OPTIONS,
   type ColorPreset,
   type BackgroundPattern,
   type FontFamily,
   type BorderRadiusSize,
+  type FontSizeScale,
+  type UIDensity,
+  type SidebarStyle,
+  type AnimationSpeed,
 } from '@/hooks/useCustomTheme';
+
+function SectionHeader({ icon: Icon, label }: { icon: React.ComponentType<{ className?: string }>; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 mb-2">
+      <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+    </div>
+  );
+}
 
 export function ThemeCustomizer() {
   const { customTheme, updateTheme, resetTheme } = useCustomTheme();
@@ -36,10 +54,7 @@ export function ThemeCustomizer() {
       <CollapsibleContent className="pl-2 pr-1 space-y-4 mt-2 mb-2 animate-accordion-down max-h-[60vh] overflow-y-auto custom-scrollbar">
         {/* Color presets */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2">
-            <Palette className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Paleta de colores</span>
-          </div>
+          <SectionHeader icon={Palette} label="Paleta de colores" />
           <div className="grid grid-cols-5 gap-1">
             {(Object.entries(COLOR_PRESETS) as [ColorPreset, typeof COLOR_PRESETS[ColorPreset]][]).map(([key, preset]) => (
               <button
@@ -65,10 +80,7 @@ export function ThemeCustomizer() {
 
         {/* Background pattern */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2">
-            <Wallpaper className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Estampado de fondo</span>
-          </div>
+          <SectionHeader icon={Wallpaper} label="Estampado de fondo" />
           <div className="grid grid-cols-4 gap-1">
             {(Object.entries(BACKGROUND_PATTERNS) as [BackgroundPattern, typeof BACKGROUND_PATTERNS[BackgroundPattern]][]).map(([key, pattern]) => (
               <button
@@ -89,10 +101,7 @@ export function ThemeCustomizer() {
 
         {/* Font family */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2">
-            <Type className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tipografía</span>
-          </div>
+          <SectionHeader icon={Type} label="Tipografía" />
           <div className="grid grid-cols-2 gap-1">
             {(Object.entries(FONT_FAMILIES) as [FontFamily, typeof FONT_FAMILIES[FontFamily]][]).map(([key, font]) => (
               <button
@@ -111,12 +120,30 @@ export function ThemeCustomizer() {
           </div>
         </div>
 
+        {/* Font size */}
+        <div>
+          <SectionHeader icon={TextCursor} label="Tamaño de fuente" />
+          <div className="grid grid-cols-5 gap-1">
+            {(Object.entries(FONT_SIZE_OPTIONS) as [FontSizeScale, typeof FONT_SIZE_OPTIONS[FontSizeScale]][]).map(([key, opt]) => (
+              <button
+                key={key}
+                onClick={() => updateTheme({ fontSize: key })}
+                className={cn(
+                  "px-1 py-1 rounded-md text-[9px] font-medium transition-all text-center",
+                  customTheme.fontSize === key
+                    ? "ring-2 ring-primary bg-sidebar-accent"
+                    : "hover:bg-sidebar-accent/50"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Border radius */}
         <div>
-          <div className="flex items-center gap-1.5 mb-2">
-            <Circle className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Bordes</span>
-          </div>
+          <SectionHeader icon={Circle} label="Bordes" />
           <div className="grid grid-cols-3 gap-1">
             {(Object.entries(BORDER_RADIUS_OPTIONS) as [BorderRadiusSize, typeof BORDER_RADIUS_OPTIONS[BorderRadiusSize]][]).map(([key, opt]) => (
               <button
@@ -134,6 +161,82 @@ export function ThemeCustomizer() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* UI Density */}
+        <div>
+          <SectionHeader icon={Layers} label="Densidad de interfaz" />
+          <div className="grid grid-cols-3 gap-1">
+            {(Object.entries(UI_DENSITY_OPTIONS) as [UIDensity, typeof UI_DENSITY_OPTIONS[UIDensity]][]).map(([key, opt]) => (
+              <button
+                key={key}
+                onClick={() => updateTheme({ uiDensity: key })}
+                className={cn(
+                  "px-2 py-1 rounded-md text-[9px] font-medium transition-all text-center",
+                  customTheme.uiDensity === key
+                    ? "ring-2 ring-primary bg-sidebar-accent"
+                    : "hover:bg-sidebar-accent/50"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sidebar style */}
+        <div>
+          <SectionHeader icon={Sparkles} label="Estilo del sidebar" />
+          <div className="grid grid-cols-3 gap-1">
+            {(Object.entries(SIDEBAR_STYLE_OPTIONS) as [SidebarStyle, typeof SIDEBAR_STYLE_OPTIONS[SidebarStyle]][]).map(([key, opt]) => (
+              <button
+                key={key}
+                onClick={() => updateTheme({ sidebarStyle: key })}
+                className={cn(
+                  "px-2 py-1 rounded-md text-[9px] font-medium transition-all text-center",
+                  customTheme.sidebarStyle === key
+                    ? "ring-2 ring-primary bg-sidebar-accent"
+                    : "hover:bg-sidebar-accent/50"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Animation speed */}
+        <div>
+          <SectionHeader icon={Zap} label="Velocidad de animación" />
+          <div className="grid grid-cols-4 gap-1">
+            {(Object.entries(ANIMATION_SPEED_OPTIONS) as [AnimationSpeed, typeof ANIMATION_SPEED_OPTIONS[AnimationSpeed]][]).map(([key, opt]) => (
+              <button
+                key={key}
+                onClick={() => updateTheme({ animationSpeed: key })}
+                className={cn(
+                  "px-1 py-1 rounded-md text-[9px] font-medium transition-all text-center",
+                  customTheme.animationSpeed === key
+                    ? "ring-2 ring-primary bg-sidebar-accent"
+                    : "hover:bg-sidebar-accent/50"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* High contrast */}
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-1.5">
+            <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Alto contraste</span>
+          </div>
+          <Switch
+            checked={customTheme.highContrast}
+            onCheckedChange={(checked) => updateTheme({ highContrast: checked })}
+            className="scale-75"
+          />
         </div>
 
         {/* Reset */}
