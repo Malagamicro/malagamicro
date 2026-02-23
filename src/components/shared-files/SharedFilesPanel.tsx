@@ -37,6 +37,7 @@ import {
   FileSpreadsheet,
   Presentation,
   Pencil,
+  FolderDown,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,10 +80,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useSharedFiles, useSharedFolders, formatFileSize, SharedFile, SharedFolder } from '@/hooks/useSharedFiles';
+import { useAllSharedFolders, useGlobalFileSearch } from '@/hooks/useAllSharedFiles';
 import { useMessageTemplates } from '@/hooks/useMessageTemplates';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { FolderTreeSidebar } from './FolderTreeSidebar';
 
 const TEMPLATE_CATEGORIES = [
   { value: 'general', label: 'General' },
@@ -348,11 +351,21 @@ export function SharedFilesPanel() {
   
   const { files, isLoading: filesLoading, uploadFile, deleteFile, updateDescription, moveFile, reorderFiles } = useSharedFiles(currentFolderId);
   const { folders, isLoading: foldersLoading, createFolder, deleteFolder, renameFolder } = useSharedFolders(currentFolderId);
+  const { folderTree } = useAllSharedFolders();
   
   // Also fetch root folders for "move to folder" menu
   const { folders: allRootFolders } = useSharedFolders(null);
   // Fetch subfolders of current folder for move options
   const { folders: currentSubfolders } = useSharedFolders(currentFolderId);
+
+  // Global search state
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const { results: globalSearchResults, isLoading: globalSearchLoading } = useGlobalFileSearch(globalSearchQuery);
+
+  // Desktop drag & drop state
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
 
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState<string>('all');
@@ -376,6 +389,61 @@ export function SharedFilesPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isLoading = filesLoading || foldersLoading;
+
+  // Desktop drag & drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    dragCounterRef.current = 0;
+
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length === 0) return;
+
+    const validFiles: File[] = [];
+    for (const f of droppedFiles) {
+      if (f.size > 50 * 1024 * 1024) {
+        toast.error(`"${f.name}" es demasiado grande (máx. 50MB)`);
+      } else {
+        validFiles.push(f);
+      }
+    }
+    if (validFiles.length === 0) return;
+
+    setSelectedUploadFiles(validFiles);
+    setDescription('');
+    setUploadDialogOpen(true);
+  }, []);
+
+  // Tree sidebar navigation
+  const handleTreeNavigate = useCallback((folderId: string | null, path: { id: string | null; name: string }[]) => {
+    setCurrentFolderId(folderId);
+    setBreadcrumbs(path);
+    setIsSearchMode(false);
+  }, []);
 
   // Build move-to-folder options (root folders + subfolders, excluding current)
   const moveTargetFolders = useMemo(() => {
@@ -586,8 +654,35 @@ export function SharedFilesPanel() {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <Card className="flex-1 flex flex-col">
+    <div className="h-full flex">
+      {/* Tree Sidebar */}
+      <FolderTreeSidebar
+        tree={folderTree}
+        currentFolderId={currentFolderId}
+        onNavigate={handleTreeNavigate}
+        onSearchMode={() => { setIsSearchMode(true); setGlobalSearchQuery(''); }}
+        isSearchMode={isSearchMode}
+      />
+
+    <div
+      className="flex-1 flex flex-col relative"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drop zone overlay */}
+      {isDragOver && (
+        <div className="absolute inset-0 z-50 bg-primary/10 border-2 border-dashed border-primary rounded-lg flex items-center justify-center backdrop-blur-sm">
+          <div className="text-center">
+            <FolderDown className="h-12 w-12 text-primary mx-auto mb-2" />
+            <p className="text-lg font-semibold text-primary">Soltar archivos aquí</p>
+            <p className="text-sm text-muted-foreground">Se subirán a la carpeta actual</p>
+          </div>
+        </div>
+      )}
+
+    <Card className="flex-1 flex flex-col border-0 rounded-none">
         <CardHeader className="pb-2 md:pb-4 px-2 md:px-6 pt-2 md:pt-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-3">
             <div className="flex items-center gap-2">
@@ -683,7 +778,60 @@ export function SharedFilesPanel() {
         <CardContent className="flex-1 overflow-hidden px-2 md:px-6 pb-2 md:pb-6">
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} accept="*/*" multiple />
 
-          {isLoading ? (
+          {isSearchMode ? (
+            /* Global Search Mode */
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar archivos en todas las carpetas..."
+                  value={globalSearchQuery}
+                  onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                  className="pl-10"
+                  autoFocus
+                />
+              </div>
+              {globalSearchLoading ? (
+                <div className="flex items-center justify-center h-32"><Loader2 className="h-6 w-6 animate-spin" /></div>
+              ) : globalSearchQuery.length < 2 ? (
+                <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                  <Search className="h-8 w-8 mb-2 opacity-30" />
+                  <p className="text-sm">Escribe al menos 2 caracteres para buscar</p>
+                </div>
+              ) : globalSearchResults.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                  <p className="text-sm">No se encontraron archivos</p>
+                </div>
+              ) : (
+                <ScrollArea className="h-[calc(100vh-300px)]">
+                  <div className="grid gap-2">
+                    {globalSearchResults.map(file => {
+                      const FileIcon = getFileIcon(file.file_type);
+                      return (
+                        <div key={file.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer" onClick={() => { setSelectedFile(file); setPreviewDialogOpen(true); }}>
+                          <FileIcon className="h-5 w-5 text-muted-foreground shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{file.file_name}</p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{formatFileSize(file.file_size)}</span>
+                              {file.folder_name && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  <Folder className="h-3 w-3 mr-1" />{file.folder_name}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); window.open(file.file_path, '_blank'); }}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center h-48">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
@@ -691,7 +839,7 @@ export function SharedFilesPanel() {
             <div className="flex flex-col items-center justify-center h-48 text-muted-foreground px-4 text-center">
               <Cloud className="h-10 w-10 md:h-12 md:w-12 mb-3 opacity-30" />
               <p className="font-medium text-sm md:text-base">Esta carpeta está vacía</p>
-              <p className="text-xs md:text-sm">Sube archivos o crea carpetas para organizar</p>
+              <p className="text-xs md:text-sm">Sube archivos o arrastra desde tu escritorio</p>
             </div>
           ) : (
             <ScrollArea className="h-[calc(100vh-240px)] md:h-[calc(100vh-340px)]">
@@ -1050,6 +1198,7 @@ export function SharedFilesPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }

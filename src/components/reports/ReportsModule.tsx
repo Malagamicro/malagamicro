@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { format, subDays, startOfWeek, endOfWeek } from 'date-fns';
+import { useState, useMemo } from 'react';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { FileText, Plus, Trash2, Download, Loader2, Calendar, Clock, User } from 'lucide-react';
+import { FileText, Plus, Trash2, Download, Loader2, Calendar, Clock, User, Users, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,10 +10,62 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useExitRecords, ExitRecord } from '@/hooks/useExitRecords';
-import { useReports } from '@/hooks/useReports';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useExitRecords } from '@/hooks/useExitRecords';
+import { useReports, Report } from '@/hooks/useReports';
 import { useAuth } from '@/hooks/useAuth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+
+function exportReportToPdf(report: Report) {
+  const doc = new jsPDF();
+  const margin = 20;
+  const pageWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  let y = margin;
+
+  // Title
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  const titleLines = doc.splitTextToSize(report.title, pageWidth);
+  doc.text(titleLines, margin, y);
+  y += titleLines.length * 8 + 5;
+
+  // Metadata
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(120);
+  doc.text(`Tipo: ${report.report_type} | Fecha: ${format(new Date(report.created_at), "d MMM yyyy HH:mm", { locale: es })}`, margin, y);
+  y += 6;
+  if (report.week_start && report.week_end) {
+    doc.text(`Periodo: ${report.week_start} — ${report.week_end}`, margin, y);
+    y += 6;
+  }
+  y += 4;
+
+  // Separator
+  doc.setDrawColor(200);
+  doc.line(margin, y, margin + pageWidth, y);
+  y += 8;
+
+  // Content
+  doc.setTextColor(40);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  const contentLines = doc.splitTextToSize(report.content, pageWidth);
+
+  for (const line of contentLines) {
+    if (y > doc.internal.pageSize.getHeight() - margin) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.text(line, margin, y);
+    y += 5.5;
+  }
+
+  doc.save(`${report.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+  toast.success('PDF descargado');
+}
 
 export function ReportsModule() {
   const { user } = useAuth();
@@ -21,6 +73,7 @@ export function ReportsModule() {
   const { reports, isLoading: reportsLoading, isGenerating, generateReport, deleteReport } = useReports();
   const [showExitForm, setShowExitForm] = useState(false);
   const [showReportViewer, setShowReportViewer] = useState<string | null>(null);
+  const [reportTypeFilter, setReportTypeFilter] = useState<string>('all');
   const [exitForm, setExitForm] = useState({
     student_name: '',
     exit_date: format(new Date(), 'yyyy-MM-dd'),
@@ -50,6 +103,16 @@ export function ReportsModule() {
       exit_time: format(new Date(), 'HH:mm'), return_time: '', reason: '', destination: '', notes: '',
     });
   };
+
+  const filteredReports = useMemo(() => {
+    if (reportTypeFilter === 'all') return reports;
+    return reports.filter(r => r.report_type === reportTypeFilter);
+  }, [reports, reportTypeFilter]);
+
+  const reportTypes = useMemo(() => {
+    const types = new Set(reports.map(r => r.report_type));
+    return Array.from(types);
+  }, [reports]);
 
   const selectedReport = reports.find(r => r.id === showReportViewer);
 
@@ -131,24 +194,51 @@ export function ReportsModule() {
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">
-          <h2 className="text-lg font-semibold">Informes generados</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Informes generados</h2>
+            {reportTypes.length > 1 && (
+              <Select value={reportTypeFilter} onValueChange={setReportTypeFilter}>
+                <SelectTrigger className="w-[160px] h-8">
+                  <Filter className="w-3.5 h-3.5 mr-1.5" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  {reportTypes.map(t => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
           {reportsLoading ? (
             <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
-          ) : reports.length === 0 ? (
+          ) : filteredReports.length === 0 ? (
             <Card><CardContent className="p-8 text-center text-muted-foreground">No hay informes generados</CardContent></Card>
           ) : (
             <div className="space-y-2">
-              {reports.map(r => (
+              {filteredReports.map(r => (
                 <Card key={r.id} className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setShowReportViewer(r.id)}>
                   <CardContent className="p-3 flex items-center gap-3">
                     <FileText className="w-5 h-5 text-primary shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{r.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(r.created_at), "d MMM yyyy HH:mm", { locale: es })}
-                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(r.created_at), "d MMM yyyy HH:mm", { locale: es })}
+                        </p>
+                        {r.week_start && r.week_end && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {r.week_start} — {r.week_end}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <Badge variant="secondary" className="text-[10px]">{r.report_type}</Badge>
+                    <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); exportReportToPdf(r); }} title="Exportar PDF">
+                      <Download className="w-4 h-4" />
+                    </Button>
                     <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); deleteReport(r.id); }}>
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
@@ -188,10 +278,20 @@ export function ReportsModule() {
         </DialogContent>
       </Dialog>
 
-      {/* Report viewer dialog */}
+      {/* Report viewer dialog with PDF export */}
       <Dialog open={!!showReportViewer} onOpenChange={() => setShowReportViewer(null)}>
         <DialogContent className="sm:max-w-[600px] max-h-[80vh]">
-          <DialogHeader><DialogTitle>{selectedReport?.title}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="flex-1 truncate">{selectedReport?.title}</DialogTitle>
+              {selectedReport && (
+                <Button size="sm" variant="outline" onClick={() => exportReportToPdf(selectedReport)}>
+                  <Download className="w-4 h-4 mr-1.5" />
+                  PDF
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
               {selectedReport?.content}
