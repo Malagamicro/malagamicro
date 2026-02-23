@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { DocumentEditor } from '@/components/editor/DocumentEditor';
+import { FileTreeSidebar } from '@/components/editor/FileTreeSidebar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import type { SharedFile } from '@/hooks/useSharedFiles';
 
 function sanitizeFileName(name: string): string {
   return name
@@ -17,6 +19,7 @@ const DocumentEditorPage = () => {
   const [initialTitle, setInitialTitle] = useState('');
   const [fileId, setFileId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const content = sessionStorage.getItem('editor_file_content');
@@ -27,13 +30,26 @@ const DocumentEditorPage = () => {
       setInitialContent(content);
       setInitialTitle(title || 'Sin título');
       setFileId(id);
-      // Clear so refreshing doesn't reload stale data
       sessionStorage.removeItem('editor_file_content');
       sessionStorage.removeItem('editor_file_title');
       sessionStorage.removeItem('editor_file_type');
       sessionStorage.removeItem('editor_file_id');
     }
     setReady(true);
+  }, []);
+
+  const handleOpenFile = useCallback(async (file: SharedFile) => {
+    try {
+      const response = await fetch(file.file_path);
+      if (!response.ok) throw new Error('Error al descargar archivo');
+      const text = await response.text();
+      setInitialContent(text);
+      setInitialTitle(file.file_name.replace(/\.\w+$/, ''));
+      setFileId(file.id);
+    } catch (e) {
+      console.error(e);
+      toast.error('No se pudo abrir el archivo');
+    }
   }, []);
 
   // When editing a shared file, save overwrites the existing file
@@ -69,12 +85,21 @@ const DocumentEditorPage = () => {
   if (!ready) return null;
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <DocumentEditor
-        initialContent={initialContent}
-        initialTitle={initialTitle}
-        onSaveToCloud={handleSaveToCloud}
+    <div className="h-screen flex bg-background">
+      <FileTreeSidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onOpenFile={handleOpenFile}
+        activeFileId={fileId}
       />
+      <div className="flex-1 flex flex-col min-w-0">
+        <DocumentEditor
+          key={fileId || 'new'}
+          initialContent={initialContent}
+          initialTitle={initialTitle}
+          onSaveToCloud={handleSaveToCloud}
+        />
+      </div>
     </div>
   );
 };
