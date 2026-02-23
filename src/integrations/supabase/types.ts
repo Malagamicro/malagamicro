@@ -867,6 +867,7 @@ export type Database = {
           recurrence_type: string
           reminder_date: string
           snooze_until: string | null
+          target_user_ids: string[] | null
           title: string
           updated_at: string
           user_id: string
@@ -884,6 +885,7 @@ export type Database = {
           recurrence_type?: string
           reminder_date: string
           snooze_until?: string | null
+          target_user_ids?: string[] | null
           title: string
           updated_at?: string
           user_id: string
@@ -901,6 +903,7 @@ export type Database = {
           recurrence_type?: string
           reminder_date?: string
           snooze_until?: string | null
+          target_user_ids?: string[] | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -1205,6 +1208,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          is_admin_only: boolean | null
           name: string
           updated_at: string
           user_id: string
@@ -1214,6 +1218,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          is_admin_only?: boolean | null
           name: string
           updated_at?: string
           user_id: string
@@ -1223,6 +1228,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          is_admin_only?: boolean | null
           name?: string
           updated_at?: string
           user_id?: string

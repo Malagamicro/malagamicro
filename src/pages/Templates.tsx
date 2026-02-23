@@ -1,45 +1,25 @@
 import { useState, useMemo } from 'react';
 import { useMessageTemplates, MessageTemplate } from '@/hooks/useMessageTemplates';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { 
-  FileText, 
-  Plus, 
-  Loader2, 
-  MoreVertical, 
-  Pencil, 
-  Trash2,
-  Copy,
-  MessageSquare,
-  Search,
-  Tag,
-  Sparkles,
-  Send,
+  FileText, Plus, Loader2, MoreVertical, Pencil, Trash2,
+  Copy, MessageSquare, Search, Tag, Sparkles, Send, ShieldAlert,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -47,6 +27,7 @@ interface TemplateFormData {
   name: string;
   content: string;
   category: string;
+  is_admin_only: boolean;
 }
 
 const TEMPLATE_CATEGORIES = [
@@ -62,6 +43,7 @@ const defaultFormData: TemplateFormData = {
   name: '',
   content: '',
   category: 'general',
+  is_admin_only: false,
 };
 
 function getCategoryInfo(category: string) {
@@ -70,14 +52,9 @@ function getCategoryInfo(category: string) {
 
 export default function Templates() {
   const { 
-    templates, 
-    isLoading, 
-    createTemplate, 
-    updateTemplate, 
-    deleteTemplate,
-    isCreating,
-    isUpdating,
+    templates, isLoading, createTemplate, updateTemplate, deleteTemplate, isCreating, isUpdating,
   } = useMessageTemplates();
+  const { isAdmin } = useUserRole();
 
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
@@ -98,7 +75,6 @@ export default function Templates() {
     });
   }, [templates, searchTerm, categoryFilter]);
 
-  // Group templates by category
   const groupedTemplates = useMemo(() => {
     const groups: Record<string, MessageTemplate[]> = {};
     filteredTemplates.forEach(template => {
@@ -121,6 +97,7 @@ export default function Templates() {
       name: template.name,
       content: template.content,
       category: template.category || 'general',
+      is_admin_only: template.isAdminOnly,
     });
     setShowModal(true);
   };
@@ -137,12 +114,14 @@ export default function Templates() {
         name: formData.name.trim(),
         content: formData.content.trim(),
         category: formData.category,
+        is_admin_only: formData.is_admin_only,
       });
     } else {
       createTemplate({
         name: formData.name.trim(),
         content: formData.content.trim(),
         category: formData.category,
+        is_admin_only: formData.is_admin_only,
       });
     }
 
@@ -316,7 +295,15 @@ El mensaje debe ser breve (máximo 3-4 párrafos), directo y profesional. Incluy
                     <Card key={template.id} className="group hover:shadow-md transition-all duration-200">
                       <CardHeader className="pb-2 p-3 md:p-4">
                         <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-sm md:text-base truncate flex-1">{template.name}</CardTitle>
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <CardTitle className="text-sm md:text-base truncate">{template.name}</CardTitle>
+                            {template.isAdminOnly && (
+                              <Badge variant="outline" className="text-[10px] shrink-0 gap-0.5">
+                                <ShieldAlert className="w-2.5 h-2.5" />
+                                Admin
+                              </Badge>
+                            )}
+                          </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -407,6 +394,26 @@ El mensaje debe ser breve (máximo 3-4 párrafos), directo y profesional. Incluy
                 </Select>
               </div>
             </div>
+
+            {/* Admin-only toggle */}
+            {isAdmin && (
+              <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
+                <div className="space-y-0.5">
+                  <Label className="text-sm flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    Solo administradores
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Solo los administradores podrán ver esta plantilla
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.is_admin_only}
+                  onCheckedChange={(v) => setFormData(prev => ({ ...prev, is_admin_only: v }))}
+                  disabled={isSaving}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">

@@ -11,6 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   MessageSquare, 
   Send, 
@@ -29,6 +32,7 @@ import {
   Bell,
   BellOff,
   Download,
+  Upload,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -103,6 +107,9 @@ export default function Inbox() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
+  const [showCsvImport, setShowCsvImport] = useState(false);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const csvInputRef = useRef<HTMLInputElement>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -149,6 +156,38 @@ export default function Inbox() {
       toast.error('Error al actualizar');
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    setCsvImporting(true);
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      const header = lines[0].toLowerCase();
+      const phoneIdx = header.split(/[,;\t]/).findIndex(h => h.trim().match(/phone|telefono|teléfono|número|number|móvil/i));
+      const nameIdx = header.split(/[,;\t]/).findIndex(h => h.trim().match(/name|nombre|contacto/i));
+      const sep = header.includes('\t') ? '\t' : header.includes(';') ? ';' : ',';
+      let imported = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(sep).map(c => c.trim().replace(/^["']|["']$/g, ''));
+        const phone = (cols[phoneIdx >= 0 ? phoneIdx : 0] || '').replace(/\D/g, '');
+        const name = nameIdx >= 0 ? cols[nameIdx] : undefined;
+        if (phone.length >= 9) {
+          const chatId = `${phone}@s.whatsapp.net`;
+          await getOrCreateChat({ chatId, phone, customName: name });
+          imported++;
+        }
+      }
+      toast.success(`${imported} contactos importados desde CSV`);
+      await refetchChats();
+    } catch (err) {
+      toast.error('Error al importar CSV');
+    } finally {
+      setCsvImporting(false);
+      e.target.value = '';
     }
   };
 
@@ -425,6 +464,23 @@ export default function Inbox() {
                 <TooltipContent>Sincronizar chats desde WhatsApp</TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => csvInputRef.current?.click()}
+                    disabled={csvImporting}
+                    title="Importar contactos CSV"
+                  >
+                    {csvImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Importar contactos desde CSV</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <input ref={csvInputRef} type="file" accept=".csv,.txt" className="hidden" onChange={handleCsvImport} />
             <Button
               variant="ghost"
               size="icon"
