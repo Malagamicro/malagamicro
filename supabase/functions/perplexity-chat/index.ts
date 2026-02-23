@@ -408,6 +408,27 @@ const tools = [
       },
     },
   },
+  // Calendar: Share event with participants
+  {
+    type: "function",
+    function: {
+      name: "share_calendar_event",
+      description: "Compartir un evento del calendario con otros usuarios del equipo. Puedes asignar permisos de solo ver o editar.",
+      parameters: {
+        type: "object",
+        properties: {
+          event_id: { type: "string", description: "ID del evento a compartir" },
+          participant_names: { 
+            type: "array", 
+            items: { type: "string" },
+            description: "Nombres de los usuarios con quienes compartir el evento" 
+          },
+          permission: { type: "string", enum: ["view", "edit"], description: "Permiso: 'view' (solo ver) o 'edit' (editar). Default: 'view'" },
+        },
+        required: ["event_id", "participant_names"],
+      },
+    },
+  },
   // ===== STEL ORDER BUDGETS =====
   {
     type: "function",
@@ -1364,6 +1385,85 @@ async function executeToolCall(
           event_id: data.id,
         });
       }
+
+      case "share_calendar_event": {
+        const { event_id, participant_names, permission = "view" } = args;
+
+        // Verify the event belongs to the user
+        const { data: eventData, error: eventError } = await supabase
+          .from("calendar_events")
+          .select("id, title")
+          .eq("id", event_id)
+          .eq("creator_id", userId)
+          .single();
+
+        if (eventError || !eventData) {
+          return JSON.stringify({ success: false, error: "Evento no encontrado o no tienes permisos para compartirlo." });
+        }
+
+        const sharedWith: string[] = [];
+        const errors: string[] = [];
+
+        for (const name of participant_names) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, full_name")
+            .ilike("full_name", `%${name}%`)
+            .limit(1);
+
+          if (!profiles || profiles.length === 0) {
+            errors.push(`No se encontró usuario "${name}"`);
+            continue;
+          }
+
+          const participantUserId = profiles[0].user_id;
+
+          // Check if already a participant
+          const { data: existing } = await supabase
+            .from("event_participants")
+            .select("id")
+            .eq("event_id", event_id)
+            .eq("user_id", participantUserId)
+            .maybeSingle();
+
+          if (existing) {
+            // Update permission
+            await supabase
+              .from("event_participants")
+              .update({ permission })
+              .eq("id", existing.id);
+            sharedWith.push(profiles[0].full_name);
+          } else {
+            const { error: insertError } = await supabase
+              .from("event_participants")
+              .insert({
+                event_id,
+                user_id: participantUserId,
+                permission,
+              });
+
+            if (insertError) {
+              errors.push(`Error al compartir con ${profiles[0].full_name}: ${insertError.message}`);
+            } else {
+              sharedWith.push(profiles[0].full_name);
+            }
+          }
+        }
+
+        const resultMsg = [];
+        if (sharedWith.length > 0) {
+          resultMsg.push(`Evento "${eventData.title}" compartido con: ${sharedWith.join(", ")} (permiso: ${permission})`);
+        }
+        if (errors.length > 0) {
+          resultMsg.push(`Errores: ${errors.join("; ")}`);
+        }
+
+        return JSON.stringify({
+          success: sharedWith.length > 0,
+          message: resultMsg.join(". "),
+          shared_with: sharedWith,
+        });
+      }
       
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
@@ -1456,6 +1556,7 @@ Puedes:
 **CALENDARIO:**
 - Ver eventos del calendario (filtrar por fechas)
 - Crear nuevos eventos con título, fecha, hora y descripción
+- **Compartir eventos con otros usuarios del equipo** (permisos de ver o editar)
 
 **AUDITORÍA:**
 - Ver registro de acciones del sistema

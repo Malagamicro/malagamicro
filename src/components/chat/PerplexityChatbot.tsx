@@ -38,6 +38,9 @@ import {
   Pencil,
   FileIcon,
   X,
+  Paperclip,
+  Image,
+  FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
@@ -54,6 +57,15 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  attachments?: FileAttachment[];
+}
+
+interface FileAttachment {
+  name: string;
+  type: string;
+  size: number;
+  content?: string; // text content for text-based files
+  url?: string; // storage URL for binary files
 }
 
 const MODELS = [
@@ -98,7 +110,10 @@ export function PerplexityChatbot() {
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  
+  const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
   
   const { isRecording, isTranscribing, startRecording, stopRecording } = useAudioRecorder({
     onTranscription: (text) => {
@@ -241,43 +256,144 @@ export function PerplexityChatbot() {
     }
   };
 
+  const TEXT_EXTENSIONS = ['.txt', '.md', '.csv', '.json', '.xml', '.html', '.css', '.js', '.ts', '.tsx', '.jsx', '.yaml', '.yml', '.log', '.sql'];
+  const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+  const ALLOWED_EXTENSIONS = [...TEXT_EXTENSIONS, ...IMAGE_EXTENSIONS, '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx'];
+
+  const isTextFile = (fileName: string) => TEXT_EXTENSIONS.some(ext => fileName.toLowerCase().endsWith(ext));
+  const isImageFile = (fileName: string) => IMAGE_EXTENSIONS.some(ext => fileName.toLowerCase().endsWith(ext));
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newAttachments: FileAttachment[] = [];
+
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} excede 10MB`);
+        continue;
+      }
+
+      const isValid = ALLOWED_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext));
+      if (!isValid) {
+        toast.error(`${file.name}: tipo no soportado`);
+        continue;
+      }
+
+      const attachment: FileAttachment = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      };
+
+      if (isTextFile(file.name)) {
+        // Read text content directly
+        const text = await file.text();
+        attachment.content = text.substring(0, 50000); // Limit to ~50k chars
+      } else if (isImageFile(file.name)) {
+        // Convert to base64 data URL for display
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+        attachment.url = dataUrl;
+        attachment.content = `[Imagen adjunta: ${file.name}]`;
+      } else {
+        // Binary files (PDF, DOCX, etc.) - upload to storage
+        const filePath = `chat-uploads/${crypto.randomUUID()}_${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('shared-files')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          toast.error(`Error al subir ${file.name}`);
+          continue;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('shared-files')
+          .getPublicUrl(filePath);
+
+        attachment.url = urlData.publicUrl;
+        attachment.content = `[Archivo adjunto: ${file.name} (${(file.size / 1024).toFixed(1)} KB) - URL: ${urlData.publicUrl}]`;
+      }
+
+      newAttachments.push(attachment);
+    }
+
+    setPendingFiles(prev => [...prev, ...newAttachments]);
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async (customPrompt?: string) => {
     const messageText = customPrompt || input.trim();
-    if (!messageText || isLoading) return;
+    if (!messageText && pendingFiles.length === 0) return;
+    if (isLoading) return;
 
     let sessionId = activeSessionId;
 
     // Create new session if none active
     if (!sessionId) {
       const newSession = await createSession.mutateAsync({ 
-        title: generateTitle(messageText),
+        title: generateTitle(messageText || pendingFiles[0]?.name || 'Archivo'),
         model: selectedModel,
       });
       sessionId = newSession.id;
       setActiveSessionId(sessionId);
     }
 
+    // Build content with file attachments
+    let fullContent = messageText || '';
+    const currentFiles = [...pendingFiles];
+    
+    if (currentFiles.length > 0) {
+      const fileContextParts = currentFiles.map(f => {
+        if (f.content && !f.content.startsWith('[')) {
+          // Text file - include content
+          return `\n\n--- Archivo: ${f.name} ---\n${f.content}\n--- Fin de ${f.name} ---`;
+        }
+        return f.content || `[Archivo: ${f.name}]`;
+      });
+      fullContent += fileContextParts.join('\n');
+    }
+
     const userMessage: Message = { 
       id: crypto.randomUUID(),
       role: 'user', 
-      content: messageText,
+      content: messageText || `📎 ${currentFiles.map(f => f.name).join(', ')}`,
       timestamp: new Date(),
+      attachments: currentFiles.length > 0 ? currentFiles : undefined,
     };
     
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput('');
+    setPendingFiles([]);
     setIsLoading(true);
 
     // Save user message to DB
     await addMessage.mutateAsync({
       sessionId,
       role: 'user',
-      content: messageText,
+      content: userMessage.content,
     });
 
     try {
-      await streamChat(newMessages.map(m => ({ role: m.role, content: m.content })), sessionId);
+      // Send full content (with file data) to AI, but display only user text
+      const aiMessages = newMessages.map((m, i) => {
+        if (i === newMessages.length - 1 && m.role === 'user') {
+          return { role: m.role, content: fullContent };
+        }
+        return { role: m.role, content: m.content };
+      });
+      await streamChat(aiMessages, sessionId);
     } catch (error) {
       console.error('Chat error:', error);
       toast.error(error instanceof Error ? error.message : 'Error al enviar mensaje');
@@ -588,7 +704,23 @@ export function PerplexityChatbot() {
                           </div>
                         )
                       ) : (
-                        <p className="text-sm">{message.content}</p>
+                        <div>
+                          {message.attachments && message.attachments.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                              {message.attachments.map((att, idx) => (
+                                <div key={idx} className="flex items-center gap-1 text-xs bg-primary-foreground/20 rounded px-2 py-1">
+                                  {isImageFile(att.name) && att.url ? (
+                                    <Image className="h-3 w-3" />
+                                  ) : (
+                                    <FileText className="h-3 w-3" />
+                                  )}
+                                  <span className="truncate max-w-[120px]">{att.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-sm">{message.content}</p>
+                        </div>
                       )}
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1 px-1">
@@ -603,7 +735,45 @@ export function PerplexityChatbot() {
 
         {/* Input */}
         <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
+          {/* Pending files preview */}
+          {pendingFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {pendingFiles.map((file, idx) => (
+                <div key={idx} className="flex items-center gap-1.5 bg-muted rounded-lg px-3 py-1.5 text-xs">
+                  {isImageFile(file.name) ? (
+                    <Image className="h-3.5 w-3.5 text-primary" />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5 text-primary" />
+                  )}
+                  <span className="truncate max-w-[100px]">{file.name}</span>
+                  <button onClick={() => removePendingFile(idx)} className="ml-1 hover:text-destructive">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
           <div className="flex gap-3 items-center">
+            {/* File upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.csv,.md,.txt,.json,.xml,.html,.css,.js,.ts,.tsx,.jpg,.jpeg,.png,.gif,.webp,.svg"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading}
+              className="h-12 w-12 rounded-xl shrink-0"
+              title="Adjuntar archivo"
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
             <Button
               variant={isRecording ? "destructive" : "ghost"}
               size="icon"
@@ -633,7 +803,7 @@ export function PerplexityChatbot() {
             </div>
             <Button 
               onClick={() => handleSend()} 
-              disabled={!input.trim() || isLoading}
+              disabled={(!input.trim() && pendingFiles.length === 0) || isLoading}
               size="icon"
               className="h-12 w-12 rounded-xl"
             >
@@ -645,7 +815,7 @@ export function PerplexityChatbot() {
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground text-center mt-2">
-            Powered by Perplexity • Modelo: {selectedModelInfo.name} • 🎙️ Voxtral STT
+            Powered by Perplexity • Modelo: {selectedModelInfo.name} • 📎 PDF, DOCX, CSV, MD, imágenes
           </p>
         </div>
       </div>
