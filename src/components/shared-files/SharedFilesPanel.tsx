@@ -154,8 +154,33 @@ function canEditInEditor(fileType: string | null): boolean {
   );
 }
 
+// Parse CSV text into rows/columns
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let current = '';
+  let inQuotes = false;
+  let row: string[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') { current += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { current += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { row.push(current); current = ''; }
+      else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+        row.push(current); current = ''; rows.push(row); row = [];
+        if (ch === '\r') i++;
+      } else { current += ch; }
+    }
+  }
+  if (current || row.length > 0) { row.push(current); rows.push(row); }
+  return rows;
+}
+
 // Preview dialog supporting images, PDF, text, office docs, video, audio
-function FilePreviewDialog({ open, onOpenChange, file }: { open: boolean; onOpenChange: (v: boolean) => void; file: SharedFile | null }) {
+function FilePreviewDialog({ open, onOpenChange, file, onOpenInEditor }: { open: boolean; onOpenChange: (v: boolean) => void; file: SharedFile | null; onOpenInEditor?: (file: SharedFile) => void }) {
   const [textContent, setTextContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -172,8 +197,9 @@ function FilePreviewDialog({ open, onOpenChange, file }: { open: boolean; onOpen
       .finally(() => setLoading(false));
   }, [open, file]);
 
+  const isCsv = file?.file_type === 'text/csv';
   const isMarkdown = file?.file_type === 'text/markdown';
-  const isText = file?.file_type === 'text/plain' || file?.file_type === 'text/html' || file?.file_type === 'text/csv' || isMarkdown;
+  const isText = file?.file_type === 'text/plain' || file?.file_type === 'text/html' || isCsv || isMarkdown;
 
   const [ReactMarkdown, setReactMarkdown] = useState<any>(null);
   useEffect(() => {
@@ -181,6 +207,13 @@ function FilePreviewDialog({ open, onOpenChange, file }: { open: boolean; onOpen
       import('react-markdown').then(mod => setReactMarkdown(() => mod.default));
     }
   }, [isMarkdown, open]);
+
+  const csvData = useMemo(() => {
+    if (isCsv && textContent) return parseCsv(textContent);
+    return null;
+  }, [isCsv, textContent]);
+
+  const showEditorButton = file && canEditInEditor(file.file_type) && onOpenInEditor;
 
   const renderContent = () => {
     if (!file) return null;
@@ -227,9 +260,49 @@ function FilePreviewDialog({ open, onOpenChange, file }: { open: boolean; onOpen
     // Text/Markdown/CSV
     if (isText && textContent !== null) {
       if (loading) return <div className="flex items-center justify-center h-48"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+
+      // CSV → table
+      if (isCsv && csvData && csvData.length > 0) {
+        const header = csvData[0];
+        const body = csvData.slice(1);
+        return (
+          <div className="overflow-auto max-h-[70vh]">
+            <table className="w-full text-sm border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr>
+                  {header.map((cell, i) => (
+                    <th key={i} className="bg-muted border border-border px-3 py-2 text-left font-semibold text-foreground whitespace-nowrap">
+                      {cell}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {body.map((row, ri) => (
+                  <tr key={ri} className="hover:bg-muted/50">
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="border border-border px-3 py-1.5 text-foreground whitespace-nowrap">
+                        {cell}
+                      </td>
+                    ))}
+                    {/* Fill missing cells if row is shorter than header */}
+                    {row.length < header.length && Array.from({ length: header.length - row.length }).map((_, ci) => (
+                      <td key={`empty-${ci}`} className="border border-border px-3 py-1.5" />
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+
+      // Markdown → rendered
       if (isMarkdown && ReactMarkdown) {
         return <div className="p-6 prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown>{textContent}</ReactMarkdown></div>;
       }
+
+      // Plain text
       return <pre className="p-6 text-sm whitespace-pre-wrap font-mono bg-muted rounded-lg">{textContent}</pre>;
     }
 
@@ -245,6 +318,12 @@ function FilePreviewDialog({ open, onOpenChange, file }: { open: boolean; onOpen
         <div className="flex-1 overflow-auto">{renderContent()}</div>
         <DialogFooter className="flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          {showEditorButton && (
+            <Button variant="secondary" onClick={() => { onOpenInEditor(file); onOpenChange(false); }}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Abrir en Editor
+            </Button>
+          )}
           <Button onClick={() => file && window.open(file.file_path, '_blank')}>
             <Download className="h-4 w-4 mr-2" />
             Descargar
@@ -907,7 +986,7 @@ export function SharedFilesPanel() {
       </Dialog>
 
       {/* Preview Dialog */}
-      <FilePreviewDialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen} file={selectedFile} />
+      <FilePreviewDialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen} file={selectedFile} onOpenInEditor={handleEditInEditor} />
 
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
