@@ -467,7 +467,8 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
       <div
         key={category.id}
         className="rounded-lg transition-all"
-        style={category.bgColor ? { backgroundColor: category.bgColor + '20' } : undefined}
+        style={category.bgColor ? { backgroundColor: category.bgColor, opacity: 1, backgroundBlendMode: 'normal' } : undefined}
+        data-has-bg={!!category.bgColor}
       >
       <Collapsible open={isOpen} onOpenChange={() => toggleCategory(category.id)}>
         <div className="flex items-center group">

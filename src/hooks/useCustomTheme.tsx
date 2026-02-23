@@ -6,12 +6,21 @@ export type ColorPreset = 'default' | 'ocean' | 'forest' | 'sunset' | 'berry' | 
 export type BackgroundPattern = 'none' | 'dots' | 'grid' | 'diagonal' | 'waves' | 'cross' | 'noise' | 'gradient-radial';
 export type FontFamily = 'dm-sans' | 'inter' | 'poppins' | 'nunito' | 'outfit' | 'work-sans' | 'space-grotesk' | 'raleway' | 'plus-jakarta' | 'manrope';
 export type BorderRadiusSize = 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type FontSizeScale = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type UIDensity = 'compact' | 'comfortable' | 'spacious';
+export type SidebarStyle = 'solid' | 'glass' | 'transparent';
+export type AnimationSpeed = 'none' | 'reduced' | 'normal' | 'smooth';
 
 export interface CustomTheme {
   colorPreset: ColorPreset;
   backgroundPattern: BackgroundPattern;
   fontFamily: FontFamily;
   borderRadius: BorderRadiusSize;
+  fontSize: FontSizeScale;
+  uiDensity: UIDensity;
+  sidebarStyle: SidebarStyle;
+  animationSpeed: AnimationSpeed;
+  highContrast: boolean;
 }
 
 const DEFAULT_THEME: CustomTheme = {
@@ -19,6 +28,11 @@ const DEFAULT_THEME: CustomTheme = {
   backgroundPattern: 'none',
   fontFamily: 'dm-sans',
   borderRadius: 'lg',
+  fontSize: 'md',
+  uiDensity: 'comfortable',
+  sidebarStyle: 'solid',
+  animationSpeed: 'normal',
+  highContrast: false,
 };
 
 // Full color system per preset - ALL variables covered
@@ -482,6 +496,33 @@ export const BORDER_RADIUS_OPTIONS: Record<BorderRadiusSize, { label: string; va
   full: { label: 'Máximo', value: '1.5rem' },
 };
 
+export const FONT_SIZE_OPTIONS: Record<FontSizeScale, { label: string; scale: string }> = {
+  xs: { label: 'Muy pequeña', scale: '87.5%' },
+  sm: { label: 'Pequeña', scale: '93.75%' },
+  md: { label: 'Normal', scale: '100%' },
+  lg: { label: 'Grande', scale: '106.25%' },
+  xl: { label: 'Muy grande', scale: '112.5%' },
+};
+
+export const UI_DENSITY_OPTIONS: Record<UIDensity, { label: string; spacing: string }> = {
+  compact: { label: 'Compacto', spacing: '0.5' },
+  comfortable: { label: 'Cómodo', spacing: '1' },
+  spacious: { label: 'Amplio', spacing: '1.5' },
+};
+
+export const SIDEBAR_STYLE_OPTIONS: Record<SidebarStyle, { label: string }> = {
+  solid: { label: 'Sólido' },
+  glass: { label: 'Cristal' },
+  transparent: { label: 'Transparente' },
+};
+
+export const ANIMATION_SPEED_OPTIONS: Record<AnimationSpeed, { label: string }> = {
+  none: { label: 'Sin animación' },
+  reduced: { label: 'Reducida' },
+  normal: { label: 'Normal' },
+  smooth: { label: 'Suave' },
+};
+
 const PATTERN_SIZES: Record<BackgroundPattern, string> = {
   none: '', dots: '20px 20px', grid: '24px 24px, 24px 24px',
   diagonal: '', waves: '', cross: '16px 16px, 16px 16px',
@@ -541,7 +582,6 @@ function applyFont(font: FontFamily) {
   document.documentElement.style.setProperty('--font-body', config.family);
   document.documentElement.style.setProperty('--font-heading', config.heading);
   document.body.style.fontFamily = config.family;
-  // Apply to all headings
   const style = document.getElementById('custom-heading-font') || document.createElement('style');
   style.id = 'custom-heading-font';
   style.textContent = `h1,h2,h3,h4,h5,h6{font-family:${config.heading} !important;}`;
@@ -552,6 +592,66 @@ function applyBorderRadius(size: BorderRadiusSize) {
   const config = BORDER_RADIUS_OPTIONS[size];
   if (!config) return;
   document.documentElement.style.setProperty('--radius', config.value);
+}
+
+function applyFontSize(scale: FontSizeScale) {
+  const config = FONT_SIZE_OPTIONS[scale];
+  if (!config) return;
+  document.documentElement.style.setProperty('--font-size-scale', config.scale);
+  document.documentElement.style.fontSize = config.scale;
+}
+
+function applyUIDensity(density: UIDensity) {
+  const root = document.documentElement;
+  root.setAttribute('data-density', density);
+  const densityStyle = document.getElementById('custom-density') || document.createElement('style');
+  densityStyle.id = 'custom-density';
+  const multiplier = density === 'compact' ? 0.75 : density === 'spacious' ? 1.35 : 1;
+  densityStyle.textContent = `
+    [data-density="compact"] .p-3 { padding: 0.5rem !important; }
+    [data-density="compact"] .p-4 { padding: 0.625rem !important; }
+    [data-density="compact"] .gap-3 { gap: 0.5rem !important; }
+    [data-density="compact"] .gap-4 { gap: 0.625rem !important; }
+    [data-density="compact"] .space-y-3 > * + * { margin-top: 0.5rem !important; }
+    [data-density="compact"] .space-y-4 > * + * { margin-top: 0.625rem !important; }
+    [data-density="spacious"] .p-3 { padding: 1rem !important; }
+    [data-density="spacious"] .p-4 { padding: 1.5rem !important; }
+    [data-density="spacious"] .gap-3 { gap: 1rem !important; }
+    [data-density="spacious"] .gap-4 { gap: 1.25rem !important; }
+    [data-density="spacious"] .space-y-3 > * + * { margin-top: 1rem !important; }
+    [data-density="spacious"] .space-y-4 > * + * { margin-top: 1.25rem !important; }
+  `;
+  if (!densityStyle.parentNode) document.head.appendChild(densityStyle);
+}
+
+function applySidebarStyle(style: SidebarStyle) {
+  const root = document.documentElement;
+  root.setAttribute('data-sidebar-style', style);
+}
+
+function applyAnimationSpeed(speed: AnimationSpeed) {
+  const root = document.documentElement;
+  const animStyle = document.getElementById('custom-animations') || document.createElement('style');
+  animStyle.id = 'custom-animations';
+  if (speed === 'none') {
+    animStyle.textContent = `*, *::before, *::after { animation-duration: 0s !important; transition-duration: 0s !important; }`;
+  } else if (speed === 'reduced') {
+    animStyle.textContent = `*, *::before, *::after { animation-duration: 0.1s !important; transition-duration: 0.1s !important; }`;
+  } else if (speed === 'smooth') {
+    animStyle.textContent = `*, *::before, *::after { transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important; transition-duration: 0.4s !important; }`;
+  } else {
+    animStyle.textContent = '';
+  }
+  if (!animStyle.parentNode) document.head.appendChild(animStyle);
+}
+
+function applyHighContrast(enabled: boolean) {
+  const root = document.documentElement;
+  if (enabled) {
+    root.setAttribute('data-high-contrast', 'true');
+  } else {
+    root.removeAttribute('data-high-contrast');
+  }
 }
 
 export function useCustomTheme() {
@@ -586,6 +686,11 @@ export function useCustomTheme() {
     applyBackgroundPattern(customTheme.backgroundPattern);
     applyFont(customTheme.fontFamily);
     applyBorderRadius(customTheme.borderRadius);
+    applyFontSize(customTheme.fontSize);
+    applyUIDensity(customTheme.uiDensity);
+    applySidebarStyle(customTheme.sidebarStyle);
+    applyAnimationSpeed(customTheme.animationSpeed);
+    applyHighContrast(customTheme.highContrast);
   }, [customTheme]);
 
   useEffect(() => {
@@ -618,7 +723,6 @@ export function useCustomTheme() {
   const resetTheme = useCallback(() => {
     setCustomTheme(DEFAULT_THEME);
     saveTheme(DEFAULT_THEME);
-    // Remove all inline styles from root
     const root = document.documentElement;
     for (const cssVar of Object.values(CSS_VAR_MAP)) {
       root.style.removeProperty(cssVar);
@@ -628,11 +732,18 @@ export function useCustomTheme() {
     root.style.removeProperty('--font-body');
     root.style.removeProperty('--font-heading');
     root.style.removeProperty('--radius');
+    root.style.removeProperty('--font-size-scale');
+    root.style.fontSize = '';
+    root.removeAttribute('data-density');
+    root.removeAttribute('data-sidebar-style');
+    root.removeAttribute('data-high-contrast');
     document.body.style.fontFamily = '';
     const link = document.querySelector('link[data-custom-font]');
     if (link) link.remove();
-    const headingStyle = document.getElementById('custom-heading-font');
-    if (headingStyle) headingStyle.remove();
+    ['custom-heading-font', 'custom-density', 'custom-animations'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
   }, [saveTheme]);
 
   return { customTheme, updateTheme, resetTheme };
