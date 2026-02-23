@@ -83,6 +83,36 @@ export function useTicketNotes(ticketId: string | null) {
       .insert({ ticket_id: ticketId, user_id: user.id, content: content.trim() });
     if (error) {
       toast.error('Error al añadir nota');
+    } else {
+      // Send notifications for @mentions
+      const mentions = content.match(/@(\w+(?:\s\w+)?)/g);
+      if (mentions && mentions.length > 0) {
+        try {
+          const { data: profiles } = await supabase.from('profiles').select('user_id, full_name');
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          const senderName = senderProfile?.full_name || 'Alguien';
+          
+          for (const mention of mentions) {
+            const mentionName = mention.slice(1).toLowerCase();
+            const mentionedUser = (profiles || []).find(
+              p => (p.full_name || '').toLowerCase().includes(mentionName)
+            );
+            if (mentionedUser && mentionedUser.user_id !== user.id) {
+              await supabase.from('budget_notifications').insert({
+                user_id: mentionedUser.user_id,
+                type: 'mention',
+                message: `${senderName} te mencionó en el ticket #${ticketId.slice(0, 6)}: "${content.slice(0, 80)}${content.length > 80 ? '...' : ''}"`,
+              });
+            }
+          }
+        } catch (e) {
+          console.error('Error sending mention notifications:', e);
+        }
+      }
     }
     setIsAdding(false);
   };

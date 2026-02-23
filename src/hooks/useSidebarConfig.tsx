@@ -68,7 +68,6 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
       { id: 'correo', label: 'Correo', icon: 'Mail', color: 'text-blue-500' },
       { id: 'mensajes', label: 'Chat Interno', icon: 'MessagesSquare', color: 'text-sky-500' },
       { id: 'osticket', label: 'Tickets', icon: 'Ticket', color: 'text-yellow-500' },
-      { id: 'ticket-editor', label: 'Editor Tickets', icon: 'MessageSquare', color: 'text-orange-500' },
     ]
   },
   {
@@ -90,7 +89,6 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
     color: 'text-lime-500',
     items: [
       { id: 'chat-ai', label: 'Chat IA', icon: 'Bot', color: 'text-violet-500' },
-      { id: 'editor', label: 'Editor IA', icon: 'FileEdit', color: 'text-emerald-500', route: '/tools/editor' },
       { id: 'seo-generator', label: 'Generador SEO', icon: 'Sparkles', color: 'text-amber-500', route: '/tools/seo' },
       
       
