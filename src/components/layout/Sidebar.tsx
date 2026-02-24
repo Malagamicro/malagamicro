@@ -623,7 +623,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
             <TooltipTrigger asChild>
               <button
                 onClick={() => { onTabChange('dashboard'); }}
-                className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+                className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
               >
                 <img src={logoIcon} alt="MalagaMicro" className="w-9 h-9 object-contain" />
               </button>
@@ -748,7 +748,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           <div className="flex items-center gap-3">
             <button
               onClick={() => { onTabChange('dashboard'); }}
-              className="h-10 rounded-lg overflow-hidden flex items-center justify-center bg-white px-2 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+              className="h-10 rounded-lg overflow-hidden flex items-center justify-center px-2 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
             >
               <img src={logoFull} alt="MalagaMicro CRM" className="h-8 object-contain" />
             </button>
@@ -846,7 +846,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           <div className="flex items-center gap-2">
             <button
               onClick={() => { onTabChange('dashboard'); if (isMobile) setMobileOpen(false); }}
-              className="h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white px-1.5 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+              className="h-8 rounded-lg overflow-hidden flex items-center justify-center px-1.5 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
             >
               <img src={logoFull} alt="MalagaMicro CRM" className="h-6 object-contain" />
             </button>
