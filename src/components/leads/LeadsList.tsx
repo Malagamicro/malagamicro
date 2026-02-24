@@ -105,19 +105,8 @@ export function LeadsList({
       return matchesSearch && matchesStatus && matchesSegment && matchesFolder;
     });
 
-    // Deduplicate by company name (keep the most recent)
-    const seen = new Map<string, Lead>();
-    for (const lead of filtered) {
-      const key = lead.companyName.toLowerCase().trim();
-      const existing = seen.get(key);
-      if (!existing || lead.createdAt.getTime() > existing.createdAt.getTime()) {
-        seen.set(key, lead);
-      }
-    }
-    const deduplicated = Array.from(seen.values());
-
     // Sort the filtered leads
-    return [...deduplicated].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'score':
           return (b.score ?? 0) - (a.score ?? 0);
