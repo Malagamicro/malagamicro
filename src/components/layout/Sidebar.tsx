@@ -616,7 +616,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   // Collapsed sidebar content
   const collapsedContent = (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b border-sidebar-border flex flex-col items-center gap-1">
+      <div className="px-3 py-1.5 border-b border-sidebar-border flex items-center justify-center">
         <span className="text-[8px] font-mono text-muted-foreground/60 leading-none">{APP_VERSION}</span>
       </div>
 
@@ -729,15 +729,11 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
 
   const expandedContent = (
     <>
-      <div className="p-4 border-b border-sidebar-border">
-        <div className="text-[9px] font-mono text-muted-foreground/60 mb-1">{APP_VERSION} · {APP_BUILD_DATE}</div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-          </div>
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent">
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-        </div>
+      <div className="px-4 py-2 border-b border-sidebar-border flex items-center justify-between">
+        <span className="text-[9px] font-mono text-muted-foreground/60">{APP_VERSION} · {APP_BUILD_DATE}</span>
+        <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-7 w-7 text-sidebar-foreground hover:bg-sidebar-accent">
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
       </div>
 
       {/* Open Tabs Section - Collapsible */}
@@ -821,19 +817,15 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   // Mobile content
   const mobileContent = (
     <>
-      <div className="p-2.5 border-b border-sidebar-border">
-        <div className="text-[8px] font-mono text-muted-foreground/60 mb-0.5">{APP_VERSION} · {APP_BUILD_DATE}</div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-          </div>
-          <div className="flex items-center gap-0.5">
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-7 w-7 text-sidebar-foreground hover:bg-sidebar-accent">
-              {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)} className="h-7 w-7 text-sidebar-foreground hover:bg-sidebar-accent">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+      <div className="px-2.5 py-1.5 border-b border-sidebar-border flex items-center justify-between">
+        <span className="text-[8px] font-mono text-muted-foreground/60">{APP_VERSION} · {APP_BUILD_DATE}</span>
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-7 w-7 text-sidebar-foreground hover:bg-sidebar-accent">
+            {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)} className="h-7 w-7 text-sidebar-foreground hover:bg-sidebar-accent">
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
