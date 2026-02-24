@@ -1,18 +1,19 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle } from '@react-google-maps/api';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import {
-  Search, Loader2, AlertCircle, MapPin, Phone, Globe, Star,
-  Building2, Plus, ExternalLink, ChevronRight,
+  Search, Loader2, AlertCircle, Phone, Globe, Star,
+  Building2, Plus, ChevronRight, Download, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLeads } from '@/hooks/useLeads';
+import ExcelJS from 'exceljs';
 
 interface PlaceResult {
   id: string;
@@ -37,10 +38,17 @@ const SECTORS = [
   { value: 'gym', label: 'Gimnasios' },
   { value: 'beauty', label: 'Peluquerías / Estética' },
   { value: 'automotive', label: 'Talleres / Automóvil' },
+  { value: 'education', label: 'Educación / Academias' },
+  { value: 'hotel', label: 'Hoteles / Alojamiento' },
+  { value: 'tech', label: 'Tecnología / Informática' },
+  { value: 'construction', label: 'Construcción / Reformas' },
+  { value: 'real_estate', label: 'Inmobiliarias' },
 ];
 
 const containerStyle = { width: '100%', height: '100%' };
 const defaultCenter = { lat: 36.7213, lng: -4.4214 };
+
+const LIBRARIES: ("places")[] = ['places'];
 
 function ProspectionMap({ apiKey }: { apiKey: string }) {
   const [places, setPlaces] = useState<PlaceResult[]>([]);
@@ -50,23 +58,61 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
   const [location, setLocation] = useState('Málaga');
   const [sector, setSector] = useState('all');
   const [radius, setRadius] = useState([5]); // km
+  const [radiusEnabled, setRadiusEnabled] = useState(true);
   const [mapCenter, setMapCenter] = useState(defaultCenter);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
+  const geocoderRef = useRef<google.maps.Geocoder | null>(null);
 
-  const { addLead, isAddingLead } = useLeads();
+  const { addLead } = useLeads();
 
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
+    libraries: LIBRARIES,
   });
 
-  const onLoad = useCallback((m: google.maps.Map) => setMap(m), []);
+  const onLoad = useCallback((m: google.maps.Map) => {
+    setMap(m);
+    geocoderRef.current = new google.maps.Geocoder();
+  }, []);
   const onUnmount = useCallback(() => setMap(null), []);
+
+  // Geocode location text to center the map
+  const geocodeLocation = useCallback(async (loc: string) => {
+    if (!geocoderRef.current || !loc.trim()) return;
+    setIsGeocodingLocation(true);
+    try {
+      const result = await geocoderRef.current.geocode({ address: loc });
+      if (result.results?.[0]?.geometry?.location) {
+        const pos = {
+          lat: result.results[0].geometry.location.lat(),
+          lng: result.results[0].geometry.location.lng(),
+        };
+        setMapCenter(pos);
+        map?.panTo(pos);
+        if (radiusEnabled) {
+          const zoomForRadius = Math.round(14 - Math.log2(radius[0] / 2));
+          map?.setZoom(Math.max(8, Math.min(16, zoomForRadius)));
+        } else {
+          map?.setZoom(13);
+        }
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setIsGeocodingLocation(false);
+    }
+  }, [map, radius, radiusEnabled]);
 
   const handleSearch = async (pageToken?: string) => {
     setIsSearching(true);
+    // If first search, geocode the location to center the map
+    if (!pageToken && location.trim()) {
+      await geocodeLocation(location);
+    }
     try {
       const { data, error } = await supabase.functions.invoke('search-places', {
         body: {
@@ -93,7 +139,9 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
         newPlaces.forEach((p: PlaceResult) => {
           if (p.location) bounds.extend(p.location);
         });
-        map.fitBounds(bounds);
+        if (!radiusEnabled) {
+          map.fitBounds(bounds);
+        }
       }
 
       if (newPlaces.length === 0 && !pageToken) {
@@ -125,10 +173,88 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
     setTimeout(() => setAddingId(null), 500);
   };
 
+  // Export to Excel
+  const handleExport = async () => {
+    const toExport = radiusEnabled ? filteredPlaces : places;
+    if (toExport.length === 0) {
+      toast.error('No hay resultados para exportar');
+      return;
+    }
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Prospección');
+      sheet.columns = [
+        { header: 'Nombre', key: 'name', width: 30 },
+        { header: 'Dirección', key: 'address', width: 40 },
+        { header: 'Teléfono', key: 'phone', width: 18 },
+        { header: 'Web', key: 'website', width: 30 },
+        { header: 'Valoración', key: 'rating', width: 12 },
+        { header: 'Reseñas', key: 'reviews', width: 12 },
+        { header: 'Categoría', key: 'category', width: 20 },
+        { header: 'Latitud', key: 'lat', width: 14 },
+        { header: 'Longitud', key: 'lng', width: 14 },
+      ];
+      // Style header
+      sheet.getRow(1).eachCell(cell => {
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      });
+      toExport.forEach(p => {
+        sheet.addRow({
+          name: p.name,
+          address: p.address,
+          phone: p.phone || '',
+          website: p.website || '',
+          rating: p.rating || '',
+          reviews: p.userRatingsTotal || '',
+          category: p.category,
+          lat: p.location?.lat || '',
+          lng: p.location?.lng || '',
+        });
+      });
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `prospeccion_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${toExport.length} empresas exportadas`);
+    } catch {
+      toast.error('Error al exportar');
+    }
+  };
+
+  // Export CSV
+  const handleExportCSV = () => {
+    const toExport = radiusEnabled ? filteredPlaces : places;
+    if (toExport.length === 0) {
+      toast.error('No hay resultados para exportar');
+      return;
+    }
+    const headers = ['Nombre', 'Dirección', 'Teléfono', 'Web', 'Valoración', 'Reseñas', 'Categoría', 'Latitud', 'Longitud'];
+    const rows = toExport.map(p => [
+      p.name, p.address, p.phone || '', p.website || '',
+      p.rating?.toString() || '', p.userRatingsTotal?.toString() || '',
+      p.category, p.location?.lat?.toString() || '', p.location?.lng?.toString() || '',
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prospeccion_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${toExport.length} empresas exportadas`);
+  };
+
   // Filter places by radius from center
-  const filteredPlaces = places.filter(p => {
+  const filteredPlaces = !radiusEnabled ? places : places.filter(p => {
     if (!p.location) return true;
-    const R = 6371; // Earth's radius in km
+    const R = 6371;
     const dLat = (p.location.lat - mapCenter.lat) * Math.PI / 180;
     const dLng = (p.location.lng - mapCenter.lng) * Math.PI / 180;
     const a = Math.sin(dLat / 2) ** 2 +
@@ -137,6 +263,13 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
     const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return d <= radius[0];
   });
+
+  // Handle circle drag
+  const handleCircleDragEnd = (e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      setMapCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+    }
+  };
 
   if (loadError) {
     return (
@@ -162,7 +295,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
       {/* Search controls */}
       <Card className="border-border">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Buscar</label>
               <Input
@@ -175,12 +308,18 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Ubicación</label>
-              <Input
-                placeholder="Ciudad o zona"
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-                className="h-9"
-              />
+              <div className="relative">
+                <Input
+                  placeholder="Ciudad o zona"
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                  className="h-9"
+                />
+                {isGeocodingLocation && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin absolute right-2.5 top-2.5 text-muted-foreground" />
+                )}
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Sector</label>
@@ -196,20 +335,42 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Radio: {radius[0]} km</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Radio: {radiusEnabled ? `${radius[0]} km` : 'Sin límite'}
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <Switch
+                    checked={radiusEnabled}
+                    onCheckedChange={setRadiusEnabled}
+                    className="scale-75"
+                  />
+                </div>
+              </div>
               <Slider
                 value={radius}
                 onValueChange={setRadius}
                 min={1}
-                max={50}
+                max={100}
                 step={1}
                 className="py-2"
+                disabled={!radiusEnabled}
               />
             </div>
             <Button onClick={() => handleSearch()} disabled={isSearching} className="h-9">
               {isSearching ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
               Buscar
             </Button>
+            <div className="flex gap-1.5">
+              <Button variant="outline" size="sm" className="h-9 flex-1" onClick={handleExport} disabled={filteredPlaces.length === 0}>
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                Excel
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 flex-1" onClick={handleExportCSV} disabled={filteredPlaces.length === 0}>
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                CSV
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -225,7 +386,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
             onLoad={onLoad}
             onUnmount={onUnmount}
             onClick={(e) => {
-              if (e.latLng) {
+              if (e.latLng && radiusEnabled) {
                 setMapCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
               }
             }}
@@ -236,17 +397,43 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
               styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }],
             }}
           >
-            <Circle
-              center={mapCenter}
-              radius={radius[0] * 1000}
-              options={{
-                fillColor: 'hsl(var(--primary))',
-                fillOpacity: 0.08,
-                strokeColor: 'hsl(var(--primary))',
-                strokeOpacity: 0.3,
-                strokeWeight: 2,
-              }}
-            />
+            {radiusEnabled && (
+              <>
+                <Circle
+                  center={mapCenter}
+                  radius={radius[0] * 1000}
+                  draggable
+                  onDragEnd={handleCircleDragEnd}
+                  options={{
+                    fillColor: 'hsl(var(--primary))',
+                    fillOpacity: 0.08,
+                    strokeColor: 'hsl(var(--primary))',
+                    strokeOpacity: 0.3,
+                    strokeWeight: 2,
+                    clickable: true,
+                    draggable: true,
+                  }}
+                />
+                {/* Center marker for the circle */}
+                <Marker
+                  position={mapCenter}
+                  draggable
+                  onDragEnd={(e) => {
+                    if (e.latLng) {
+                      setMapCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+                    }
+                  }}
+                  icon={{
+                    path: google.maps.SymbolPath.CIRCLE,
+                    fillColor: 'hsl(var(--primary))',
+                    fillOpacity: 0.6,
+                    strokeColor: '#fff',
+                    strokeWeight: 2,
+                    scale: 8,
+                  }}
+                />
+              </>
+            )}
             {filteredPlaces.map(place => place.location && (
               <Marker
                 key={place.id}
@@ -292,16 +479,28 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
           {/* Results count overlay */}
           <div className="absolute top-3 left-3 z-10 bg-card/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md border border-border">
             <p className="text-xs font-medium">
-              {filteredPlaces.length} resultado{filteredPlaces.length !== 1 ? 's' : ''} en zona
+              {filteredPlaces.length} resultado{filteredPlaces.length !== 1 ? 's' : ''}{radiusEnabled ? ' en zona' : ''}
             </p>
+            {radiusEnabled && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Arrastra el círculo para mover la zona
+              </p>
+            )}
           </div>
         </div>
 
         {/* Results list */}
         <div className="border border-border rounded-lg overflow-hidden flex flex-col bg-card">
-          <div className="p-3 border-b border-border bg-muted/30">
-            <h3 className="text-sm font-semibold">Empresas encontradas</h3>
-            <p className="text-xs text-muted-foreground">{filteredPlaces.length} resultados</p>
+          <div className="p-3 border-b border-border bg-muted/30 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold">Empresas encontradas</h3>
+              <p className="text-xs text-muted-foreground">{filteredPlaces.length} resultados</p>
+            </div>
+            {filteredPlaces.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={handleExport}>
+                <Download className="w-3 h-3" /> Exportar
+              </Button>
+            )}
           </div>
           <div className="flex-1 overflow-auto divide-y divide-border">
             {filteredPlaces.length === 0 && !isSearching && (
