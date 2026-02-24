@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const MICRO_EMAIL_PROFILE_ID = "845ff24b-a330-478b-a47f-d62c2fbab991";
+const EVOLUTION_API_URL = (Deno.env.get("EVOLUTION_API_URL") || "https://evolutionapi.malagamicro.com").replace(/\/+$/, "");
+const EVOLUTION_API_KEY = Deno.env.get("EVOLUTION_API_KEY") || "";
+const EVOLUTION_INSTANCE = Deno.env.get("EVOLUTION_INSTANCE_NAME") || "CRM";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -485,48 +490,44 @@ async function executeToolCall(
         const body = String(args.body || "");
         if (!to || !subject || !body) return JSON.stringify({ success: false, error: "Faltan parámetros: to, subject y body son obligatorios." });
 
-        const { data: profile } = await supabase.from("email_profiles").select("id, from_email, from_name").eq("user_id", userId).eq("is_default", true).maybeSingle();
-        const emailProfile = profile || (await supabase.from("email_profiles").select("id, from_email, from_name").eq("user_id", userId).limit(1).maybeSingle()).data;
-        
-        if (!emailProfile) return JSON.stringify({ success: false, error: "No tienes ningún perfil de correo configurado." });
-
+        // Use Micro's dedicated email profile
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const res = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
-          body: JSON.stringify({ to, subject, html: body, profileId: (emailProfile as any).id }),
+          body: JSON.stringify({ to, subject, html: body, profileId: MICRO_EMAIL_PROFILE_ID }),
         });
         const result = await res.json();
         if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al enviar" });
-        return JSON.stringify({ success: true, message: `Correo enviado a ${to} desde ${(emailProfile as any).from_email}` });
+        return JSON.stringify({ success: true, message: `Correo enviado a ${to} desde ia@malagamicro.com (Micro)` });
       }
 
       case "get_inbox": {
         const limit = Number(args.limit) || 5;
-        const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, folder, has_attachments").eq("user_id", userId).eq("folder", "inbox").eq("is_deleted", false).order("date", { ascending: false }).limit(limit);
+        // Get emails from Micro's dedicated profile
+        const { data: microProfile } = await supabase.from("email_profiles").select("user_id").eq("id", MICRO_EMAIL_PROFILE_ID).single();
+        const microUserId = (microProfile as any)?.user_id || userId;
+        const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, folder, has_attachments").eq("profile_id", MICRO_EMAIL_PROFILE_ID).eq("folder", "inbox").eq("is_deleted", false).order("date", { ascending: false }).limit(limit);
         if (error) throw error;
-        if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada." });
+        if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada de Micro." });
         return JSON.stringify({
-          message: `${data.length} correo(s) recientes`,
+          message: `${data.length} correo(s) recientes en el buzón de Micro (ia@malagamicro.com)`,
           emails: data.map((e: any) => ({ id: e.id, asunto: e.subject || "(Sin asunto)", de: e.from_name || e.from_address, fecha: e.date, leido: e.is_read, adjuntos: e.has_attachments })),
         });
       }
 
       case "sync_inbox_imap": {
         const limit = Number(args.limit) || 20;
-        const { data: profile } = await supabase.from("email_profiles").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
-        const emailProfile = profile || (await supabase.from("email_profiles").select("id").eq("user_id", userId).limit(1).maybeSingle()).data;
-        if (!emailProfile) return JSON.stringify({ success: false, error: "No tienes ningún perfil de correo configurado." });
-
+        // Sync Micro's dedicated IMAP profile
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
-          body: JSON.stringify({ profile_id: (emailProfile as any).id, action: "sync", limit }),
+          body: JSON.stringify({ profile_id: MICRO_EMAIL_PROFILE_ID, action: "sync", limit }),
         });
         const result = await res.json();
         if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al sincronizar" });
-        return JSON.stringify({ success: true, message: `Sincronización completada. ${result.new_messages ?? 0} correo(s) nuevo(s).`, total: result.total_messages ?? 0 });
+        return JSON.stringify({ success: true, message: `Sincronización del buzón de Micro completada. ${result.new_messages ?? 0} correo(s) nuevo(s).`, total: result.total_messages ?? 0 });
       }
 
       case "read_email": {
@@ -535,30 +536,26 @@ async function executeToolCall(
         let msg: any = null;
 
         if (messageId) {
-          const { data } = await supabase.from("email_messages").select("*").eq("id", messageId).eq("user_id", userId).single();
+          const { data } = await supabase.from("email_messages").select("*").eq("id", messageId).eq("profile_id", MICRO_EMAIL_PROFILE_ID).single();
           msg = data;
         } else if (search) {
-          const { data } = await supabase.from("email_messages").select("*").eq("user_id", userId).eq("is_deleted", false).or(`subject.ilike.%${search}%,from_address.ilike.%${search}%,from_name.ilike.%${search}%`).order("date", { ascending: false }).limit(1);
+          const { data } = await supabase.from("email_messages").select("*").eq("profile_id", MICRO_EMAIL_PROFILE_ID).eq("is_deleted", false).or(`subject.ilike.%${search}%,from_address.ilike.%${search}%,from_name.ilike.%${search}%`).order("date", { ascending: false }).limit(1);
           msg = data?.[0];
         }
         if (!msg) return JSON.stringify({ error: "No se encontró el correo." });
 
-        // If no body, try to fetch from IMAP
+        // If no body, try to fetch from IMAP using Micro's profile
         if (!msg.body_html && !msg.body_text && msg.message_uid) {
-          const { data: profile } = await supabase.from("email_profiles").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
-          const emailProfile = profile || (await supabase.from("email_profiles").select("id").eq("user_id", userId).limit(1).maybeSingle()).data;
-          if (emailProfile) {
-            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-            const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
-              body: JSON.stringify({ profile_id: (emailProfile as any).id, action: "fetch-body", message_uid: msg.message_uid }),
-            });
-            const result = await res.json();
-            if (result.body_html || result.body_text) {
-              msg.body_html = result.body_html;
-              msg.body_text = result.body_text;
-            }
+          const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+          const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+            body: JSON.stringify({ profile_id: MICRO_EMAIL_PROFILE_ID, action: "fetch-body", message_uid: msg.message_uid, message_id: msg.id }),
+          });
+          const result = await res.json();
+          if (result.body_html || result.body_text) {
+            msg.body_html = result.body_html;
+            msg.body_text = result.body_text;
           }
         }
 
@@ -590,7 +587,7 @@ async function executeToolCall(
         if (!query) return JSON.stringify({ error: "Necesito un término de búsqueda." });
 
         const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, has_attachments, folder")
-          .eq("user_id", userId).eq("is_deleted", false).eq("folder", folder)
+          .eq("profile_id", MICRO_EMAIL_PROFILE_ID).eq("is_deleted", false).eq("folder", folder)
           .or(`subject.ilike.%${query}%,from_address.ilike.%${query}%,from_name.ilike.%${query}%,body_text.ilike.%${query}%`)
           .order("date", { ascending: false }).limit(limit);
         if (error) throw error;
@@ -606,25 +603,25 @@ async function executeToolCall(
         const message = String(args.message || "");
         if (!phone || !message) return JSON.stringify({ success: false, error: "Faltan parámetros: phone y message son obligatorios." });
 
-        const chatId = `${phone}@c.us`;
-        const wahaUrl = Deno.env.get("WAHA_API_URL");
-        const wahaKey = Deno.env.get("WAHA_API_KEY");
-        if (!wahaUrl) return JSON.stringify({ success: false, error: "WAHA no está configurado." });
+        // Use Evolution API instead of WAHA
+        let cleanPhone = phone.replace(/^0+/, "");
+        if (cleanPhone.length === 9) cleanPhone = "34" + cleanPhone;
+        const chatId = `${cleanPhone}@s.whatsapp.net`;
 
         try {
-          const res = await fetch(`${wahaUrl}/api/sendText`, {
+          const res = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...(wahaKey ? { "X-Api-Key": wahaKey } : {}) },
-            body: JSON.stringify({ chatId, text: message, session: "default" }),
+            headers: { "Content-Type": "application/json", "apikey": EVOLUTION_API_KEY },
+            body: JSON.stringify({ number: cleanPhone, text: message }),
           });
           if (!res.ok) {
             const errText = await res.text();
-            return JSON.stringify({ success: false, error: `Error WAHA [${res.status}]: ${errText}` });
+            return JSON.stringify({ success: false, error: `Error Evolution API [${res.status}]: ${errText}` });
           }
           await supabase.from("waha_messages").insert({ chat_id: chatId, content: message, from_me: true, user_id: userId, message_type: "text" });
-          return JSON.stringify({ success: true, message: `WhatsApp enviado a ${phone}` });
+          return JSON.stringify({ success: true, message: `WhatsApp enviado a ${cleanPhone}` });
         } catch (err) {
-          return JSON.stringify({ success: false, error: `Error de conexión con WAHA: ${String(err)}` });
+          return JSON.stringify({ success: false, error: `Error de conexión con Evolution API: ${String(err)}` });
         }
       }
 
@@ -959,6 +956,8 @@ serve(async (req) => {
 
 Fecha actual: ${today}
 
+Tu buzón de correo dedicado: ia@malagamicro.com (envías y recibes correos desde esta cuenta)
+
 Personalidad:
 - Amable, entusiasta y servicial
 - Hablas en español con tono cercano pero profesional
@@ -968,14 +967,15 @@ Personalidad:
 HERRAMIENTAS DISPONIBLES:
 📖 LECTURA (ejecución directa):
 - get_team_users, get_shared_files, get_shared_folders
-- get_inbox, get_leads, get_reminders, get_ostickets
+- get_inbox (ver correos recibidos en tu buzón ia@malagamicro.com)
+- get_leads, get_reminders, get_ostickets
 - get_calendar_events, get_budgets, get_apps_config
-- sync_inbox_imap (sincronizar correos desde el servidor IMAP)
+- sync_inbox_imap (sincronizar tu buzón ia@malagamicro.com desde el servidor)
 - read_email (leer el contenido completo de un correo)
 - search_emails (buscar correos por asunto, remitente o contenido)
 
 ✍️ ESCRITURA (REQUIEREN CONFIRMACIÓN):
-- send_internal_message, send_email, send_whatsapp
+- send_internal_message, send_email (envía desde ia@malagamicro.com), send_whatsapp
 - create_lead, update_lead
 - create_reminder, complete_reminder
 - create_calendar_event

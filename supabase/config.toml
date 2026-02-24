@@ -107,3 +107,15 @@ verify_jwt = false
 
 [functions.spreadsheet-action]
 verify_jwt = false
+
+[functions.resend-ticket-notification]
+verify_jwt = false
+
+[functions.enrich-lead-phone]
+verify_jwt = false
+
+[functions.generate-theme]
+verify_jwt = false
+
+[functions.spreadsheet-nlp]
+verify_jwt = false
