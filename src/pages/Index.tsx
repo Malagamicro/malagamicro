@@ -222,7 +222,15 @@ const IndexContent = () => {
           />
         );
       case 'prospeccion':
-        return <div className="p-8 text-center text-muted-foreground">Módulo no disponible</div>;
+        return (
+          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
+            <div>
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Prospección</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">Busca y descubre nuevos clientes potenciales</p>
+            </div>
+            <LeadMap leads={leads} onViewLead={handleViewLead} />
+          </div>
+        );
       case 'pipeline':
         return (
           <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">

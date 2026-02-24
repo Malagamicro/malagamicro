@@ -44,6 +44,7 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
     items: [
       { id: 'leads', label: 'Leads', icon: 'Users', color: 'text-indigo-500' },
       { id: 'pipeline', label: 'Pipeline', icon: 'Kanban', color: 'text-purple-500' },
+      { id: 'prospeccion', label: 'Prospección', icon: 'Search', color: 'text-cyan-500' },
       { id: 'mapa', label: 'Mapa', icon: 'MapPin', color: 'text-red-500' },
     ]
   },
@@ -129,7 +130,7 @@ export function useSidebarConfig() {
         const saved = (rawData.items || rawData) as unknown as SidebarCategory[];
         if (saved.length > 0) {
           // Remove deprecated items (e.g. old file manager)
-          const deprecatedIds = new Set(['files', 'presupuesto', 'prospeccion']);
+          const deprecatedIds = new Set(['files', 'presupuesto']);
           const cleaned = saved.map(cat => ({
             ...cat,
             items: cat.items.filter(i => !deprecatedIds.has(i.id)),
