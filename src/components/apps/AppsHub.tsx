@@ -52,6 +52,7 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [editingDescId, setEditingDescId] = useState<string | null>(null);
   const [editingDescValue, setEditingDescValue] = useState('');
+  const [activeAppPopover, setActiveAppPopover] = useState<string | null>(null);
 
   // Compute favorites
   const favoriteApps = useMemo(() => {
@@ -100,8 +101,11 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
     setItemSize(categoryId, itemId, currentSize >= 4 ? 1 : currentSize + 1);
   };
 
-  const handleAppClick = (app: AppItem) => {
-    if (editMode) return;
+  const handleAppClick = (app: AppItem, categoryId?: string) => {
+    if (editMode) {
+      setActiveAppPopover(activeAppPopover === app.id ? null : app.id);
+      return;
+    }
     if (app.externalUrl) window.open(app.externalUrl, '_blank', 'noopener,noreferrer');
     else onOpenApp(app.id);
   };
@@ -126,41 +130,47 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
     const Icon = getIconComponent(app.icon);
     const iconColor = getIconColor(app.color);
     const desc = app.customDescription || app.description;
+    const isPopoverOpen = editMode && activeAppPopover === app.id;
 
     return (
-      <button
-        key={app.id}
-        onClick={() => handleAppClick(app)}
-        disabled={editMode}
-        className={cn(
-          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border/30',
-          'bg-card/30 hover:bg-card/60 hover:border-primary/20 transition-all group',
-          app.hidden && 'opacity-40',
-        )}
-      >
-        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center bg-background/80 shadow-sm shrink-0')}>
-          <Icon className={cn('w-4.5 h-4.5', iconColor.className)} style={iconColor.style} />
-        </div>
-        <div className="flex-1 text-left min-w-0">
-          <span className="text-sm font-semibold text-foreground block truncate">{app.label}</span>
-          <span className="text-[11px] text-muted-foreground truncate block">{desc}</span>
-        </div>
-        {app.isFavorite && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />}
-        {app.externalUrl && <ExternalLink className="w-3 h-3 text-muted-foreground/50 shrink-0" />}
+      <Popover key={app.id} open={isPopoverOpen} onOpenChange={(open) => { if (!open) setActiveAppPopover(null); }}>
+        <PopoverTrigger asChild>
+          <button
+            onClick={() => handleAppClick(app, categoryId)}
+            className={cn(
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border/30',
+              'bg-card/30 hover:bg-card/60 hover:border-primary/20 transition-all group',
+              isPopoverOpen && 'ring-2 ring-primary/50 border-primary/40',
+              app.hidden && 'opacity-40',
+            )}
+          >
+            <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center bg-background/80 shadow-sm shrink-0')}>
+              <Icon className={cn('w-4.5 h-4.5', iconColor.className)} style={iconColor.style} />
+            </div>
+            <div className="flex-1 text-left min-w-0">
+              <span className="text-sm font-semibold text-foreground block truncate">{app.label}</span>
+              <span className="text-[11px] text-muted-foreground truncate block">{desc}</span>
+            </div>
+            {app.isFavorite && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />}
+            {app.externalUrl && <ExternalLink className="w-3 h-3 text-muted-foreground/50 shrink-0" />}
+          </button>
+        </PopoverTrigger>
         {editMode && (
-          <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-            <button onClick={() => toggleFavorite(categoryId, app.id)} className="p-1 rounded hover:bg-muted">
-              {app.isFavorite ? <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> : <StarOff className="w-3 h-3 text-muted-foreground" />}
-            </button>
-            <button onClick={() => startEditDesc(app)} className="p-1 rounded hover:bg-muted">
-              <Pencil className="w-3 h-3 text-muted-foreground" />
-            </button>
-            <button onClick={() => toggleItemVisibility(categoryId, app.id)} className="p-1 rounded hover:bg-muted">
-              {app.hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-            </button>
-          </div>
+          <PopoverContent className="w-auto p-2 space-y-2" align="end" side="top" sideOffset={8} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-1">
+              <button onClick={() => toggleFavorite(categoryId, app.id)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                {app.isFavorite ? <Star className="w-4 h-4 text-amber-400 fill-amber-400" /> : <StarOff className="w-4 h-4 text-muted-foreground" />}
+              </button>
+              <button onClick={() => { startEditDesc(app); setActiveAppPopover(null); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                <Pencil className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <button onClick={() => toggleItemVisibility(categoryId, app.id)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                {app.hidden ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
+              </button>
+            </div>
+          </PopoverContent>
         )}
-      </button>
+      </Popover>
     );
   };
 
@@ -170,81 +180,78 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
     const sc = ITEM_SIZE[size as keyof typeof ITEM_SIZE] || ITEM_SIZE[1];
     const iconColor = getIconColor(app.color);
 
+    const isPopoverOpen = editMode && activeAppPopover === app.id;
+
     return (
       <div className="relative group/card h-full">
-        <button
-          onClick={() => handleAppClick(app)}
-          disabled={editMode}
-          className={cn(
-            'w-full h-full flex flex-col items-center justify-center', sc.gap, sc.padding,
-            'rounded-2xl border border-border/50',
-            'bg-gradient-to-br', app.bgGradient,
-            !editMode && 'hover:shadow-lg hover:scale-[1.03] hover:border-primary/30 active:scale-[0.98]',
-            'transition-all duration-200',
-            app.hidden && 'opacity-40',
-            isDragging && 'shadow-xl scale-105 z-50',
-          )}
-        >
-          <div className={cn(sc.iconBox, 'rounded-2xl flex items-center justify-center bg-background/80 shadow-sm group-hover/card:shadow-md transition-shadow relative')}>
-            <Icon className={cn(sc.iconSize, iconColor.className)} style={iconColor.style} />
-            {app.externalUrl && <ExternalLink className="w-2.5 h-2.5 absolute top-1 right-1 text-muted-foreground/50" />}
-          </div>
-          <div className="text-center w-full">
-            <span className={cn(sc.textSize, 'font-semibold text-foreground block leading-tight truncate')}>{app.label}</span>
-            {size >= 2 && (
-              <span className={cn(sc.descSize, 'text-muted-foreground leading-tight truncate block')}>
-                {app.customDescription || (app.externalUrl ? app.externalUrl.replace(/^https?:\/\//, '').slice(0, 30) : app.description)}
-              </span>
-            )}
-          </div>
-          {app.isFavorite && <Star className="w-3 h-3 text-amber-400 fill-amber-400 absolute top-1.5 left-1.5" />}
-        </button>
-
-        {editMode && (
-          <div className="absolute top-1 right-1 flex items-center gap-0.5">
-            <button onClick={(e) => { e.stopPropagation(); toggleFavorite(categoryId, app.id); }}
-              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors">
-              {app.isFavorite ? <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> : <StarOff className="w-3 h-3 text-muted-foreground" />}
+        <Popover open={isPopoverOpen} onOpenChange={(open) => { if (!open) setActiveAppPopover(null); }}>
+          <PopoverTrigger asChild>
+            <button
+              onClick={() => handleAppClick(app, categoryId)}
+              className={cn(
+                'w-full h-full flex flex-col items-center justify-center', sc.gap, sc.padding,
+                'rounded-2xl border border-border/50',
+                'bg-gradient-to-br', app.bgGradient,
+                !editMode && 'hover:shadow-lg hover:scale-[1.03] hover:border-primary/30 active:scale-[0.98]',
+                editMode && 'hover:border-primary/40 cursor-pointer',
+                isPopoverOpen && 'ring-2 ring-primary/50 border-primary/40',
+                'transition-all duration-200',
+                app.hidden && 'opacity-40',
+                isDragging && 'shadow-xl scale-105 z-50',
+              )}
+            >
+              <div className={cn(sc.iconBox, 'rounded-2xl flex items-center justify-center bg-background/80 shadow-sm group-hover/card:shadow-md transition-shadow relative')}>
+                <Icon className={cn(sc.iconSize, iconColor.className)} style={iconColor.style} />
+                {app.externalUrl && <ExternalLink className="w-2.5 h-2.5 absolute top-1 right-1 text-muted-foreground/50" />}
+              </div>
+              <div className="text-center w-full">
+                <span className={cn(sc.textSize, 'font-semibold text-foreground block leading-tight truncate')}>{app.label}</span>
+                {size >= 2 && (
+                  <span className={cn(sc.descSize, 'text-muted-foreground leading-tight truncate block')}>
+                    {app.customDescription || (app.externalUrl ? app.externalUrl.replace(/^https?:\/\//, '').slice(0, 30) : app.description)}
+                  </span>
+                )}
+              </div>
+              {app.isFavorite && <Star className="w-3 h-3 text-amber-400 fill-amber-400 absolute top-1.5 left-1.5" />}
             </button>
-            <button onClick={(e) => { e.stopPropagation(); cycleItemSize(categoryId, app.id, size); }}
-              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors"
-              title={`Tamaño: ${SIZE_LABELS[size]} → ${SIZE_LABELS[size >= 4 ? 1 : size + 1]}`}>
-              {size < 3 ? <Maximize2 className="w-3 h-3 text-muted-foreground" /> : <Minimize2 className="w-3 h-3 text-muted-foreground" />}
-            </button>
-            <IconPicker value={app.icon} onChange={(icon) => setItemIcon(categoryId, app.id, icon)} triggerClassName="bg-background/90 shadow-sm !p-1 !rounded-md" />
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors" onClick={e => e.stopPropagation()}>
-                  <Palette className="w-3 h-3" style={{ color: app.color.startsWith('#') ? app.color : undefined }} />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-2" align="end" onClick={e => e.stopPropagation()}>
-                <div className="grid grid-cols-5 gap-1">
-                  {ICON_COLORS.map(c => (
-                    <button key={c} onClick={() => setItemColor(categoryId, app.id, c)}
-                      className={cn('w-6 h-6 rounded-full border-2 transition-transform hover:scale-110', app.color === c ? 'border-foreground scale-110' : 'border-transparent')}
-                      style={{ backgroundColor: c }} />
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-            <button onClick={(e) => { e.stopPropagation(); startEditDesc(app); }}
-              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors">
-              <Pencil className="w-3 h-3 text-muted-foreground" />
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); toggleItemVisibility(categoryId, app.id); }}
-              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors">
-              {app.hidden ? <EyeOff className="w-3 h-3 text-muted-foreground" /> : <Eye className="w-3 h-3 text-muted-foreground" />}
-            </button>
-            {app.isCustom && (
-              <button onClick={(e) => { e.stopPropagation(); deleteItem(categoryId, app.id); }}
-                className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-destructive/20 transition-colors">
-                <Trash2 className="w-3 h-3 text-destructive" />
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2 space-y-2" align="center" side="top" sideOffset={8} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-1">
+              <button onClick={() => toggleFavorite(categoryId, app.id)}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Favorito">
+                {app.isFavorite ? <Star className="w-4 h-4 text-amber-400 fill-amber-400" /> : <StarOff className="w-4 h-4 text-muted-foreground" />}
               </button>
-            )}
-          </div>
-        )}
-        {editMode && <span className="absolute bottom-0.5 right-1 text-[9px] font-bold text-muted-foreground/50 select-none">{SIZE_LABELS[size]}</span>}
+              <button onClick={() => cycleItemSize(categoryId, app.id, size)}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                title={`Tamaño: ${SIZE_LABELS[size]} → ${SIZE_LABELS[size >= 4 ? 1 : size + 1]}`}>
+                {size < 3 ? <Maximize2 className="w-4 h-4 text-muted-foreground" /> : <Minimize2 className="w-4 h-4 text-muted-foreground" />}
+              </button>
+              <IconPicker value={app.icon} onChange={(icon) => setItemIcon(categoryId, app.id, icon)} triggerClassName="!p-1.5 !rounded-lg" />
+              <button onClick={() => { startEditDesc(app); setActiveAppPopover(null); }}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Editar descripción">
+                <Pencil className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <button onClick={() => toggleItemVisibility(categoryId, app.id)}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors" title={app.hidden ? 'Mostrar' : 'Ocultar'}>
+                {app.hidden ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
+              </button>
+              {app.isCustom && (
+                <button onClick={() => { deleteItem(categoryId, app.id); setActiveAppPopover(null); }}
+                  className="p-1.5 rounded-lg hover:bg-destructive/20 transition-colors" title="Eliminar">
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-5 gap-1 pt-1 border-t border-border/50">
+              {ICON_COLORS.map(c => (
+                <button key={c} onClick={() => setItemColor(categoryId, app.id, c)}
+                  className={cn('w-5 h-5 rounded-full border-2 transition-transform hover:scale-110', app.color === c ? 'border-foreground scale-110' : 'border-transparent')}
+                  style={{ backgroundColor: c }} />
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        {editMode && <span className="absolute bottom-0.5 right-1 text-[9px] font-bold text-muted-foreground/50 select-none pointer-events-none">{SIZE_LABELS[size]}</span>}
       </div>
     );
   };
