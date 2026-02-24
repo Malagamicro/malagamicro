@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { ImapClient } from "jsr:@workingdevshero/deno-imap";
+import { ImapClient, hasAttachments, findAttachments } from "jsr:@workingdevshero/deno-imap";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,6 +37,65 @@ function parseAddressList(raw: any): string[] {
     });
   }
   return [String(raw)];
+}
+
+// Decode Uint8Array part data to string, handling different encodings
+function decodePartData(part: any): string {
+  if (!part || !part.data) return '';
+  
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  let raw = '';
+  
+  if (part.data instanceof Uint8Array) {
+    raw = decoder.decode(part.data);
+  } else if (typeof part.data === 'string') {
+    raw = part.data;
+  } else {
+    return '';
+  }
+
+  // Handle quoted-printable encoding
+  const encoding = (part.encoding || '').toUpperCase();
+  if (encoding === 'QUOTED-PRINTABLE') {
+    raw = raw
+      .replace(/=\r?\n/g, '') // soft line breaks
+      .replace(/=([0-9A-Fa-f]{2})/g, (_m: string, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  } else if (encoding === 'BASE64') {
+    try {
+      raw = atob(raw.replace(/\s/g, ''));
+    } catch { /* keep as-is */ }
+  }
+
+  return raw;
+}
+
+// Walk bodyStructure recursively to find text parts and their section paths
+function findTextParts(bs: any, path = ''): { textSection: string | null; htmlSection: string | null } {
+  let textSection: string | null = null;
+  let htmlSection: string | null = null;
+
+  if (!bs) return { textSection, htmlSection };
+
+  const type = (bs.type || '').toUpperCase();
+  const subtype = (bs.subtype || '').toUpperCase();
+
+  if (type === 'TEXT' && subtype === 'PLAIN') {
+    textSection = path || '1';
+  } else if (type === 'TEXT' && subtype === 'HTML') {
+    htmlSection = path || '1';
+  }
+
+  // Check child parts
+  if (bs.parts && Array.isArray(bs.parts)) {
+    for (let i = 0; i < bs.parts.length; i++) {
+      const childPath = path ? `${path}.${i + 1}` : `${i + 1}`;
+      const child = findTextParts(bs.parts[i], childPath);
+      if (child.textSection && !textSection) textSection = child.textSection;
+      if (child.htmlSection && !htmlSection) htmlSection = child.htmlSection;
+    }
+  }
+
+  return { textSection, htmlSection };
 }
 
 serve(async (req) => {
@@ -140,10 +199,12 @@ serve(async (req) => {
         const fetchRange = `${startSeq}:${totalMessages}`;
 
         console.log(`Fetching messages ${fetchRange}`);
+        
+        // First pass: fetch envelope + bodyStructure to get message info and find text parts
         const messages = await client.fetch(fetchRange, {
           envelope: true,
           bodyStructure: true,
-          body: true,
+          uid: true,
         });
 
         let insertedCount = 0;
@@ -175,27 +236,62 @@ serve(async (req) => {
             const toAddresses = parseAddressList(envelope.to);
             const ccAddresses = parseAddressList(envelope.cc);
 
-            // Extract body text
-            let bodyText = '';
-            let bodyHtml = '';
-            if (msg.body) {
-              if (typeof msg.body === 'string') {
-                // Check if it looks like HTML
-                if (msg.body.includes('<html') || msg.body.includes('<div') || msg.body.includes('<p')) {
-                  bodyHtml = msg.body;
-                } else {
-                  bodyText = msg.body;
-                }
-              } else if (typeof msg.body === 'object') {
-                bodyText = (msg.body as any).text || '';
-                bodyHtml = (msg.body as any).html || '';
-              }
+            // Determine which body parts to fetch for text/html content
+            const { textSection, htmlSection } = findTextParts(msg.bodyStructure);
+            const partsToFetch: string[] = [];
+            if (textSection) partsToFetch.push(textSection);
+            if (htmlSection) partsToFetch.push(htmlSection);
+            // Fallback: try common sections
+            if (partsToFetch.length === 0) {
+              partsToFetch.push('1', '1.1', '1.2');
             }
 
-            const hasAttachments = msg.bodyStructure ? 
-              JSON.stringify(msg.bodyStructure).toLowerCase().includes('attachment') : false;
+            // Second fetch: get the actual body parts for this message
+            let bodyText = '';
+            let bodyHtml = '';
 
-            const { error: insertError } = await supabase
+            try {
+              const seqStr = `${msg.seq}`;
+              const bodyMessages = await client.fetch(seqStr, {
+                bodyParts: partsToFetch,
+              });
+
+              if (bodyMessages.length > 0) {
+                const bm = bodyMessages[0];
+                if (bm.parts) {
+                  console.log(`Message ${msg.seq} parts keys: ${Object.keys(bm.parts).join(', ')}`);
+                  
+                  // Try to get content from known sections
+                  if (htmlSection && bm.parts[htmlSection]) {
+                    bodyHtml = decodePartData(bm.parts[htmlSection]);
+                  }
+                  if (textSection && bm.parts[textSection]) {
+                    bodyText = decodePartData(bm.parts[textSection]);
+                  }
+                  
+                  // Fallback: iterate over all parts and detect content type
+                  if (!bodyText && !bodyHtml) {
+                    for (const [section, part] of Object.entries(bm.parts)) {
+                      const partType = ((part as any).type || '').toLowerCase();
+                      const content = decodePartData(part);
+                      if (!content) continue;
+                      
+                      if (partType.includes('html') || content.includes('<html') || content.includes('<div') || content.includes('<p>')) {
+                        if (!bodyHtml) bodyHtml = content;
+                      } else {
+                        if (!bodyText) bodyText = content;
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (fetchErr) {
+              console.error(`Error fetching body for msg ${msg.seq}:`, fetchErr);
+            }
+
+            const msgHasAttachments = msg.bodyStructure ? hasAttachments(msg.bodyStructure) : false;
+
+            const { data: inserted, error: insertError } = await supabase
               .from('email_messages')
               .insert({
                 from_address: from.address,
@@ -210,15 +306,67 @@ serve(async (req) => {
                 user_id: profile.user_id,
                 to_addresses: toAddresses.length > 0 ? toAddresses : null,
                 cc_addresses: ccAddresses.length > 0 ? ccAddresses : null,
-                has_attachments: hasAttachments,
+                has_attachments: msgHasAttachments,
                 folder: 'inbox',
                 is_read: false,
-              });
+              })
+              .select('id')
+              .single();
 
             if (insertError) {
               console.error('Insert error:', insertError.message);
               continue;
             }
+
+            // If message has attachments, try to save them
+            if (msgHasAttachments && msg.bodyStructure && inserted) {
+              try {
+                const attachmentInfos = findAttachments(msg.bodyStructure);
+                for (const att of attachmentInfos) {
+                  try {
+                    const attMessages = await client.fetch(`${msg.seq}`, {
+                      bodyParts: [att.section],
+                    });
+                    
+                    if (attMessages.length > 0 && attMessages[0].parts && attMessages[0].parts[att.section]) {
+                      const partData = attMessages[0].parts[att.section];
+                      const fileData = partData.data;
+                      
+                      if (fileData && fileData.length > 0) {
+                        // Upload to storage
+                        const storagePath = `${profile.user_id}/${inserted.id}/${att.filename}`;
+                        const { error: uploadError } = await supabase.storage
+                          .from('email-attachments')
+                          .upload(storagePath, fileData, {
+                            contentType: `${att.type.toLowerCase()}/${att.subtype.toLowerCase()}`,
+                            upsert: true,
+                          });
+
+                        if (!uploadError) {
+                          // Save attachment record
+                          await supabase.from('email_attachments').insert({
+                            message_id: inserted.id,
+                            user_id: profile.user_id,
+                            file_name: att.filename,
+                            file_type: `${att.type.toLowerCase()}/${att.subtype.toLowerCase()}`,
+                            file_size: att.size || fileData.length,
+                            storage_path: storagePath,
+                            is_inline: false,
+                          });
+                        } else {
+                          console.error(`Upload error for ${att.filename}:`, uploadError.message);
+                        }
+                      }
+                    }
+                  } catch (attErr) {
+                    console.error(`Error fetching attachment ${att.filename}:`, attErr);
+                  }
+                }
+              } catch (attErr) {
+                console.error('Error processing attachments:', attErr);
+              }
+            }
+
             insertedCount++;
           } catch (msgErr) {
             console.error('Error processing message:', msgErr);
@@ -249,7 +397,6 @@ serve(async (req) => {
       } catch (imapError: any) {
         console.error('IMAP error:', imapError);
         
-        // Update connection status to error
         await supabase
           .from('email_profiles')
           .update({ connection_status: 'error' })
