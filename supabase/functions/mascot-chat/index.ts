@@ -277,6 +277,51 @@ const tools = [
   {
     type: "function",
     function: {
+      name: "sync_inbox_imap",
+      description: "Sincronizar la bandeja de entrada IMAP para obtener los correos más recientes del servidor. Úsalo cuando el usuario pida actualizar o sincronizar su correo.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Número máximo de correos a sincronizar (default 20)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_email",
+      description: "Leer el contenido completo de un correo electrónico específico por su asunto o remitente. Devuelve el cuerpo del correo y adjuntos.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "Buscar por asunto, remitente o parte del contenido" },
+          message_id: { type: "string", description: "ID específico del mensaje si se conoce" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_emails",
+      description: "Buscar correos electrónicos por asunto, remitente, o contenido. Más potente que get_inbox.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Término de búsqueda (asunto, remitente, contenido)" },
+          folder: { type: "string", description: "Carpeta: inbox, sent, drafts (default: inbox)" },
+          limit: { type: "number", description: "Número máximo de resultados (default 10)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_apps_config",
       description: "Ver la configuración actual del hub de aplicaciones del usuario (categorías, apps, tamaño de iconos).",
       parameters: { type: "object", properties: {}, required: [] },
@@ -458,12 +503,101 @@ async function executeToolCall(
 
       case "get_inbox": {
         const limit = Number(args.limit) || 5;
-        const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, folder").eq("user_id", userId).eq("folder", "inbox").eq("is_deleted", false).order("date", { ascending: false }).limit(limit);
+        const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, folder, has_attachments").eq("user_id", userId).eq("folder", "inbox").eq("is_deleted", false).order("date", { ascending: false }).limit(limit);
         if (error) throw error;
         if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada." });
         return JSON.stringify({
           message: `${data.length} correo(s) recientes`,
-          emails: data.map((e: any) => ({ asunto: e.subject || "(Sin asunto)", de: e.from_name || e.from_address, fecha: e.date, leido: e.is_read })),
+          emails: data.map((e: any) => ({ id: e.id, asunto: e.subject || "(Sin asunto)", de: e.from_name || e.from_address, fecha: e.date, leido: e.is_read, adjuntos: e.has_attachments })),
+        });
+      }
+
+      case "sync_inbox_imap": {
+        const limit = Number(args.limit) || 20;
+        const { data: profile } = await supabase.from("email_profiles").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
+        const emailProfile = profile || (await supabase.from("email_profiles").select("id").eq("user_id", userId).limit(1).maybeSingle()).data;
+        if (!emailProfile) return JSON.stringify({ success: false, error: "No tienes ningún perfil de correo configurado." });
+
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+          body: JSON.stringify({ profile_id: (emailProfile as any).id, action: "sync", limit }),
+        });
+        const result = await res.json();
+        if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al sincronizar" });
+        return JSON.stringify({ success: true, message: `Sincronización completada. ${result.new_messages ?? 0} correo(s) nuevo(s).`, total: result.total_messages ?? 0 });
+      }
+
+      case "read_email": {
+        const messageId = String(args.message_id || "");
+        const search = String(args.search || "");
+        let msg: any = null;
+
+        if (messageId) {
+          const { data } = await supabase.from("email_messages").select("*").eq("id", messageId).eq("user_id", userId).single();
+          msg = data;
+        } else if (search) {
+          const { data } = await supabase.from("email_messages").select("*").eq("user_id", userId).eq("is_deleted", false).or(`subject.ilike.%${search}%,from_address.ilike.%${search}%,from_name.ilike.%${search}%`).order("date", { ascending: false }).limit(1);
+          msg = data?.[0];
+        }
+        if (!msg) return JSON.stringify({ error: "No se encontró el correo." });
+
+        // If no body, try to fetch from IMAP
+        if (!msg.body_html && !msg.body_text && msg.message_uid) {
+          const { data: profile } = await supabase.from("email_profiles").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
+          const emailProfile = profile || (await supabase.from("email_profiles").select("id").eq("user_id", userId).limit(1).maybeSingle()).data;
+          if (emailProfile) {
+            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+            const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+              body: JSON.stringify({ profile_id: (emailProfile as any).id, action: "fetch-body", message_uid: msg.message_uid }),
+            });
+            const result = await res.json();
+            if (result.body_html || result.body_text) {
+              msg.body_html = result.body_html;
+              msg.body_text = result.body_text;
+            }
+          }
+        }
+
+        // Get attachments
+        const { data: attachments } = await supabase.from("email_attachments").select("file_name, file_type, file_size").eq("message_id", msg.id);
+
+        // Strip HTML for readable text
+        let bodyText = msg.body_text || "";
+        if (!bodyText && msg.body_html) {
+          bodyText = msg.body_html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 2000);
+        }
+
+        return JSON.stringify({
+          id: msg.id,
+          asunto: msg.subject || "(Sin asunto)",
+          de: msg.from_name ? `${msg.from_name} <${msg.from_address}>` : msg.from_address,
+          para: msg.to_addresses,
+          cc: msg.cc_addresses,
+          fecha: msg.date,
+          contenido: bodyText.slice(0, 3000),
+          adjuntos: attachments?.map((a: any) => ({ nombre: a.file_name, tipo: a.file_type, tamaño: formatBytes(a.file_size) })) || [],
+        });
+      }
+
+      case "search_emails": {
+        const query = String(args.query || "");
+        const folder = String(args.folder || "inbox");
+        const limit = Number(args.limit) || 10;
+        if (!query) return JSON.stringify({ error: "Necesito un término de búsqueda." });
+
+        const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, has_attachments, folder")
+          .eq("user_id", userId).eq("is_deleted", false).eq("folder", folder)
+          .or(`subject.ilike.%${query}%,from_address.ilike.%${query}%,from_name.ilike.%${query}%,body_text.ilike.%${query}%`)
+          .order("date", { ascending: false }).limit(limit);
+        if (error) throw error;
+        if (!data?.length) return JSON.stringify({ message: `No se encontraron correos con "${query}" en ${folder}.` });
+        return JSON.stringify({
+          message: `${data.length} correo(s) encontrado(s)`,
+          emails: data.map((e: any) => ({ id: e.id, asunto: e.subject || "(Sin asunto)", de: e.from_name || e.from_address, fecha: e.date, leido: e.is_read, adjuntos: e.has_attachments })),
         });
       }
 
@@ -836,6 +970,9 @@ HERRAMIENTAS DISPONIBLES:
 - get_team_users, get_shared_files, get_shared_folders
 - get_inbox, get_leads, get_reminders, get_ostickets
 - get_calendar_events, get_budgets, get_apps_config
+- sync_inbox_imap (sincronizar correos desde el servidor IMAP)
+- read_email (leer el contenido completo de un correo)
+- search_emails (buscar correos por asunto, remitente o contenido)
 
 ✍️ ESCRITURA (REQUIEREN CONFIRMACIÓN):
 - send_internal_message, send_email, send_whatsapp
