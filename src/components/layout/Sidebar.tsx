@@ -796,8 +796,26 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         </div>
       )}
 
+      {/* Quick search hint */}
+      <div className="px-3 pb-1">
+        <button
+          onClick={() => {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
+          }}
+          className={cn(
+            "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+            "bg-muted/50 hover:bg-muted text-muted-foreground border border-border/50"
+          )}
+        >
+          <Search className="w-4 h-4" />
+          <span className="flex-1 text-left text-xs">Buscar...</span>
+          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </button>
+      </div>
+
       <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
-        {expandedNavContent}
       </nav>
 
       <div className="p-3 border-t border-sidebar-border space-y-1">

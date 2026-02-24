@@ -42,18 +42,20 @@ import { ReportsModule } from '@/components/reports/ReportsModule';
 import { AppsHub } from '@/components/apps/AppsHub';
 import { GeneralRemindersList } from '@/components/reminders/GeneralRemindersList';
 import { SeoArticleGenerator } from '@/components/seo/SeoArticleGenerator';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { SeoArticleCard } from '@/components/seo/SeoArticleCard';
 import { SeoArticleViewer } from '@/components/seo/SeoArticleViewer';
 import { useSeoArticles, SeoArticle } from '@/hooks/useSeoArticles';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
-import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List } from 'lucide-react';
+import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { CommandPalette } from '@/components/layout/CommandPalette';
 
 const SeoGeneratorInline = () => {
   const { articles, loading, generating, generateArticle, deleteArticle } = useSeoArticles();
@@ -353,49 +355,52 @@ const IndexContent = () => {
         );
       case 'prospeccion':
         return (
-          <div className="p-3 sm:p-8 flex flex-col gap-4 animate-fade-in h-[calc(100vh-4rem)]">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Prospección</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">Busca y descubre nuevos clientes potenciales por zona geográfica</p>
-            </div>
-            <div className="flex-1 min-h-0">
+          <div className="flex flex-col gap-0 animate-fade-in h-[calc(100vh-4rem)]">
+            <PageHeader
+              title="Prospección"
+              description="Busca y descubre nuevos clientes potenciales por zona geográfica"
+              icon={<Search className="h-5 w-5 text-primary" />}
+            />
+            <div className="flex-1 min-h-0 p-3 sm:p-6">
               <ProspectionModule />
             </div>
           </div>
         );
       case 'pipeline':
         return (
-          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Pipeline</h1>
-              <p className="text-xs sm:text-base text-muted-foreground mt-1">
-                Arrastra los leads entre columnas para cambiar su estado
-              </p>
-            </div>
-            <LeadKanban 
-              leads={leads} 
-              onViewLead={handleViewLead} 
-              onUpdateStatus={handleUpdateLeadStatus}
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Pipeline"
+              description="Arrastra los leads entre columnas para cambiar su estado"
+              icon={<Kanban className="h-5 w-5 text-primary" />}
             />
+            <div className="flex-1 min-h-0 p-3 sm:p-6">
+              <LeadKanban 
+                leads={leads} 
+                onViewLead={handleViewLead} 
+                onUpdateStatus={handleUpdateLeadStatus}
+              />
+            </div>
           </div>
         );
       case 'campaigns':
         return <EmailCampaigns />;
       case 'mapa':
         return (
-          <div className="p-3 sm:p-8 h-full flex flex-col space-y-4 sm:space-y-6 animate-fade-in">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Mapa de Leads</h1>
-              <p className="text-xs sm:text-base text-muted-foreground mt-1">
-                Visualiza tus leads en el mapa
-              </p>
-            </div>
-            <LeadMap 
-              leads={leads} 
-              onViewLead={handleViewLead} 
-              onBulkGeocode={bulkGeocode}
-              isBulkGeocoding={isBulkGeocoding}
+          <div className="flex flex-col h-full animate-fade-in">
+            <PageHeader
+              title="Mapa de Leads"
+              description="Visualiza tus leads en el mapa"
+              icon={<MapPin className="h-5 w-5 text-primary" />}
             />
+            <div className="flex-1 min-h-0 p-3 sm:p-6">
+              <LeadMap 
+                leads={leads} 
+                onViewLead={handleViewLead} 
+                onBulkGeocode={bulkGeocode}
+                isBulkGeocoding={isBulkGeocoding}
+              />
+            </div>
           </div>
         );
       case 'reports':
@@ -404,14 +409,15 @@ const IndexContent = () => {
         return <Inbox />;
       case 'whatsapp':
         return (
-          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">WhatsApp</h1>
-              <p className="text-xs sm:text-base text-muted-foreground mt-1">
-                Gestiona tus conversaciones
-              </p>
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="WhatsApp"
+              description="Gestiona tus conversaciones"
+              icon={<MessageSquare className="h-5 w-5 text-primary" />}
+            />
+            <div className="flex-1 min-h-0 p-3 sm:p-6">
+              <WhatsAppPanel />
             </div>
-            <WhatsAppPanel />
           </div>
         );
       case 'templates':
@@ -439,12 +445,11 @@ const IndexContent = () => {
       case 'osticket':
         return (
           <div className="flex flex-col overflow-hidden animate-fade-in" style={{ height: '100%' }}>
-            <div className="px-4 sm:px-8 py-3 border-b bg-card flex-shrink-0">
-              <h1 className="text-lg sm:text-2xl font-bold text-foreground">Tickets osTicket</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Gestiona y responde tickets con mensajes de WhatsApp personalizados
-              </p>
-            </div>
+            <PageHeader
+              title="Tickets osTicket"
+              description="Gestiona y responde tickets con mensajes de WhatsApp"
+              icon={<Ticket className="h-5 w-5 text-primary" />}
+            />
             <div style={{ flex: 1, minHeight: 0 }}>
               <OsTicketPanel />
             </div>
@@ -456,55 +461,56 @@ const IndexContent = () => {
         return <ReportsModule />;
       case 'chat-ai':
         return (
-          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in w-full max-w-none md:max-w-4xl md:mx-auto">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Chat IA</h1>
-              <p className="text-xs sm:text-base text-muted-foreground mt-1">
-                Asistente inteligente con búsqueda en tiempo real
-              </p>
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Chat IA"
+              description="Asistente inteligente con búsqueda en tiempo real"
+              icon={<Bot className="h-5 w-5 text-primary" />}
+            />
+            <div className="flex-1 min-h-0 p-3 sm:p-6 w-full max-w-none md:max-w-4xl md:mx-auto">
+              <PerplexityChatbot />
             </div>
-            <PerplexityChatbot />
           </div>
         );
       case 'reminders':
         return (
-          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in max-w-5xl mx-auto">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Recordatorios</h1>
-              <p className="text-xs sm:text-base text-muted-foreground mt-1">
-                Gestiona recordatorios generales para la empresa
-              </p>
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Recordatorios"
+              description="Gestiona recordatorios generales para la empresa"
+              icon={<Bell className="h-5 w-5 text-primary" />}
+            />
+            <div className="flex-1 min-h-0 p-3 sm:p-6 max-w-5xl mx-auto w-full">
+              <GeneralRemindersList />
             </div>
-            <GeneralRemindersList />
           </div>
         );
       case 'seo-generator':
         return <SeoGeneratorInline />;
       case 'settings':
         return (
-          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Ajustes</h1>
-              <p className="text-xs sm:text-base text-muted-foreground mt-1">
-                Configuración y registro de actividad
-              </p>
-            </div>
-            <ProfileSettings />
-            <ThemeToggleCard />
-            
-            <div className="pt-2 sm:pt-4">
-              <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">Integraciones</h2>
-              <div className="space-y-3 sm:space-y-4">
-                <GoogleSheetsCard />
-                <OsTicketConfigCard />
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Ajustes"
+              description="Configuración y registro de actividad"
+              icon={<Settings className="h-5 w-5 text-primary" />}
+            />
+            <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6 space-y-4">
+              <ProfileSettings />
+              <ThemeToggleCard />
+              <div className="pt-2 sm:pt-4">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">Integraciones</h2>
+                <div className="space-y-3 sm:space-y-4">
+                  <GoogleSheetsCard />
+                  <OsTicketConfigCard />
+                </div>
               </div>
+              <PasswordChangeCard />
+              <TwoFactorAuthCard />
+              <NotificationPreferencesCard />
+              <AuditLogViewer />
+              <DeleteAccountCard />
             </div>
-            
-            <PasswordChangeCard />
-            <TwoFactorAuthCard />
-            <NotificationPreferencesCard />
-            <AuditLogViewer />
-            <DeleteAccountCard />
           </div>
         );
       default:
@@ -537,6 +543,7 @@ const IndexContent = () => {
             </div>
           </main>
         </div>
+        <CommandPalette onNavigate={setActiveTab} />
 
       <LeadFormModal
         open={isFormOpen}
