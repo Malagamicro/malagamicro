@@ -17,75 +17,43 @@ function parseAddress(raw: any): { address: string; name: string | null } {
   }
   if (Array.isArray(raw) && raw.length > 0) {
     const first = raw[0];
-    if (first.mailbox && first.host) {
-      return { address: `${first.mailbox}@${first.host}`, name: first.name || null };
-    }
+    if (first.mailbox && first.host) return { address: `${first.mailbox}@${first.host}`, name: first.name || null };
     return parseAddress(first);
   }
-  if (raw.mailbox && raw.host) {
-    return { address: `${raw.mailbox}@${raw.host}`, name: raw.name || null };
-  }
+  if (raw.mailbox && raw.host) return { address: `${raw.mailbox}@${raw.host}`, name: raw.name || null };
   return { address: String(raw), name: null };
 }
 
 function parseAddressList(raw: any): string[] {
   if (!raw) return [];
-  if (Array.isArray(raw)) {
-    return raw.map(r => {
-      if (r.mailbox && r.host) return `${r.mailbox}@${r.host}`;
-      return String(r);
-    });
-  }
+  if (Array.isArray(raw)) return raw.map(r => r.mailbox && r.host ? `${r.mailbox}@${r.host}` : String(r));
   return [String(raw)];
 }
 
-// Decode Uint8Array part data to string, handling different encodings
 function decodePartData(part: any): string {
   if (!part || !part.data) return '';
-  
   const decoder = new TextDecoder('utf-8', { fatal: false });
   let raw = '';
-  
-  if (part.data instanceof Uint8Array) {
-    raw = decoder.decode(part.data);
-  } else if (typeof part.data === 'string') {
-    raw = part.data;
-  } else {
-    return '';
-  }
-
-  // Handle quoted-printable encoding
+  if (part.data instanceof Uint8Array) raw = decoder.decode(part.data);
+  else if (typeof part.data === 'string') raw = part.data;
+  else return '';
   const encoding = (part.encoding || '').toUpperCase();
   if (encoding === 'QUOTED-PRINTABLE') {
-    raw = raw
-      .replace(/=\r?\n/g, '') // soft line breaks
-      .replace(/=([0-9A-Fa-f]{2})/g, (_m: string, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+    raw = raw.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (_m: string, hex: string) => String.fromCharCode(parseInt(hex, 16)));
   } else if (encoding === 'BASE64') {
-    try {
-      raw = atob(raw.replace(/\s/g, ''));
-    } catch { /* keep as-is */ }
+    try { raw = atob(raw.replace(/\s/g, '')); } catch { /* keep */ }
   }
-
   return raw;
 }
 
-// Walk bodyStructure recursively to find text parts and their section paths
 function findTextParts(bs: any, path = ''): { textSection: string | null; htmlSection: string | null } {
   let textSection: string | null = null;
   let htmlSection: string | null = null;
-
   if (!bs) return { textSection, htmlSection };
-
   const type = (bs.type || '').toUpperCase();
   const subtype = (bs.subtype || '').toUpperCase();
-
-  if (type === 'TEXT' && subtype === 'PLAIN') {
-    textSection = path || '1';
-  } else if (type === 'TEXT' && subtype === 'HTML') {
-    htmlSection = path || '1';
-  }
-
-  // Check child parts
+  if (type === 'TEXT' && subtype === 'PLAIN') textSection = path || '1';
+  else if (type === 'TEXT' && subtype === 'HTML') htmlSection = path || '1';
   if (bs.parts && Array.isArray(bs.parts)) {
     for (let i = 0; i < bs.parts.length; i++) {
       const childPath = path ? `${path}.${i + 1}` : `${i + 1}`;
@@ -94,113 +62,224 @@ function findTextParts(bs: any, path = ''): { textSection: string | null; htmlSe
       if (child.htmlSection && !htmlSection) htmlSection = child.htmlSection;
     }
   }
-
   return { textSection, htmlSection };
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const body = await req.json();
 
-    // MODE 1: Real IMAP sync from the app (profile_id provided)
     if (body.profile_id) {
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Not authenticated' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ success: false, error: 'Not authenticated' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
+      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
       const { data: profile, error: profileError } = await supabase
-        .from('email_profiles')
-        .select('*')
-        .eq('id', body.profile_id)
-        .single();
+        .from('email_profiles').select('*').eq('id', body.profile_id).single();
 
       if (profileError || !profile) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Profile not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ success: false, error: 'Profile not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       if (!profile.imap_host || !profile.imap_user || !profile.imap_password) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'IMAP not configured. Please fill in IMAP host, user, and password.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ success: false, error: 'IMAP not configured' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      const isTestOnly = body.action === 'test';
+      // =============================================
+      // ACTION: fetch-body - Fetch body for a single message on-demand
+      // =============================================
+      if (body.action === 'fetch-body' && body.message_uid) {
+        let client: ImapClient | null = null;
+        try {
+          client = new ImapClient({
+            host: profile.imap_host.trim(),
+            port: profile.imap_port || 993,
+            tls: profile.imap_secure !== false,
+            username: profile.imap_user.trim(),
+            password: profile.imap_password,
+          });
+          await client.connect();
+          await client.authenticate();
+
+          const inbox = await client.selectMailbox('INBOX');
+
+          // Search for the message by UID
+          const searchResults = await client.search(`UID ${body.message_uid}`);
+          if (!searchResults || searchResults.length === 0) {
+            await client.disconnect();
+            return new Response(JSON.stringify({ success: false, error: 'Message not found on server' }),
+              { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+
+          const seqNum = searchResults[0];
+
+          // Fetch bodyStructure to find text parts
+          const structMsgs = await client.fetch(`${seqNum}`, { bodyStructure: true });
+          if (!structMsgs.length) {
+            await client.disconnect();
+            return new Response(JSON.stringify({ success: false, error: 'Could not fetch structure' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+
+          const bs = structMsgs[0].bodyStructure;
+          const { textSection, htmlSection } = findTextParts(bs);
+          const parts: string[] = [];
+          if (textSection) parts.push(textSection);
+          if (htmlSection) parts.push(htmlSection);
+          if (parts.length === 0) parts.push('1');
+
+          // Fetch body parts
+          const bodyMsgs = await client.fetch(`${seqNum}`, { bodyParts: parts });
+          let bodyText = '';
+          let bodyHtml = '';
+
+          if (bodyMsgs.length > 0 && bodyMsgs[0].parts) {
+            for (const [section, part] of Object.entries(bodyMsgs[0].parts)) {
+              const content = decodePartData(part);
+              if (!content) continue;
+              if (section === htmlSection || content.includes('<html') || content.includes('<div') || content.includes('<p>')) {
+                if (!bodyHtml) bodyHtml = content;
+              } else {
+                if (!bodyText) bodyText = content;
+              }
+            }
+          }
+
+          // Update the message in DB
+          if (body.message_id) {
+            await supabase.from('email_messages').update({
+              body_text: bodyText || null,
+              body_html: bodyHtml || null,
+            }).eq('id', body.message_id);
+          }
+
+          // Also fetch and save attachment metadata + files
+          const msgHasAttachments = bs ? hasAttachments(bs) : false;
+          const savedAttachments: any[] = [];
+
+          if (msgHasAttachments && body.message_id) {
+            try {
+              const attInfos = findAttachments(bs);
+              for (const att of attInfos.slice(0, 5)) {
+                try {
+                  const attMsgs = await client.fetch(`${seqNum}`, { bodyParts: [att.section] });
+                  if (attMsgs.length > 0 && attMsgs[0].parts && attMsgs[0].parts[att.section]) {
+                    const fileData = attMsgs[0].parts[att.section].data;
+                    if (fileData && fileData.length > 0) {
+                      const storagePath = `${profile.user_id}/${body.message_id}/${att.filename || 'attachment'}`;
+                      const contentType = `${(att.type || 'application').toLowerCase()}/${(att.subtype || 'octet-stream').toLowerCase()}`;
+                      const { error: upErr } = await supabase.storage
+                        .from('email-attachments')
+                        .upload(storagePath, fileData, { contentType, upsert: true });
+
+                      if (!upErr) {
+                        const { data: attRecord } = await supabase.from('email_attachments').insert({
+                          message_id: body.message_id,
+                          user_id: profile.user_id,
+                          file_name: att.filename || 'attachment',
+                          file_type: contentType,
+                          file_size: att.size || fileData.length,
+                          storage_path: storagePath,
+                          is_inline: false,
+                        }).select().single();
+                        if (attRecord) savedAttachments.push(attRecord);
+                      }
+                    }
+                  }
+                } catch (e) { console.error('Att fetch:', e); }
+              }
+            } catch (e) { console.error('Att process:', e); }
+          }
+
+          await client.disconnect();
+
+          return new Response(JSON.stringify({
+            success: true,
+            body_text: bodyText,
+            body_html: bodyHtml,
+            attachments: savedAttachments,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+        } catch (err: any) {
+          if (client) try { await client.disconnect(); } catch {}
+          return new Response(JSON.stringify({ success: false, error: err.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // =============================================
+      // ACTION: test - Just verify IMAP connection
+      // =============================================
+      if (body.action === 'test') {
+        let client: ImapClient | null = null;
+        try {
+          client = new ImapClient({
+            host: profile.imap_host.trim(),
+            port: profile.imap_port || 993,
+            tls: profile.imap_secure !== false,
+            username: profile.imap_user.trim(),
+            password: profile.imap_password,
+          });
+          await client.connect();
+          await client.authenticate();
+          await client.disconnect();
+          await supabase.from('email_profiles')
+            .update({ connection_status: 'connected', last_sync_at: new Date().toISOString() })
+            .eq('id', body.profile_id);
+          return new Response(JSON.stringify({ success: true, message: 'IMAP OK' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        } catch (err: any) {
+          if (client) try { await client.disconnect(); } catch {}
+          return new Response(JSON.stringify({ success: false, error: err.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+
+      // =============================================
+      // ACTION: sync (default) - Sync envelope metadata only (no body)
+      // =============================================
+      const batchSize = Math.min(body.batch_size || 20, 50);
+      const pageOffset = body.page_offset || 0;
 
       let client: ImapClient | null = null;
       try {
-        const imapHost = profile.imap_host.trim();
-        const imapPort = profile.imap_port || 993;
-        console.log(`Connecting to IMAP: ${imapHost}:${imapPort}`);
-        
         client = new ImapClient({
-          host: imapHost,
-          port: imapPort,
+          host: profile.imap_host.trim(),
+          port: profile.imap_port || 993,
           tls: profile.imap_secure !== false,
           username: profile.imap_user.trim(),
           password: profile.imap_password,
         });
-
         await client.connect();
         await client.authenticate();
-        console.log('IMAP login successful');
+        console.log('IMAP connected');
 
-        // Test mode - just verify connection
-        if (isTestOnly) {
-          await client.disconnect();
-          await supabase
-            .from('email_profiles')
-            .update({ connection_status: 'connected', last_sync_at: new Date().toISOString() })
-            .eq('id', body.profile_id);
-
-          return new Response(
-            JSON.stringify({ success: true, message: 'IMAP connection verified successfully' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Sync mode - fetch recent emails
         const inbox = await client.selectMailbox('INBOX');
         const totalMessages = inbox.exists || 0;
-        console.log(`Mailbox has ${totalMessages} messages`);
 
         if (totalMessages === 0) {
           await client.disconnect();
-          await supabase
-            .from('email_profiles')
+          await supabase.from('email_profiles')
             .update({ connection_status: 'connected', last_sync_at: new Date().toISOString() })
             .eq('id', body.profile_id);
-
-          return new Response(
-            JSON.stringify({ success: true, count: 0, message: 'Mailbox is empty' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return new Response(JSON.stringify({ success: true, count: 0, message: 'Empty' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
-        // Fetch last 50 messages (or fewer if mailbox is smaller)
-        const fetchCount = Math.min(totalMessages, 50);
-        const startSeq = Math.max(1, totalMessages - fetchCount + 1);
-        const fetchRange = `${startSeq}:${totalMessages}`;
+        const endSeq = Math.max(1, totalMessages - pageOffset);
+        const startSeq = Math.max(1, endSeq - batchSize + 1);
+        const fetchRange = `${startSeq}:${endSeq}`;
+        console.log(`Fetching envelopes ${fetchRange} of ${totalMessages}`);
 
-        console.log(`Fetching messages ${fetchRange}`);
-        
-        // First pass: fetch envelope + bodyStructure to get message info and find text parts
+        // Only fetch envelope + bodyStructure (lightweight, no body content)
         const messages = await client.fetch(fetchRange, {
           envelope: true,
           bodyStructure: true,
@@ -217,287 +296,110 @@ serve(async (req) => {
 
             const messageId = envelope.messageId || msg.uid?.toString() || null;
 
-            // Check if already exists
             if (messageId) {
               const { data: existing } = await supabase
-                .from('email_messages')
-                .select('id')
+                .from('email_messages').select('id')
                 .eq('message_id_header', messageId)
-                .eq('profile_id', body.profile_id)
-                .maybeSingle();
-
-              if (existing) {
-                skippedCount++;
-                continue;
-              }
+                .eq('profile_id', body.profile_id).maybeSingle();
+              if (existing) { skippedCount++; continue; }
             }
 
             const from = parseAddress(envelope.from);
             const toAddresses = parseAddressList(envelope.to);
             const ccAddresses = parseAddressList(envelope.cc);
-
-            // Determine which body parts to fetch for text/html content
-            const { textSection, htmlSection } = findTextParts(msg.bodyStructure);
-            const partsToFetch: string[] = [];
-            if (textSection) partsToFetch.push(textSection);
-            if (htmlSection) partsToFetch.push(htmlSection);
-            // Fallback: try common sections
-            if (partsToFetch.length === 0) {
-              partsToFetch.push('1', '1.1', '1.2');
-            }
-
-            // Second fetch: get the actual body parts for this message
-            let bodyText = '';
-            let bodyHtml = '';
-
-            try {
-              const seqStr = `${msg.seq}`;
-              const bodyMessages = await client.fetch(seqStr, {
-                bodyParts: partsToFetch,
-              });
-
-              if (bodyMessages.length > 0) {
-                const bm = bodyMessages[0];
-                if (bm.parts) {
-                  console.log(`Message ${msg.seq} parts keys: ${Object.keys(bm.parts).join(', ')}`);
-                  
-                  // Try to get content from known sections
-                  if (htmlSection && bm.parts[htmlSection]) {
-                    bodyHtml = decodePartData(bm.parts[htmlSection]);
-                  }
-                  if (textSection && bm.parts[textSection]) {
-                    bodyText = decodePartData(bm.parts[textSection]);
-                  }
-                  
-                  // Fallback: iterate over all parts and detect content type
-                  if (!bodyText && !bodyHtml) {
-                    for (const [section, part] of Object.entries(bm.parts)) {
-                      const partType = ((part as any).type || '').toLowerCase();
-                      const content = decodePartData(part);
-                      if (!content) continue;
-                      
-                      if (partType.includes('html') || content.includes('<html') || content.includes('<div') || content.includes('<p>')) {
-                        if (!bodyHtml) bodyHtml = content;
-                      } else {
-                        if (!bodyText) bodyText = content;
-                      }
-                    }
-                  }
-                }
-              }
-            } catch (fetchErr) {
-              console.error(`Error fetching body for msg ${msg.seq}:`, fetchErr);
-            }
-
             const msgHasAttachments = msg.bodyStructure ? hasAttachments(msg.bodyStructure) : false;
 
-            const { data: inserted, error: insertError } = await supabase
-              .from('email_messages')
-              .insert({
-                from_address: from.address,
-                from_name: from.name,
-                subject: envelope.subject || '(Sin asunto)',
-                body_text: bodyText || null,
-                body_html: bodyHtml || null,
-                date: envelope.date ? new Date(envelope.date).toISOString() : new Date().toISOString(),
-                message_id_header: messageId,
-                message_uid: msg.uid?.toString() || null,
-                profile_id: body.profile_id,
-                user_id: profile.user_id,
-                to_addresses: toAddresses.length > 0 ? toAddresses : null,
-                cc_addresses: ccAddresses.length > 0 ? ccAddresses : null,
-                has_attachments: msgHasAttachments,
-                folder: 'inbox',
-                is_read: false,
-              })
-              .select('id')
-              .single();
-
-            if (insertError) {
-              console.error('Insert error:', insertError.message);
-              continue;
-            }
-
-            // If message has attachments, try to save them
-            if (msgHasAttachments && msg.bodyStructure && inserted) {
-              try {
-                const attachmentInfos = findAttachments(msg.bodyStructure);
-                for (const att of attachmentInfos) {
-                  try {
-                    const attMessages = await client.fetch(`${msg.seq}`, {
-                      bodyParts: [att.section],
-                    });
-                    
-                    if (attMessages.length > 0 && attMessages[0].parts && attMessages[0].parts[att.section]) {
-                      const partData = attMessages[0].parts[att.section];
-                      const fileData = partData.data;
-                      
-                      if (fileData && fileData.length > 0) {
-                        // Upload to storage
-                        const storagePath = `${profile.user_id}/${inserted.id}/${att.filename}`;
-                        const { error: uploadError } = await supabase.storage
-                          .from('email-attachments')
-                          .upload(storagePath, fileData, {
-                            contentType: `${att.type.toLowerCase()}/${att.subtype.toLowerCase()}`,
-                            upsert: true,
-                          });
-
-                        if (!uploadError) {
-                          // Save attachment record
-                          await supabase.from('email_attachments').insert({
-                            message_id: inserted.id,
-                            user_id: profile.user_id,
-                            file_name: att.filename,
-                            file_type: `${att.type.toLowerCase()}/${att.subtype.toLowerCase()}`,
-                            file_size: att.size || fileData.length,
-                            storage_path: storagePath,
-                            is_inline: false,
-                          });
-                        } else {
-                          console.error(`Upload error for ${att.filename}:`, uploadError.message);
-                        }
-                      }
-                    }
-                  } catch (attErr) {
-                    console.error(`Error fetching attachment ${att.filename}:`, attErr);
-                  }
-                }
-              } catch (attErr) {
-                console.error('Error processing attachments:', attErr);
-              }
-            }
+            await supabase.from('email_messages').insert({
+              from_address: from.address,
+              from_name: from.name,
+              subject: envelope.subject || '(Sin asunto)',
+              body_text: null, // Will be fetched on-demand
+              body_html: null,
+              date: envelope.date ? new Date(envelope.date).toISOString() : new Date().toISOString(),
+              message_id_header: messageId,
+              message_uid: msg.uid?.toString() || null,
+              profile_id: body.profile_id,
+              user_id: profile.user_id,
+              to_addresses: toAddresses.length > 0 ? toAddresses : null,
+              cc_addresses: ccAddresses.length > 0 ? ccAddresses : null,
+              has_attachments: msgHasAttachments,
+              folder: 'inbox',
+              is_read: false,
+            });
 
             insertedCount++;
-          } catch (msgErr) {
-            console.error('Error processing message:', msgErr);
-          }
+          } catch (e) { console.error('Msg:', e); }
         }
 
         await client.disconnect();
-
-        // Update profile sync status
-        await supabase
-          .from('email_profiles')
+        await supabase.from('email_profiles')
           .update({ connection_status: 'connected', last_sync_at: new Date().toISOString() })
           .eq('id', body.profile_id);
 
-        console.log(`Sync complete: ${insertedCount} inserted, ${skippedCount} skipped`);
+        const hasMore = startSeq > 1;
+        console.log(`Done: ${insertedCount} new, ${skippedCount} skip`);
 
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            count: insertedCount, 
-            skipped: skippedCount,
-            total: totalMessages,
-            message: `${insertedCount} correos sincronizados, ${skippedCount} ya existían` 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({
+          success: true, count: insertedCount, skipped: skippedCount,
+          total: totalMessages, has_more: hasMore, next_offset: pageOffset + batchSize,
+          message: `${insertedCount} sincronizados, ${skippedCount} existían`
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
       } catch (imapError: any) {
         console.error('IMAP error:', imapError);
-        
-        await supabase
-          .from('email_profiles')
-          .update({ connection_status: 'error' })
-          .eq('id', body.profile_id);
-
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: `IMAP connection failed: ${imapError.message || 'Unknown error'}` 
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        if (client) try { await client.disconnect(); } catch {}
+        await supabase.from('email_profiles')
+          .update({ connection_status: 'error' }).eq('id', body.profile_id);
+        return new Response(JSON.stringify({ success: false, error: imapError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
 
-    // MODE 2: n8n webhook - receive emails (emails array provided) - kept for backward compat
+    // MODE 2: n8n webhook
     if (body.emails && Array.isArray(body.emails)) {
       const webhookSecret = Deno.env.get('N8N_WEBHOOK_SECRET');
       const providedSecret = req.headers.get('x-webhook-secret');
-      
       if (webhookSecret && providedSecret !== webhookSecret) {
-        return new Response(
-          JSON.stringify({ error: 'Unauthorized' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
-
+      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
       const { emails, user_id } = body;
       const results = [];
-      const errors = [];
-
       for (const email of emails) {
-        const { 
-          from_address, from_name, subject, body_text, body_html, 
-          date, message_id_header, message_uid, profile_id, 
-          to_addresses, cc_addresses, has_attachments, folder
-        } = email;
-
-        if (message_id_header) {
-          const { data: existing } = await supabase
-            .from('email_messages')
-            .select('id')
-            .eq('message_id_header', message_id_header)
-            .maybeSingle();
-
-          if (existing) {
-            results.push({ id: existing.id, status: 'already_exists' });
-            continue;
-          }
+        if (email.message_id_header) {
+          const { data: existing } = await supabase.from('email_messages')
+            .select('id').eq('message_id_header', email.message_id_header).maybeSingle();
+          if (existing) { results.push({ id: existing.id, status: 'exists' }); continue; }
         }
-
-        const { data: inserted, error: insertError } = await supabase
-          .from('email_messages')
-          .insert({
-            from_address: from_address || 'unknown@unknown.com',
-            from_name: from_name || null,
-            subject: subject || '(Sin asunto)',
-            body_text: body_text || null,
-            body_html: body_html || null,
-            date: date || new Date().toISOString(),
-            message_id_header: message_id_header || null,
-            message_uid: message_uid || null,
-            profile_id: profile_id,
-            user_id: user_id,
-            to_addresses: to_addresses || null,
-            cc_addresses: cc_addresses || null,
-            has_attachments: has_attachments || false,
-            folder: folder || 'inbox',
-            is_read: false,
-          })
-          .select('id')
-          .single();
-
-        if (insertError) {
-          errors.push({ message_id_header, error: insertError.message });
-          continue;
-        }
-        results.push({ id: inserted.id, status: 'inserted' });
+        const { data: inserted, error } = await supabase.from('email_messages').insert({
+          from_address: email.from_address || 'unknown@unknown.com',
+          from_name: email.from_name || null,
+          subject: email.subject || '(Sin asunto)',
+          body_text: email.body_text || null,
+          body_html: email.body_html || null,
+          date: email.date || new Date().toISOString(),
+          message_id_header: email.message_id_header || null,
+          message_uid: email.message_uid || null,
+          profile_id: email.profile_id,
+          user_id: user_id,
+          to_addresses: email.to_addresses || null,
+          cc_addresses: email.cc_addresses || null,
+          has_attachments: email.has_attachments || false,
+          folder: email.folder || 'inbox',
+          is_read: false,
+        }).select('id').single();
+        results.push(error ? { error: error.message } : { id: inserted?.id, status: 'ok' });
       }
-
-      return new Response(
-        JSON.stringify({ success: true, processed: results.length, errors: errors.length, results }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: true, results }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    return new Response(
-      JSON.stringify({ error: 'Invalid payload: provide profile_id for IMAP sync or emails array for import' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: 'Invalid payload' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-  } catch (error) {
-    console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

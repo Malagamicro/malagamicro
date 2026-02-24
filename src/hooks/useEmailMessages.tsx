@@ -145,6 +145,25 @@ export function useEmailMessages(profileId?: string) {
     return () => clearInterval(interval);
   }, [user, fetchMessages]);
 
+  const syncProfilePaginated = async (pId: string): Promise<number> => {
+    let totalInserted = 0;
+    let offset = 0;
+    const batchSize = 20;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase.functions.invoke('imap-check', {
+        body: { profile_id: pId, action: 'sync', batch_size: batchSize, page_offset: offset }
+      });
+      if (error) throw error;
+      totalInserted += data?.count || 0;
+      hasMore = data?.has_more === true && (data?.count > 0 || data?.skipped > 0);
+      offset = data?.next_offset || offset + batchSize;
+      if (offset > 200) break;
+    }
+    return totalInserted;
+  };
+
   const syncInbox = async (pId?: string) => {
     setSyncing(true);
     try {
@@ -170,20 +189,13 @@ export function useEmailMessages(profileId?: string) {
         let errors = 0;
         for (const p of validProfiles) {
           try {
-            const { data, error } = await supabase.functions.invoke('imap-check', {
-              body: { profile_id: p.id, action: 'sync' }
-            });
-            if (error) { errors++; continue; }
-            totalCount += data?.count || 0;
+            totalCount += await syncProfilePaginated(p.id);
           } catch { errors++; }
         }
         toast.success(`${totalCount} correos sincronizados de ${validProfiles.length - errors} perfil(es)`);
       } else {
-        const { data, error } = await supabase.functions.invoke('imap-check', {
-          body: { profile_id: targetProfileId, action: 'sync' }
-        });
-        if (error) throw error;
-        toast.success(`${data?.count || 0} correos sincronizados`);
+        const count = await syncProfilePaginated(targetProfileId);
+        toast.success(`${count} correos sincronizados`);
       }
       await fetchMessages();
     } catch (err: any) {
@@ -193,6 +205,46 @@ export function useEmailMessages(profileId?: string) {
     }
   };
 
+  // Fetch body on-demand when user opens a message
+  const fetchBodyOnDemand = async (msg: EmailMessage): Promise<EmailMessage> => {
+    if (msg.body_html || msg.body_text) return msg; // Already has body
+    if (!msg.message_uid) return msg; // No UID to fetch
+
+    try {
+      const { data, error } = await supabase.functions.invoke('imap-check', {
+        body: {
+          profile_id: msg.profile_id,
+          action: 'fetch-body',
+          message_uid: msg.message_uid,
+          message_id: msg.id,
+        }
+      });
+
+      if (error || !data?.success) {
+        console.error('Error fetching body:', error || data?.error);
+        return msg;
+      }
+
+      const updated = {
+        ...msg,
+        body_text: data.body_text || msg.body_text,
+        body_html: data.body_html || msg.body_html,
+      };
+
+      // Update local state
+      setMessages(prev => prev.map(m => m.id === msg.id ? updated : m));
+
+      // If attachments were saved, load them
+      if (data.attachments?.length > 0) {
+        setAttachments(data.attachments);
+      }
+
+      return updated;
+    } catch (err) {
+      console.error('Body fetch error:', err);
+      return msg;
+    }
+  };
   const markAsRead = async (id: string) => {
     await supabase.from('email_messages').update({ is_read: true } as any).eq('id', id);
     setMessages(prev => prev.map(m => m.id === id ? { ...m, is_read: true } : m));
@@ -238,6 +290,9 @@ export function useEmailMessages(profileId?: string) {
   const selectMessage = async (msg: EmailMessage) => {
     setSelectedMessage(msg);
     if (!msg.is_read) await markAsRead(msg.id);
+    // Fetch body on-demand if not yet loaded
+    const updated = await fetchBodyOnDemand(msg);
+    setSelectedMessage(updated);
     if (msg.has_attachments) await fetchAttachments(msg.id);
   };
 
