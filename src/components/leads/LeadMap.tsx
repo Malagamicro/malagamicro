@@ -48,6 +48,7 @@ function GoogleMapWrapper({ apiKey, leads, onViewLead, onBulkGeocode, isBulkGeoc
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
+    libraries: ['places'] as ("places")[],
   });
 
   const onLoad = useCallback((map: google.maps.Map) => {
