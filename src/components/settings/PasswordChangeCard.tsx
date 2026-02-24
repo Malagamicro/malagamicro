@@ -7,66 +7,81 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 import { Lock, Loader2, Eye, EyeOff, Check } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export function PasswordChangeCard() {
-  const { updatePassword } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const passwordsMatch = newPassword === confirmPassword && newPassword.length > 0;
   const isValidPassword = newPassword.length >= 8;
+  const canSubmit = currentPassword.length > 0 && passwordsMatch && isValidPassword;
 
   const handleChangePassword = async () => {
-    if (!passwordsMatch) {
-      toast({
-        title: 'Error',
-        description: 'Las contraseñas no coinciden.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!isValidPassword) {
-      toast({
-        title: 'Error',
-        description: 'La contraseña debe tener al menos 8 caracteres.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!canSubmit || !user?.email) return;
 
     setIsUpdating(true);
-    const { error } = await updatePassword(newPassword);
-    setIsUpdating(false);
 
-    if (error) {
-      console.error('Password change error:', error);
-      let errorMsg = 'No se pudo cambiar la contraseña. Inténtalo de nuevo.';
-      if (error.message?.includes('same_password')) {
-        errorMsg = 'La nueva contraseña debe ser diferente a la actual.';
-      } else if (error.message?.includes('weak_password')) {
-        errorMsg = 'La contraseña es demasiado débil. Usa al menos 8 caracteres con letras y números.';
-      } else if (error.message) {
-        errorMsg = error.message;
+    try {
+      // Step 1: Verify current password by re-authenticating
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        toast({
+          title: 'Error',
+          description: 'La contraseña actual es incorrecta.',
+          variant: 'destructive',
+        });
+        setIsUpdating(false);
+        return;
       }
+
+      // Step 2: Update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        let errorMsg = 'No se pudo cambiar la contraseña.';
+        if (updateError.message?.includes('same_password') || updateError.message?.includes('different')) {
+          errorMsg = 'La nueva contraseña debe ser diferente a la actual.';
+        } else if (updateError.message) {
+          errorMsg = updateError.message;
+        }
+        toast({
+          title: 'Error',
+          description: errorMsg,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Contraseña actualizada',
+          description: 'Tu contraseña se ha cambiado correctamente. Usa la nueva contraseña para iniciar sesión.',
+        });
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      }
+    } catch (err) {
       toast({
         title: 'Error',
-        description: errorMsg,
+        description: 'Ocurrió un error inesperado. Inténtalo de nuevo.',
         variant: 'destructive',
       });
-    } else {
-      toast({
-        title: 'Contraseña actualizada',
-        description: 'Tu contraseña se ha cambiado correctamente.',
-      });
-      setNewPassword('');
-      setConfirmPassword('');
     }
+
+    setIsUpdating(false);
   };
 
   return (
@@ -77,10 +92,37 @@ export function PasswordChangeCard() {
           Cambiar Contraseña
         </CardTitle>
         <CardDescription>
-          Actualiza tu contraseña para mantener tu cuenta segura
+          Introduce tu contraseña actual y la nueva contraseña
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="currentPassword">Contraseña actual</Label>
+          <div className="relative">
+            <Input
+              id="currentPassword"
+              type={showCurrentPassword ? 'text' : 'password'}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Ingresa tu contraseña actual"
+              className="pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+            >
+              {showCurrentPassword ? (
+                <EyeOff className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
+          </div>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="newPassword">Nueva contraseña</Label>
           <div className="relative">
@@ -110,7 +152,7 @@ export function PasswordChangeCard() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+          <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
           <div className="relative">
             <Input
               id="confirmPassword"
@@ -151,7 +193,7 @@ export function PasswordChangeCard() {
         <div className="flex justify-end pt-4 border-t">
           <Button 
             onClick={handleChangePassword} 
-            disabled={isUpdating || !passwordsMatch || !isValidPassword}
+            disabled={isUpdating || !canSubmit}
           >
             {isUpdating ? (
               <>
