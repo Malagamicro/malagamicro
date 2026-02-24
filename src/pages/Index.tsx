@@ -522,7 +522,7 @@ const IndexContent = () => {
     
     return (
       <div className={cn(
-        "min-h-screen bg-background",
+        "h-screen bg-background overflow-hidden",
         isHorizontal ? "flex flex-col" : "flex",
         localPosition === 'right' && "flex-row-reverse",
         localPosition === 'bottom' && "flex-col-reverse",
