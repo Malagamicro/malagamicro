@@ -13,10 +13,10 @@ export function LeadsByStatusChart({ stats }: LeadsByStatusChartProps) {
   };
 
   const data = [
-    { name: 'Nuevos', value: stats.newLeads, color: getHslColor('--primary', 'hsl(210, 100%, 50%)') },
-    { name: 'Contactados', value: stats.contactedLeads, color: getHslColor('--accent', 'hsl(45, 93%, 47%)') },
-    { name: 'Interesados', value: stats.interestedLeads, color: getHslColor('--secondary', 'hsl(142, 71%, 45%)') },
-    { name: 'Clientes', value: stats.clients, color: getHslColor('--muted-foreground', 'hsl(224, 40%, 39%)') },
+    { name: 'Nuevos', value: stats.newLeads, color: getHslColor('--status-new', 'hsl(210, 100%, 50%)') },
+    { name: 'Contactados', value: stats.contactedLeads, color: getHslColor('--status-contacted', 'hsl(45, 93%, 47%)') },
+    { name: 'Interesados', value: stats.interestedLeads, color: getHslColor('--status-interested', 'hsl(142, 71%, 45%)') },
+    { name: 'Clientes', value: stats.clients, color: getHslColor('--status-client', 'hsl(224, 40%, 39%)') },
   ];
 
   return (

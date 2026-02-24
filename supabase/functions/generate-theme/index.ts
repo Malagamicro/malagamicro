@@ -13,9 +13,9 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `Eres un diseñador de temas UI experto. El usuario te describe cómo quiere que se vea su aplicación CRM y tú generas un tema completo.
+    const systemPrompt = `Eres un diseñador de temas UI experto para un CRM. El usuario te describe cómo quiere que se vea su aplicación y tú generas un tema COMPLETO que incluye colores, sidebar, estados de leads, y configuración visual.
 
-Debes responder SOLO con un JSON válido con esta estructura exacta (valores HSL sin "hsl()" wrapper, solo "H S% L%"):
+Debes responder SOLO con un JSON válido con esta estructura (valores HSL sin "hsl()" wrapper, solo "H S% L%"):
 
 {
   "colorPreset": "custom",
@@ -36,23 +36,41 @@ Debes responder SOLO con un JSON válido con esta estructura exacta (valores HSL
     "sidebarBackground": "222 47% 8%",
     "sidebarForeground": "0 0% 98%",
     "sidebarAccent": "222 47% 14%",
-    "sidebarBorder": "222 47% 18%"
+    "sidebarBorder": "222 47% 18%",
+    "statusNew": "210 100% 55%",
+    "statusContacted": "45 93% 55%",
+    "statusInterested": "142 71% 50%",
+    "statusClient": "224 50% 55%",
+    "success": "142 71% 45%",
+    "warning": "45 93% 47%",
+    "info": "210 100% 50%"
   },
   "backgroundPattern": "none",
   "fontFamily": "dm-sans",
   "borderRadius": "lg",
   "sidebarStyle": "solid",
-  "animationSpeed": "normal"
+  "animationSpeed": "normal",
+  "sidebarConfig": {
+    "visibleModules": ["dashboard", "leads", "calendar", "whatsapp", "email", "tickets", "budgets", "files", "reports", "chat", "reminders", "seo", "settings"],
+    "sidebarPosition": "left"
+  }
 }
 
 Reglas:
 - Genera colores coherentes y con buen contraste
-- Siempre genera tanto variantes claras como oscuras (usa la variante oscura por defecto)
+- Los colores de estado (statusNew, statusContacted, etc.) deben ser distinguibles entre sí
+- success/warning/info son colores semánticos para feedback al usuario
+- Los colores del sidebar deben ser coherentes con el tema general
 - backgroundPattern opciones: none, dots, grid, diagonal, waves, gradient-radial
 - fontFamily opciones: dm-sans, inter, poppins, nunito, outfit, work-sans, space-grotesk, raleway, plus-jakarta, manrope
 - borderRadius opciones: none, sm, md, lg, xl, full
 - sidebarStyle opciones: solid, glass, transparent
 - animationSpeed opciones: none, reduced, normal, smooth
+- sidebarConfig.visibleModules: array con los módulos a mostrar. Opciones: dashboard, leads, calendar, whatsapp, email, tickets, budgets, files, reports, chat, reminders, seo, campaigns, settings, templates, admin
+- sidebarConfig.sidebarPosition: left, right, top, bottom
+- Si el usuario pide un tema minimalista, reduce los módulos visibles a los esenciales
+- Si el usuario pide un tema completo, incluye todos los módulos
+- Adapta la organización del sidebar según el tipo de uso que describe el usuario
 - NO incluyas texto explicativo, SOLO el JSON`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -91,7 +109,6 @@ Reglas:
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
     
-    // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return new Response(JSON.stringify({ error: "No se pudo generar el tema" }), {
