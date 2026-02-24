@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,19 +44,59 @@ function formatFileSize(bytes: number) {
 }
 
 function AttachmentPreview({ attachment }: { attachment: EmailAttachment }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const isImage = attachment.file_type?.startsWith('image/');
+  const isPdf = attachment.file_type?.includes('pdf');
+  const canPreview = isImage || isPdf;
+
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50 hover:bg-muted transition-colors">
-      {getAttachmentIcon(attachment.file_type)}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{attachment.file_name}</p>
-        <p className="text-xs text-muted-foreground">{formatFileSize(attachment.file_size)}</p>
+    <>
+      <div
+        className={cn(
+          "flex items-center gap-3 p-3 rounded-lg border bg-muted/50 hover:bg-muted transition-colors",
+          canPreview && "cursor-pointer"
+        )}
+        onClick={() => canPreview && setPreviewOpen(true)}
+      >
+        {isImage && attachment.file_path ? (
+          <img src={attachment.file_path} alt={attachment.file_name} className="h-10 w-10 rounded object-cover flex-shrink-0" />
+        ) : (
+          getAttachmentIcon(attachment.file_type)
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{attachment.file_name}</p>
+          <p className="text-xs text-muted-foreground">{formatFileSize(attachment.file_size)}</p>
+        </div>
+        <div className="flex gap-1">
+          {canPreview && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setPreviewOpen(true); }}>
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); window.open(attachment.file_path || '#', '_blank'); }}>
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
-      <Button variant="ghost" size="icon" asChild>
-        <a href={attachment.file_path || '#'} download={attachment.file_name} target="_blank" rel="noopener noreferrer">
-          <Download className="h-4 w-4" />
-        </a>
-      </Button>
-    </div>
+
+      {canPreview && (
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+            <DialogHeader className="p-4 pb-2">
+              <DialogTitle className="truncate">{attachment.file_name}</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto p-4 pt-0">
+              {isImage && (
+                <img src={attachment.file_path || ''} alt={attachment.file_name} className="w-full h-auto rounded-lg" />
+              )}
+              {isPdf && (
+                <iframe src={attachment.file_path || ''} className="w-full h-[75vh] rounded-lg border" title={attachment.file_name} />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
 

@@ -65,6 +65,32 @@ function findTextParts(bs: any, path = ''): { textSection: string | null; htmlSe
   return { textSection, htmlSection };
 }
 
+function findInlineParts(bs: any, path = ''): Array<{ section: string; contentId: string; type: string; subtype: string; filename?: string }> {
+  const results: Array<{ section: string; contentId: string; type: string; subtype: string; filename?: string }> = [];
+  if (!bs) return results;
+  const type = (bs.type || '').toUpperCase();
+  const disposition = bs.disposition?.type?.toUpperCase();
+  const cid = bs.id ? bs.id.replace(/[<>]/g, '') : null;
+  
+  if (type === 'IMAGE' && cid) {
+    results.push({
+      section: path || '1',
+      contentId: cid,
+      type: (bs.type || 'image').toLowerCase(),
+      subtype: (bs.subtype || 'png').toLowerCase(),
+      filename: bs.disposition?.params?.filename || bs.params?.name || `inline_${cid}`,
+    });
+  }
+  
+  if (bs.parts && Array.isArray(bs.parts)) {
+    for (let i = 0; i < bs.parts.length; i++) {
+      const childPath = path ? `${path}.${i + 1}` : `${i + 1}`;
+      results.push(...findInlineParts(bs.parts[i], childPath));
+    }
+  }
+  return results;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -153,6 +179,58 @@ serve(async (req) => {
             }
           }
 
+          // Handle inline images (cid: references)
+          const inlineParts = findInlineParts(bs);
+          const cidMap: Record<string, string> = {};
+          
+          if (inlineParts.length > 0 && body.message_id) {
+            for (const ip of inlineParts.slice(0, 10)) {
+              try {
+                const ipMsgs = await client.fetch(`${seqNum}`, { bodyParts: [ip.section] });
+                if (ipMsgs.length > 0 && ipMsgs[0].parts && ipMsgs[0].parts[ip.section]) {
+                  const imgData = ipMsgs[0].parts[ip.section].data;
+                  if (imgData && imgData.length > 0) {
+                    const storagePath = `${profile.user_id}/${body.message_id}/inline_${ip.contentId}`;
+                    const contentType = `${ip.type}/${ip.subtype}`;
+                    const { error: upErr } = await supabase.storage
+                      .from('email-attachments')
+                      .upload(storagePath, imgData, { contentType, upsert: true });
+                    
+                    if (!upErr) {
+                      // Create a signed URL for the inline image
+                      const { data: signedData } = await supabase.storage
+                        .from('email-attachments')
+                        .createSignedUrl(storagePath, 60 * 60 * 24 * 7); // 7 days
+                      
+                      if (signedData?.signedUrl) {
+                        cidMap[ip.contentId] = signedData.signedUrl;
+                      }
+                      
+                      // Also save as inline attachment record
+                      await supabase.from('email_attachments').insert({
+                        message_id: body.message_id,
+                        user_id: profile.user_id,
+                        file_name: ip.filename || `inline_${ip.contentId}`,
+                        file_type: contentType,
+                        file_size: imgData.length,
+                        storage_path: storagePath,
+                        content_id: ip.contentId,
+                        is_inline: true,
+                      });
+                    }
+                  }
+                }
+              } catch (e) { console.error('Inline img:', e); }
+            }
+            
+            // Replace cid: references in HTML body
+            if (bodyHtml && Object.keys(cidMap).length > 0) {
+              for (const [cid, url] of Object.entries(cidMap)) {
+                bodyHtml = bodyHtml.replace(new RegExp(`cid:${cid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), url);
+              }
+            }
+          }
+
           // Update the message in DB
           if (body.message_id) {
             await supabase.from('email_messages').update({
@@ -169,6 +247,10 @@ serve(async (req) => {
             try {
               const attInfos = findAttachments(bs);
               for (const att of attInfos.slice(0, 5)) {
+                // Skip inline images already processed
+                const attCid = att.id ? att.id.replace(/[<>]/g, '') : null;
+                if (attCid && cidMap[attCid]) continue;
+                
                 try {
                   const attMsgs = await client.fetch(`${seqNum}`, { bodyParts: [att.section] });
                   if (attMsgs.length > 0 && attMsgs[0].parts && attMsgs[0].parts[att.section]) {

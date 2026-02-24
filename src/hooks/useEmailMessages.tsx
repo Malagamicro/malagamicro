@@ -284,7 +284,21 @@ export function useEmailMessages(profileId?: string) {
       .from('email_attachments')
       .select('*')
       .eq('message_id', messageId);
-    if (!error) setAttachments((data as any[]) || []);
+    if (!error && data) {
+      // Generate signed URLs for attachments from private bucket
+      const withUrls = await Promise.all((data as any[]).map(async (att) => {
+        if (att.storage_path) {
+          const { data: signedData } = await supabase.storage
+            .from('email-attachments')
+            .createSignedUrl(att.storage_path, 60 * 60); // 1 hour
+          return { ...att, file_path: signedData?.signedUrl || att.file_path };
+        }
+        return att;
+      }));
+      setAttachments(withUrls);
+    } else {
+      setAttachments([]);
+    }
   };
 
   const selectMessage = async (msg: EmailMessage) => {
