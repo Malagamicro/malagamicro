@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Settings2, RotateCcw, GripVertical, Eye, EyeOff, Pencil, Check, X,
   Plus, Trash2, Maximize2, Minimize2, ExternalLink, Palette,
+  Search, List, LayoutGrid, Star, StarOff,
 } from 'lucide-react';
 import { useAppsConfig, AppCategory, AppItem, ICON_COLORS } from '@/hooks/useAppsConfig';
 import { IconPicker, getIconComponent } from '@/components/apps/IconPicker';
@@ -36,82 +37,131 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
     updateDefaultSize, setItemSize, setAllItemsSize, setItemColor,
     renameCategory, setCategoryIcon, setCategoryColor, setItemIcon,
     addCategory, addCustomApp, deleteItem, deleteCategory,
-    reorderCategories, reorderItems, moveItem, toggleItemVisibility, resetToDefault,
+    reorderCategories, reorderItems, moveItem, toggleItemVisibility,
+    toggleFavorite, updateItemDescription, resetToDefault,
   } = useAppsConfig();
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [newCatName, setNewCatName] = useState('');
   const [showNewCat, setShowNewCat] = useState(false);
-
-  // New custom app form state
   const [addingAppToCat, setAddingAppToCat] = useState<string | null>(null);
   const [newAppLabel, setNewAppLabel] = useState('');
   const [newAppUrl, setNewAppUrl] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [editingDescId, setEditingDescId] = useState<string | null>(null);
+  const [editingDescValue, setEditingDescValue] = useState('');
 
-  const startRename = (catId: string, name: string) => {
-    setRenamingId(catId);
-    setRenameValue(name);
-  };
+  // Compute favorites
+  const favoriteApps = useMemo(() => {
+    const favs: { app: AppItem; categoryId: string }[] = [];
+    categories.forEach(cat => {
+      cat.items.forEach(app => {
+        if (app.isFavorite && !app.hidden) favs.push({ app, categoryId: cat.id });
+      });
+    });
+    return favs;
+  }, [categories]);
 
-  const finishRename = (catId: string) => {
-    if (renameValue.trim()) renameCategory(catId, renameValue.trim());
-    setRenamingId(null);
-  };
+  // Filter by search
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return categories;
+    const q = searchQuery.toLowerCase();
+    return categories.map(cat => ({
+      ...cat,
+      items: cat.items.filter(app =>
+        app.label.toLowerCase().includes(q) ||
+        app.description.toLowerCase().includes(q) ||
+        (app.customDescription || '').toLowerCase().includes(q)
+      ),
+    })).filter(cat => cat.items.length > 0);
+  }, [categories, searchQuery]);
 
-  const handleAddCategory = () => {
-    if (newCatName.trim()) {
-      addCategory(newCatName.trim());
-      setNewCatName('');
-      setShowNewCat(false);
-    }
-  };
-
+  const startRename = (catId: string, name: string) => { setRenamingId(catId); setRenameValue(name); };
+  const finishRename = (catId: string) => { if (renameValue.trim()) renameCategory(catId, renameValue.trim()); setRenamingId(null); };
+  const handleAddCategory = () => { if (newCatName.trim()) { addCategory(newCatName.trim()); setNewCatName(''); setShowNewCat(false); } };
   const handleAddCustomApp = (catId: string) => {
     if (newAppLabel.trim() && newAppUrl.trim()) {
       addCustomApp(catId, newAppLabel.trim(), newAppUrl.trim());
-      setNewAppLabel('');
-      setNewAppUrl('');
-      setAddingAppToCat(null);
+      setNewAppLabel(''); setNewAppUrl(''); setAddingAppToCat(null);
     }
   };
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     const { source, destination, type } = result;
-
-    if (type === 'APP_CATEGORY') {
-      reorderCategories(source.index, destination.index);
-      return;
-    }
-
-    if (source.droppableId === destination.droppableId) {
-      reorderItems(source.droppableId, source.index, destination.index);
-    } else {
-      const fromCat = categories.find(c => c.id === source.droppableId);
-      if (!fromCat) return;
-      const item = fromCat.items[source.index];
-      if (item) moveItem(item.id, source.droppableId, destination.droppableId);
-    }
+    if (type === 'APP_CATEGORY') { reorderCategories(source.index, destination.index); return; }
+    if (source.droppableId === destination.droppableId) { reorderItems(source.droppableId, source.index, destination.index); }
+    else { const fromCat = categories.find(c => c.id === source.droppableId); if (!fromCat) return; const item = fromCat.items[source.index]; if (item) moveItem(item.id, source.droppableId, destination.droppableId); }
   };
 
   const cycleItemSize = (categoryId: string, itemId: string, currentSize: number) => {
-    const next = currentSize >= 4 ? 1 : currentSize + 1;
-    setItemSize(categoryId, itemId, next);
+    setItemSize(categoryId, itemId, currentSize >= 4 ? 1 : currentSize + 1);
   };
 
   const handleAppClick = (app: AppItem) => {
     if (editMode) return;
-    if (app.externalUrl) {
-      window.open(app.externalUrl, '_blank', 'noopener,noreferrer');
-    } else {
-      onOpenApp(app.id);
-    }
+    if (app.externalUrl) window.open(app.externalUrl, '_blank', 'noopener,noreferrer');
+    else onOpenApp(app.id);
   };
 
   const getIconColor = (color: string): { className?: string; style?: React.CSSProperties } => {
     if (color.startsWith('text-')) return { className: color };
     return { style: { color } };
+  };
+
+  const startEditDesc = (app: AppItem) => {
+    setEditingDescId(app.id);
+    setEditingDescValue(app.customDescription || app.description);
+  };
+
+  const finishEditDesc = (categoryId: string, appId: string) => {
+    updateItemDescription(categoryId, appId, editingDescValue.trim());
+    setEditingDescId(null);
+  };
+
+  // List view item renderer
+  const renderListItem = (app: AppItem, categoryId: string) => {
+    const Icon = getIconComponent(app.icon);
+    const iconColor = getIconColor(app.color);
+    const desc = app.customDescription || app.description;
+
+    return (
+      <button
+        key={app.id}
+        onClick={() => handleAppClick(app)}
+        disabled={editMode}
+        className={cn(
+          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border/30',
+          'bg-card/30 hover:bg-card/60 hover:border-primary/20 transition-all group',
+          app.hidden && 'opacity-40',
+        )}
+      >
+        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center bg-background/80 shadow-sm shrink-0')}>
+          <Icon className={cn('w-4.5 h-4.5', iconColor.className)} style={iconColor.style} />
+        </div>
+        <div className="flex-1 text-left min-w-0">
+          <span className="text-sm font-semibold text-foreground block truncate">{app.label}</span>
+          <span className="text-[11px] text-muted-foreground truncate block">{desc}</span>
+        </div>
+        {app.isFavorite && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />}
+        {app.externalUrl && <ExternalLink className="w-3 h-3 text-muted-foreground/50 shrink-0" />}
+        {editMode && (
+          <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+            <button onClick={() => toggleFavorite(categoryId, app.id)} className="p-1 rounded hover:bg-muted">
+              {app.isFavorite ? <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> : <StarOff className="w-3 h-3 text-muted-foreground" />}
+            </button>
+            <button onClick={() => startEditDesc(app)} className="p-1 rounded hover:bg-muted">
+              <Pencil className="w-3 h-3 text-muted-foreground" />
+            </button>
+            <button onClick={() => toggleItemVisibility(categoryId, app.id)} className="p-1 rounded hover:bg-muted">
+              {app.hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            </button>
+          </div>
+        )}
+      </button>
+    );
   };
 
   const renderAppCard = (app: AppItem, categoryId: string, isDragging?: boolean) => {
@@ -135,98 +185,89 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
             isDragging && 'shadow-xl scale-105 z-50',
           )}
         >
-          <div className={cn(
-            sc.iconBox, 'rounded-2xl flex items-center justify-center',
-            'bg-background/80 shadow-sm',
-            'group-hover/card:shadow-md transition-shadow relative'
-          )}>
+          <div className={cn(sc.iconBox, 'rounded-2xl flex items-center justify-center bg-background/80 shadow-sm group-hover/card:shadow-md transition-shadow relative')}>
             <Icon className={cn(sc.iconSize, iconColor.className)} style={iconColor.style} />
-            {app.externalUrl && (
-              <ExternalLink className="w-2.5 h-2.5 absolute top-1 right-1 text-muted-foreground/50" />
-            )}
+            {app.externalUrl && <ExternalLink className="w-2.5 h-2.5 absolute top-1 right-1 text-muted-foreground/50" />}
           </div>
           <div className="text-center w-full">
             <span className={cn(sc.textSize, 'font-semibold text-foreground block leading-tight truncate')}>{app.label}</span>
             {size >= 2 && (
               <span className={cn(sc.descSize, 'text-muted-foreground leading-tight truncate block')}>
-                {app.externalUrl ? app.externalUrl.replace(/^https?:\/\//, '').slice(0, 30) : app.description}
+                {app.customDescription || (app.externalUrl ? app.externalUrl.replace(/^https?:\/\//, '').slice(0, 30) : app.description)}
               </span>
             )}
           </div>
+          {app.isFavorite && <Star className="w-3 h-3 text-amber-400 fill-amber-400 absolute top-1.5 left-1.5" />}
         </button>
 
-        {/* Edit overlay */}
         {editMode && (
           <div className="absolute top-1 right-1 flex items-center gap-0.5">
-            <button
-              onClick={(e) => { e.stopPropagation(); cycleItemSize(categoryId, app.id, size); }}
-              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors"
-              title={`Tamaño: ${SIZE_LABELS[size]} → ${SIZE_LABELS[size >= 4 ? 1 : size + 1]}`}
-            >
-              {size < 3
-                ? <Maximize2 className="w-3 h-3 text-muted-foreground" />
-                : <Minimize2 className="w-3 h-3 text-muted-foreground" />
-              }
+            <button onClick={(e) => { e.stopPropagation(); toggleFavorite(categoryId, app.id); }}
+              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors">
+              {app.isFavorite ? <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> : <StarOff className="w-3 h-3 text-muted-foreground" />}
             </button>
-            <IconPicker
-              value={app.icon}
-              onChange={(icon) => setItemIcon(categoryId, app.id, icon)}
-              triggerClassName="bg-background/90 shadow-sm !p-1 !rounded-md"
-            />
-            {/* Color picker */}
+            <button onClick={(e) => { e.stopPropagation(); cycleItemSize(categoryId, app.id, size); }}
+              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors"
+              title={`Tamaño: ${SIZE_LABELS[size]} → ${SIZE_LABELS[size >= 4 ? 1 : size + 1]}`}>
+              {size < 3 ? <Maximize2 className="w-3 h-3 text-muted-foreground" /> : <Minimize2 className="w-3 h-3 text-muted-foreground" />}
+            </button>
+            <IconPicker value={app.icon} onChange={(icon) => setItemIcon(categoryId, app.id, icon)} triggerClassName="bg-background/90 shadow-sm !p-1 !rounded-md" />
             <Popover>
               <PopoverTrigger asChild>
-                <button
-                  className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors"
-                  onClick={e => e.stopPropagation()}
-                >
+                <button className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors" onClick={e => e.stopPropagation()}>
                   <Palette className="w-3 h-3" style={{ color: app.color.startsWith('#') ? app.color : undefined }} />
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-2" align="end" onClick={e => e.stopPropagation()}>
                 <div className="grid grid-cols-5 gap-1">
                   {ICON_COLORS.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => setItemColor(categoryId, app.id, c)}
-                      className={cn(
-                        'w-6 h-6 rounded-full border-2 transition-transform hover:scale-110',
-                        app.color === c ? 'border-foreground scale-110' : 'border-transparent'
-                      )}
-                      style={{ backgroundColor: c }}
-                    />
+                    <button key={c} onClick={() => setItemColor(categoryId, app.id, c)}
+                      className={cn('w-6 h-6 rounded-full border-2 transition-transform hover:scale-110', app.color === c ? 'border-foreground scale-110' : 'border-transparent')}
+                      style={{ backgroundColor: c }} />
                   ))}
                 </div>
               </PopoverContent>
             </Popover>
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleItemVisibility(categoryId, app.id); }}
-              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors"
-            >
-              {app.hidden
-                ? <EyeOff className="w-3 h-3 text-muted-foreground" />
-                : <Eye className="w-3 h-3 text-muted-foreground" />
-              }
+            <button onClick={(e) => { e.stopPropagation(); startEditDesc(app); }}
+              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors">
+              <Pencil className="w-3 h-3 text-muted-foreground" />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); toggleItemVisibility(categoryId, app.id); }}
+              className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors">
+              {app.hidden ? <EyeOff className="w-3 h-3 text-muted-foreground" /> : <Eye className="w-3 h-3 text-muted-foreground" />}
             </button>
             {app.isCustom && (
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteItem(categoryId, app.id); }}
-                className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-destructive/20 transition-colors"
-              >
+              <button onClick={(e) => { e.stopPropagation(); deleteItem(categoryId, app.id); }}
+                className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-destructive/20 transition-colors">
                 <Trash2 className="w-3 h-3 text-destructive" />
               </button>
             )}
           </div>
         )}
-
-        {editMode && (
-          <span className="absolute bottom-0.5 right-1 text-[9px] font-bold text-muted-foreground/50 select-none">
-            {SIZE_LABELS[size]}
-          </span>
-        )}
+        {editMode && <span className="absolute bottom-0.5 right-1 text-[9px] font-bold text-muted-foreground/50 select-none">{SIZE_LABELS[size]}</span>}
       </div>
     );
   };
+
+  // Description edit modal inline
+  const descEditOverlay = editingDescId && (() => {
+    let targetCatId = '';
+    categories.forEach(c => { if (c.items.some(i => i.id === editingDescId)) targetCatId = c.id; });
+    return (
+      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onClick={() => setEditingDescId(null)}>
+        <div className="bg-background border border-border rounded-xl p-4 w-80 space-y-3" onClick={e => e.stopPropagation()}>
+          <h3 className="text-sm font-semibold">Editar descripción</h3>
+          <Input value={editingDescValue} onChange={e => setEditingDescValue(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && finishEditDesc(targetCatId, editingDescId)}
+            placeholder="Descripción personalizada..." autoFocus className="text-sm" />
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setEditingDescId(null)}>Cancelar</Button>
+            <Button size="sm" onClick={() => finishEditDesc(targetCatId, editingDescId)}>Guardar</Button>
+          </div>
+        </div>
+      </div>
+    );
+  })();
 
   const renderCategoryBlock = (category: AppCategory, isEditMode: boolean) => {
     const CatIcon = getIconComponent(category.icon || 'Folder');
@@ -234,35 +275,26 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
     if (!isEditMode && visibleApps.length === 0) return null;
 
     return (
-      <div
-        key={category.id}
-        className={cn(
-          'rounded-xl border border-border/30 bg-card/30 p-3 flex-shrink-0',
-          // Let categories take their natural width but allow growing
-          'flex-grow-0 basis-auto'
-        )}
-        style={{ minWidth: '200px' }}
-      >
-        {/* Category header */}
+      <div key={category.id} className={cn('rounded-xl border border-border/30 bg-card/30 p-3 flex-shrink-0', viewMode === 'list' ? 'w-full' : 'flex-grow-0 basis-auto')} style={viewMode === 'grid' ? { minWidth: '200px' } : undefined}>
         <div className="flex items-center gap-1.5 mb-2">
-          <div
-            className="w-5 h-5 rounded-md flex items-center justify-center"
-            style={{ backgroundColor: (category.color || '#6366f1') + '20' }}
-          >
+          <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ backgroundColor: (category.color || '#6366f1') + '20' }}>
             <CatIcon className="w-3 h-3" style={{ color: category.color || '#6366f1' }} />
           </div>
-          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-            {category.label}
-          </h2>
+          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{category.label}</h2>
         </div>
-        {/* Items */}
-        <div className="flex flex-wrap gap-2">
-          {visibleApps.map((app) => (
-            <div key={app.id} className={cn(ITEM_SIZE[(app.size || 1) as keyof typeof ITEM_SIZE]?.minW)} style={{ flex: '0 0 auto' }}>
-              {renderAppCard(app, category.id)}
-            </div>
-          ))}
-        </div>
+        {viewMode === 'list' ? (
+          <div className="space-y-1">
+            {visibleApps.map(app => renderListItem(app, category.id))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {visibleApps.map(app => (
+              <div key={app.id} className={cn(ITEM_SIZE[(app.size || 1) as keyof typeof ITEM_SIZE]?.minW)} style={{ flex: '0 0 auto' }}>
+                {renderAppCard(app, category.id)}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -286,14 +318,35 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
               </Button>
             </>
           )}
-          <Button
-            variant={editMode ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setEditMode(!editMode)}
-            className="gap-1.5"
-          >
+          <Button variant={editMode ? 'default' : 'outline'} size="sm" onClick={() => setEditMode(!editMode)} className="gap-1.5">
             <Settings2 className="w-4 h-4" />
             {editMode ? 'Listo' : 'Organizar'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Search + View toggle bar */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar aplicación..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9 h-9 text-sm"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted">
+              <X className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+          <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('grid')}>
+            <LayoutGrid className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('list')}>
+            <List className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
@@ -303,18 +356,14 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
         <div className="flex items-center gap-2 flex-wrap bg-card/50 border border-border/50 rounded-xl p-2.5">
           <span className="text-xs text-muted-foreground font-medium">Todos:</span>
           {[1, 2, 3, 4].map(s => (
-            <Button
-              key={s}
-              variant="outline"
-              size="sm"
+            <Button key={s} variant="outline" size="sm"
               className={cn('h-6 px-2.5 text-[11px]', defaultSize === s && 'bg-primary text-primary-foreground')}
-              onClick={() => setAllItemsSize(s)}
-            >
+              onClick={() => setAllItemsSize(s)}>
               {SIZE_LABELS[s]}
             </Button>
           ))}
           <span className="text-[10px] text-muted-foreground ml-1">
-            · Cada icono se redimensiona individualmente · Clic en 🎨 para cambiar color
+            · ⭐ Favoritos · 🎨 Color · ✏️ Descripción
           </span>
         </div>
       )}
@@ -322,20 +371,33 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
       {/* New category form */}
       {showNewCat && (
         <div className="flex items-center gap-2 bg-card/50 border border-border/50 rounded-xl p-2.5">
-          <Input
-            placeholder="Nombre de la categoría..."
-            value={newCatName}
-            onChange={e => setNewCatName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
-            className="h-8 text-sm flex-1"
-            autoFocus
-          />
-          <Button size="sm" onClick={handleAddCategory} className="h-8 gap-1">
-            <Check className="w-3.5 h-3.5" /> Crear
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => { setShowNewCat(false); setNewCatName(''); }} className="h-8">
-            <X className="w-3.5 h-3.5" />
-          </Button>
+          <Input placeholder="Nombre de la categoría..." value={newCatName} onChange={e => setNewCatName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAddCategory()} className="h-8 text-sm flex-1" autoFocus />
+          <Button size="sm" onClick={handleAddCategory} className="h-8 gap-1"><Check className="w-3.5 h-3.5" /> Crear</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setShowNewCat(false); setNewCatName(''); }} className="h-8"><X className="w-3.5 h-3.5" /></Button>
+        </div>
+      )}
+
+      {/* Favorites section */}
+      {!editMode && !searchQuery && favoriteApps.length > 0 && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Favoritos</h2>
+          </div>
+          {viewMode === 'list' ? (
+            <div className="space-y-1">
+              {favoriteApps.map(({ app, categoryId }) => renderListItem(app, categoryId))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {favoriteApps.map(({ app, categoryId }) => (
+                <div key={app.id} className={cn(ITEM_SIZE[(app.size || 1) as keyof typeof ITEM_SIZE]?.minW)} style={{ flex: '0 0 auto' }}>
+                  {renderAppCard(app, categoryId)}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -344,139 +406,73 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="app-categories" type="APP_CATEGORY">
             {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps} className="flex flex-wrap gap-4">
+              <div ref={provided.innerRef} {...provided.droppableProps} className={cn(viewMode === 'list' ? 'space-y-4' : 'flex flex-wrap gap-4')}>
                 {categories.map((category, catIdx) => (
                   <Draggable key={category.id} draggableId={`cat-${category.id}`} index={catIdx}>
                     {(catProvided, catSnap) => (
-                      <div
-                        ref={catProvided.innerRef}
-                        {...catProvided.draggableProps}
-                        className={cn(
-                          'rounded-xl border border-border/50 bg-card/50 p-3 flex-shrink-0',
-                          catSnap.isDragging && 'shadow-xl',
-                        )}
-                        style={{ ...catProvided.draggableProps.style, minWidth: '220px', maxWidth: '500px' }}
-                      >
+                      <div ref={catProvided.innerRef} {...catProvided.draggableProps}
+                        className={cn('rounded-xl border border-border/50 bg-card/50 p-3 flex-shrink-0', catSnap.isDragging && 'shadow-xl', viewMode === 'list' && 'w-full')}
+                        style={{ ...catProvided.draggableProps.style, ...(viewMode === 'grid' ? { minWidth: '220px', maxWidth: '500px' } : {}) }}>
                         {/* Category header */}
                         <div className="flex items-center gap-1.5 mb-2">
                           <div {...catProvided.dragHandleProps} className="cursor-grab active:cursor-grabbing p-0.5">
                             <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
                           </div>
-
-                          <IconPicker
-                            value={category.icon || 'Folder'}
-                            onChange={(icon) => setCategoryIcon(category.id, icon)}
-                          />
-
+                          <IconPicker value={category.icon || 'Folder'} onChange={(icon) => setCategoryIcon(category.id, icon)} />
                           <Popover>
                             <PopoverTrigger asChild>
-                              <button
-                                className="w-4 h-4 rounded-full border border-border/50 shrink-0"
-                                style={{ backgroundColor: category.color || '#6366f1' }}
-                              />
+                              <button className="w-4 h-4 rounded-full border border-border/50 shrink-0" style={{ backgroundColor: category.color || '#6366f1' }} />
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-2" align="start">
                               <div className="grid grid-cols-5 gap-1.5">
                                 {CATEGORY_COLORS.map(c => (
-                                  <button
-                                    key={c}
-                                    onClick={() => setCategoryColor(category.id, c)}
-                                    className={cn(
-                                      'w-6 h-6 rounded-full border-2 transition-transform hover:scale-110',
-                                      category.color === c ? 'border-foreground scale-110' : 'border-transparent'
-                                    )}
-                                    style={{ backgroundColor: c }}
-                                  />
+                                  <button key={c} onClick={() => setCategoryColor(category.id, c)}
+                                    className={cn('w-6 h-6 rounded-full border-2 transition-transform hover:scale-110', category.color === c ? 'border-foreground scale-110' : 'border-transparent')}
+                                    style={{ backgroundColor: c }} />
                                 ))}
                               </div>
                             </PopoverContent>
                           </Popover>
-
                           {renamingId === category.id ? (
                             <div className="flex items-center gap-1 flex-1">
-                              <Input
-                                value={renameValue}
-                                onChange={e => setRenameValue(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && finishRename(category.id)}
-                                className="h-6 text-xs"
-                                autoFocus
-                              />
-                              <button onClick={() => finishRename(category.id)} className="p-0.5 hover:bg-muted rounded">
-                                <Check className="w-3 h-3 text-green-500" />
-                              </button>
-                              <button onClick={() => setRenamingId(null)} className="p-0.5 hover:bg-muted rounded">
-                                <X className="w-3 h-3 text-muted-foreground" />
-                              </button>
+                              <Input value={renameValue} onChange={e => setRenameValue(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && finishRename(category.id)} className="h-6 text-xs" autoFocus />
+                              <button onClick={() => finishRename(category.id)} className="p-0.5 hover:bg-muted rounded"><Check className="w-3 h-3 text-green-500" /></button>
+                              <button onClick={() => setRenamingId(null)} className="p-0.5 hover:bg-muted rounded"><X className="w-3 h-3 text-muted-foreground" /></button>
                             </div>
                           ) : (
                             <>
-                              <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex-1 truncate">
-                                {category.label}
-                              </h2>
-                              <button onClick={() => startRename(category.id, category.label)} className="p-0.5 hover:bg-muted rounded">
-                                <Pencil className="w-3 h-3 text-muted-foreground" />
-                              </button>
-                              <button
-                                onClick={() => setAddingAppToCat(addingAppToCat === category.id ? null : category.id)}
-                                className="p-0.5 hover:bg-muted rounded"
-                                title="Añadir app externa"
-                              >
-                                <Plus className="w-3 h-3 text-muted-foreground" />
-                              </button>
-                              <button onClick={() => deleteCategory(category.id)} className="p-0.5 hover:bg-destructive/20 rounded">
-                                <Trash2 className="w-3 h-3 text-destructive" />
-                              </button>
+                              <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex-1 truncate">{category.label}</h2>
+                              <button onClick={() => startRename(category.id, category.label)} className="p-0.5 hover:bg-muted rounded"><Pencil className="w-3 h-3 text-muted-foreground" /></button>
+                              <button onClick={() => setAddingAppToCat(addingAppToCat === category.id ? null : category.id)} className="p-0.5 hover:bg-muted rounded" title="Añadir app externa"><Plus className="w-3 h-3 text-muted-foreground" /></button>
+                              <button onClick={() => deleteCategory(category.id)} className="p-0.5 hover:bg-destructive/20 rounded"><Trash2 className="w-3 h-3 text-destructive" /></button>
                             </>
                           )}
                         </div>
 
-                        {/* Add custom app form */}
                         {addingAppToCat === category.id && (
                           <div className="flex flex-col gap-1.5 mb-2 p-2 rounded-lg bg-muted/50 border border-border/30">
-                            <Input
-                              placeholder="Nombre de la app..."
-                              value={newAppLabel}
-                              onChange={e => setNewAppLabel(e.target.value)}
-                              className="h-7 text-xs"
-                              autoFocus
-                            />
-                            <Input
-                              placeholder="https://ejemplo.com"
-                              value={newAppUrl}
-                              onChange={e => setNewAppUrl(e.target.value)}
-                              onKeyDown={e => e.key === 'Enter' && handleAddCustomApp(category.id)}
-                              className="h-7 text-xs"
-                            />
+                            <Input placeholder="Nombre de la app..." value={newAppLabel} onChange={e => setNewAppLabel(e.target.value)} className="h-7 text-xs" autoFocus />
+                            <Input placeholder="https://ejemplo.com" value={newAppUrl} onChange={e => setNewAppUrl(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && handleAddCustomApp(category.id)} className="h-7 text-xs" />
                             <div className="flex gap-1">
-                              <Button size="sm" onClick={() => handleAddCustomApp(category.id)} className="h-6 text-[10px] gap-1 flex-1">
-                                <ExternalLink className="w-3 h-3" /> Añadir
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => { setAddingAppToCat(null); setNewAppLabel(''); setNewAppUrl(''); }} className="h-6 text-[10px]">
-                                <X className="w-3 h-3" />
-                              </Button>
+                              <Button size="sm" onClick={() => handleAddCustomApp(category.id)} className="h-6 text-[10px] gap-1 flex-1"><ExternalLink className="w-3 h-3" /> Añadir</Button>
+                              <Button size="sm" variant="ghost" onClick={() => { setAddingAppToCat(null); setNewAppLabel(''); setNewAppUrl(''); }} className="h-6 text-[10px]"><X className="w-3 h-3" /></Button>
                             </div>
                           </div>
                         )}
 
-                        {/* Droppable items */}
                         <Droppable droppableId={category.id} type="APP_ITEM">
                           {(itemsProvided) => (
-                            <div
-                              ref={itemsProvided.innerRef}
-                              {...itemsProvided.droppableProps}
-                              className="flex flex-wrap gap-2 min-h-[60px]"
-                            >
+                            <div ref={itemsProvided.innerRef} {...itemsProvided.droppableProps}
+                              className={cn(viewMode === 'list' ? 'space-y-1 min-h-[40px]' : 'flex flex-wrap gap-2 min-h-[60px]')}>
                               {category.items.map((app, appIdx) => (
                                 <Draggable key={app.id} draggableId={`app-${app.id}`} index={appIdx}>
                                   {(appProvided, appSnap) => (
-                                    <div
-                                      ref={appProvided.innerRef}
-                                      {...appProvided.draggableProps}
-                                      {...appProvided.dragHandleProps}
-                                      className={cn(ITEM_SIZE[(app.size || 1) as keyof typeof ITEM_SIZE]?.minW)}
-                                      style={{ ...appProvided.draggableProps.style, flex: '0 0 auto' }}
-                                    >
-                                      {renderAppCard(app, category.id, appSnap.isDragging)}
+                                    <div ref={appProvided.innerRef} {...appProvided.draggableProps} {...appProvided.dragHandleProps}
+                                      className={cn(viewMode === 'grid' && ITEM_SIZE[(app.size || 1) as keyof typeof ITEM_SIZE]?.minW)}
+                                      style={{ ...appProvided.draggableProps.style, ...(viewMode === 'grid' ? { flex: '0 0 auto' } : {}) }}>
+                                      {viewMode === 'list' ? renderListItem(app, category.id) : renderAppCard(app, category.id, appSnap.isDragging)}
                                     </div>
                                   )}
                                 </Draggable>
@@ -495,11 +491,18 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
           </Droppable>
         </DragDropContext>
       ) : (
-        /* Normal view — categories side by side, wrapping */
-        <div className="flex flex-wrap gap-4">
-          {categories.map((category) => renderCategoryBlock(category, false))}
+        <div className={cn(viewMode === 'list' ? 'space-y-4' : 'flex flex-wrap gap-4')}>
+          {(searchQuery ? filteredCategories : categories).map((category) => renderCategoryBlock(category, false))}
+          {searchQuery && filteredCategories.length === 0 && (
+            <div className="w-full text-center py-12 text-muted-foreground">
+              <Search className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No se encontraron aplicaciones para "{searchQuery}"</p>
+            </div>
+          )}
         </div>
       )}
+
+      {descEditOverlay}
     </div>
   );
 }

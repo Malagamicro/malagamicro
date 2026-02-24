@@ -385,16 +385,62 @@ export function ThemeCustomizer() {
                 </div>
               </div>
 
+              {/* Blur effect toggle */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <Wallpaper className="w-4 h-4 text-primary" />
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider block">Efecto blur (glassmorphism)</span>
+                    <span className="text-[10px] text-muted-foreground">Aplica desenfoque a tarjetas y diálogos</span>
+                  </div>
+                </div>
+                <Switch
+                  checked={customTheme.sidebarStyle === 'glass'}
+                  onCheckedChange={(checked) => updateTheme({ sidebarStyle: checked ? 'glass' : 'solid' })}
+                />
+              </div>
+
               {/* High contrast */}
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                 <div className="flex items-center gap-2">
                   <Eye className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Alto contraste</span>
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider block">Alto contraste</span>
+                    <span className="text-[10px] text-muted-foreground">Mayor contraste entre elementos</span>
+                  </div>
                 </div>
                 <Switch
                   checked={customTheme.highContrast}
                   onCheckedChange={(checked) => updateTheme({ highContrast: checked })}
                 />
+              </div>
+
+              {/* Live Preview */}
+              <div>
+                <SectionHeader icon={Eye} label="Vista previa" />
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <div className="bg-card p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                        <Sparkles className="w-4 h-4 text-primary-foreground" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">Título de ejemplo</div>
+                        <div className="text-[10px] text-muted-foreground">Texto secundario de referencia</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <div className="px-2 py-1 rounded bg-primary text-primary-foreground text-[10px] font-medium">Primario</div>
+                      <div className="px-2 py-1 rounded bg-secondary text-secondary-foreground text-[10px] font-medium">Secundario</div>
+                      <div className="px-2 py-1 rounded bg-accent text-accent-foreground text-[10px] font-medium">Acento</div>
+                      <div className="px-2 py-1 rounded bg-destructive text-destructive-foreground text-[10px] font-medium">Peligro</div>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <div className="px-2 py-1 rounded bg-muted text-muted-foreground text-[10px]">Atenuado</div>
+                      <div className="px-2 py-1 rounded border border-border text-foreground text-[10px]">Borde</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </TabsContent>
 

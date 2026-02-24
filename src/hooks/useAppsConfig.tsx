@@ -14,6 +14,8 @@ export interface AppItem {
   size?: number;         // 1=S, 2=M, 3=L, 4=XL
   externalUrl?: string;  // if set, opens URL in new tab instead of internal nav
   isCustom?: boolean;    // user-created app
+  isFavorite?: boolean;  // pinned to top
+  customDescription?: string; // user-editable description
 }
 
 export interface AppCategory {
@@ -337,6 +339,24 @@ export function useAppsConfig() {
     saveConfig(updated);
   };
 
+  const toggleFavorite = (categoryId: string, itemId: string) => {
+    const updated = categories.map(c => {
+      if (c.id !== categoryId) return c;
+      return { ...c, items: c.items.map(i => i.id === itemId ? { ...i, isFavorite: !i.isFavorite } : i) };
+    });
+    setCategories(updated);
+    saveConfig(updated);
+  };
+
+  const updateItemDescription = (categoryId: string, itemId: string, desc: string) => {
+    const updated = categories.map(c => {
+      if (c.id !== categoryId) return c;
+      return { ...c, items: c.items.map(i => i.id === itemId ? { ...i, customDescription: desc } : i) };
+    });
+    setCategories(updated);
+    saveConfig(updated);
+  };
+
   const resetToDefault = () => {
     setCategories(DEFAULT_APP_CATEGORIES);
     setDefaultSize(1);
@@ -372,6 +392,8 @@ export function useAppsConfig() {
     reorderItems,
     moveItem,
     toggleItemVisibility,
+    toggleFavorite,
+    updateItemDescription,
     resetToDefault,
     setFullConfig,
     isLoading,
