@@ -164,9 +164,7 @@
     background-size: var(--custom-bg-size, auto);
   }
 
-  /* Apply pattern to cards and surfaces */
-  .bg-card,
-  [class*="bg-card"],
+  /* Pattern only on main content area, not on cards */
   main,
   [role="main"] {
     background-image: var(--custom-bg-pattern, none);
