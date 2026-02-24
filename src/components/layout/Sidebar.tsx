@@ -894,15 +894,15 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
 
   // Horizontal sidebar content (top/bottom)
   const horizontalContent = (
-    <div className="flex items-center h-full w-full px-2 gap-1">
+    <div className="flex items-center h-full w-full px-3 gap-1.5">
       <button
         onClick={() => onTabChange('dashboard')}
         className="h-9 rounded-lg overflow-hidden flex items-center justify-center bg-white px-2 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0"
       >
         <img src={logoFull} alt="MalagaMicro CRM" className="h-7 object-contain" />
       </button>
-      <div className="h-8 w-px bg-sidebar-border mx-1 flex-shrink-0" />
-      <nav className="flex items-center gap-0.5 overflow-x-auto flex-1">
+      <div className="h-6 w-px bg-sidebar-border mx-1 flex-shrink-0" />
+      <nav className="flex items-center gap-0.5 overflow-x-auto flex-1 scrollbar-none">
         {categories.flatMap(cat => cat.items).filter(i => !i.hidden).map(item => {
           const isActive = activeTab === item.id;
           const Icon = getIcon(item.icon);
@@ -933,14 +933,60 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           );
         })}
       </nav>
-      <div className="h-8 w-px bg-sidebar-border mx-1 flex-shrink-0" />
+      <div className="h-6 w-px bg-sidebar-border mx-1 flex-shrink-0" />
       <div className="flex items-center gap-0.5 flex-shrink-0">
         <button onClick={toggleTheme} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors">
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
-        <button onClick={() => setEditMode(!editMode)} className={cn("w-8 h-8 flex items-center justify-center rounded-lg transition-colors", editMode ? "bg-primary/10 text-primary" : "hover:bg-sidebar-accent")}>
-          <Pencil className="w-4 h-4" />
-        </button>
+        <ThemeCustomizer />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={cn("w-8 h-8 flex items-center justify-center rounded-lg transition-colors", editMode ? "bg-primary/10 text-primary" : "hover:bg-sidebar-accent")}>
+              <Pencil className="w-4 h-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-72 p-3 space-y-3" sideOffset={8}>
+            <h3 className="font-semibold text-sm">Personalizar Sidebar</h3>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Posición</label>
+              <div className="grid grid-cols-4 gap-1">
+                {([
+                  { pos: 'left' as SidebarPosition, icon: PanelLeftIcon, label: 'Izq' },
+                  { pos: 'right' as SidebarPosition, icon: PanelRight, label: 'Der' },
+                  { pos: 'top' as SidebarPosition, icon: PanelTop, label: 'Arriba' },
+                  { pos: 'bottom' as SidebarPosition, icon: PanelBottom, label: 'Abajo' },
+                ]).map(({ pos, icon: Icon, label }) => (
+                  <button
+                    key={pos}
+                    onClick={() => { setSidebarPosition(pos); onPositionChange?.(pos); }}
+                    className={cn(
+                      "flex flex-col items-center gap-0.5 p-1.5 rounded-md text-[10px] transition-colors",
+                      sidebarPosition === pos
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-sidebar-accent text-muted-foreground"
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className={cn(
+                "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                editMode ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-sidebar-accent"
+              )}
+            >
+              <Pencil className="w-4 h-4" />
+              <span>{editMode ? 'Terminar edición' : 'Editar elementos'}</span>
+            </button>
+            <button onClick={resetToDefault} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent">
+              <RotateCcw className="w-4 h-4" /> Restaurar por defecto
+            </button>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <button onClick={() => handleTabChange('settings')} className={cn("w-8 h-8 flex items-center justify-center rounded-lg transition-colors", activeTab === 'settings' && "bg-sidebar-accent")}>
           <Settings className="w-4 h-4" />
         </button>
@@ -948,43 +994,6 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           <LogOut className="w-4 h-4" />
         </button>
       </div>
-      {/* Edit mode popover for horizontal */}
-      {editMode && (
-        <div className="fixed top-16 right-4 z-50 bg-sidebar border border-sidebar-border rounded-xl p-4 shadow-xl w-72 space-y-3">
-          <h3 className="font-semibold text-sm">Editar Sidebar</h3>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Posición</label>
-            <div className="grid grid-cols-4 gap-1">
-              {([
-                { pos: 'left' as SidebarPosition, icon: PanelLeftIcon, label: 'Izq' },
-                { pos: 'right' as SidebarPosition, icon: PanelRight, label: 'Der' },
-                { pos: 'top' as SidebarPosition, icon: PanelTop, label: 'Arriba' },
-                { pos: 'bottom' as SidebarPosition, icon: PanelBottom, label: 'Abajo' },
-              ]).map(({ pos, icon: Icon, label }) => (
-                <button
-                  key={pos}
-                  onClick={() => { setSidebarPosition(pos); onPositionChange?.(pos); }}
-                  className={cn(
-                    "flex flex-col items-center gap-0.5 p-1.5 rounded-md text-[10px] transition-colors",
-                    sidebarPosition === pos
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-sidebar-accent text-muted-foreground"
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <button onClick={resetToDefault} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent">
-            <RotateCcw className="w-4 h-4" /> Restaurar
-          </button>
-          <button onClick={() => setEditMode(false)} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-sm font-medium">
-            Listo
-          </button>
-        </div>
-      )}
     </div>
   );
 
@@ -1011,7 +1020,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           (position === 'left' || position === 'right') && !isMobile && "h-screen",
           (position === 'left' || position === 'right') && !isMobile && (collapsed ? "w-[60px]" : "w-64"),
           // Horizontal sidebar (top/bottom)
-          (position === 'top' || position === 'bottom') && !isMobile && "w-full flex-row items-center h-14 overflow-x-auto",
+          (position === 'top' || position === 'bottom') && !isMobile && "w-full flex-row items-center h-12 overflow-hidden",
           // Mobile always left
           isMobile && "fixed inset-y-0 left-0 z-50 w-60 flex-col",
           isMobile && (mobileOpen ? "translate-x-0" : "-translate-x-full")
@@ -1030,6 +1039,8 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--sidebar-border)); border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--sidebar-foreground) / 0.3); }
+        .scrollbar-none::-webkit-scrollbar { display: none; }
+        .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </>
   );
