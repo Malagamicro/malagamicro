@@ -95,9 +95,9 @@ serve(async (req) => {
 
     console.log(`Authenticated user: ${user.id}`);
 
-    const { query, location, category, pageToken } = await req.json();
+    const { query, location, category, pageToken, lat, lng, radiusKm } = await req.json();
     
-    console.log('Search request:', { query, location, category, pageToken: pageToken ? 'yes' : 'no' });
+    console.log('Search request:', { query, location, category, pageToken: pageToken ? 'yes' : 'no', lat, lng, radiusKm });
     
     const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
     if (!apiKey) {
@@ -123,11 +123,20 @@ serve(async (req) => {
       };
       searchQuery = categoryMap[category] || searchQuery;
     }
+
+    // Determine if we use location-based (lat/lng) or text-based search
+    const useCoordinates = lat && lng && !location?.trim();
     
-    // Add location to query
-    const fullQuery = `${searchQuery} en ${location || 'Málaga'}`;
+    let fullQuery: string;
+    if (useCoordinates) {
+      // Search by query/category only, location will come from lat/lng params
+      fullQuery = searchQuery || 'empresa';
+    } else {
+      // Add location to query
+      fullQuery = `${searchQuery} en ${location || 'Málaga'}`;
+    }
     
-    console.log('Searching for:', fullQuery);
+    console.log('Searching for:', fullQuery, useCoordinates ? `at ${lat},${lng} r=${radiusKm}km` : '');
 
     // Build Text Search URL
     const textSearchUrl = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
@@ -135,6 +144,12 @@ serve(async (req) => {
     textSearchUrl.searchParams.set('key', apiKey);
     textSearchUrl.searchParams.set('language', 'es');
     textSearchUrl.searchParams.set('region', 'es');
+    
+    // If using coordinates, set location and radius
+    if (useCoordinates) {
+      textSearchUrl.searchParams.set('location', `${lat},${lng}`);
+      textSearchUrl.searchParams.set('radius', String(Math.min((radiusKm || 5) * 1000, 50000)));
+    }
     
     // If we have a page token, use it to get next page
     if (pageToken) {

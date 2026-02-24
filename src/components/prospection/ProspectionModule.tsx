@@ -9,10 +9,11 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import {
   Search, Loader2, AlertCircle, Phone, Globe, Star,
-  Building2, Plus, ChevronRight, Download, X,
+  Building2, Plus, ChevronRight, Download, X, CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLeads } from '@/hooks/useLeads';
+import { Badge } from '@/components/ui/badge';
 import ExcelJS from 'exceljs';
 
 interface PlaceResult {
@@ -66,7 +67,14 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
   const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
 
-  const { addLead } = useLeads();
+  const { addLead, leads } = useLeads();
+
+  // Build a set of existing lead names for duplicate detection (case-insensitive)
+  const existingLeadNames = new Set(
+    (leads || []).map((l: any) => l.companyName?.toLowerCase().trim()).filter(Boolean)
+  );
+
+  const isLeadSaved = (placeName: string) => existingLeadNames.has(placeName?.toLowerCase().trim());
 
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
@@ -114,13 +122,20 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
       await geocodeLocation(location);
     }
     try {
+      const body: any = {
+        query: query || undefined,
+        location: location.trim() || undefined,
+        category: sector,
+        pageToken,
+      };
+      // If no location text, send circle center coords + radius
+      if (!location.trim() && radiusEnabled) {
+        body.lat = mapCenter.lat;
+        body.lng = mapCenter.lng;
+        body.radiusKm = radius[0];
+      }
       const { data, error } = await supabase.functions.invoke('search-places', {
-        body: {
-          query: query || undefined,
-          location,
-          category: sector,
-          pageToken,
-        },
+        body,
       });
 
       if (error) throw error;
@@ -156,6 +171,10 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
   };
 
   const handleAddAsLead = (place: PlaceResult) => {
+    if (isLeadSaved(place.name)) {
+      toast.error(`"${place.name}" ya está guardado como lead`);
+      return;
+    }
     setAddingId(place.id);
     addLead({
       companyName: place.name,
@@ -464,13 +483,19 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                       <span style={{ color: '#999' }}>({selectedPlace.userRatingsTotal})</span>
                     </div>
                   )}
-                  <button
-                    onClick={() => handleAddAsLead(selectedPlace)}
-                    style={{ background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
-                    className="w-full mt-1 px-3 py-1.5 text-xs rounded transition-opacity hover:opacity-90"
-                  >
-                    + Añadir como lead
-                  </button>
+                  {isLeadSaved(selectedPlace.name) ? (
+                    <div className="flex items-center gap-1.5 mt-1 px-3 py-1.5 text-xs rounded" style={{ background: '#16a34a22', color: '#16a34a' }}>
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Ya guardado como lead
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleAddAsLead(selectedPlace)}
+                      style={{ background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
+                      className="w-full mt-1 px-3 py-1.5 text-xs rounded transition-opacity hover:opacity-90"
+                    >
+                      + Añadir como lead
+                    </button>
+                  )}
                 </div>
               </InfoWindow>
             )}
@@ -528,52 +553,63 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                 }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                      <p className="text-sm font-medium truncate">{place.name}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <p className="text-sm font-medium truncate">{place.name}</p>
+                        {isLeadSaved(place.name) && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
+                            <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" /> Guardado
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{place.address}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        {place.rating && (
+                          <div className="flex items-center gap-0.5 text-xs">
+                            <Star className="w-3 h-3 text-warning fill-warning" />
+                            <span>{place.rating}</span>
+                          </div>
+                        )}
+                        {place.phone && (
+                          <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                            <Phone className="w-3 h-3" />
+                            <span>{place.phone}</span>
+                          </div>
+                        )}
+                        {place.website && (
+                          <a
+                            href={`https://${place.website}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="flex items-center gap-0.5 text-xs text-primary hover:underline"
+                          >
+                            <Globe className="w-3 h-3" />
+                            <span className="truncate max-w-[120px]">{place.website}</span>
+                          </a>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{place.address}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                      {place.rating && (
-                        <div className="flex items-center gap-0.5 text-xs">
-                          <Star className="w-3 h-3 text-warning fill-warning" />
-                          <span>{place.rating}</span>
-                        </div>
-                      )}
-                      {place.phone && (
-                        <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                          <Phone className="w-3 h-3" />
-                          <span>{place.phone}</span>
-                        </div>
-                      )}
-                      {place.website && (
-                        <a
-                          href={`https://${place.website}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
-                          className="flex items-center gap-0.5 text-xs text-primary hover:underline"
-                        >
-                          <Globe className="w-3 h-3" />
-                          <span className="truncate max-w-[120px]">{place.website}</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={e => { e.stopPropagation(); handleAddAsLead(place); }}
-                    disabled={addingId === place.id}
-                  >
-                    {addingId === place.id ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    {isLeadSaved(place.name) ? (
+                      <div className="h-7 w-7 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      </div>
                     ) : (
-                      <Plus className="w-3.5 h-3.5" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={e => { e.stopPropagation(); handleAddAsLead(place); }}
+                        disabled={addingId === place.id}
+                      >
+                        {addingId === place.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
                     )}
-                  </Button>
                 </div>
               </div>
             ))}
