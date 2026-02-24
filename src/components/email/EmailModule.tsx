@@ -5,9 +5,26 @@ import { Inbox, Settings, PenLine } from 'lucide-react';
 import { EmailInbox } from './EmailInbox';
 import { EmailProfilesManager } from './EmailProfilesManager';
 import { EmailCompose } from './EmailCompose';
+import { EmailMessage } from '@/hooks/useEmailMessages';
+
+export interface ComposeData {
+  mode: 'reply' | 'forward' | 'new';
+  to?: string;
+  cc?: string;
+  subject?: string;
+  bodyHtml?: string;
+  inReplyTo?: string;
+  originalMessage?: EmailMessage;
+}
 
 export function EmailModule() {
   const [tab, setTab] = useState('inbox');
+  const [composeData, setComposeData] = useState<ComposeData | null>(null);
+
+  const handleCompose = (data: ComposeData) => {
+    setComposeData(data);
+    setTab('compose');
+  };
 
   return (
     <div className="p-4 md:p-8 h-full flex flex-col animate-fade-in">
@@ -16,7 +33,7 @@ export function EmailModule() {
         <p className="text-muted-foreground mt-1">Bandeja de entrada, redacción con IA y perfiles de correo</p>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col">
+      <Tabs value={tab} onValueChange={v => { setTab(v); if (v !== 'compose') setComposeData(null); }} className="flex-1 flex flex-col">
         <TabsList className="w-fit">
           <TabsTrigger value="inbox" className="gap-2"><Inbox className="h-4 w-4" />Bandeja</TabsTrigger>
           <TabsTrigger value="compose" className="gap-2"><PenLine className="h-4 w-4" />Redactar</TabsTrigger>
@@ -24,12 +41,12 @@ export function EmailModule() {
         </TabsList>
         <TabsContent value="inbox" className="flex-1 mt-4">
           <Card className="h-full overflow-hidden">
-            <EmailInbox />
+            <EmailInbox onCompose={handleCompose} />
           </Card>
         </TabsContent>
         <TabsContent value="compose" className="flex-1 mt-4">
           <Card className="h-full overflow-hidden">
-            <EmailCompose />
+            <EmailCompose initialData={composeData} />
           </Card>
         </TabsContent>
         <TabsContent value="profiles" className="mt-4">
