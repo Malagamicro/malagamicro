@@ -53,15 +53,22 @@ function saveSignatures(sigs: EmailSignature[]) {
   localStorage.setItem(SIGNATURES_KEY, JSON.stringify(sigs));
 }
 
-export function EmailCompose() {
+import type { ComposeData } from './EmailModule';
+
+interface EmailComposeProps {
+  initialData?: ComposeData | null;
+}
+
+export function EmailCompose({ initialData }: EmailComposeProps) {
   const { user } = useAuth();
   const { profiles, defaultProfile } = useEmailProfiles();
   const [selectedProfileId, setSelectedProfileId] = useState<string>(defaultProfile?.id || '');
-  const [to, setTo] = useState('');
-  const [cc, setCc] = useState('');
-  const [subject, setSubject] = useState('');
+  const [to, setTo] = useState(initialData?.to || '');
+  const [cc, setCc] = useState(initialData?.cc || '');
+  const [subject, setSubject] = useState(initialData?.subject || '');
   const [isSending, setIsSending] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef(false);
 
   // Attachments
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
@@ -95,6 +102,19 @@ export function EmailCompose() {
       setSelectedProfileId(defaultProfile.id);
     }
   }, [defaultProfile, selectedProfileId]);
+
+  // Populate fields from initialData (reply/forward)
+  useEffect(() => {
+    if (initialData && !initializedRef.current) {
+      initializedRef.current = true;
+      if (initialData.to) setTo(initialData.to);
+      if (initialData.cc) setCc(initialData.cc);
+      if (initialData.subject) setSubject(initialData.subject);
+      if (initialData.bodyHtml && editorRef.current) {
+        editorRef.current.innerHTML = initialData.bodyHtml;
+      }
+    }
+  }, [initialData]);
 
   // Rich text commands
   const execCommand = (cmd: string, value?: string) => {
