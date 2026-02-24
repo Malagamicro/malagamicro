@@ -314,7 +314,7 @@ function AddLinkDialog({ categories, onAdd }: {
 export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionChange, openTabs = [], onCloseTab }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openCategories, setOpenCategories] = useState<string[]>(['main', 'captar', 'seguimiento', 'comunicar', 'analizar', 'crm']);
+  const [openCategories, setOpenCategories] = useState<string[]>(['main', 'crm']);
   const [renamingCategory, setRenamingCategory] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const { signOut, user } = useAuth();
