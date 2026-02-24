@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Settings2, RotateCcw, GripVertical, Eye, EyeOff, Pencil, Check, X,
-  Plus, Trash2, ZoomIn, ZoomOut, Maximize2, Minimize2,
+  Plus, Trash2, Maximize2, Minimize2, ExternalLink, Palette,
 } from 'lucide-react';
-import { useAppsConfig, AppCategory, AppItem } from '@/hooks/useAppsConfig';
+import { useAppsConfig, AppCategory, AppItem, ICON_COLORS } from '@/hooks/useAppsConfig';
 import { IconPicker, getIconComponent } from '@/components/apps/IconPicker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,12 +17,11 @@ const CATEGORY_COLORS = [
   '#e11d48', '#84cc16', '#0ea5e9', '#a855f7', '#64748b',
 ];
 
-// Per-item size configs — each app can be a different size
 const ITEM_SIZE = {
-  1: { iconBox: 'w-10 h-10', iconSize: 'w-5 h-5', textSize: 'text-xs', descSize: 'text-[10px]', padding: 'p-2.5', gap: 'gap-1', span: '', minW: 'min-w-[80px]' },
-  2: { iconBox: 'w-14 h-14', iconSize: 'w-7 h-7', textSize: 'text-sm', descSize: 'text-[11px]', padding: 'p-3.5', gap: 'gap-1.5', span: '', minW: 'min-w-[100px]' },
-  3: { iconBox: 'w-20 h-20', iconSize: 'w-10 h-10', textSize: 'text-base', descSize: 'text-xs', padding: 'p-5', gap: 'gap-2', span: 'col-span-2', minW: 'min-w-[140px]' },
-  4: { iconBox: 'w-28 h-28', iconSize: 'w-14 h-14', textSize: 'text-lg', descSize: 'text-sm', padding: 'p-6', gap: 'gap-3', span: 'col-span-2 row-span-2', minW: 'min-w-[180px]' },
+  1: { iconBox: 'w-10 h-10', iconSize: 'w-5 h-5', textSize: 'text-xs', descSize: 'text-[10px]', padding: 'p-2.5', gap: 'gap-1', minW: 'min-w-[80px] max-w-[100px]' },
+  2: { iconBox: 'w-14 h-14', iconSize: 'w-7 h-7', textSize: 'text-sm', descSize: 'text-[11px]', padding: 'p-3.5', gap: 'gap-1.5', minW: 'min-w-[110px] max-w-[130px]' },
+  3: { iconBox: 'w-20 h-20', iconSize: 'w-10 h-10', textSize: 'text-base', descSize: 'text-xs', padding: 'p-5', gap: 'gap-2', minW: 'min-w-[150px] max-w-[180px]' },
+  4: { iconBox: 'w-28 h-28', iconSize: 'w-14 h-14', textSize: 'text-lg', descSize: 'text-sm', padding: 'p-6', gap: 'gap-3', minW: 'min-w-[200px] max-w-[240px]' },
 };
 
 const SIZE_LABELS = ['', 'S', 'M', 'L', 'XL'];
@@ -34,9 +33,9 @@ interface AppsHubProps {
 export function AppsHub({ onOpenApp }: AppsHubProps) {
   const {
     categories, defaultSize, editMode, setEditMode,
-    updateDefaultSize, setItemSize, setAllItemsSize,
+    updateDefaultSize, setItemSize, setAllItemsSize, setItemColor,
     renameCategory, setCategoryIcon, setCategoryColor, setItemIcon,
-    addCategory, deleteCategory,
+    addCategory, addCustomApp, deleteItem, deleteCategory,
     reorderCategories, reorderItems, moveItem, toggleItemVisibility, resetToDefault,
   } = useAppsConfig();
 
@@ -44,6 +43,11 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
   const [renameValue, setRenameValue] = useState('');
   const [newCatName, setNewCatName] = useState('');
   const [showNewCat, setShowNewCat] = useState(false);
+
+  // New custom app form state
+  const [addingAppToCat, setAddingAppToCat] = useState<string | null>(null);
+  const [newAppLabel, setNewAppLabel] = useState('');
+  const [newAppUrl, setNewAppUrl] = useState('');
 
   const startRename = (catId: string, name: string) => {
     setRenamingId(catId);
@@ -60,6 +64,15 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
       addCategory(newCatName.trim());
       setNewCatName('');
       setShowNewCat(false);
+    }
+  };
+
+  const handleAddCustomApp = (catId: string) => {
+    if (newAppLabel.trim() && newAppUrl.trim()) {
+      addCustomApp(catId, newAppLabel.trim(), newAppUrl.trim());
+      setNewAppLabel('');
+      setNewAppUrl('');
+      setAddingAppToCat(null);
     }
   };
 
@@ -87,15 +100,30 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
     setItemSize(categoryId, itemId, next);
   };
 
+  const handleAppClick = (app: AppItem) => {
+    if (editMode) return;
+    if (app.externalUrl) {
+      window.open(app.externalUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      onOpenApp(app.id);
+    }
+  };
+
+  const getIconColor = (color: string): { className?: string; style?: React.CSSProperties } => {
+    if (color.startsWith('text-')) return { className: color };
+    return { style: { color } };
+  };
+
   const renderAppCard = (app: AppItem, categoryId: string, isDragging?: boolean) => {
     const Icon = getIconComponent(app.icon);
     const size = app.size || defaultSize || 1;
     const sc = ITEM_SIZE[size as keyof typeof ITEM_SIZE] || ITEM_SIZE[1];
+    const iconColor = getIconColor(app.color);
 
     return (
-      <div className={cn('relative group/card', sc.span)}>
+      <div className="relative group/card h-full">
         <button
-          onClick={() => !editMode && onOpenApp(app.id)}
+          onClick={() => handleAppClick(app)}
           disabled={editMode}
           className={cn(
             'w-full h-full flex flex-col items-center justify-center', sc.gap, sc.padding,
@@ -110,22 +138,26 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
           <div className={cn(
             sc.iconBox, 'rounded-2xl flex items-center justify-center',
             'bg-background/80 shadow-sm',
-            'group-hover/card:shadow-md transition-shadow'
+            'group-hover/card:shadow-md transition-shadow relative'
           )}>
-            <Icon className={cn(sc.iconSize, app.color)} />
+            <Icon className={cn(sc.iconSize, iconColor.className)} style={iconColor.style} />
+            {app.externalUrl && (
+              <ExternalLink className="w-2.5 h-2.5 absolute top-1 right-1 text-muted-foreground/50" />
+            )}
           </div>
-          <div className="text-center">
-            <span className={cn(sc.textSize, 'font-semibold text-foreground block leading-tight')}>{app.label}</span>
+          <div className="text-center w-full">
+            <span className={cn(sc.textSize, 'font-semibold text-foreground block leading-tight truncate')}>{app.label}</span>
             {size >= 2 && (
-              <span className={cn(sc.descSize, 'text-muted-foreground leading-tight')}>{app.description}</span>
+              <span className={cn(sc.descSize, 'text-muted-foreground leading-tight truncate block')}>
+                {app.externalUrl ? app.externalUrl.replace(/^https?:\/\//, '').slice(0, 30) : app.description}
+              </span>
             )}
           </div>
         </button>
 
         {/* Edit overlay */}
         {editMode && (
-          <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5">
-            {/* Size cycle button */}
+          <div className="absolute top-1 right-1 flex items-center gap-0.5">
             <button
               onClick={(e) => { e.stopPropagation(); cycleItemSize(categoryId, app.id, size); }}
               className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors"
@@ -141,6 +173,32 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
               onChange={(icon) => setItemIcon(categoryId, app.id, icon)}
               triggerClassName="bg-background/90 shadow-sm !p-1 !rounded-md"
             />
+            {/* Color picker */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <Palette className="w-3 h-3" style={{ color: app.color.startsWith('#') ? app.color : undefined }} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="end" onClick={e => e.stopPropagation()}>
+                <div className="grid grid-cols-5 gap-1">
+                  {ICON_COLORS.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setItemColor(categoryId, app.id, c)}
+                      className={cn(
+                        'w-6 h-6 rounded-full border-2 transition-transform hover:scale-110',
+                        app.color === c ? 'border-foreground scale-110' : 'border-transparent'
+                      )}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
             <button
               onClick={(e) => { e.stopPropagation(); toggleItemVisibility(categoryId, app.id); }}
               className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-muted transition-colors"
@@ -150,12 +208,19 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
                 : <Eye className="w-3 h-3 text-muted-foreground" />
               }
             </button>
+            {app.isCustom && (
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteItem(categoryId, app.id); }}
+                className="p-1 rounded-md bg-background/90 border border-border/50 shadow-sm hover:bg-destructive/20 transition-colors"
+              >
+                <Trash2 className="w-3 h-3 text-destructive" />
+              </button>
+            )}
           </div>
         )}
 
-        {/* Size badge in edit mode */}
         {editMode && (
-          <span className="absolute bottom-1 right-1.5 text-[9px] font-bold text-muted-foreground/60 select-none">
+          <span className="absolute bottom-0.5 right-1 text-[9px] font-bold text-muted-foreground/50 select-none">
             {SIZE_LABELS[size]}
           </span>
         )}
@@ -163,13 +228,52 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
     );
   };
 
+  const renderCategoryBlock = (category: AppCategory, isEditMode: boolean) => {
+    const CatIcon = getIconComponent(category.icon || 'Folder');
+    const visibleApps = isEditMode ? category.items : category.items.filter(a => !a.hidden);
+    if (!isEditMode && visibleApps.length === 0) return null;
+
+    return (
+      <div
+        key={category.id}
+        className={cn(
+          'rounded-xl border border-border/30 bg-card/30 p-3 flex-shrink-0',
+          // Let categories take their natural width but allow growing
+          'flex-grow-0 basis-auto'
+        )}
+        style={{ minWidth: '200px' }}
+      >
+        {/* Category header */}
+        <div className="flex items-center gap-1.5 mb-2">
+          <div
+            className="w-5 h-5 rounded-md flex items-center justify-center"
+            style={{ backgroundColor: (category.color || '#6366f1') + '20' }}
+          >
+            <CatIcon className="w-3 h-3" style={{ color: category.color || '#6366f1' }} />
+          </div>
+          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            {category.label}
+          </h2>
+        </div>
+        {/* Items */}
+        <div className="flex flex-wrap gap-2">
+          {visibleApps.map((app) => (
+            <div key={app.id} className={cn(ITEM_SIZE[(app.size || 1) as keyof typeof ITEM_SIZE]?.minW)} style={{ flex: '0 0 auto' }}>
+              {renderAppCard(app, category.id)}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="p-4 sm:p-8 animate-fade-in max-w-6xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 animate-fade-in space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Aplicaciones</h1>
-          <p className="text-sm text-muted-foreground mt-1">Accede a todas las herramientas y utilidades</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Accede a todas las herramientas y utilidades</p>
         </div>
         <div className="flex items-center gap-2">
           {editMode && (
@@ -194,30 +298,30 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
         </div>
       </div>
 
-      {/* Bulk size controls */}
+      {/* Bulk size + info */}
       {editMode && (
-        <div className="flex items-center gap-2 flex-wrap bg-card/50 border border-border/50 rounded-xl p-3">
-          <span className="text-xs text-muted-foreground font-medium">Tamaño global:</span>
+        <div className="flex items-center gap-2 flex-wrap bg-card/50 border border-border/50 rounded-xl p-2.5">
+          <span className="text-xs text-muted-foreground font-medium">Todos:</span>
           {[1, 2, 3, 4].map(s => (
             <Button
               key={s}
               variant="outline"
               size="sm"
-              className={cn('h-7 px-3 text-xs', defaultSize === s && 'bg-primary text-primary-foreground')}
+              className={cn('h-6 px-2.5 text-[11px]', defaultSize === s && 'bg-primary text-primary-foreground')}
               onClick={() => setAllItemsSize(s)}
             >
               {SIZE_LABELS[s]}
             </Button>
           ))}
-          <span className="text-[10px] text-muted-foreground ml-2">
-            (o cambia cada icono individualmente con ⤢)
+          <span className="text-[10px] text-muted-foreground ml-1">
+            · Cada icono se redimensiona individualmente · Clic en 🎨 para cambiar color
           </span>
         </div>
       )}
 
       {/* New category form */}
       {showNewCat && (
-        <div className="flex items-center gap-2 bg-card/50 border border-border/50 rounded-xl p-3">
+        <div className="flex items-center gap-2 bg-card/50 border border-border/50 rounded-xl p-2.5">
           <Input
             placeholder="Nombre de la categoría..."
             value={newCatName}
@@ -240,7 +344,7 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="app-categories" type="APP_CATEGORY">
             {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-6">
+              <div ref={provided.innerRef} {...provided.droppableProps} className="flex flex-wrap gap-4">
                 {categories.map((category, catIdx) => (
                   <Draggable key={category.id} draggableId={`cat-${category.id}`} index={catIdx}>
                     {(catProvided, catSnap) => (
@@ -248,14 +352,15 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
                         ref={catProvided.innerRef}
                         {...catProvided.draggableProps}
                         className={cn(
-                          'rounded-xl border border-border/50 bg-card/50 p-4',
-                          catSnap.isDragging && 'shadow-xl'
+                          'rounded-xl border border-border/50 bg-card/50 p-3 flex-shrink-0',
+                          catSnap.isDragging && 'shadow-xl',
                         )}
+                        style={{ ...catProvided.draggableProps.style, minWidth: '220px', maxWidth: '500px' }}
                       >
                         {/* Category header */}
-                        <div className="flex items-center gap-2 mb-3">
-                          <div {...catProvided.dragHandleProps} className="cursor-grab active:cursor-grabbing p-1">
-                            <GripVertical className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <div {...catProvided.dragHandleProps} className="cursor-grab active:cursor-grabbing p-0.5">
+                            <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
                           </div>
 
                           <IconPicker
@@ -266,7 +371,7 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
                           <Popover>
                             <PopoverTrigger asChild>
                               <button
-                                className="w-5 h-5 rounded-full border border-border/50 shrink-0"
+                                className="w-4 h-4 rounded-full border border-border/50 shrink-0"
                                 style={{ backgroundColor: category.color || '#6366f1' }}
                               />
                             </PopoverTrigger>
@@ -277,7 +382,7 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
                                     key={c}
                                     onClick={() => setCategoryColor(category.id, c)}
                                     className={cn(
-                                      'w-7 h-7 rounded-full border-2 transition-transform hover:scale-110',
+                                      'w-6 h-6 rounded-full border-2 transition-transform hover:scale-110',
                                       category.color === c ? 'border-foreground scale-110' : 'border-transparent'
                                     )}
                                     style={{ backgroundColor: c }}
@@ -288,49 +393,78 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
                           </Popover>
 
                           {renamingId === category.id ? (
-                            <div className="flex items-center gap-1.5 flex-1">
+                            <div className="flex items-center gap-1 flex-1">
                               <Input
                                 value={renameValue}
                                 onChange={e => setRenameValue(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && finishRename(category.id)}
-                                className="h-7 text-sm"
+                                className="h-6 text-xs"
                                 autoFocus
                               />
-                              <button onClick={() => finishRename(category.id)} className="p-1 hover:bg-muted rounded">
-                                <Check className="w-3.5 h-3.5 text-green-500" />
+                              <button onClick={() => finishRename(category.id)} className="p-0.5 hover:bg-muted rounded">
+                                <Check className="w-3 h-3 text-green-500" />
                               </button>
-                              <button onClick={() => setRenamingId(null)} className="p-1 hover:bg-muted rounded">
-                                <X className="w-3.5 h-3.5 text-muted-foreground" />
+                              <button onClick={() => setRenamingId(null)} className="p-0.5 hover:bg-muted rounded">
+                                <X className="w-3 h-3 text-muted-foreground" />
                               </button>
                             </div>
                           ) : (
                             <>
-                              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-1">
+                              <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex-1 truncate">
                                 {category.label}
                               </h2>
-                              <button
-                                onClick={() => startRename(category.id, category.label)}
-                                className="p-1 hover:bg-muted rounded"
-                              >
-                                <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                              <button onClick={() => startRename(category.id, category.label)} className="p-0.5 hover:bg-muted rounded">
+                                <Pencil className="w-3 h-3 text-muted-foreground" />
                               </button>
                               <button
-                                onClick={() => deleteCategory(category.id)}
-                                className="p-1 hover:bg-destructive/20 rounded"
+                                onClick={() => setAddingAppToCat(addingAppToCat === category.id ? null : category.id)}
+                                className="p-0.5 hover:bg-muted rounded"
+                                title="Añadir app externa"
                               >
-                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                <Plus className="w-3 h-3 text-muted-foreground" />
+                              </button>
+                              <button onClick={() => deleteCategory(category.id)} className="p-0.5 hover:bg-destructive/20 rounded">
+                                <Trash2 className="w-3 h-3 text-destructive" />
                               </button>
                             </>
                           )}
                         </div>
 
-                        {/* Droppable items — flex wrap for mixed sizes */}
+                        {/* Add custom app form */}
+                        {addingAppToCat === category.id && (
+                          <div className="flex flex-col gap-1.5 mb-2 p-2 rounded-lg bg-muted/50 border border-border/30">
+                            <Input
+                              placeholder="Nombre de la app..."
+                              value={newAppLabel}
+                              onChange={e => setNewAppLabel(e.target.value)}
+                              className="h-7 text-xs"
+                              autoFocus
+                            />
+                            <Input
+                              placeholder="https://ejemplo.com"
+                              value={newAppUrl}
+                              onChange={e => setNewAppUrl(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && handleAddCustomApp(category.id)}
+                              className="h-7 text-xs"
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" onClick={() => handleAddCustomApp(category.id)} className="h-6 text-[10px] gap-1 flex-1">
+                                <ExternalLink className="w-3 h-3" /> Añadir
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => { setAddingAppToCat(null); setNewAppLabel(''); setNewAppUrl(''); }} className="h-6 text-[10px]">
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Droppable items */}
                         <Droppable droppableId={category.id} type="APP_ITEM">
                           {(itemsProvided) => (
                             <div
                               ref={itemsProvided.innerRef}
                               {...itemsProvided.droppableProps}
-                              className="flex flex-wrap gap-3 min-h-[80px]"
+                              className="flex flex-wrap gap-2 min-h-[60px]"
                             >
                               {category.items.map((app, appIdx) => (
                                 <Draggable key={app.id} draggableId={`app-${app.id}`} index={appIdx}>
@@ -361,35 +495,9 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
           </Droppable>
         </DragDropContext>
       ) : (
-        /* Normal view — flex wrap for mixed sizes */
-        <div className="space-y-8">
-          {categories.map((category) => {
-            const visibleApps = category.items.filter(a => !a.hidden);
-            if (visibleApps.length === 0) return null;
-            const CatIcon = getIconComponent(category.icon || 'Folder');
-            return (
-              <div key={category.id}>
-                <div className="flex items-center gap-2 mb-3">
-                  <div
-                    className="w-6 h-6 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: (category.color || '#6366f1') + '20' }}
-                  >
-                    <CatIcon className="w-3.5 h-3.5" style={{ color: category.color || '#6366f1' }} />
-                  </div>
-                  <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {category.label}
-                  </h2>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {visibleApps.map((app) => (
-                    <div key={app.id} className={cn(ITEM_SIZE[(app.size || 1) as keyof typeof ITEM_SIZE]?.minW)} style={{ flex: '0 0 auto' }}>
-                      {renderAppCard(app, category.id)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+        /* Normal view — categories side by side, wrapping */
+        <div className="flex flex-wrap gap-4">
+          {categories.map((category) => renderCategoryBlock(category, false))}
         </div>
       )}
     </div>

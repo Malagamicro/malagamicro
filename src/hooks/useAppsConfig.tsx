@@ -8,10 +8,12 @@ export interface AppItem {
   label: string;
   description: string;
   icon: string;
-  color: string;
+  color: string;        // icon color — now editable hex
   bgGradient: string;
   hidden?: boolean;
-  size?: number; // 1=S, 2=M, 3=L, 4=XL — per-item
+  size?: number;         // 1=S, 2=M, 3=L, 4=XL
+  externalUrl?: string;  // if set, opens URL in new tab instead of internal nav
+  isCustom?: boolean;    // user-created app
 }
 
 export interface AppCategory {
@@ -27,6 +29,21 @@ export interface AppsConfigState {
   defaultSize: number;
 }
 
+// Palette of icon colors for the picker
+export const ICON_COLORS = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
+  '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
+  '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+  '#ec4899', '#f43f5e', '#64748b', '#78716c', '#000000',
+];
+
+// Convert hex to a tailwind-compatible style color
+export function hexToIconStyle(hex: string): string | undefined {
+  // If it starts with "text-" it's a legacy tailwind class
+  if (hex.startsWith('text-')) return undefined;
+  return hex;
+}
+
 const DEFAULT_APP_CATEGORIES: AppCategory[] = [
   {
     id: 'comunicacion',
@@ -34,10 +51,10 @@ const DEFAULT_APP_CATEGORIES: AppCategory[] = [
     icon: 'MessagesSquare',
     color: '#3b82f6',
     items: [
-      { id: 'inbox', label: 'Inbox', description: 'Notificaciones', icon: 'Inbox', color: 'text-teal-500', bgGradient: 'from-teal-500/20 to-teal-600/10', size: 1 },
-      { id: 'correo', label: 'Correo', description: 'Email completo', icon: 'Mail', color: 'text-blue-500', bgGradient: 'from-blue-500/20 to-blue-600/10', size: 1 },
-      { id: 'mensajes', label: 'Chat Interno', description: 'Mensajería del equipo', icon: 'MessagesSquare', color: 'text-sky-500', bgGradient: 'from-sky-500/20 to-sky-600/10', size: 1 },
-      { id: 'osticket', label: 'Tickets', description: 'Soporte osTicket', icon: 'Ticket', color: 'text-yellow-500', bgGradient: 'from-yellow-500/20 to-yellow-600/10', size: 1 },
+      { id: 'inbox', label: 'Inbox', description: 'Notificaciones', icon: 'Inbox', color: '#14b8a6', bgGradient: 'from-teal-500/20 to-teal-600/10', size: 1 },
+      { id: 'correo', label: 'Correo', description: 'Email completo', icon: 'Mail', color: '#3b82f6', bgGradient: 'from-blue-500/20 to-blue-600/10', size: 1 },
+      { id: 'mensajes', label: 'Chat Interno', description: 'Mensajería del equipo', icon: 'MessagesSquare', color: '#0ea5e9', bgGradient: 'from-sky-500/20 to-sky-600/10', size: 1 },
+      { id: 'osticket', label: 'Tickets', description: 'Soporte osTicket', icon: 'Ticket', color: '#eab308', bgGradient: 'from-yellow-500/20 to-yellow-600/10', size: 1 },
     ],
   },
   {
@@ -46,9 +63,9 @@ const DEFAULT_APP_CATEGORIES: AppCategory[] = [
     icon: 'Megaphone',
     color: '#ec4899',
     items: [
-      { id: 'campaigns', label: 'Campañas', description: 'Email marketing', icon: 'Megaphone', color: 'text-pink-500', bgGradient: 'from-pink-500/20 to-pink-600/10', size: 1 },
-      { id: 'whatsapp', label: 'WhatsApp', description: 'Mensajería directa', icon: 'MessageSquare', color: 'text-green-500', bgGradient: 'from-green-500/20 to-green-600/10', size: 1 },
-      { id: 'templates', label: 'Plantillas', description: 'Mensajes predefinidos', icon: 'FileText', color: 'text-amber-500', bgGradient: 'from-amber-500/20 to-amber-600/10', size: 1 },
+      { id: 'campaigns', label: 'Campañas', description: 'Email marketing', icon: 'Megaphone', color: '#ec4899', bgGradient: 'from-pink-500/20 to-pink-600/10', size: 1 },
+      { id: 'whatsapp', label: 'WhatsApp', description: 'Mensajería directa', icon: 'MessageSquare', color: '#22c55e', bgGradient: 'from-green-500/20 to-green-600/10', size: 1 },
+      { id: 'templates', label: 'Plantillas', description: 'Mensajes predefinidos', icon: 'FileText', color: '#f59e0b', bgGradient: 'from-amber-500/20 to-amber-600/10', size: 1 },
     ],
   },
   {
@@ -57,10 +74,10 @@ const DEFAULT_APP_CATEGORIES: AppCategory[] = [
     icon: 'Briefcase',
     color: '#10b981',
     items: [
-      { id: 'calendario', label: 'Calendario', description: 'Eventos y citas', icon: 'Calendar', color: 'text-blue-500', bgGradient: 'from-blue-500/20 to-blue-600/10', size: 1 },
-      { id: 'informes', label: 'Informes', description: 'Reportes detallados', icon: 'BarChart3', color: 'text-emerald-500', bgGradient: 'from-emerald-500/20 to-emerald-600/10', size: 1 },
-      { id: 'reminders', label: 'Recordatorios', description: 'Alertas y tareas', icon: 'Bell', color: 'text-rose-400', bgGradient: 'from-rose-500/20 to-rose-600/10', size: 1 },
-      { id: 'shared-files', label: 'Archivos', description: 'Almacenamiento compartido', icon: 'Cloud', color: 'text-slate-500', bgGradient: 'from-slate-500/20 to-slate-600/10', size: 1 },
+      { id: 'calendario', label: 'Calendario', description: 'Eventos y citas', icon: 'Calendar', color: '#3b82f6', bgGradient: 'from-blue-500/20 to-blue-600/10', size: 1 },
+      { id: 'informes', label: 'Informes', description: 'Reportes detallados', icon: 'BarChart3', color: '#10b981', bgGradient: 'from-emerald-500/20 to-emerald-600/10', size: 1 },
+      { id: 'reminders', label: 'Recordatorios', description: 'Alertas y tareas', icon: 'Bell', color: '#f43f5e', bgGradient: 'from-rose-500/20 to-rose-600/10', size: 1 },
+      { id: 'shared-files', label: 'Archivos', description: 'Almacenamiento compartido', icon: 'Cloud', color: '#64748b', bgGradient: 'from-slate-500/20 to-slate-600/10', size: 1 },
     ],
   },
   {
@@ -69,9 +86,9 @@ const DEFAULT_APP_CATEGORIES: AppCategory[] = [
     icon: 'Brain',
     color: '#8b5cf6',
     items: [
-      { id: 'chat-ai', label: 'Chat IA', description: 'Asistente inteligente', icon: 'Bot', color: 'text-violet-500', bgGradient: 'from-violet-500/20 to-violet-600/10', size: 1 },
-      { id: 'editor', label: 'Editor IA', description: 'Documentos con IA', icon: 'FileEdit', color: 'text-emerald-500', bgGradient: 'from-emerald-500/20 to-emerald-600/10', size: 1 },
-      { id: 'seo-generator', label: 'SEO Generator', description: 'Artículos optimizados', icon: 'Sparkles', color: 'text-amber-500', bgGradient: 'from-amber-500/20 to-amber-600/10', size: 1 },
+      { id: 'chat-ai', label: 'Chat IA', description: 'Asistente inteligente', icon: 'Bot', color: '#8b5cf6', bgGradient: 'from-violet-500/20 to-violet-600/10', size: 1 },
+      { id: 'editor', label: 'Editor IA', description: 'Documentos con IA', icon: 'FileEdit', color: '#10b981', bgGradient: 'from-emerald-500/20 to-emerald-600/10', size: 1 },
+      { id: 'seo-generator', label: 'SEO Generator', description: 'Artículos optimizados', icon: 'Sparkles', color: '#f59e0b', bgGradient: 'from-amber-500/20 to-amber-600/10', size: 1 },
     ],
   },
 ];
@@ -206,6 +223,15 @@ export function useAppsConfig() {
     saveConfig(updated);
   };
 
+  const setItemColor = (categoryId: string, itemId: string, color: string) => {
+    const updated = categories.map(c => {
+      if (c.id !== categoryId) return c;
+      return { ...c, items: c.items.map(i => i.id === itemId ? { ...i, color } : i) };
+    });
+    setCategories(updated);
+    saveConfig(updated);
+  };
+
   const addCategory = (label: string, icon?: string, color?: string) => {
     const id = `custom-${Date.now()}`;
     const newCat: AppCategory = { id, label, icon: icon || 'Folder', color: color || '#6366f1', items: [] };
@@ -213,6 +239,48 @@ export function useAppsConfig() {
     setCategories(updated);
     saveConfig(updated);
     return id;
+  };
+
+  const addCustomApp = (categoryId: string, label: string, url: string, icon?: string, color?: string) => {
+    const id = `custom-app-${Date.now()}`;
+    const newApp: AppItem = {
+      id,
+      label,
+      description: url,
+      icon: icon || 'Globe',
+      color: color || '#3b82f6',
+      bgGradient: 'from-primary/10 to-primary/5',
+      size: 1,
+      externalUrl: url,
+      isCustom: true,
+    };
+    const updated = categories.map(c => {
+      if (c.id !== categoryId) return c;
+      return { ...c, items: [...c.items, newApp] };
+    });
+    setCategories(updated);
+    saveConfig(updated);
+    toast.success(`App "${label}" añadida`);
+    return id;
+  };
+
+  const deleteItem = (categoryId: string, itemId: string) => {
+    const updated = categories.map(c => {
+      if (c.id !== categoryId) return c;
+      return { ...c, items: c.items.filter(i => i.id !== itemId) };
+    });
+    setCategories(updated);
+    saveConfig(updated);
+    toast.success('App eliminada');
+  };
+
+  const updateItem = (categoryId: string, itemId: string, updates: Partial<AppItem>) => {
+    const updated = categories.map(c => {
+      if (c.id !== categoryId) return c;
+      return { ...c, items: c.items.map(i => i.id === itemId ? { ...i, ...updates } : i) };
+    });
+    setCategories(updated);
+    saveConfig(updated);
   };
 
   const deleteCategory = (categoryId: string) => {
@@ -294,7 +362,11 @@ export function useAppsConfig() {
     setCategoryIcon,
     setCategoryColor,
     setItemIcon,
+    setItemColor,
     addCategory,
+    addCustomApp,
+    deleteItem,
+    updateItem,
     deleteCategory,
     reorderCategories,
     reorderItems,
