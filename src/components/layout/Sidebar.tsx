@@ -892,7 +892,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
     </>
   );
 
-  // Horizontal sidebar content (top/bottom)
+  // Horizontal sidebar content (top/bottom) with category popovers
   const horizontalContent = (
     <div className="flex items-center h-full w-full px-3 gap-1.5">
       <button
@@ -903,33 +903,58 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
       </button>
       <div className="h-6 w-px bg-sidebar-border mx-1 flex-shrink-0" />
       <nav className="flex items-center gap-0.5 overflow-x-auto flex-1 scrollbar-none">
-        {categories.flatMap(cat => cat.items).filter(i => !i.hidden).map(item => {
-          const isActive = activeTab === item.id;
-          const Icon = getIcon(item.icon);
+        {categories.map(cat => {
+          const visibleItems = cat.items.filter(i => !i.hidden);
+          if (visibleItems.length === 0) return null;
+          const CatIcon = getIcon(cat.icon);
+          const hasActiveItem = visibleItems.some(item => item.id === activeTab);
           return (
-            <TooltipProvider key={item.id} delayDuration={0}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => handleItemClick(item)}
-                    className={cn(
-                      "relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-xs font-medium whitespace-nowrap flex-shrink-0",
-                      "hover:bg-sidebar-accent",
-                      isActive && "bg-primary/15 text-primary font-semibold border-b-2 border-primary"
-                    )}
-                  >
-                    <Icon className={cn("w-4 h-4", isActive ? "text-primary" : item.color)} />
-                    <span>{item.label}</span>
-                    {item.showBadge && unreadCount > 0 && (
-                      <span className="h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                      </span>
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side={position === 'top' ? 'bottom' : 'top'}>{item.label}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <DropdownMenu key={cat.id}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold uppercase tracking-wide whitespace-nowrap flex-shrink-0",
+                    "hover:bg-sidebar-accent",
+                    hasActiveItem && "bg-primary/15 text-primary border-b-2 border-primary"
+                  )}
+                >
+                  <CatIcon className={cn("w-4 h-4", hasActiveItem ? "text-primary" : cat.color)} />
+                  <span>{cat.label}</span>
+                  <ChevronDown className="w-3 h-3 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                side={position === 'top' ? 'bottom' : 'top'}
+                sideOffset={4}
+                className="min-w-[180px] p-1.5"
+              >
+                {visibleItems.map(item => {
+                  const isActive = activeTab === item.id;
+                  const Icon = getIcon(item.icon);
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleItemClick(item)}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-all text-sm",
+                        "hover:bg-sidebar-accent",
+                        isActive && "bg-primary/15 text-primary font-semibold"
+                      )}
+                    >
+                      <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-primary" : item.color)} />
+                      <span className="flex-1 text-left">{item.label}</span>
+                      {item.isExternal && <ExternalLink className="w-3 h-3 text-muted-foreground/50" />}
+                      {item.showBadge && unreadCount > 0 && (
+                        <Badge variant="destructive" className="h-4 min-w-[16px] text-[10px] px-1">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           );
         })}
       </nav>
@@ -945,7 +970,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
               <Pencil className="w-4 h-4" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72 p-3 space-y-3" sideOffset={8}>
+          <DropdownMenuContent align="end" side={position === 'top' ? 'bottom' : 'top'} className="w-72 p-3 space-y-3" sideOffset={8}>
             <h3 className="font-semibold text-sm">Personalizar Sidebar</h3>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Posición</label>
