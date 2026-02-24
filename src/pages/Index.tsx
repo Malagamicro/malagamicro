@@ -39,6 +39,7 @@ import { OsTicketHistory } from '@/components/osticket/OsTicketHistory';
 import { OsTicketPanel } from '@/components/osticket/OsTicketPanel';
 import { CalendarModule } from '@/components/calendar/CalendarModule';
 import { ReportsModule } from '@/components/reports/ReportsModule';
+import { AppsHub } from '@/components/apps/AppsHub';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
@@ -206,6 +207,8 @@ const IndexContent = () => {
     }
 
     switch (activeTab) {
+      case 'apps':
+        return <AppsHub onOpenApp={setActiveTab} />;
       case 'dashboard':
         return <Dashboard onViewLead={handleViewLead} onTabChange={setActiveTab} />;
       case 'leads':
