@@ -623,9 +623,9 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
             <TooltipTrigger asChild>
               <button
                 onClick={() => { onTabChange('dashboard'); }}
-                className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+                className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
               >
-                <img src={logoIcon} alt="MalagaMicro" className="w-9 h-9 object-contain" />
+                <img src={logoIcon} alt="MalagaMicro" className="w-9 h-9 object-contain rounded-full" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="right"><p className="font-bold">Ir al Dashboard</p></TooltipContent>
