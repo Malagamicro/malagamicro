@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 import { 
   Palette, Type, Wallpaper, RotateCcw, Circle, TextCursor, 
   Layers, Sparkles, Zap, Eye, Bot, Send, Loader2, Pipette,
-  ChevronRight, BarChart3
+  ChevronRight, BarChart3, Save, Trash2, Download, FolderOpen
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -104,11 +104,12 @@ function ColorPickerInput({
 }
 
 export function ThemeCustomizer() {
-  const { customTheme, updateTheme, resetTheme } = useCustomTheme();
+  const { customTheme, updateTheme, resetTheme, savedThemes, saveCurrentTheme, loadSavedTheme, deleteSavedTheme } = useCustomTheme();
   const { categories, setSidebarPosition, toggleItemVisibility } = useSidebarConfig();
   const [open, setOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [saveThemeName, setSaveThemeName] = useState('');
 
   const handleAIGenerate = useCallback(async () => {
     if (!aiPrompt.trim() || aiLoading) return;
@@ -197,7 +198,7 @@ export function ThemeCustomizer() {
         </DialogHeader>
 
         <Tabs defaultValue="colors" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="mx-6 grid grid-cols-4 mb-2">
+          <TabsList className="mx-6 grid grid-cols-5 mb-2">
             <TabsTrigger value="colors" className="text-xs gap-1">
               <Palette className="w-3.5 h-3.5" /> Colores
             </TabsTrigger>
@@ -205,7 +206,10 @@ export function ThemeCustomizer() {
               <Layers className="w-3.5 h-3.5" /> Interfaz
             </TabsTrigger>
             <TabsTrigger value="typography" className="text-xs gap-1">
-              <Type className="w-3.5 h-3.5" /> Tipografía
+              <Type className="w-3.5 h-3.5" /> Texto
+            </TabsTrigger>
+            <TabsTrigger value="saved" className="text-xs gap-1">
+              <Save className="w-3.5 h-3.5" /> Temas
             </TabsTrigger>
             <TabsTrigger value="ai" className="text-xs gap-1">
               <Bot className="w-3.5 h-3.5" /> IA
@@ -300,6 +304,43 @@ export function ThemeCustomizer() {
 
             {/* LAYOUT TAB */}
             <TabsContent value="layout" className="mt-0 space-y-6">
+              {/* Sidebar style - enhanced */}
+              <div>
+                <SectionHeader icon={Sparkles} label="Estilo visual" />
+                <p className="text-xs text-muted-foreground mb-3">Afecta al sidebar, tarjetas y paneles.</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {(Object.entries(SIDEBAR_STYLE_OPTIONS) as [SidebarStyle, typeof SIDEBAR_STYLE_OPTIONS[SidebarStyle]][]).map(([key, opt]) => (
+                    <button
+                      key={key}
+                      onClick={() => updateTheme({ sidebarStyle: key })}
+                      className={cn(
+                        "relative flex flex-col items-center gap-2 p-4 rounded-xl transition-all border",
+                        customTheme.sidebarStyle === key
+                          ? "ring-2 ring-primary bg-primary/10 border-primary/30"
+                          : "hover:bg-muted/50 border-border/50"
+                      )}
+                    >
+                      {/* Visual preview */}
+                      <div className={cn(
+                        "w-full h-12 rounded-lg border border-border/30 flex items-center justify-center",
+                        key === 'solid' && "bg-card",
+                        key === 'glass' && "bg-card/40 backdrop-blur-md",
+                        key === 'transparent' && "bg-card/15 backdrop-blur-sm",
+                      )}>
+                        <div className={cn(
+                          "w-8 h-1.5 rounded-full",
+                          key === 'solid' && "bg-primary",
+                          key === 'glass' && "bg-primary/70",
+                          key === 'transparent' && "bg-primary/40",
+                        )} />
+                      </div>
+                      <span className="text-xs font-semibold">{opt.label}</span>
+                      <span className="text-[9px] text-muted-foreground text-center leading-tight">{opt.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Border radius */}
               <div>
                 <SectionHeader icon={Circle} label="Bordes redondeados" />
@@ -343,27 +384,6 @@ export function ThemeCustomizer() {
                 </div>
               </div>
 
-              {/* Sidebar style */}
-              <div>
-                <SectionHeader icon={Sparkles} label="Estilo del sidebar" />
-                <div className="grid grid-cols-3 gap-2">
-                  {(Object.entries(SIDEBAR_STYLE_OPTIONS) as [SidebarStyle, typeof SIDEBAR_STYLE_OPTIONS[SidebarStyle]][]).map(([key, opt]) => (
-                    <button
-                      key={key}
-                      onClick={() => updateTheme({ sidebarStyle: key })}
-                      className={cn(
-                        "px-3 py-2 rounded-lg text-xs font-medium transition-all",
-                        customTheme.sidebarStyle === key
-                          ? "ring-2 ring-primary bg-muted"
-                          : "hover:bg-muted/50"
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Animation speed */}
               <div>
                 <SectionHeader icon={Zap} label="Velocidad de animación" />
@@ -383,21 +403,6 @@ export function ThemeCustomizer() {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              {/* Blur effect toggle */}
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <Wallpaper className="w-4 h-4 text-primary" />
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-wider block">Efecto blur (glassmorphism)</span>
-                    <span className="text-[10px] text-muted-foreground">Aplica desenfoque a tarjetas y diálogos</span>
-                  </div>
-                </div>
-                <Switch
-                  checked={customTheme.sidebarStyle === 'glass'}
-                  onCheckedChange={(checked) => updateTheme({ sidebarStyle: checked ? 'glass' : 'solid' })}
-                />
               </div>
 
               {/* High contrast */}
@@ -487,6 +492,88 @@ export function ThemeCustomizer() {
                     </button>
                   ))}
                 </div>
+              </div>
+            </TabsContent>
+
+            {/* SAVED THEMES TAB */}
+            <TabsContent value="saved" className="mt-0 space-y-6">
+              <div>
+                <SectionHeader icon={Save} label="Guardar tema actual" />
+                <div className="flex gap-2">
+                  <Input
+                    value={saveThemeName}
+                    onChange={(e) => setSaveThemeName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && saveThemeName.trim()) {
+                        saveCurrentTheme(saveThemeName.trim());
+                        setSaveThemeName('');
+                        toast.success('Tema guardado correctamente');
+                      }
+                    }}
+                    placeholder="Nombre del tema..."
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!saveThemeName.trim()}
+                    onClick={() => {
+                      saveCurrentTheme(saveThemeName.trim());
+                      setSaveThemeName('');
+                      toast.success('Tema guardado correctamente');
+                    }}
+                    className="gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5" /> Guardar
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <SectionHeader icon={FolderOpen} label="Temas guardados" />
+                {savedThemes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Save className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No tienes temas guardados</p>
+                    <p className="text-xs mt-1">Personaliza la apariencia y guárdala para reutilizarla después</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {savedThemes.map((saved) => (
+                      <div key={saved.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card/30 hover:bg-card/60 transition-colors group">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-semibold text-foreground block truncate">{saved.name}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {saved.theme.colorPreset !== 'custom' ? COLOR_PRESETS[saved.theme.colorPreset]?.label : 'Personalizado'}
+                            {' · '}{FONT_FAMILIES[saved.theme.fontFamily]?.label}
+                            {' · '}{SIDEBAR_STYLE_OPTIONS[saved.theme.sidebarStyle]?.label}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            loadSavedTheme(saved.id);
+                            toast.success(`Tema "${saved.name}" aplicado`);
+                          }}
+                        >
+                          <Download className="w-3 h-3" /> Aplicar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+                          onClick={() => {
+                            deleteSavedTheme(saved.id);
+                            toast.success('Tema eliminado');
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </TabsContent>
 

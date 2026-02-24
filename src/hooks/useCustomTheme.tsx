@@ -53,6 +53,13 @@ export interface CustomTheme {
   customColors?: CustomColors;
 }
 
+export interface SavedTheme {
+  id: string;
+  name: string;
+  theme: CustomTheme;
+  createdAt: string;
+}
+
 const DEFAULT_THEME: CustomTheme = {
   colorPreset: 'default',
   backgroundPattern: 'none',
@@ -750,10 +757,10 @@ export const UI_DENSITY_OPTIONS: Record<UIDensity, { label: string; spacing: str
   spacious: { label: 'Amplio', spacing: '1.5' },
 };
 
-export const SIDEBAR_STYLE_OPTIONS: Record<SidebarStyle, { label: string }> = {
-  solid: { label: 'Sólido' },
-  glass: { label: 'Cristal' },
-  transparent: { label: 'Transparente' },
+export const SIDEBAR_STYLE_OPTIONS: Record<SidebarStyle, { label: string; description: string }> = {
+  solid: { label: 'Sólido', description: 'Fondo opaco sin transparencia' },
+  glass: { label: 'Cristal', description: 'Glassmorphism con blur y transparencia' },
+  transparent: { label: 'Transparente', description: 'Fondo muy transparente, minimalista' },
 };
 
 export const ANIMATION_SPEED_OPTIONS: Record<AnimationSpeed, { label: string }> = {
@@ -910,9 +917,23 @@ function applyHighContrast(enabled: boolean) {
   }
 }
 
+const SAVED_THEMES_KEY = 'crm-saved-themes';
+
+function loadSavedThemes(): SavedTheme[] {
+  try {
+    const raw = localStorage.getItem(SAVED_THEMES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function persistSavedThemes(themes: SavedTheme[]) {
+  localStorage.setItem(SAVED_THEMES_KEY, JSON.stringify(themes));
+}
+
 export function useCustomTheme() {
   const { user } = useAuth();
   const [customTheme, setCustomTheme] = useState<CustomTheme>(DEFAULT_THEME);
+  const [savedThemes, setSavedThemes] = useState<SavedTheme[]>(loadSavedThemes);
   const initialized = useRef(false);
   const saving = useRef(false);
 
@@ -1002,5 +1023,32 @@ export function useCustomTheme() {
     });
   }, [saveTheme]);
 
-  return { customTheme, updateTheme, resetTheme };
+  const saveCurrentTheme = useCallback((name: string) => {
+    const newTheme: SavedTheme = {
+      id: crypto.randomUUID(),
+      name,
+      theme: { ...customTheme },
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...savedThemes, newTheme];
+    setSavedThemes(updated);
+    persistSavedThemes(updated);
+    return newTheme;
+  }, [customTheme, savedThemes]);
+
+  const loadSavedTheme = useCallback((themeId: string) => {
+    const found = savedThemes.find(t => t.id === themeId);
+    if (found) {
+      setCustomTheme(found.theme);
+      saveTheme(found.theme);
+    }
+  }, [savedThemes, saveTheme]);
+
+  const deleteSavedTheme = useCallback((themeId: string) => {
+    const updated = savedThemes.filter(t => t.id !== themeId);
+    setSavedThemes(updated);
+    persistSavedThemes(updated);
+  }, [savedThemes]);
+
+  return { customTheme, updateTheme, resetTheme, savedThemes, saveCurrentTheme, loadSavedTheme, deleteSavedTheme };
 }
