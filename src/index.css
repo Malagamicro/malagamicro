@@ -293,17 +293,33 @@
               inset 0 0 0 1px hsl(var(--foreground) / 0.04);
 }
 [data-sidebar-style="transparent"] [data-sidebar] {
-  background: hsl(var(--sidebar-background) / 0.2) !important;
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
-  border-right-color: hsl(var(--sidebar-border) / 0.15) !important;
+  background: hsl(var(--sidebar-background) / 0.08) !important;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-right: 1px solid hsl(var(--sidebar-foreground) / 0.08) !important;
+  box-shadow: inset 0 1px 0 0 hsl(var(--sidebar-foreground) / 0.06),
+              inset 1px 0 0 0 hsl(var(--sidebar-foreground) / 0.04),
+              4px 0 30px -8px hsl(0 0% 0% / 0.2);
 }
 [data-sidebar-style="transparent"] .bg-card,
 [data-sidebar-style="transparent"] [class*="bg-card"] {
-  background: hsl(var(--card) / 0.35) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-color: hsl(var(--border) / 0.2) !important;
+  background: hsl(var(--card) / 0.08) !important;
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border-color: hsl(var(--foreground) / 0.08) !important;
+  box-shadow: inset 0 1px 0 0 hsl(var(--foreground) / 0.07),
+              inset 0 0 0 1px hsl(var(--foreground) / 0.04),
+              0 4px 20px -4px hsl(0 0% 0% / 0.15);
+}
+[data-sidebar-style="transparent"] .border,
+[data-sidebar-style="transparent"] [class*="border-border"] {
+  border-color: hsl(var(--foreground) / 0.07) !important;
+}
+[data-sidebar-style="transparent"] .rounded-xl,
+[data-sidebar-style="transparent"] .rounded-lg,
+[data-sidebar-style="transparent"] .rounded-2xl {
+  box-shadow: inset 0 1px 0 0 hsl(var(--foreground) / 0.05),
+              inset 0 0 0 1px hsl(var(--foreground) / 0.03);
 }
 
 /* Sidebar category bg colors - use transparent overlay */
