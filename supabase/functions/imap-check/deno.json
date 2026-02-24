@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "jsr:@workingdevshero/deno-imap": "https://esm.sh/jsr/@workingdevshero/deno-imap@1.0.0"
+  }
+}
