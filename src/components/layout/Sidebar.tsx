@@ -9,7 +9,7 @@ import {
   GripVertical, Plus, RotateCcw, Trash2, FolderPlus, Check,
   Calendar as CalendarIcon, Palette, Eye, EyeOff,
   PanelLeft as PanelLeftIcon, PanelRight, PanelTop, PanelBottom,
-  ExternalLink, Link, FileEdit,
+  ExternalLink, Link, FileEdit, LayoutGrid,
 } from 'lucide-react';
 import { ThemeCustomizer } from '@/components/layout/ThemeCustomizer';
 import { Button } from '@/components/ui/button';
@@ -46,7 +46,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   MapPin, Settings, Kanban, BarChart3, Inbox, FileText, Globe,
   Ticket, FolderOpen, Bot, Cloud, Calculator, Bell, Megaphone,
   Briefcase, Wrench, MessageCircle, Sparkles, FolderPlus, Calendar: CalendarIcon,
-  ExternalLink, Link, FileEdit,
+  ExternalLink, Link, FileEdit, LayoutGrid,
 };
 
 const ICON_OPTIONS = Object.keys(ICON_MAP);

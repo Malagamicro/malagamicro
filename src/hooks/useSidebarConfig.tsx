@@ -33,6 +33,7 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
     color: 'text-blue-500',
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', color: 'text-blue-500' },
+      { id: 'apps', label: 'Aplicaciones', icon: 'LayoutGrid', color: 'text-violet-500' },
       { id: 'reports', label: 'Reportes', icon: 'BarChart3', color: 'text-orange-500' },
     ]
   },
@@ -46,54 +47,6 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
       { id: 'pipeline', label: 'Pipeline', icon: 'Kanban', color: 'text-purple-500' },
       { id: 'prospeccion', label: 'Prospección', icon: 'Search', color: 'text-cyan-500' },
       { id: 'mapa', label: 'Mapa', icon: 'MapPin', color: 'text-red-500' },
-    ]
-  },
-  {
-    id: 'marketing',
-    label: 'Marketing',
-    icon: 'Megaphone',
-    color: 'text-pink-500',
-    items: [
-      { id: 'campaigns', label: 'Campañas Email', icon: 'Mail', color: 'text-pink-500' },
-      { id: 'whatsapp', label: 'WhatsApp', icon: 'MessageSquare', color: 'text-green-500' },
-      { id: 'templates', label: 'Plantillas', icon: 'FileText', color: 'text-amber-500' },
-    ]
-  },
-  {
-    id: 'comunicacion',
-    label: 'Comunicación',
-    icon: 'MessageCircle',
-    color: 'text-teal-500',
-    items: [
-      { id: 'inbox', label: 'Inbox', icon: 'Inbox', color: 'text-teal-500', showBadge: true },
-      { id: 'correo', label: 'Correo', icon: 'Mail', color: 'text-blue-500' },
-      { id: 'mensajes', label: 'Chat Interno', icon: 'MessagesSquare', color: 'text-sky-500' },
-      { id: 'osticket', label: 'Tickets', icon: 'Ticket', color: 'text-yellow-500' },
-    ]
-  },
-  {
-    id: 'gestion',
-    label: 'Gestión',
-    icon: 'Calculator',
-    color: 'text-emerald-500',
-    items: [
-      { id: 'calendario', label: 'Calendario', icon: 'Calendar', color: 'text-blue-500' },
-      { id: 'informes', label: 'Informes', icon: 'FileText', color: 'text-emerald-500' },
-      { id: 'reminders', label: 'Recordatorios', icon: 'Bell', color: 'text-rose-400', route: '/reminders' },
-      { id: 'shared-files', label: 'Archivos', icon: 'Cloud', color: 'text-slate-400' },
-    ]
-  },
-  {
-    id: 'herramientas',
-    label: 'Herramientas',
-    icon: 'Wrench',
-    color: 'text-lime-500',
-    items: [
-      { id: 'chat-ai', label: 'Chat IA', icon: 'Bot', color: 'text-violet-500' },
-      { id: 'editor', label: 'Editor IA', icon: 'FileEdit', color: 'text-emerald-500', route: '/tools/editor' },
-      { id: 'seo-generator', label: 'Generador SEO', icon: 'Sparkles', color: 'text-amber-500', route: '/tools/seo' },
-      
-      
     ]
   },
 ];
