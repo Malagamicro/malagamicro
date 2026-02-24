@@ -923,11 +923,11 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
                   <ChevronDown className="w-3 h-3 opacity-50" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
+                <DropdownMenuContent
                 align="start"
                 side={position === 'top' ? 'bottom' : 'top'}
                 sideOffset={4}
-                className="min-w-[180px] p-1.5"
+                className="min-w-[180px] p-1.5 bg-sidebar text-sidebar-foreground border-sidebar-border"
               >
                 {visibleItems.map(item => {
                   const isActive = activeTab === item.id;
@@ -970,7 +970,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
               <Pencil className="w-4 h-4" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side={position === 'top' ? 'bottom' : 'top'} className="w-72 p-3 space-y-3" sideOffset={8}>
+          <DropdownMenuContent align="end" side={position === 'top' ? 'bottom' : 'top'} className="w-72 p-3 space-y-3 bg-sidebar text-sidebar-foreground border-sidebar-border" sideOffset={8}>
             <h3 className="font-semibold text-sm">Personalizar Sidebar</h3>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Posición</label>
