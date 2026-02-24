@@ -82,9 +82,20 @@ export function useSidebarConfig() {
         }
         const saved = (rawData.items || rawData) as unknown as SidebarCategory[];
         if (saved.length > 0) {
-          // Remove deprecated items (e.g. old file manager)
-          const deprecatedIds = new Set(['files', 'presupuesto']);
-          const cleaned = saved.map(cat => ({
+          // Remove deprecated items (moved to Apps hub or old)
+          const deprecatedIds = new Set([
+            'files', 'presupuesto',
+            // Items now in Apps hub
+            'inbox', 'correo', 'mensajes', 'osticket',
+            'campaigns', 'whatsapp', 'templates',
+            'calendario', 'informes', 'reminders', 'shared-files',
+            'chat-ai', 'editor', 'seo-generator',
+          ]);
+          // Also remove deprecated categories
+          const deprecatedCatIds = new Set(['marketing', 'comunicacion', 'gestion', 'herramientas']);
+          const cleaned = saved
+            .filter(cat => !deprecatedCatIds.has(cat.id))
+            .map(cat => ({
             ...cat,
             items: cat.items.filter(i => !deprecatedIds.has(i.id)),
           }));
