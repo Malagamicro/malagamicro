@@ -113,12 +113,7 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
     );
   };
 
-  const timeOptions = [];
-  for (let h = 6; h <= 22; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      timeOptions.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
-    }
-  }
+  // Free time input - no longer restricted to 30-min intervals
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,10 +146,15 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
             </div>
             <div className="grid gap-2">
               <Label>Hora</Label>
-              <Select value={time} onValueChange={setTime}>
-                <SelectTrigger><div className="flex items-center"><Clock className="mr-2 h-4 w-4 text-muted-foreground" /><SelectValue /></div></SelectTrigger>
-                <SelectContent className="bg-popover">{timeOptions.map((t) => (<SelectItem key={t} value={t}>{t}</SelectItem>))}</SelectContent>
-              </Select>
+              <div className="relative">
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
           </div>
 
