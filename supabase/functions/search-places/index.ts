@@ -124,16 +124,18 @@ serve(async (req) => {
       searchQuery = categoryMap[category] || searchQuery;
     }
 
-    // Determine if we use location-based (lat/lng) or text-based search
+    // Determine search mode
     const useCoordinates = lat && lng && !location?.trim();
+    const isGlobalSearch = !location?.trim() && !useCoordinates;
     
     let fullQuery: string;
     if (useCoordinates) {
-      // Search by query/category only, location will come from lat/lng params
+      fullQuery = searchQuery || 'empresa';
+    } else if (isGlobalSearch) {
+      // Global search — no location restriction
       fullQuery = searchQuery || 'empresa';
     } else {
-      // Add location to query
-      fullQuery = `${searchQuery} en ${location || 'Málaga'}`;
+      fullQuery = `${searchQuery} en ${location}`;
     }
     
     console.log('Searching for:', fullQuery, useCoordinates ? `at ${lat},${lng} r=${radiusKm}km` : '');
