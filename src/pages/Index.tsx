@@ -10,6 +10,7 @@ import { LeadKanban } from '@/components/leads/LeadKanban';
 import { LeadMap } from '@/components/leads/LeadMap';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadImportModal } from '@/components/leads/LeadImportModal';
+import { ProspectionModule } from '@/components/prospection/ProspectionModule';
 
 import { EmailCampaigns } from '@/components/campaigns/EmailCampaigns';
 import { ReportsDashboard } from '@/components/reports/ReportsDashboard';
@@ -223,12 +224,14 @@ const IndexContent = () => {
         );
       case 'prospeccion':
         return (
-          <div className="p-3 sm:p-8 space-y-4 sm:space-y-6 animate-fade-in">
+          <div className="p-3 sm:p-8 flex flex-col gap-4 animate-fade-in h-[calc(100vh-4rem)]">
             <div>
               <h1 className="text-xl sm:text-3xl font-bold text-foreground">Prospección</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">Busca y descubre nuevos clientes potenciales</p>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">Busca y descubre nuevos clientes potenciales por zona geográfica</p>
             </div>
-            <LeadMap leads={leads} onViewLead={handleViewLead} />
+            <div className="flex-1 min-h-0">
+              <ProspectionModule />
+            </div>
           </div>
         );
       case 'pipeline':
