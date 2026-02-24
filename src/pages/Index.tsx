@@ -424,7 +424,7 @@ const IndexContent = () => {
         return <Templates />;
       case 'mensajes':
         return (
-          <div className="animate-fade-in h-full">
+          <div className="animate-fade-in flex-1 min-h-0 flex flex-col">
             <InternalChatPage />
           </div>
         );
