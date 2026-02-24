@@ -45,9 +45,18 @@ export function PasswordChangeCard() {
     setIsUpdating(false);
 
     if (error) {
+      console.error('Password change error:', error);
+      let errorMsg = 'No se pudo cambiar la contraseña. Inténtalo de nuevo.';
+      if (error.message?.includes('same_password')) {
+        errorMsg = 'La nueva contraseña debe ser diferente a la actual.';
+      } else if (error.message?.includes('weak_password')) {
+        errorMsg = 'La contraseña es demasiado débil. Usa al menos 8 caracteres con letras y números.';
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
       toast({
         title: 'Error',
-        description: 'No se pudo cambiar la contraseña. Inténtalo de nuevo.',
+        description: errorMsg,
         variant: 'destructive',
       });
     } else {
