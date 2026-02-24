@@ -179,6 +179,31 @@ serve(async (req) => {
       );
     }
 
+    // UPDATE PASSWORD
+    if (req.method === 'POST' && action === 'update-password') {
+      const { userId, password } = await req.json();
+
+      if (!userId || !password) {
+        return new Response(
+          JSON.stringify({ error: 'User ID and password are required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(userId, {
+        password: password
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      return new Response(
+        JSON.stringify({ message: 'Password updated successfully' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // SET ROLE
     if (req.method === 'POST' && action === 'set-role') {
       const { userId, role } = await req.json();
