@@ -274,6 +274,36 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_apps_config",
+      description: "Ver la configuración actual del hub de aplicaciones del usuario (categorías, apps, tamaño de iconos).",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_apps_config",
+      description: "Actualizar la configuración del hub de aplicaciones. REQUIERE CONFIRMACIÓN. Puede: crear/renombrar/eliminar categorías, cambiar iconos de apps y categorías, cambiar colores de categorías, cambiar tamaño de iconos (1=S, 2=M, 3=L, 4=XL), mover apps entre categorías, y ocultar/mostrar apps. Iconos disponibles: Home, Search, Settings, User, Users, Mail, MessageSquare, Phone, Video, Camera, Image, FileText, File, Folder, Globe, Cloud, Database, Lock, Shield, Bell, Clock, Calendar, Star, Heart, Bookmark, Flag, Tag, MapPin, Map, Sun, Moon, Zap, Cpu, Monitor, Smartphone, Music, Activity, Flame, Target, Award, Gift, ShoppingCart, CreditCard, DollarSign, Building, Truck, Package, Briefcase, BookOpen, Bot, Sparkles, Brain, Rocket, Megaphone, Ticket, MessagesSquare, FileEdit, Crown, Gem, etc.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", description: "Acción: 'add_category', 'rename_category', 'delete_category', 'set_category_icon', 'set_category_color', 'set_app_icon', 'set_icon_size', 'toggle_app_visibility', 'move_app'" },
+          category_id: { type: "string", description: "ID de la categoría" },
+          category_name: { type: "string", description: "Nombre para nueva categoría o renombrar" },
+          icon: { type: "string", description: "Nombre del icono (PascalCase, ej: 'Rocket', 'Brain')" },
+          color: { type: "string", description: "Color hex (ej: '#3b82f6')" },
+          app_id: { type: "string", description: "ID de la app a modificar" },
+          target_category_id: { type: "string", description: "Categoría destino para mover app" },
+          icon_size: { type: "number", description: "Tamaño: 1(S), 2(M), 3(L), 4(XL)" },
+          confirmed: { type: "boolean", description: "Si el usuario ya confirmó" },
+        },
+        required: ["action"],
+      },
+    },
+  },
 ];
 
 // Confirmation check for write operations
@@ -281,7 +311,7 @@ function needsConfirmation(toolName: string, args: Record<string, unknown>): str
   const writeTools = [
     "send_internal_message", "send_email", "send_whatsapp",
     "create_lead", "update_lead", "create_reminder", "complete_reminder",
-    "create_calendar_event",
+    "create_calendar_event", "update_apps_config",
   ];
   if (!writeTools.includes(toolName)) return null;
   if (args.confirmed === true) return null;
@@ -303,6 +333,8 @@ function needsConfirmation(toolName: string, args: Record<string, unknown>): str
       return `✅ **Completar recordatorio** "${args.search}"\n\n¿Confirmas?`;
     case "create_calendar_event":
       return `📅 **Crear evento**\n- **Título:** ${args.title}\n- **Fecha:** ${args.event_date} a las ${args.start_time}\n\n¿Confirmas?`;
+    case "update_apps_config":
+      return `🎨 **Modificar aplicaciones**\n- **Acción:** ${args.action}\n${args.category_name ? `- **Categoría:** ${args.category_name}\n` : ''}${args.icon ? `- **Icono:** ${args.icon}\n` : ''}${args.color ? `- **Color:** ${args.color}\n` : ''}${args.icon_size ? `- **Tamaño:** ${args.icon_size}\n` : ''}\n¿Confirmas?`;
     default:
       return null;
   }
@@ -644,6 +676,98 @@ async function executeToolCall(
         return JSON.stringify({ success: true, message: `Evento "${(data as any).title}" creado para el ${(data as any).event_date} a las ${(data as any).start_time}`, event_id: (data as any).id });
       }
 
+      case "get_apps_config": {
+        const { data, error } = await supabase
+          .from("user_sidebar_config")
+          .select("categories")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (error) throw error;
+        const rawData = (data?.categories as any) || {};
+        const apps = rawData.apps || [];
+        const iconSize = rawData.appsIconSize || 2;
+        return JSON.stringify({
+          message: `Configuración actual del hub de apps`,
+          icon_size: iconSize,
+          categories: apps.map((c: any) => ({
+            id: c.id,
+            label: c.label,
+            icon: c.icon || "Folder",
+            color: c.color || "#6366f1",
+            apps: c.items?.map((i: any) => ({ id: i.id, label: i.label, icon: i.icon, hidden: !!i.hidden })) || [],
+          })),
+        });
+      }
+
+      case "update_apps_config": {
+        const action = String(args.action);
+        const { data: existing } = await supabase
+          .from("user_sidebar_config")
+          .select("categories")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const rawData = (existing?.categories as any) || {};
+        let apps = rawData.apps || [];
+        let iconSize = rawData.appsIconSize || 2;
+
+        switch (action) {
+          case "set_icon_size":
+            iconSize = Number(args.icon_size) || 2;
+            break;
+          case "add_category": {
+            const id = `custom-${Date.now()}`;
+            apps.push({ id, label: String(args.category_name || "Nueva"), icon: String(args.icon || "Folder"), color: String(args.color || "#6366f1"), items: [] });
+            break;
+          }
+          case "rename_category":
+            apps = apps.map((c: any) => c.id === args.category_id ? { ...c, label: String(args.category_name) } : c);
+            break;
+          case "delete_category": {
+            const cat = apps.find((c: any) => c.id === args.category_id);
+            apps = apps.filter((c: any) => c.id !== args.category_id);
+            if (cat?.items?.length && apps.length) apps[0].items = [...apps[0].items, ...cat.items];
+            break;
+          }
+          case "set_category_icon":
+            apps = apps.map((c: any) => c.id === args.category_id ? { ...c, icon: String(args.icon) } : c);
+            break;
+          case "set_category_color":
+            apps = apps.map((c: any) => c.id === args.category_id ? { ...c, color: String(args.color) } : c);
+            break;
+          case "set_app_icon":
+            apps = apps.map((c: any) => ({
+              ...c,
+              items: c.items.map((i: any) => i.id === args.app_id ? { ...i, icon: String(args.icon) } : i),
+            }));
+            break;
+          case "toggle_app_visibility":
+            apps = apps.map((c: any) => ({
+              ...c,
+              items: c.items.map((i: any) => i.id === args.app_id ? { ...i, hidden: !i.hidden } : i),
+            }));
+            break;
+          case "move_app": {
+            let movedItem: any = null;
+            apps = apps.map((c: any) => {
+              const idx = c.items.findIndex((i: any) => i.id === args.app_id);
+              if (idx >= 0) { movedItem = c.items[idx]; return { ...c, items: c.items.filter((_: any, i: number) => i !== idx) }; }
+              return c;
+            });
+            if (movedItem) {
+              apps = apps.map((c: any) => c.id === args.target_category_id ? { ...c, items: [...c.items, movedItem] } : c);
+            }
+            break;
+          }
+        }
+
+        const merged = { ...rawData, apps, appsIconSize: iconSize };
+        const { error } = await supabase
+          .from("user_sidebar_config")
+          .upsert({ user_id: userId, categories: merged }, { onConflict: "user_id" });
+        if (error) throw error;
+        return JSON.stringify({ success: true, message: `Aplicaciones actualizadas: ${action}` });
+      }
+
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
@@ -711,13 +835,14 @@ HERRAMIENTAS DISPONIBLES:
 📖 LECTURA (ejecución directa):
 - get_team_users, get_shared_files, get_shared_folders
 - get_inbox, get_leads, get_reminders, get_ostickets
-- get_calendar_events, get_budgets
+- get_calendar_events, get_budgets, get_apps_config
 
 ✍️ ESCRITURA (REQUIEREN CONFIRMACIÓN):
 - send_internal_message, send_email, send_whatsapp
 - create_lead, update_lead
 - create_reminder, complete_reminder
 - create_calendar_event
+- update_apps_config (personalizar el hub de aplicaciones: cambiar iconos, colores, categorías, tamaño)
 
 REGLA CRÍTICA DE CONFIRMACIÓN:
 Para TODAS las acciones de escritura, DEBES seguir este flujo:
