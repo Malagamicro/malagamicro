@@ -120,8 +120,8 @@ function CollapsedIconButton({ item, isActive, onClick, unreadCount }: {
           <button
             onClick={onClick}
             className={cn(
-              "relative w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200",
-              "hover:bg-sidebar-accent hover:scale-105",
+              "relative w-10 h-10 flex items-center justify-center rounded-xl transition-colors duration-150",
+              "hover:bg-sidebar-accent",
               isActive && "bg-primary/15 shadow-sm ring-2 ring-primary/30"
             )}>
             <Icon className={cn("w-5 h-5", isActive ? "text-primary" : item.color)} />
@@ -418,7 +418,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         key={item.id}
         onClick={() => handleItemClick(item)}
         className={cn(
-          "w-full flex items-center gap-2 px-2.5 py-1 rounded-md transition-all duration-200 relative min-h-[30px]",
+          "w-full flex items-center gap-2 px-2.5 py-1 rounded-md transition-colors duration-150 relative min-h-[30px]",
           isMobile && "gap-1.5 px-2 py-0.5 min-h-[26px]",
           "hover:bg-sidebar-accent",
           isActive && "bg-primary/15 border-l-2 border-primary font-semibold shadow-sm",
@@ -428,7 +428,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         <div className="relative">
           <Icon className={cn("w-3.5 h-3.5 flex-shrink-0", isMobile && "w-3 h-3", isActive ? "text-primary" : item.color)} />
         </div>
-        <span className={cn("text-[11px] animate-fade-in flex-1 text-left", isMobile && "text-[10px]", isActive && "text-primary font-semibold")}>{item.label}</span>
+        <span className={cn("text-[11px] flex-1 text-left", isMobile && "text-[10px]", isActive && "text-primary font-semibold")}>{item.label}</span>
         {item.isExternal && (
           <ExternalLink className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
         )}
@@ -643,7 +643,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button onClick={toggleTheme} className="w-10 h-10 mx-auto flex items-center justify-center rounded-xl hover:bg-sidebar-accent transition-all duration-200 hover:scale-105">
+          <button onClick={toggleTheme} className="w-10 h-10 mx-auto flex items-center justify-center rounded-xl hover:bg-sidebar-accent transition-colors duration-150">
                 {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
             </TooltipTrigger>
@@ -658,7 +658,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button onClick={handleSignOut} className="w-10 h-10 mx-auto flex items-center justify-center rounded-xl hover:bg-sidebar-accent transition-all duration-200 text-destructive hover:scale-105">
+              <button onClick={handleSignOut} className="w-10 h-10 mx-auto flex items-center justify-center rounded-xl hover:bg-sidebar-accent transition-colors duration-150 text-destructive">
                 <LogOut className="w-5 h-5" />
               </button>
             </TooltipTrigger>
