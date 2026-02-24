@@ -46,37 +46,38 @@ export function hexToIconStyle(hex: string): string | undefined {
 
 const DEFAULT_APP_CATEGORIES: AppCategory[] = [
   {
-    id: 'comunicacion',
-    label: 'Comunicación',
-    icon: 'MessagesSquare',
-    color: '#3b82f6',
+    id: 'captar',
+    label: 'Conseguir clientes',
+    icon: 'Search',
+    color: '#06b6d4',
     items: [
-      { id: 'inbox', label: 'Inbox', description: 'Notificaciones', icon: 'Inbox', color: '#14b8a6', bgGradient: 'from-teal-500/20 to-teal-600/10', size: 1 },
-      { id: 'correo', label: 'Correo', description: 'Email completo', icon: 'Mail', color: '#3b82f6', bgGradient: 'from-blue-500/20 to-blue-600/10', size: 1 },
-      { id: 'mensajes', label: 'Chat Interno', description: 'Mensajería del equipo', icon: 'MessagesSquare', color: '#0ea5e9', bgGradient: 'from-sky-500/20 to-sky-600/10', size: 1 },
-      { id: 'osticket', label: 'Tickets', description: 'Soporte osTicket', icon: 'Ticket', color: '#eab308', bgGradient: 'from-yellow-500/20 to-yellow-600/10', size: 1 },
-    ],
-  },
-  {
-    id: 'marketing',
-    label: 'Marketing',
-    icon: 'Megaphone',
-    color: '#ec4899',
-    items: [
-      { id: 'campaigns', label: 'Campañas', description: 'Email marketing', icon: 'Megaphone', color: '#ec4899', bgGradient: 'from-pink-500/20 to-pink-600/10', size: 1 },
+      { id: 'correo', label: 'Correo', description: 'Email profesional', icon: 'Mail', color: '#3b82f6', bgGradient: 'from-blue-500/20 to-blue-600/10', size: 1 },
       { id: 'whatsapp', label: 'WhatsApp', description: 'Mensajería directa', icon: 'MessageSquare', color: '#22c55e', bgGradient: 'from-green-500/20 to-green-600/10', size: 1 },
+      { id: 'campaigns', label: 'Campañas', description: 'Email marketing', icon: 'Megaphone', color: '#ec4899', bgGradient: 'from-pink-500/20 to-pink-600/10', size: 1 },
       { id: 'templates', label: 'Plantillas', description: 'Mensajes predefinidos', icon: 'FileText', color: '#f59e0b', bgGradient: 'from-amber-500/20 to-amber-600/10', size: 1 },
+      { id: 'seo-generator', label: 'SEO Generator', description: 'Artículos optimizados', icon: 'Sparkles', color: '#f59e0b', bgGradient: 'from-amber-500/20 to-amber-600/10', size: 1 },
     ],
   },
   {
-    id: 'gestion',
-    label: 'Gestión',
-    icon: 'Briefcase',
-    color: '#10b981',
+    id: 'seguimiento',
+    label: 'Hacer seguimiento',
+    icon: 'Kanban',
+    color: '#8b5cf6',
     items: [
       { id: 'calendario', label: 'Calendario', description: 'Eventos y citas', icon: 'Calendar', color: '#3b82f6', bgGradient: 'from-blue-500/20 to-blue-600/10', size: 1 },
-      { id: 'informes', label: 'Informes', description: 'Reportes detallados', icon: 'BarChart3', color: '#10b981', bgGradient: 'from-emerald-500/20 to-emerald-600/10', size: 1 },
       { id: 'reminders', label: 'Recordatorios', description: 'Alertas y tareas', icon: 'Bell', color: '#f43f5e', bgGradient: 'from-rose-500/20 to-rose-600/10', size: 1 },
+      { id: 'osticket', label: 'Tickets', description: 'Soporte osTicket', icon: 'Ticket', color: '#eab308', bgGradient: 'from-yellow-500/20 to-yellow-600/10', size: 1 },
+      { id: 'informes', label: 'Informes', description: 'Reportes detallados', icon: 'BarChart3', color: '#10b981', bgGradient: 'from-emerald-500/20 to-emerald-600/10', size: 1 },
+    ],
+  },
+  {
+    id: 'comunicar',
+    label: 'Comunicación interna',
+    icon: 'MessagesSquare',
+    color: '#0ea5e9',
+    items: [
+      { id: 'mensajes', label: 'Chat Interno', description: 'Mensajería del equipo', icon: 'MessagesSquare', color: '#0ea5e9', bgGradient: 'from-sky-500/20 to-sky-600/10', size: 1 },
+      { id: 'inbox', label: 'Inbox', description: 'Notificaciones', icon: 'Inbox', color: '#14b8a6', bgGradient: 'from-teal-500/20 to-teal-600/10', size: 1 },
       { id: 'shared-files', label: 'Archivos', description: 'Almacenamiento compartido', icon: 'Cloud', color: '#64748b', bgGradient: 'from-slate-500/20 to-slate-600/10', size: 1 },
     ],
   },
@@ -88,7 +89,6 @@ const DEFAULT_APP_CATEGORIES: AppCategory[] = [
     items: [
       { id: 'chat-ai', label: 'Chat IA', description: 'Asistente inteligente', icon: 'Bot', color: '#8b5cf6', bgGradient: 'from-violet-500/20 to-violet-600/10', size: 1 },
       { id: 'editor', label: 'Editor IA', description: 'Documentos con IA', icon: 'FileEdit', color: '#10b981', bgGradient: 'from-emerald-500/20 to-emerald-600/10', size: 1 },
-      { id: 'seo-generator', label: 'SEO Generator', description: 'Artículos optimizados', icon: 'Sparkles', color: '#f59e0b', bgGradient: 'from-amber-500/20 to-amber-600/10', size: 1 },
     ],
   },
 ];

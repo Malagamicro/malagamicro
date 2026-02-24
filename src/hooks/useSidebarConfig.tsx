@@ -37,46 +37,15 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
     ]
   },
   {
-    id: 'captar',
-    label: 'Conseguir clientes',
-    icon: 'Search',
-    color: 'text-cyan-500',
+    id: 'crm',
+    label: 'CRM',
+    icon: 'Briefcase',
+    color: 'text-indigo-500',
     items: [
       { id: 'leads', label: 'Leads', icon: 'Users', color: 'text-indigo-500' },
+      { id: 'pipeline', label: 'Pipeline', icon: 'Kanban', color: 'text-purple-500' },
       { id: 'prospeccion', label: 'Prospección', icon: 'Search', color: 'text-cyan-500' },
       { id: 'mapa', label: 'Mapa', icon: 'MapPin', color: 'text-red-500' },
-    ]
-  },
-  {
-    id: 'seguimiento',
-    label: 'Hacer seguimiento',
-    icon: 'Kanban',
-    color: 'text-purple-500',
-    items: [
-      { id: 'pipeline', label: 'Pipeline', icon: 'Kanban', color: 'text-purple-500' },
-      { id: 'calendario', label: 'Calendario', icon: 'Calendar', color: 'text-teal-500' },
-      { id: 'reminders', label: 'Recordatorios', icon: 'Bell', color: 'text-yellow-500' },
-    ]
-  },
-  {
-    id: 'comunicar',
-    label: 'Comunicación',
-    icon: 'MessageSquare',
-    color: 'text-green-500',
-    items: [
-      { id: 'correo', label: 'Correo', icon: 'Mail', color: 'text-sky-500' },
-      { id: 'whatsapp', label: 'WhatsApp', icon: 'MessageSquare', color: 'text-green-500' },
-      { id: 'mensajes', label: 'Chat Interno', icon: 'MessagesSquare', color: 'text-emerald-500' },
-    ]
-  },
-  {
-    id: 'analizar',
-    label: 'Analizar resultados',
-    icon: 'BarChart3',
-    color: 'text-orange-500',
-    items: [
-      { id: 'informes', label: 'Informes', icon: 'BarChart3', color: 'text-orange-500' },
-      { id: 'reports', label: 'Reportes', icon: 'BarChart3', color: 'text-amber-500' },
     ]
   },
 ];
@@ -115,14 +84,14 @@ export function useSidebarConfig() {
           // Remove deprecated items (moved to Apps hub or old)
           const deprecatedIds = new Set([
             'files', 'presupuesto',
-            // Items only in Apps hub (not in sidebar defaults)
-            'inbox', 'osticket',
-            'campaigns', 'templates',
-            'shared-files',
+            // Items only in Apps hub
+            'inbox', 'correo', 'mensajes', 'osticket',
+            'campaigns', 'whatsapp', 'templates',
+            'calendario', 'informes', 'reminders', 'shared-files',
             'chat-ai', 'editor', 'seo-generator',
           ]);
           // Also remove deprecated categories
-          const deprecatedCatIds = new Set(['marketing', 'herramientas']);
+          const deprecatedCatIds = new Set(['marketing', 'comunicacion', 'gestion', 'herramientas', 'captar', 'seguimiento', 'comunicar', 'analizar']);
           const cleaned = saved
             .filter(cat => !deprecatedCatIds.has(cat.id))
             .map(cat => ({
