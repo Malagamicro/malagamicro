@@ -27,7 +27,7 @@ export function OnlineUsersWidget() {
     <Card className="h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <Wifi className="h-4 w-4 text-green-500" />
+          <Wifi className="h-4 w-4 text-success" />
           Usuarios Online
           <Badge variant="secondary" className="ml-auto text-xs">
             {onlineUsers.length}
@@ -49,7 +49,7 @@ export function OnlineUsersWidget() {
                     {(u.profile?.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-success border-2 border-background" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">

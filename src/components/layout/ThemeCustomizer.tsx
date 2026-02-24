@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 import { 
   Palette, Type, Wallpaper, RotateCcw, Circle, TextCursor, 
   Layers, Sparkles, Zap, Eye, Bot, Send, Loader2, Pipette,
-  ChevronRight
+  ChevronRight, BarChart3
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useSidebarConfig } from '@/hooks/useSidebarConfig';
 import {
   useCustomTheme,
   COLOR_PRESETS,
@@ -104,6 +105,7 @@ function ColorPickerInput({
 
 export function ThemeCustomizer() {
   const { customTheme, updateTheme, resetTheme } = useCustomTheme();
+  const { categories, setSidebarPosition, toggleItemVisibility } = useSidebarConfig();
   const [open, setOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -129,7 +131,28 @@ export function ThemeCustomizer() {
         if (theme.sidebarStyle) updates.sidebarStyle = theme.sidebarStyle;
         if (theme.animationSpeed) updates.animationSpeed = theme.animationSpeed;
         updateTheme(updates as any);
-        toast.success('¡Tema generado por IA aplicado!');
+
+        // Apply sidebar config from AI
+        if (theme.sidebarConfig) {
+          if (theme.sidebarConfig.sidebarPosition) {
+            setSidebarPosition(theme.sidebarConfig.sidebarPosition);
+          }
+          if (theme.sidebarConfig.visibleModules && categories.length > 0) {
+            const visibleSet = new Set(theme.sidebarConfig.visibleModules as string[]);
+            // Toggle visibility for each item based on AI response
+            for (const cat of categories) {
+              for (const item of cat.items) {
+                const shouldBeVisible = visibleSet.has(item.id);
+                const isCurrentlyHidden = !!item.hidden;
+                if (shouldBeVisible === isCurrentlyHidden) {
+                  toggleItemVisibility(cat.id, item.id);
+                }
+              }
+            }
+          }
+        }
+
+        toast.success('¡Tema completo generado por IA aplicado!');
         setAiPrompt('');
       }
     } catch (e: any) {
@@ -137,7 +160,7 @@ export function ThemeCustomizer() {
     } finally {
       setAiLoading(false);
     }
-  }, [aiPrompt, aiLoading, customTheme, updateTheme]);
+  }, [aiPrompt, aiLoading, customTheme, updateTheme, categories, setSidebarPosition, toggleItemVisibility]);
 
   const customColors = customTheme.customColors || {};
   const updateCustomColor = (key: keyof CustomColors, value: string) => {
@@ -235,6 +258,21 @@ export function ThemeCustomizer() {
                   <ColorPickerInput label="Sidebar texto" value={customColors.sidebarForeground || '0 0% 98%'} onChange={(v) => updateCustomColor('sidebarForeground', v)} />
                   <ColorPickerInput label="Sidebar acento" value={customColors.sidebarAccent || '222 47% 14%'} onChange={(v) => updateCustomColor('sidebarAccent', v)} />
                   <ColorPickerInput label="Sidebar borde" value={customColors.sidebarBorder || '222 47% 18%'} onChange={(v) => updateCustomColor('sidebarBorder', v)} />
+                </div>
+              </div>
+
+              {/* Status & Semantic colors */}
+              <div>
+                <SectionHeader icon={BarChart3} label="Colores de estados y widgets" />
+                <p className="text-xs text-muted-foreground mb-3">Colores para estados de leads, gráficos y alertas.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <ColorPickerInput label="Lead Nuevo" value={customColors.statusNew || '210 100% 55%'} onChange={(v) => updateCustomColor('statusNew', v)} />
+                  <ColorPickerInput label="Lead Contactado" value={customColors.statusContacted || '45 93% 55%'} onChange={(v) => updateCustomColor('statusContacted', v)} />
+                  <ColorPickerInput label="Lead Interesado" value={customColors.statusInterested || '142 71% 50%'} onChange={(v) => updateCustomColor('statusInterested', v)} />
+                  <ColorPickerInput label="Lead Cliente" value={customColors.statusClient || '224 50% 55%'} onChange={(v) => updateCustomColor('statusClient', v)} />
+                  <ColorPickerInput label="Éxito" value={customColors.success || '142 71% 45%'} onChange={(v) => updateCustomColor('success', v)} />
+                  <ColorPickerInput label="Advertencia" value={customColors.warning || '45 93% 47%'} onChange={(v) => updateCustomColor('warning', v)} />
+                  <ColorPickerInput label="Información" value={customColors.info || '210 100% 50%'} onChange={(v) => updateCustomColor('info', v)} />
                 </div>
               </div>
 
@@ -409,9 +447,12 @@ export function ThemeCustomizer() {
             {/* AI TAB */}
             <TabsContent value="ai" className="mt-0 space-y-6">
               <div>
-                <SectionHeader icon={Bot} label="Personalización con IA" />
-                <p className="text-sm text-muted-foreground mb-4">
-                  Describe cómo quieres que se vea tu aplicación y la IA generará un tema personalizado.
+                <SectionHeader icon={Bot} label="Personalización completa con IA" />
+                <p className="text-sm text-muted-foreground mb-2">
+                  Describe cómo quieres tu aplicación. La IA modificará <strong>colores, sidebar, tipografía, estados de leads, estampados y organización de módulos</strong>.
+                </p>
+                <p className="text-xs text-muted-foreground/70 mb-4">
+                  Puedes pedir cosas como "solo quiero ver leads, WhatsApp y calendario" o "sidebar a la derecha con tema neón".
                 </p>
                 <div className="space-y-3">
                   <div className="flex gap-2">
@@ -419,7 +460,7 @@ export function ThemeCustomizer() {
                       value={aiPrompt}
                       onChange={(e) => setAiPrompt(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAIGenerate()}
-                      placeholder="Ej: Tema minimalista oscuro con acentos dorados..."
+                      placeholder="Ej: CRM minimalista oscuro, solo leads y calendario, sidebar derecho..."
                       disabled={aiLoading}
                       className="flex-1"
                     />
@@ -429,12 +470,12 @@ export function ThemeCustomizer() {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      'Tema corporativo azul profesional',
-                      'Diseño cálido con tonos tierra',
-                      'Estilo neón futurista',
-                      'Minimalista elegante en blanco y negro',
-                      'Tema inspirado en la naturaleza',
-                      'Estilo retro vintage',
+                      'Tema corporativo azul, solo módulos esenciales',
+                      'Diseño cálido con tonos tierra, sidebar cristal',
+                      'Estilo neón futurista, sidebar a la derecha',
+                      'Minimalista: solo leads, WhatsApp y calendario',
+                      'Tema naturaleza con sidebar transparente',
+                      'CRM de ventas agresivo, colores vivos, todos los módulos',
                     ].map((suggestion) => (
                       <button
                         key={suggestion}

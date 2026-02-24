@@ -29,6 +29,15 @@ export interface CustomColors {
   sidebarForeground?: string;
   sidebarAccent?: string;
   sidebarBorder?: string;
+  // Status colors
+  statusNew?: string;
+  statusContacted?: string;
+  statusInterested?: string;
+  statusClient?: string;
+  // Semantic colors
+  success?: string;
+  warning?: string;
+  info?: string;
 }
 
 export interface CustomTheme {
@@ -607,13 +616,22 @@ function applyColorPreset(preset: ColorPreset, isDark: boolean, customColors?: C
   const mode = isDark ? config.dark : config.light;
   const root = document.documentElement;
   for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
-    // If preset is 'custom' and we have custom colors for this key, use them
     if (preset === 'custom' && customColors && customColors[key as keyof CustomColors]) {
       root.style.setProperty(cssVar, customColors[key as keyof CustomColors]!);
     } else {
       const value = mode[key as keyof ColorSystem];
       if (value) root.style.setProperty(cssVar, value);
     }
+  }
+  // Apply custom status & semantic colors
+  if (customColors) {
+    if (customColors.statusNew) root.style.setProperty('--status-new', customColors.statusNew);
+    if (customColors.statusContacted) root.style.setProperty('--status-contacted', customColors.statusContacted);
+    if (customColors.statusInterested) root.style.setProperty('--status-interested', customColors.statusInterested);
+    if (customColors.statusClient) root.style.setProperty('--status-client', customColors.statusClient);
+    if (customColors.success) root.style.setProperty('--success', customColors.success);
+    if (customColors.warning) root.style.setProperty('--warning', customColors.warning);
+    if (customColors.info) root.style.setProperty('--info', customColors.info);
   }
 }
 

@@ -12,10 +12,10 @@ interface LeadKanbanProps {
 }
 
 const columns: { id: LeadStatus; title: string; color: string }[] = [
-  { id: 'nuevo', title: 'Nuevos', color: 'bg-blue-500' },
-  { id: 'contactado', title: 'Contactados', color: 'bg-amber-500' },
-  { id: 'interesado', title: 'Interesados', color: 'bg-purple-500' },
-  { id: 'cliente', title: 'Clientes', color: 'bg-green-500' },
+  { id: 'nuevo', title: 'Nuevos', color: 'bg-status-new' },
+  { id: 'contactado', title: 'Contactados', color: 'bg-status-contacted' },
+  { id: 'interesado', title: 'Interesados', color: 'bg-status-interested' },
+  { id: 'cliente', title: 'Clientes', color: 'bg-status-client' },
 ];
 
 export function LeadKanban({ leads, onViewLead, onUpdateStatus }: LeadKanbanProps) {

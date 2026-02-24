@@ -64,6 +64,20 @@
     --sidebar-border: 224 40% 45%;
     --sidebar-ring: 0 0% 100%;
 
+    /* Chart colors */
+    --chart-1: 224 40% 39%;
+    --chart-2: 25 95% 53%;
+    --chart-3: 232 23% 58%;
+    --chart-4: 142 71% 45%;
+
+    /* Success / Warning / Info semantic */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 10%;
+    --info: 210 100% 50%;
+    --info-foreground: 0 0% 100%;
+
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));
     --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--primary)));
@@ -113,6 +127,26 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 222 47% 18%;
     --sidebar-ring: 224 50% 55%;
+
+    /* Status colors for leads (dark) */
+    --status-new: 210 100% 55%;
+    --status-contacted: 45 93% 55%;
+    --status-interested: 142 71% 50%;
+    --status-client: 224 50% 55%;
+
+    /* Chart colors */
+    --chart-1: 224 50% 55%;
+    --chart-2: 25 95% 53%;
+    --chart-3: 232 23% 45%;
+    --chart-4: 142 71% 50%;
+
+    /* Success / Warning / Info semantic */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 10%;
+    --info: 210 100% 50%;
+    --info-foreground: 0 0% 100%;
   }
 }
 

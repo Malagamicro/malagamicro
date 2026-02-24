@@ -50,7 +50,7 @@ export function StatCard({
           {trend && (
             <p className={cn(
               "text-[10px] md:text-xs font-medium mt-1 md:mt-2 flex items-center gap-1",
-              trend.isPositive ? "text-green-500" : "text-red-500",
+              trend.isPositive ? "text-success" : "text-destructive",
               variant !== 'default' && "text-inherit opacity-80"
             )}>
               {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
