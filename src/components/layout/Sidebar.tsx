@@ -28,7 +28,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useSidebarConfig, SidebarCategory, SidebarItem, SidebarPosition } from '@/hooks/useSidebarConfig';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import logoFull from '@/assets/logo-full.png';
-import logoIcon from '@/assets/logo-icon.png';
+import logoIcon from '@/assets/logo-m.png';
 
 const APP_VERSION = 'v2.8.6';
 const APP_BUILD_DATE = '2026-02-18 14:00';
@@ -748,9 +748,9 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           <div className="flex items-center gap-3">
             <button
               onClick={() => { onTabChange('dashboard'); }}
-              className="h-10 rounded-lg overflow-hidden flex items-center justify-center px-2 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+              className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
             >
-              <img src={logoFull} alt="MalagaMicro CRM" className="h-8 object-contain" />
+              <img src={logoIcon} alt="MalagaMicro CRM" className="w-9 h-9 object-contain rounded-full" />
             </button>
           </div>
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent">
@@ -846,9 +846,9 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           <div className="flex items-center gap-2">
             <button
               onClick={() => { onTabChange('dashboard'); if (isMobile) setMobileOpen(false); }}
-              className="h-8 rounded-lg overflow-hidden flex items-center justify-center px-1.5 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+              className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
             >
-              <img src={logoFull} alt="MalagaMicro CRM" className="h-6 object-contain" />
+              <img src={logoIcon} alt="MalagaMicro CRM" className="w-7 h-7 object-contain rounded-full" />
             </button>
           </div>
           <div className="flex items-center gap-0.5">
