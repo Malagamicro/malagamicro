@@ -33,11 +33,20 @@ import logoIcon from '@/assets/logo-icon.png';
 const APP_VERSION = 'v2.8.6';
 const APP_BUILD_DATE = '2026-02-18 14:00';
 
+interface OpenTab {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+}
+
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   position?: SidebarPosition;
   onPositionChange?: (position: SidebarPosition) => void;
+  openTabs?: OpenTab[];
+  onCloseTab?: (tabId: string) => void;
 }
 
 // Icon registry
@@ -113,10 +122,9 @@ function CollapsedIconButton({ item, isActive, onClick, unreadCount }: {
             className={cn(
               "relative w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200",
               "hover:bg-sidebar-accent hover:scale-105",
-              isActive && "bg-sidebar-accent shadow-sm ring-1 ring-primary/20"
-            )}
-          >
-            <Icon className={cn("w-5 h-5", item.color)} />
+              isActive && "bg-primary/15 shadow-sm ring-2 ring-primary/30"
+            )}>
+            <Icon className={cn("w-5 h-5", isActive ? "text-primary" : item.color)} />
             {item.showBadge && unreadCount && unreadCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1 animate-pulse">
                 {unreadCount > 99 ? '99+' : unreadCount}
@@ -303,7 +311,7 @@ function AddLinkDialog({ categories, onAdd }: {
   );
 }
 
-export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionChange }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionChange, openTabs = [], onCloseTab }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openCategories, setOpenCategories] = useState<string[]>(['main', 'crm', 'marketing']);
@@ -413,13 +421,14 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 relative min-h-[40px]",
           isMobile && "gap-2 px-2 py-1.5 min-h-[32px]",
           "hover:bg-sidebar-accent",
-          isActive && "bg-sidebar-accent"
+          isActive && "bg-primary/15 border-l-[3px] border-primary font-semibold shadow-sm",
+          !isActive && "border-l-[3px] border-transparent"
         )}
       >
         <div className="relative">
-          <Icon className={cn("w-4 h-4 flex-shrink-0", isMobile && "w-3.5 h-3.5", item.color)} />
+          <Icon className={cn("w-4 h-4 flex-shrink-0", isMobile && "w-3.5 h-3.5", isActive ? "text-primary" : item.color)} />
         </div>
-        <span className={cn("text-sm font-medium animate-fade-in flex-1 text-left", isMobile && "text-xs")}>{item.label}</span>
+        <span className={cn("text-sm animate-fade-in flex-1 text-left", isMobile && "text-xs", isActive && "text-primary font-semibold")}>{item.label}</span>
         {item.isExternal && (
           <ExternalLink className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
         )}
@@ -750,6 +759,43 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         </div>
       </div>
 
+      {/* Open Tabs Section */}
+      {openTabs.length > 0 && (
+        <div className="px-3 pt-2 pb-1 border-b border-sidebar-border/50">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">Abiertas</span>
+            <span className="text-[10px] text-muted-foreground/50">{openTabs.length}</span>
+          </div>
+          <div className="space-y-0.5 max-h-[180px] overflow-y-auto custom-scrollbar">
+            {openTabs.map(tab => {
+              const TabIcon = getIcon(tab.icon);
+              const isActive2 = activeTab === tab.id;
+              return (
+                <div
+                  key={tab.id}
+                  className={cn(
+                    "group flex items-center gap-2 px-2 py-1.5 rounded-md transition-all cursor-pointer text-xs",
+                    isActive2 ? "bg-primary/15 text-primary font-semibold" : "hover:bg-sidebar-accent text-sidebar-foreground/80"
+                  )}
+                  onClick={() => onTabChange(tab.id)}
+                >
+                  <TabIcon className={cn("w-3.5 h-3.5 shrink-0", isActive2 ? "text-primary" : tab.color)} />
+                  <span className="flex-1 truncate">{tab.label}</span>
+                  {onCloseTab && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/20 transition-all shrink-0"
+                    >
+                      <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
         {expandedNavContent}
       </nav>
@@ -764,10 +810,11 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
           onClick={() => handleTabChange('settings')}
           className={cn(
             "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all min-h-[44px]",
-            "hover:bg-sidebar-accent", activeTab === 'settings' && "bg-sidebar-accent"
+            "hover:bg-sidebar-accent",
+            activeTab === 'settings' ? "bg-primary/15 border-l-[3px] border-primary text-primary font-semibold" : "border-l-[3px] border-transparent"
           )}
         >
-          <Settings className="w-5 h-5 flex-shrink-0" />
+          <Settings className={cn("w-5 h-5 flex-shrink-0", activeTab === 'settings' && "text-primary")} />
           <span className="text-sm font-medium">Ajustes</span>
         </button>
         <button onClick={handleSignOut}
@@ -859,10 +906,10 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
                     className={cn(
                       "relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all text-xs font-medium whitespace-nowrap flex-shrink-0",
                       "hover:bg-sidebar-accent",
-                      isActive && "bg-sidebar-accent"
+                      isActive && "bg-primary/15 text-primary font-semibold border-b-2 border-primary"
                     )}
                   >
-                    <Icon className={cn("w-4 h-4", item.color)} />
+                    <Icon className={cn("w-4 h-4", isActive ? "text-primary" : item.color)} />
                     <span>{item.label}</span>
                     {item.showBadge && unreadCount > 0 && (
                       <span className="h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
