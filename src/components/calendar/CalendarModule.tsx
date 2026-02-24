@@ -278,11 +278,19 @@ export function CalendarModule() {
                       )}
                       {evt.all_day && <Badge variant="secondary" className="text-[10px]">Todo el día</Badge>}
                     </div>
-                    {evt.creator_id === user?.id && (
-                      <Button size="icon" variant="ghost" className="shrink-0" onClick={(e) => { e.stopPropagation(); deleteEvent(evt.id); }}>
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    )}
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="shrink-0" 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (window.confirm('¿Eliminar este evento?')) {
+                          deleteEvent(evt.id); 
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -388,9 +396,14 @@ export function CalendarModule() {
                 <Button className="flex-1" onClick={handleSubmit} disabled={!formData.title.trim()}>
                   {editingEvent ? 'Guardar cambios' : 'Crear evento'}
                 </Button>
-                {editingEvent && editingEvent.creator_id === user?.id && (
-                  <Button variant="destructive" onClick={() => { deleteEvent(editingEvent.id); setShowForm(false); }}>
-                    <Trash2 className="w-4 h-4" />
+                {editingEvent && (
+                  <Button variant="destructive" onClick={() => { 
+                    if (window.confirm('¿Eliminar este evento?')) {
+                      deleteEvent(editingEvent.id); 
+                      setShowForm(false); 
+                    }
+                  }}>
+                    <Trash2 className="w-4 h-4 mr-1" /> Eliminar
                   </Button>
                 )}
               </div>
