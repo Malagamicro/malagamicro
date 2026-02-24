@@ -2,7 +2,8 @@ import { cn } from '@/lib/utils';
 import { 
   Palette, Type, Wallpaper, RotateCcw, Circle, TextCursor, 
   Layers, Sparkles, Zap, Eye, Bot, Send, Loader2, Pipette,
-  ChevronRight, BarChart3, Save, Trash2, Download, FolderOpen
+  ChevronRight, BarChart3, Save, Trash2, Download, FolderOpen,
+  ScrollText,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,6 +24,7 @@ import {
   UI_DENSITY_OPTIONS,
   SIDEBAR_STYLE_OPTIONS,
   ANIMATION_SPEED_OPTIONS,
+  SCROLLBAR_STYLE_OPTIONS,
   type ColorPreset,
   type BackgroundPattern,
   type FontFamily,
@@ -31,6 +33,7 @@ import {
   type UIDensity,
   type SidebarStyle,
   type AnimationSpeed,
+  type ScrollbarStyle,
   type CustomColors,
 } from '@/hooks/useCustomTheme';
 
@@ -405,7 +408,28 @@ export function ThemeCustomizer() {
                 </div>
               </div>
 
-              {/* High contrast */}
+              {/* Scrollbar style */}
+              <div>
+                <SectionHeader icon={ScrollText} label="Estilo de scrollbar" />
+                <div className="grid grid-cols-5 gap-2">
+                  {(Object.entries(SCROLLBAR_STYLE_OPTIONS) as [ScrollbarStyle, typeof SCROLLBAR_STYLE_OPTIONS[ScrollbarStyle]][]).map(([key, opt]) => (
+                    <button
+                      key={key}
+                      onClick={() => updateTheme({ scrollbarStyle: key })}
+                      title={opt.description}
+                      className={cn(
+                        "px-2 py-2 rounded-lg text-xs font-medium transition-all text-center",
+                        customTheme.scrollbarStyle === key
+                          ? "ring-2 ring-primary bg-muted"
+                          : "hover:bg-muted/50"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                 <div className="flex items-center gap-2">
                   <Eye className="w-4 h-4 text-primary" />

@@ -10,6 +10,7 @@ export type FontSizeScale = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 export type UIDensity = 'compact' | 'comfortable' | 'spacious';
 export type SidebarStyle = 'solid' | 'glass' | 'transparent';
 export type AnimationSpeed = 'none' | 'reduced' | 'normal' | 'smooth';
+export type ScrollbarStyle = 'default' | 'thin' | 'hidden' | 'rounded' | 'colored';
 
 export interface CustomColors {
   primary?: string;
@@ -49,6 +50,7 @@ export interface CustomTheme {
   uiDensity: UIDensity;
   sidebarStyle: SidebarStyle;
   animationSpeed: AnimationSpeed;
+  scrollbarStyle: ScrollbarStyle;
   highContrast: boolean;
   customColors?: CustomColors;
 }
@@ -69,6 +71,7 @@ const DEFAULT_THEME: CustomTheme = {
   uiDensity: 'comfortable',
   sidebarStyle: 'solid',
   animationSpeed: 'normal',
+  scrollbarStyle: 'default',
   highContrast: false,
   customColors: undefined,
 };
@@ -770,6 +773,14 @@ export const ANIMATION_SPEED_OPTIONS: Record<AnimationSpeed, { label: string }> 
   smooth: { label: 'Suave' },
 };
 
+export const SCROLLBAR_STYLE_OPTIONS: Record<ScrollbarStyle, { label: string; description: string }> = {
+  default: { label: 'Por defecto', description: 'Scrollbar nativo del sistema' },
+  thin: { label: 'Fino', description: 'Scrollbar estrecho y discreto' },
+  hidden: { label: 'Oculto', description: 'Sin scrollbar visible' },
+  rounded: { label: 'Redondeado', description: 'Scrollbar con bordes suaves' },
+  colored: { label: 'Con color', description: 'Scrollbar con el color primario' },
+};
+
 const PATTERN_SIZES: Record<BackgroundPattern, string> = {
   none: '', dots: '20px 20px', grid: '24px 24px, 24px 24px',
   diagonal: '', waves: '', cross: '16px 16px, 16px 16px',
@@ -908,6 +919,50 @@ function applyAnimationSpeed(speed: AnimationSpeed) {
   if (!animStyle.parentNode) document.head.appendChild(animStyle);
 }
 
+function applyScrollbarStyle(style: ScrollbarStyle) {
+  const scrollStyle = document.getElementById('custom-scrollbar') || document.createElement('style');
+  scrollStyle.id = 'custom-scrollbar';
+  switch (style) {
+    case 'thin':
+      scrollStyle.textContent = `
+        * { scrollbar-width: thin; scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent; }
+        *::-webkit-scrollbar { width: 4px; height: 4px; }
+        *::-webkit-scrollbar-track { background: transparent; }
+        *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); border-radius: 4px; }
+        *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+      `;
+      break;
+    case 'hidden':
+      scrollStyle.textContent = `
+        * { scrollbar-width: none; }
+        *::-webkit-scrollbar { display: none; }
+      `;
+      break;
+    case 'rounded':
+      scrollStyle.textContent = `
+        * { scrollbar-width: thin; scrollbar-color: hsl(var(--muted-foreground) / 0.25) hsl(var(--muted) / 0.3); }
+        *::-webkit-scrollbar { width: 8px; height: 8px; }
+        *::-webkit-scrollbar-track { background: hsl(var(--muted) / 0.3); border-radius: 10px; margin: 4px; }
+        *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.25); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+        *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+      `;
+      break;
+    case 'colored':
+      scrollStyle.textContent = `
+        * { scrollbar-width: thin; scrollbar-color: hsl(var(--primary) / 0.4) hsl(var(--primary) / 0.08); }
+        *::-webkit-scrollbar { width: 6px; height: 6px; }
+        *::-webkit-scrollbar-track { background: hsl(var(--primary) / 0.08); border-radius: 6px; }
+        *::-webkit-scrollbar-thumb { background: hsl(var(--primary) / 0.4); border-radius: 6px; }
+        *::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.6); }
+      `;
+      break;
+    default:
+      scrollStyle.textContent = '';
+      break;
+  }
+  if (!scrollStyle.parentNode) document.head.appendChild(scrollStyle);
+}
+
 function applyHighContrast(enabled: boolean) {
   const root = document.documentElement;
   if (enabled) {
@@ -967,6 +1022,7 @@ export function useCustomTheme() {
     applyUIDensity(customTheme.uiDensity);
     applySidebarStyle(customTheme.sidebarStyle);
     applyAnimationSpeed(customTheme.animationSpeed);
+    applyScrollbarStyle(customTheme.scrollbarStyle);
     applyHighContrast(customTheme.highContrast);
   }, [customTheme]);
 
@@ -1017,7 +1073,7 @@ export function useCustomTheme() {
     document.body.style.fontFamily = '';
     const link = document.querySelector('link[data-custom-font]');
     if (link) link.remove();
-    ['custom-heading-font', 'custom-density', 'custom-animations'].forEach(id => {
+    ['custom-heading-font', 'custom-density', 'custom-animations', 'custom-scrollbar'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.remove();
     });
