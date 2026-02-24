@@ -148,15 +148,41 @@ const SeoGeneratorInline = () => {
 
 const IndexContent = () => {
   const navigate = useNavigate();
-  const { sidebarPosition, setSidebarPosition } = useSidebarConfig();
+  const { sidebarPosition, setSidebarPosition, categories: sidebarCategories } = useSidebarConfig();
   const { isAdmin, roleLoading } = useUserRole();
   const [localPosition, setLocalPosition] = useState(sidebarPosition);
   const [activeTab, setActiveTab] = useState(roleLoading ? '' : (isAdmin ? 'dashboard' : 'correo'));
+  const [openTabs, setOpenTabs] = useState<Array<{ id: string; label: string; icon: string; color: string }>>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isGoogleSheetsImportOpen, setIsGoogleSheetsImportOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+
+  // Track open tabs — skip non-content tabs
+  const SKIP_TABS = ['', 'lead-detail'];
+  useEffect(() => {
+    if (SKIP_TABS.includes(activeTab)) return;
+    setOpenTabs(prev => {
+      if (prev.some(t => t.id === activeTab)) return prev;
+      // Find tab info from sidebar categories
+      const allItems = sidebarCategories.flatMap(c => c.items);
+      const found = allItems.find(i => i.id === activeTab);
+      const label = found?.label || activeTab;
+      const icon = found?.icon || 'LayoutDashboard';
+      const color = found?.color || 'text-blue-500';
+      return [...prev, { id: activeTab, label, icon, color }];
+    });
+  }, [activeTab, sidebarCategories]);
+
+  const handleCloseTab = (tabId: string) => {
+    setOpenTabs(prev => prev.filter(t => t.id !== tabId));
+    // If closing active tab, switch to the previous or dashboard
+    if (activeTab === tabId) {
+      const remaining = openTabs.filter(t => t.id !== tabId);
+      setActiveTab(remaining.length > 0 ? remaining[remaining.length - 1].id : (isAdmin ? 'dashboard' : 'correo'));
+    }
+  };
   
   const { 
     leads,
@@ -500,6 +526,8 @@ const IndexContent = () => {
           onTabChange={setActiveTab}
           position={localPosition}
           onPositionChange={setLocalPosition}
+          openTabs={openTabs}
+          onCloseTab={handleCloseTab}
         />
         <div className="flex-1 flex flex-col overflow-hidden md:ml-0" style={{ minHeight: 0 }}>
           <EmailVerificationBanner />
