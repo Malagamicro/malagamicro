@@ -428,7 +428,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         <div className="relative">
           <Icon className={cn("w-3.5 h-3.5 flex-shrink-0", isMobile && "w-3 h-3", isActive ? "text-primary" : item.color)} />
         </div>
-        <span className={cn("text-xs animate-fade-in flex-1 text-left", isMobile && "text-[11px]", isActive && "text-primary font-semibold")}>{item.label}</span>
+        <span className={cn("text-[11px] animate-fade-in flex-1 text-left", isMobile && "text-[10px]", isActive && "text-primary font-semibold")}>{item.label}</span>
         {item.isExternal && (
           <ExternalLink className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
         )}
@@ -499,7 +499,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
                   onClick={e => e.stopPropagation()}
                 />
               ) : (
-                <span className={cn("text-xs font-semibold flex-1 text-left", isMobile && "text-[11px]")}>{category.label}</span>
+                <span className={cn("text-sm font-bold uppercase tracking-wide flex-1 text-left", isMobile && "text-xs")}>{category.label}</span>
               )}
               <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", isMobile && "w-3 h-3", isOpen && "rotate-180")} />
             </button>
