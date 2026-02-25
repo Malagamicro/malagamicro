@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import mascotImage from '@/assets/mascot.png';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -28,11 +29,16 @@ export function MascotChatWidget() {
   });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const isMobile = useIsMobile();
 
-  // Drag state
+  // Drag state using refs for smooth animation-frame based dragging
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const posRef = useRef({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const didDragRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  const widgetRef = useRef<HTMLDivElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
 
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,39 +56,52 @@ export function MascotChatWidget() {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
   }, [messages]);
 
-  // Smart positioning: bottom-right, avoiding sidebar
+  // Smart positioning
   useLayoutEffect(() => {
-    const isMobileView = window.innerWidth < 768;
-    const widgetW = isMobileView ? 80 : 360;
-    const widgetH = isMobileView ? 80 : 480;
-    // Offset from right/bottom edge, leaving space for potential sidebar
-    const rightMargin = 16;
-    const bottomMargin = 16;
-    setPosition({
-      x: Math.max(0, window.innerWidth - widgetW - rightMargin),
-      y: Math.max(0, window.innerHeight - widgetH - bottomMargin),
-    });
+    const mobileView = window.innerWidth < 768;
+    const widgetW = mobileView ? 80 : 360;
+    const widgetH = mobileView ? 80 : 480;
+    const x = Math.max(0, window.innerWidth - widgetW - 16);
+    const y = Math.max(0, window.innerHeight - widgetH - 16);
+    posRef.current = { x, y };
+    setPosition({ x, y });
   }, []);
 
+  // When opening on mobile, center the widget to avoid keyboard overlap
+  useEffect(() => {
+    if (isOpen && !isMinimized && isMobile) {
+      const x = 0;
+      const y = 0; // top of screen so keyboard doesn't cover it
+      posRef.current = { x, y };
+      setPosition({ x, y });
+    }
+  }, [isOpen, isMinimized, isMobile]);
+
+  // Smooth RAF-based drag handlers
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     didDragRef.current = false;
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: position.x, origY: position.y };
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: posRef.current.x, origY: posRef.current.y };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [position]);
+  }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return;
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
-    setPosition({
-      x: Math.max(0, Math.min(window.innerWidth - 100, dragRef.current.origX + dx)),
-      y: Math.max(0, Math.min(window.innerHeight - 100, dragRef.current.origY + dy)),
-    });
+    const newX = Math.max(0, Math.min(window.innerWidth - 60, dragRef.current.origX + dx));
+    const newY = Math.max(0, Math.min(window.innerHeight - 60, dragRef.current.origY + dy));
+    posRef.current = { x: newX, y: newY };
+    // Direct DOM manipulation for 60fps drag
+    const el = widgetRef.current || btnRef.current;
+    if (el) {
+      el.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+    }
   }, []);
 
   const handlePointerUp = useCallback(() => {
     dragRef.current = null;
+    setPosition({ ...posRef.current });
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -153,21 +172,22 @@ export function MascotChatWidget() {
 
   if (!user) return null;
 
-  // Floating mascot button - fully draggable
+  // Floating mascot button - GPU-accelerated drag
   if (!isOpen) {
     return (
       <button
+        ref={btnRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsOpen(true); }}
-        style={{ left: position.x, top: position.y, position: 'fixed' }}
+        style={{ position: 'fixed', left: 0, top: 0, transform: `translate3d(${position.x}px, ${position.y}px, 0)`, willChange: 'transform' }}
         className={cn(
           'z-50 group touch-none',
           'w-14 h-14 rounded-full shadow-2xl',
           'bg-card border border-primary/20',
           'flex items-center justify-center',
-          'hover:scale-105 transition-transform cursor-grab active:cursor-grabbing'
+          'cursor-grab active:cursor-grabbing'
         )}
         aria-label="Abrir chat con Micro"
       >
@@ -183,17 +203,18 @@ export function MascotChatWidget() {
   if (isMinimized) {
     return (
       <button
+        ref={btnRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsMinimized(false); }}
-        style={{ left: position.x, top: position.y, position: 'fixed' }}
+        style={{ position: 'fixed', left: 0, top: 0, transform: `translate3d(${position.x}px, ${position.y}px, 0)`, willChange: 'transform' }}
         className={cn(
           'z-50 touch-none',
           'w-12 h-12 rounded-full shadow-xl',
           'bg-primary text-primary-foreground',
           'flex items-center justify-center',
-          'hover:scale-105 transition-transform cursor-grab active:cursor-grabbing'
+          'cursor-grab active:cursor-grabbing'
         )}
       >
         <img src={mascotImage} alt="Micro" className="w-10 h-10 object-contain pointer-events-none" />
@@ -201,16 +222,19 @@ export function MascotChatWidget() {
     );
   }
 
-  // Full chat widget
+  // Full chat widget - fullscreen on mobile to avoid keyboard issues
   return (
     <div
-      style={{ left: position.x, top: position.y, position: 'fixed', resize: 'both' }}
+      ref={widgetRef}
+      style={isMobile
+        ? { position: 'fixed', inset: 0 }
+        : { position: 'fixed', left: 0, top: 0, transform: `translate3d(${position.x}px, ${position.y}px, 0)`, willChange: 'transform', resize: 'both' as const }
+      }
       className={cn(
-        'z-50 overflow-auto',
-        'min-w-[280px] min-h-[300px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)]',
-        'w-[340px] h-[460px]',
-        'bg-background rounded-2xl shadow-2xl border',
-        'flex flex-col'
+        'z-50 flex flex-col bg-background shadow-2xl border',
+        isMobile
+          ? 'w-full h-[100dvh] rounded-none'
+          : 'overflow-auto min-w-[280px] min-h-[300px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)] w-[340px] h-[460px] rounded-2xl'
       )}
     >
       {/* Header - draggable */}
