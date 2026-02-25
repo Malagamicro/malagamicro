@@ -31,21 +31,13 @@ export function MascotChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  // Drag: GPU-composited transform for zero-lag movement
-  const [initPos] = useState(() => {
-    const mobileView = window.innerWidth < 768;
-    const w = mobileView ? 80 : 360;
-    const h = mobileView ? 80 : 480;
-    return {
-      x: Math.max(0, window.innerWidth - w - 16),
-      y: Math.max(0, window.innerHeight - h - 16),
-    };
-  });
-  const posRef = useRef(initPos);
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; el: HTMLElement } | null>(null);
+  // Simple drag state
+  const [pos, setPos] = useState(() => ({
+    x: Math.max(0, window.innerWidth - 80),
+    y: Math.max(0, window.innerHeight - 80),
+  }));
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const didDragRef = useRef(false);
-  const widgetRef = useRef<HTMLDivElement | null>(null);
-  const btnRef = useRef<HTMLButtonElement | null>(null);
 
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,72 +55,6 @@ export function MascotChatWidget() {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
   }, [messages]);
 
-  // When opening on mobile, move to top
-  useEffect(() => {
-    if (isOpen && !isMinimized && isMobile) {
-      posRef.current = { x: 0, y: 0 };
-    }
-  }, [isOpen, isMinimized, isMobile]);
-
-  // Apply position via transform whenever the rendered element changes
-  const applyPos = useCallback((el: HTMLElement | null) => {
-    if (el) {
-      el.style.transform = `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0)`;
-    }
-  }, []);
-
-  useEffect(() => {
-    const el = widgetRef.current || btnRef.current;
-    if (el && !isMobile) applyPos(el);
-  }, [isOpen, isMinimized, isMobile, applyPos]);
-
-  // Native pointer events for maximum performance — bypass React synthetic events
-  useEffect(() => {
-    const el = widgetRef.current || btnRef.current;
-    if (!el) return;
-
-    const onDown = (e: PointerEvent) => {
-      didDragRef.current = false;
-      dragRef.current = { startX: e.clientX, startY: e.clientY, origX: posRef.current.x, origY: posRef.current.y, el };
-      el.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    };
-
-    const onMove = (e: PointerEvent) => {
-      const d = dragRef.current;
-      if (!d) return;
-      const dx = e.clientX - d.startX;
-      const dy = e.clientY - d.startY;
-      if (!didDragRef.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) didDragRef.current = true;
-      const nx = Math.max(0, Math.min(window.innerWidth - 60, d.origX + dx));
-      const ny = Math.max(0, Math.min(window.innerHeight - 60, d.origY + dy));
-      posRef.current.x = nx;
-      posRef.current.y = ny;
-      d.el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
-    };
-
-    const onUp = (e: PointerEvent) => {
-      if (!dragRef.current) return;
-      el.releasePointerCapture(e.pointerId);
-      dragRef.current = null;
-    };
-
-    // Only attach to the drag handle (header) for open widget, or the button itself
-    const handle = isOpen && !isMinimized
-      ? el.querySelector<HTMLElement>('[data-drag-handle]') || el
-      : el;
-
-    handle.addEventListener('pointerdown', onDown, { passive: false });
-    el.addEventListener('pointermove', onMove, { passive: true });
-    el.addEventListener('pointerup', onUp);
-
-    return () => {
-      handle.removeEventListener('pointerdown', onDown);
-      el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerup', onUp);
-    };
-  }, [isOpen, isMinimized]);
-
   const scrollToBottom = useCallback(() => {
     if (scrollViewportRef.current) {
       scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
@@ -144,6 +70,32 @@ export function MascotChatWidget() {
       inputRef.current?.focus();
     }
   }, [isOpen, isMinimized]);
+
+  // Simple drag handlers
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    didDragRef.current = false;
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [pos.x, pos.y]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (!didDragRef.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      didDragRef.current = true;
+    }
+    if (didDragRef.current) {
+      setPos({
+        x: Math.max(0, Math.min(window.innerWidth - 60, dragRef.current.origX + dx)),
+        y: Math.max(0, Math.min(window.innerHeight - 60, dragRef.current.origY + dy)),
+      });
+    }
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    dragRef.current = null;
+  }, []);
 
   const handleNewConversation = () => {
     setMessages([]);
@@ -197,13 +149,15 @@ export function MascotChatWidget() {
 
   if (!user) return null;
 
-  // Floating mascot button - GPU-accelerated drag
+  // Floating mascot button
   if (!isOpen) {
     return (
       <button
-        ref={btnRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsOpen(true); }}
-        style={{ position: 'fixed', left: 0, top: 0, transform: `translate3d(${initPos.x}px, ${initPos.y}px, 0)`, willChange: 'transform' }}
+        style={{ position: 'fixed', left: pos.x, top: pos.y }}
         className={cn(
           'z-50 group touch-none',
           'w-14 h-14 rounded-full shadow-2xl',
@@ -225,9 +179,11 @@ export function MascotChatWidget() {
   if (isMinimized) {
     return (
       <button
-        ref={btnRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsMinimized(false); }}
-        style={{ position: 'fixed', left: 0, top: 0, transform: `translate3d(${initPos.x}px, ${initPos.y}px, 0)`, willChange: 'transform' }}
+        style={{ position: 'fixed', left: pos.x, top: pos.y }}
         className={cn(
           'z-50 touch-none',
           'w-12 h-12 rounded-full shadow-xl',
@@ -241,30 +197,31 @@ export function MascotChatWidget() {
     );
   }
 
-  // Full chat widget - fullscreen on mobile to avoid keyboard issues
+  // Full chat widget - fullscreen on mobile
   return (
     <div
-      ref={widgetRef}
       style={isMobile
-        ? { position: 'fixed', inset: 0 }
-        : { position: 'fixed', left: 0, top: 0, transform: `translate3d(${initPos.x}px, ${initPos.y}px, 0)`, willChange: 'transform', resize: 'both' as const }
+        ? { position: 'fixed' as const, inset: 0 }
+        : { position: 'fixed' as const, left: pos.x, top: pos.y }
       }
       className={cn(
         'z-50 flex flex-col bg-background shadow-2xl border',
         isMobile
           ? 'w-full h-[100dvh] rounded-none'
-          : 'overflow-auto min-w-[280px] min-h-[300px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)] w-[340px] h-[460px] rounded-2xl'
+          : 'overflow-auto min-w-[280px] min-h-[300px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)] w-[340px] h-[460px] rounded-2xl resize'
       )}
     >
       {/* Header - draggable */}
       <div
-        data-drag-handle
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
         className="flex items-center gap-3 p-4 border-b bg-gradient-to-r from-primary/10 to-primary/5 cursor-grab active:cursor-grabbing touch-none select-none"
       >
-        <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center border shadow-sm">
+        <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center border shadow-sm pointer-events-none">
           <img src={mascotImage} alt="Micro" className="w-9 h-9 object-contain" />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 pointer-events-none">
           <h3 className="font-semibold text-sm">Micro</h3>
           <p className="text-xs text-muted-foreground">Asistente virtual 🤖</p>
         </div>
@@ -284,7 +241,7 @@ export function MascotChatWidget() {
         </Button>
       </div>
 
-      {/* Messages with proper scroll */}
+      {/* Messages */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full">
           <div ref={scrollViewportRef} className="p-4 space-y-4">
@@ -359,18 +316,9 @@ export function MascotChatWidget() {
                       <img src={mascotImage} alt="Micro" className="w-6 h-6 object-contain" />
                     </div>
                     <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1.5">
-                      <span
-                        className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
-                        style={{ animationDelay: '0ms' }}
-                      />
-                      <span
-                        className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
-                        style={{ animationDelay: '150ms' }}
-                      />
-                      <span
-                        className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
-                        style={{ animationDelay: '300ms' }}
-                      />
+                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   </div>
                 )}
