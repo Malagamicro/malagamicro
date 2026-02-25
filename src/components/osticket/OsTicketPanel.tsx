@@ -201,7 +201,8 @@ function WhatsAppEditor({
   isSending: boolean;
 }) {
   const { config } = useOsTicketConfig();
-  const ticketHeader = `📋 *Ticket #${ticket.ticket_number || ticket.ticket_id || '—'}*\n📌 Asunto: ${ticket.subject}\n👤 Cliente: ${ticket.customer_name || '—'}\n🏢 Depto: ${ticket.department || '—'}\n⚡ Prioridad: ${ticket.priority || 'Normal'}\n───────────────\n`;
+  const ticketUrl = `${config?.osticket_url || ''}/scp/tickets.php?id=${ticket.ticket_id}`;
+  const ticketHeader = `📋 *Ticket #${ticket.ticket_number || ticket.ticket_id || '—'}*\n📌 Asunto: ${ticket.subject}\n👤 Cliente: ${ticket.customer_name || '—'}\n📧 Email: ${parseEmail(ticket.customer_email) || '—'}\n🏢 Depto: ${ticket.department || '—'}\n⚡ Prioridad: ${ticket.priority || 'Normal'}\n🔗 Ver ticket: ${ticketUrl}\n───────────────\n`;
 
   const [message, setMessage] = useState(() => {
     const tmpl = config?.message_template || '';
