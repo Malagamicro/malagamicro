@@ -31,12 +31,10 @@ export function MascotChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  // Drag state using refs for smooth animation-frame based dragging
+  // Simple drag state
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const posRef = useRef({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const didDragRef = useRef(false);
-  const rafRef = useRef<number | null>(null);
   const widgetRef = useRef<HTMLDivElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -63,50 +61,34 @@ export function MascotChatWidget() {
     const widgetH = mobileView ? 80 : 480;
     const x = Math.max(0, window.innerWidth - widgetW - 16);
     const y = Math.max(0, window.innerHeight - widgetH - 16);
-    posRef.current = { x, y };
     setPosition({ x, y });
   }, []);
 
   // When opening on mobile, center the widget to avoid keyboard overlap
   useEffect(() => {
     if (isOpen && !isMinimized && isMobile) {
-      const x = 0;
-      const y = 0; // top of screen so keyboard doesn't cover it
-      posRef.current = { x, y };
-      setPosition({ x, y });
+      setPosition({ x: 0, y: 0 });
     }
   }, [isOpen, isMinimized, isMobile]);
 
-  // Smooth drag handlers — direct DOM updates, no React re-renders during drag
+  // Simple drag handlers
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
     didDragRef.current = false;
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: posRef.current.x, origY: posRef.current.y };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, []);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: position.x, origY: position.y };
+  }, [position]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return;
-    e.preventDefault();
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
     const newX = Math.max(0, Math.min(window.innerWidth - 60, dragRef.current.origX + dx));
     const newY = Math.max(0, Math.min(window.innerHeight - 60, dragRef.current.origY + dy));
-    posRef.current = { x: newX, y: newY };
-    // Direct DOM update for zero-lag movement
-    const el = widgetRef.current || btnRef.current;
-    if (el) {
-      el.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
-    }
+    setPosition({ x: newX, y: newY });
   }, []);
 
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    if (!dragRef.current) return;
-    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+  const handlePointerUp = useCallback(() => {
     dragRef.current = null;
-    // Sync React state only after drag ends
-    setPosition({ ...posRef.current });
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -186,7 +168,7 @@ export function MascotChatWidget() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsOpen(true); }}
-        style={{ position: 'fixed', left: 0, top: 0, transform: `translate3d(${position.x}px, ${position.y}px, 0)`, willChange: 'transform' }}
+        style={{ position: 'fixed', left: position.x, top: position.y }}
         className={cn(
           'z-50 group touch-none',
           'w-14 h-14 rounded-full shadow-2xl',
@@ -213,7 +195,7 @@ export function MascotChatWidget() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsMinimized(false); }}
-        style={{ position: 'fixed', left: 0, top: 0, transform: `translate3d(${position.x}px, ${position.y}px, 0)`, willChange: 'transform' }}
+        style={{ position: 'fixed', left: position.x, top: position.y }}
         className={cn(
           'z-50 touch-none',
           'w-12 h-12 rounded-full shadow-xl',
@@ -233,7 +215,7 @@ export function MascotChatWidget() {
       ref={widgetRef}
       style={isMobile
         ? { position: 'fixed', inset: 0 }
-        : { position: 'fixed', left: 0, top: 0, transform: `translate3d(${position.x}px, ${position.y}px, 0)`, willChange: 'transform', resize: 'both' as const }
+        : { position: 'fixed', left: position.x, top: position.y, resize: 'both' as const }
       }
       className={cn(
         'z-50 flex flex-col bg-background shadow-2xl border',
