@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,8 +31,17 @@ export function MascotChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  // Simple drag state - use refs for zero-lag, only state for initial position
-  const posRef = useRef({ x: 0, y: 0 });
+  // Drag: use refs for direct DOM manipulation during drag, state only for initial render
+  const [initPos] = useState(() => {
+    const mobileView = window.innerWidth < 768;
+    const w = mobileView ? 80 : 360;
+    const h = mobileView ? 80 : 480;
+    return {
+      x: Math.max(0, window.innerWidth - w - 16),
+      y: Math.max(0, window.innerHeight - h - 16),
+    };
+  });
+  const posRef = useRef(initPos);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const didDragRef = useRef(false);
   const widgetRef = useRef<HTMLDivElement | null>(null);
@@ -53,22 +62,6 @@ export function MascotChatWidget() {
   useEffect(() => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
   }, [messages]);
-
-  // Smart positioning
-  useLayoutEffect(() => {
-    const mobileView = window.innerWidth < 768;
-    const widgetW = mobileView ? 80 : 360;
-    const widgetH = mobileView ? 80 : 480;
-    const x = Math.max(0, window.innerWidth - widgetW - 16);
-    const y = Math.max(0, window.innerHeight - widgetH - 16);
-    posRef.current = { x, y };
-    // Apply initial position
-    const el = btnRef.current || widgetRef.current;
-    if (el) {
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
-    }
-  }, []);
 
   // When opening on mobile, move to top
   useEffect(() => {
@@ -191,7 +184,7 @@ export function MascotChatWidget() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsOpen(true); }}
-        style={{ position: 'fixed' }}
+        style={{ position: 'fixed', left: initPos.x, top: initPos.y }}
         className={cn(
           'z-50 group touch-none',
           'w-14 h-14 rounded-full shadow-2xl',
@@ -218,7 +211,7 @@ export function MascotChatWidget() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsMinimized(false); }}
-        style={{ position: 'fixed' }}
+        style={{ position: 'fixed', left: initPos.x, top: initPos.y }}
         className={cn(
           'z-50 touch-none',
           'w-12 h-12 rounded-full shadow-xl',
@@ -238,7 +231,7 @@ export function MascotChatWidget() {
       ref={widgetRef}
       style={isMobile
         ? { position: 'fixed', inset: 0 }
-        : { position: 'fixed', resize: 'both' as const }
+        : { position: 'fixed', left: initPos.x, top: initPos.y, resize: 'both' as const }
       }
       className={cn(
         'z-50 flex flex-col bg-background shadow-2xl border',
