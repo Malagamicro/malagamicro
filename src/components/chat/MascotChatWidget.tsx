@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Send, Loader2, Minimize2, Mic, MicOff } from 'lucide-react';
+import { X, Send, Loader2, Minimize2, Mic, MicOff, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,10 +15,17 @@ interface Message {
   content: string;
 }
 
+const STORAGE_KEY = 'micro_chat_messages';
+
 export function MascotChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -37,6 +44,11 @@ export function MascotChatWidget() {
       inputRef.current?.focus();
     },
   });
+
+  // Persist messages to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  }, [messages]);
 
   // Initialize position to bottom-right on mount
   useLayoutEffect(() => {
@@ -83,6 +95,11 @@ export function MascotChatWidget() {
       inputRef.current?.focus();
     }
   }, [isOpen, isMinimized]);
+
+  const handleNewConversation = () => {
+    setMessages([]);
+    sessionStorage.removeItem(STORAGE_KEY);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -151,7 +168,7 @@ export function MascotChatWidget() {
       >
         <img src={mascotImage} alt="Micro" className="w-12 h-12 object-contain pointer-events-none" />
         <span className="absolute -top-2 -right-1 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full font-medium shadow pointer-events-none">
-          ¡Hola!
+          {messages.length > 0 ? `${messages.length}` : '¡Hola!'}
         </span>
       </button>
     );
@@ -204,6 +221,9 @@ export function MascotChatWidget() {
           <h3 className="font-semibold text-sm">Micro</h3>
           <p className="text-xs text-muted-foreground">Asistente virtual 🤖</p>
         </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNewConversation} title="Nueva conversación">
+          <Plus className="h-4 w-4" />
+        </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMinimized(true)}>
           <Minimize2 className="h-4 w-4" />
         </Button>
@@ -211,10 +231,7 @@ export function MascotChatWidget() {
           variant="ghost"
           size="icon"
           className="h-8 w-8"
-          onClick={() => {
-            setIsOpen(false);
-            setMessages([]);
-          }}
+          onClick={() => setIsOpen(false)}
         >
           <X className="h-4 w-4" />
         </Button>

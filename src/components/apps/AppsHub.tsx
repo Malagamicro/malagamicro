@@ -53,6 +53,9 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
   const [editingDescId, setEditingDescId] = useState<string | null>(null);
   const [editingDescValue, setEditingDescValue] = useState('');
   const [activeAppPopover, setActiveAppPopover] = useState<string | null>(null);
+  const [favColor, setFavColor] = useState<string | null>(() => {
+    try { return localStorage.getItem('apps_fav_color'); } catch { return null; }
+  });
 
   // Compute favorites
   const favoriteApps = useMemo(() => {
@@ -113,6 +116,14 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
   const getIconColor = (color: string): { className?: string; style?: React.CSSProperties } => {
     if (color.startsWith('text-')) return { className: color };
     return { style: { color } };
+  };
+
+  // Derive a background color from the icon color (20% opacity)
+  const getCardBgStyle = (color: string): React.CSSProperties | undefined => {
+    if (color.startsWith('#')) {
+      return { background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)` };
+    }
+    return undefined;
   };
 
   const startEditDesc = (app: AppItem) => {
@@ -191,7 +202,7 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
               className={cn(
                 'w-full h-full flex flex-col items-center justify-center', sc.gap, sc.padding,
                 'rounded-2xl border border-border/50',
-                'bg-gradient-to-br', app.bgGradient,
+                !app.color.startsWith('#') && 'bg-gradient-to-br ' + app.bgGradient,
                 !editMode && 'hover:shadow-lg hover:scale-[1.03] hover:border-primary/30 active:scale-[0.98]',
                 editMode && 'hover:border-primary/40 cursor-pointer',
                 isPopoverOpen && 'ring-2 ring-primary/50 border-primary/40',
@@ -199,8 +210,12 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
                 app.hidden && 'opacity-40',
                 isDragging && 'shadow-xl scale-105 z-50',
               )}
+              style={app.color.startsWith('#') ? getCardBgStyle(app.color) : undefined}
             >
-              <div className={cn(sc.iconBox, 'rounded-2xl flex items-center justify-center bg-background/80 shadow-sm group-hover/card:shadow-md transition-shadow relative')}>
+              <div
+                className={cn(sc.iconBox, 'rounded-2xl flex items-center justify-center shadow-sm group-hover/card:shadow-md transition-shadow relative', !app.color.startsWith('#') && 'bg-background/80')}
+                style={app.color.startsWith('#') ? { backgroundColor: app.color + '18' } : undefined}
+              >
                 <Icon className={cn(sc.iconSize, iconColor.className)} style={iconColor.style} />
                 {app.externalUrl && <ExternalLink className="w-2.5 h-2.5 absolute top-1 right-1 text-muted-foreground/50" />}
               </div>
@@ -386,11 +401,34 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
       )}
 
       {/* Favorites section */}
-      {!editMode && !searchQuery && favoriteApps.length > 0 && (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+      {!searchQuery && favoriteApps.length > 0 && (
+        <div
+          className={cn('rounded-xl border p-3', !favColor && 'border-amber-500/20 bg-amber-500/5')}
+          style={favColor ? { backgroundColor: favColor + '15', borderColor: favColor + '30' } : undefined}
+        >
           <div className="flex items-center gap-1.5 mb-2">
             <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Favoritos</h2>
+            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex-1">Favoritos</h2>
+            {editMode && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="p-1 rounded hover:bg-muted"><Palette className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2" align="end">
+                  <div className="grid grid-cols-6 gap-1.5">
+                    <button
+                      onClick={() => { setFavColor(null); localStorage.removeItem('apps_fav_color'); }}
+                      className={cn('w-6 h-6 rounded border border-dashed border-muted-foreground/30 flex items-center justify-center', !favColor && 'ring-2 ring-primary')}
+                    ><X className="w-3 h-3" /></button>
+                    {CATEGORY_COLORS.map(c => (
+                      <button key={c} onClick={() => { setFavColor(c); localStorage.setItem('apps_fav_color', c); }}
+                        className={cn('w-6 h-6 rounded transition-all', favColor === c ? 'ring-2 ring-primary scale-110' : 'hover:scale-110')}
+                        style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
           {viewMode === 'list' ? (
             <div className="space-y-1">

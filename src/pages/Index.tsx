@@ -162,7 +162,7 @@ const IndexContent = () => {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
 
   // Track open tabs — skip non-content tabs
-  const SKIP_TABS = ['', 'lead-detail'];
+  const SKIP_TABS = ['', 'lead-detail', 'apps'];
   useEffect(() => {
     if (SKIP_TABS.includes(activeTab)) return;
     setOpenTabs(prev => {
@@ -508,13 +508,13 @@ const IndexContent = () => {
         return (
           <div className="flex flex-col h-full animate-fade-in">
             <PageHeader
-              title="Editor de Documentos"
-              description="Crea y edita documentos"
+              title="Editor IA"
+              description="Crea documentos con asistencia de inteligencia artificial"
               icon={<FileEdit className="h-5 w-5 text-primary" />}
               onBack={goApps}
             />
             <div className="flex-1 min-h-0">
-              <DocumentEditor />
+              <DocumentEditor showBackButton={false} />
             </div>
           </div>
         );
