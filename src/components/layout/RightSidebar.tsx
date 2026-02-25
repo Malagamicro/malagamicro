@@ -211,6 +211,34 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
                 mode="single"
                 selected={selectedDate}
                 onSelect={setSelectedDate}
+                modifiers={{
+                  hasEvent: calendarEvents.map(ev => new Date(ev.event_date + 'T00:00:00')),
+                }}
+                modifiersClassNames={{
+                  hasEvent: 'relative',
+                }}
+                components={{
+                  DayContent: ({ date }) => {
+                    const dateStr = format(date, 'yyyy-MM-dd');
+                    const dayEvents = calendarEvents.filter(ev => ev.event_date === dateStr);
+                    return (
+                      <div className="relative flex flex-col items-center">
+                        <span>{date.getDate()}</span>
+                        {dayEvents.length > 0 && (
+                          <div className="flex gap-0.5 absolute -bottom-1">
+                            {dayEvents.slice(0, 3).map((ev, i) => (
+                              <div
+                                key={i}
+                                className="w-1 h-1 rounded-full"
+                                style={{ backgroundColor: ev.color || 'hsl(var(--primary))' }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  },
+                }}
                 className="p-1 pointer-events-auto [&_.rdp-months]:!flex-col [&_.rdp-caption]:text-xs [&_.rdp-cell]:!w-8 [&_.rdp-cell]:!h-8 [&_.rdp-head_cell]:!w-8 [&_.rdp-day]:!h-7 [&_.rdp-day]:!w-7 [&_.rdp-day]:text-xs"
               />
             </div>

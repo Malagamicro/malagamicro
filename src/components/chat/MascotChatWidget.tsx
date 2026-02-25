@@ -183,13 +183,13 @@ export function MascotChatWidget() {
           <h3 className="font-semibold text-sm">Micro</h3>
           <p className="text-xs text-muted-foreground">Asistente virtual 🤖</p>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNewConversation} title="Nueva conversación">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onPointerDown={e => e.stopPropagation()} onClick={handleNewConversation} title="Nueva conversación">
           <Plus className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMinimized(true)}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onPointerDown={e => e.stopPropagation()} onClick={() => setIsMinimized(true)}>
           <Minimize2 className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsOpen(false)}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onPointerDown={e => e.stopPropagation()} onClick={() => setIsOpen(false)}>
           <X className="h-4 w-4" />
         </Button>
       </div>
