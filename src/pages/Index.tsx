@@ -57,6 +57,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { CommandPalette } from '@/components/layout/CommandPalette';
+import { RightSidebar } from '@/components/layout/RightSidebar';
 import { PerformanceDashboard } from '@/components/performance/PerformanceDashboard';
 import { useInteractionTracking } from '@/hooks/useInteractionTracking';
 import { AIMemoryManager } from '@/components/ai-memory/AIMemoryManager';
@@ -720,6 +721,7 @@ const IndexContent = () => {
           </main>
         </div>
         <CommandPalette onNavigate={setActiveTab} />
+        <RightSidebar onNavigate={setActiveTab} />
 
       <LeadFormModal
         open={isFormOpen}
