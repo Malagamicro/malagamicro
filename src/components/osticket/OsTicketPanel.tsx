@@ -320,6 +320,18 @@ function WhatsAppEditor({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* Plantilla automática */}
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => setMessage(ticketHeader + (config?.message_template || ''))}>
+                <Ticket className="h-3 w-3" /> Plantilla
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Insertar plantilla con datos del ticket</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
         {/* Variables */}
         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => setShowVars(!showVars)}>
           <Hash className="h-3 w-3" /> Variables
@@ -798,6 +810,16 @@ function TicketDetail({
           </div>
           <p className="text-xs text-muted-foreground truncate mt-0.5">{ticket.subject}</p>
         </div>
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 flex-shrink-0 hidden md:flex">
+                <X className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Cerrar panel</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0">
