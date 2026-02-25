@@ -49,7 +49,7 @@ import { useSeoArticles, SeoArticle } from '@/hooks/useSeoArticles';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
-import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings } from 'lucide-react';
+import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, ArrowLeft, Megaphone, MailOpen, FileCode } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -334,6 +334,8 @@ const IndexContent = () => {
       );
     }
 
+    const goApps = () => setActiveTab('apps');
+
     switch (activeTab) {
       case 'apps':
         return <AppsHub onOpenApp={setActiveTab} />;
@@ -360,6 +362,7 @@ const IndexContent = () => {
               title="Prospección"
               description="Busca y descubre nuevos clientes potenciales por zona geográfica"
               icon={<Search className="h-5 w-5 text-primary" />}
+              onBack={goApps}
             />
             <div className="flex-1 min-h-0 p-3 sm:p-6">
               <ProspectionModule />
@@ -373,6 +376,7 @@ const IndexContent = () => {
               title="Pipeline"
               description="Arrastra los leads entre columnas para cambiar su estado"
               icon={<Kanban className="h-5 w-5 text-primary" />}
+              onBack={goApps}
             />
             <div className="flex-1 min-h-0 p-3 sm:p-6">
               <LeadKanban 
@@ -384,7 +388,19 @@ const IndexContent = () => {
           </div>
         );
       case 'campaigns':
-        return <EmailCampaigns />;
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Campañas de Email"
+              description="Crea y gestiona campañas de email marketing"
+              icon={<Megaphone className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <EmailCampaigns />
+            </div>
+          </div>
+        );
       case 'mapa':
         return (
           <div className="flex flex-col h-full animate-fade-in">
@@ -392,6 +408,7 @@ const IndexContent = () => {
               title="Mapa de Leads"
               description="Visualiza tus leads en el mapa"
               icon={<MapPin className="h-5 w-5 text-primary" />}
+              onBack={goApps}
             />
             <div className="flex-1 min-h-0 p-3 sm:p-6">
               <LeadMap 
@@ -404,9 +421,33 @@ const IndexContent = () => {
           </div>
         );
       case 'reports':
-        return <ReportsDashboard />;
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Reportes"
+              description="Estadísticas y análisis de rendimiento"
+              icon={<BarChart3 className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <ReportsDashboard />
+            </div>
+          </div>
+        );
       case 'inbox':
-        return <Inbox />;
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Bandeja de entrada"
+              description="Gestiona tus notificaciones"
+              icon={<MailOpen className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <Inbox />
+            </div>
+          </div>
+        );
       case 'whatsapp':
         return (
           <div className="flex flex-col animate-fade-in h-full">
@@ -414,6 +455,7 @@ const IndexContent = () => {
               title="WhatsApp"
               description="Gestiona tus conversaciones"
               icon={<MessageSquare className="h-5 w-5 text-primary" />}
+              onBack={goApps}
             />
             <div className="flex-1 min-h-0 p-3 sm:p-6">
               <WhatsAppPanel />
@@ -421,27 +463,75 @@ const IndexContent = () => {
           </div>
         );
       case 'templates':
-        return <Templates />;
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Plantillas"
+              description="Gestiona plantillas de mensajes"
+              icon={<FileCode className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <Templates />
+            </div>
+          </div>
+        );
       case 'mensajes':
         return (
           <div className="animate-fade-in flex-1 min-h-0 flex flex-col">
-            <InternalChatPage />
+            <PageHeader
+              title="Chat Interno"
+              description="Comunicación entre el equipo"
+              icon={<MessageSquare className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0">
+              <InternalChatPage />
+            </div>
           </div>
         );
       case 'shared-files':
         return (
-          <div className="p-2 sm:p-4 md:p-8 h-full animate-fade-in">
-            <SharedFilesPanel />
+          <div className="flex flex-col h-full animate-fade-in">
+            <PageHeader
+              title="Archivos Compartidos"
+              description="Gestiona archivos del equipo"
+              icon={<FolderOpen className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 p-2 sm:p-4 md:p-8">
+              <SharedFilesPanel />
+            </div>
           </div>
         );
       case 'editor':
         return (
-          <div className="h-full animate-fade-in">
-            <DocumentEditor />
+          <div className="flex flex-col h-full animate-fade-in">
+            <PageHeader
+              title="Editor de Documentos"
+              description="Crea y edita documentos"
+              icon={<FileEdit className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0">
+              <DocumentEditor />
+            </div>
           </div>
         );
       case 'correo':
-        return <EmailModule />;
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Correo Electrónico"
+              description="Gestiona tu email profesional"
+              icon={<Mail className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <EmailModule />
+            </div>
+          </div>
+        );
       case 'osticket':
         return (
           <div className="flex flex-col overflow-hidden animate-fade-in" style={{ height: '100%' }}>
@@ -449,6 +539,7 @@ const IndexContent = () => {
               title="Tickets osTicket"
               description="Gestiona y responde tickets con mensajes de WhatsApp"
               icon={<Ticket className="h-5 w-5 text-primary" />}
+              onBack={goApps}
             />
             <div style={{ flex: 1, minHeight: 0 }}>
               <OsTicketPanel />
@@ -456,9 +547,33 @@ const IndexContent = () => {
           </div>
         );
       case 'calendario':
-        return <CalendarModule />;
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Calendario"
+              description="Gestiona eventos y citas"
+              icon={<CalendarIcon className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <CalendarModule />
+            </div>
+          </div>
+        );
       case 'informes':
-        return <ReportsModule />;
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Informes"
+              description="Registros de salida y reportes"
+              icon={<FileText className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <ReportsModule />
+            </div>
+          </div>
+        );
       case 'chat-ai':
         return (
           <div className="flex flex-col animate-fade-in h-full">
@@ -466,6 +581,7 @@ const IndexContent = () => {
               title="Chat IA"
               description="Asistente inteligente con búsqueda en tiempo real"
               icon={<Bot className="h-5 w-5 text-primary" />}
+              onBack={goApps}
             />
             <div className="flex-1 min-h-0 p-3 sm:p-6 w-full max-w-none md:max-w-4xl md:mx-auto">
               <PerplexityChatbot />
@@ -479,6 +595,7 @@ const IndexContent = () => {
               title="Recordatorios"
               description="Gestiona recordatorios generales para la empresa"
               icon={<Bell className="h-5 w-5 text-primary" />}
+              onBack={goApps}
             />
             <div className="flex-1 min-h-0 p-3 sm:p-6 max-w-5xl mx-auto w-full">
               <GeneralRemindersList />
@@ -494,6 +611,7 @@ const IndexContent = () => {
               title="Ajustes"
               description="Configuración y registro de actividad"
               icon={<Settings className="h-5 w-5 text-primary" />}
+              onBack={goApps}
             />
             <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6 space-y-4">
               <ProfileSettings />

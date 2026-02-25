@@ -16,6 +16,7 @@ import {
   Clock,
   Send,
   Loader2,
+  X as XIcon,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -363,10 +364,41 @@ export function OsTicketHistory() {
                             <Send className="h-4 w-4" />
                           )}
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950"
+                              title="Cerrar ticket"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <XIcon className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Cerrar este ticket?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Se cerrará y eliminará el ticket "{ticket.ticket_number || ticket.subject}" del historial. Esta acción no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteTicket(ticket.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Cerrar y eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
+                          title="Eliminar del historial"
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteTicket(ticket.id);
