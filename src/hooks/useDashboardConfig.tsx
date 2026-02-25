@@ -29,11 +29,15 @@ const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: 'company-reminders', type: 'company-reminders', title: 'Recordatorios Empresa', icon: 'Building', visible: true, minW: 3, minH: 3 },
   { id: 'tickets', type: 'tickets', title: 'Tickets Recientes', icon: 'Ticket', visible: true, minW: 3, minH: 4 },
   { id: 'online-users', type: 'online-users', title: 'Usuarios Online', icon: 'Wifi', visible: true, minW: 3, minH: 3 },
+  { id: 'calendar-mini', type: 'calendar-mini', title: 'Calendario', icon: 'CalendarDays', visible: false, minW: 3, minH: 4 },
+  { id: 'micro-chat', type: 'micro-chat', title: 'Chat Micro', icon: 'Bot', visible: false, minW: 3, minH: 5 },
   { id: 'inbox-preview', type: 'inbox-preview', title: 'Inbox Preview', icon: 'Inbox', visible: false, minW: 3, minH: 3 },
   { id: 'whatsapp-preview', type: 'whatsapp-preview', title: 'WhatsApp Preview', icon: 'MessageSquare', visible: false, minW: 3, minH: 3 },
   { id: 'ai-chat-quick', type: 'ai-chat-quick', title: 'Chat IA Rápido', icon: 'Bot', visible: false, minW: 3, minH: 3 },
   { id: 'map-preview', type: 'map-preview', title: 'Mapa de Leads', icon: 'MapPin', visible: false, minW: 4, minH: 4 },
   { id: 'activity-stats', type: 'activity-stats', title: 'Actividad Reciente', icon: 'Activity', visible: false, minW: 3, minH: 4 },
+  { id: 'budget-summary', type: 'budget-summary', title: 'Resumen Presupuestos', icon: 'Receipt', visible: false, minW: 3, minH: 3 },
+  { id: 'conversion-funnel', type: 'conversion-funnel', title: 'Embudo Conversión', icon: 'Filter', visible: false, minW: 4, minH: 4 },
 ];
 
 const DEFAULT_LAYOUTS: Layout[] = [

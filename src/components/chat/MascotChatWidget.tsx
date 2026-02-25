@@ -77,30 +77,35 @@ export function MascotChatWidget() {
     }
   }, [isOpen, isMinimized, isMobile]);
 
-  // Smooth RAF-based drag handlers
+  // Smooth drag handlers — direct DOM updates, no React re-renders during drag
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
     didDragRef.current = false;
     dragRef.current = { startX: e.clientX, startY: e.clientY, origX: posRef.current.x, origY: posRef.current.y };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return;
+    e.preventDefault();
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
     const newX = Math.max(0, Math.min(window.innerWidth - 60, dragRef.current.origX + dx));
     const newY = Math.max(0, Math.min(window.innerHeight - 60, dragRef.current.origY + dy));
     posRef.current = { x: newX, y: newY };
-    // Direct DOM manipulation for 60fps drag
+    // Direct DOM update for zero-lag movement
     const el = widgetRef.current || btnRef.current;
     if (el) {
       el.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
     }
   }, []);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     dragRef.current = null;
+    // Sync React state only after drag ends
     setPosition({ ...posRef.current });
   }, []);
 

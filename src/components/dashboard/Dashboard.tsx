@@ -10,20 +10,205 @@ import { CompanyReminders } from './CompanyReminders';
 import { RecentTickets } from './RecentTickets';
 import { ActivityStats } from '@/components/reports/ActivityStats';
 import { OnlineUsersWidget } from './OnlineUsersWidget';
+import { ConversionFunnel } from '@/components/reports/ConversionFunnel';
 import { useLeads, useDashboardStats } from '@/hooks/useLeads';
 import { useDashboardConfig, DashboardWidget } from '@/hooks/useDashboardConfig';
-import { Users, UserPlus, TrendingUp, Target, Loader2, Pencil, RotateCcw, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
+import { useCalendarEvents } from '@/hooks/useCalendarEvents';
+import {
+  Users, UserPlus, TrendingUp, Target, Loader2, Pencil, RotateCcw,
+  Eye, EyeOff, Lock, Unlock, BarChart3, PieChart, Bell, Building,
+  Ticket, Wifi, Inbox, MessageSquare, Bot, MapPin, Activity, CalendarDays,
+  Receipt, Filter, Send
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { format, isToday, isTomorrow, startOfMonth, endOfMonth } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import mascotImage from '@/assets/mascot.png';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
+
+// Icon map for widget previews
+const ICON_MAP: Record<string, any> = {
+  BarChart3, PieChart, Users, Bell, Building, Ticket, Wifi, Inbox,
+  MessageSquare, Bot, MapPin, Activity, CalendarDays, Receipt, Filter,
+};
+
+// Preview descriptions for each widget type
+const WIDGET_PREVIEWS: Record<string, { description: string; emoji: string }> = {
+  'stats': { description: '4 tarjetas con KPIs principales', emoji: '📊' },
+  'leads-chart': { description: 'Gráfico circular de leads por estado', emoji: '🥧' },
+  'recent-leads': { description: 'Lista de los últimos leads añadidos', emoji: '👥' },
+  'reminders': { description: 'Próximos recordatorios de seguimiento', emoji: '🔔' },
+  'company-reminders': { description: 'Recordatorios asignados a la empresa', emoji: '🏢' },
+  'tickets': { description: 'Últimos tickets de soporte recibidos', emoji: '🎫' },
+  'online-users': { description: 'Miembros del equipo conectados', emoji: '🟢' },
+  'calendar-mini': { description: 'Eventos de hoy y próximos días', emoji: '📅' },
+  'micro-chat': { description: 'Chat rápido con el asistente Micro', emoji: '🤖' },
+  'inbox-preview': { description: 'Acceso rápido a tu bandeja de email', emoji: '📬' },
+  'whatsapp-preview': { description: 'Vista rápida de conversaciones WA', emoji: '💬' },
+  'ai-chat-quick': { description: 'Consultas rápidas al asistente IA', emoji: '🧠' },
+  'map-preview': { description: 'Distribución geográfica de leads', emoji: '🗺️' },
+  'activity-stats': { description: 'Resumen de actividad reciente', emoji: '📈' },
+  'budget-summary': { description: 'Resumen de presupuestos pendientes', emoji: '💰' },
+  'conversion-funnel': { description: 'Embudo de conversión de leads', emoji: '🔻' },
+};
 
 interface DashboardProps {
   onViewLead: (id: string) => void;
   onTabChange?: (tab: string) => void;
+}
+
+// Mini calendar widget
+function MiniCalendarWidget() {
+  const { events } = useCalendarEvents();
+  const today = new Date();
+  const upcomingEvents = (events || [])
+    .filter(e => new Date(e.event_date) >= today)
+    .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+    .slice(0, 5);
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-primary" /> Calendario
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {upcomingEvents.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sin eventos próximos</p>
+        ) : (
+          upcomingEvents.map(ev => {
+            const evDate = new Date(ev.event_date);
+            const label = isToday(evDate) ? 'Hoy' : isTomorrow(evDate) ? 'Mañana' : format(evDate, 'd MMM', { locale: es });
+            return (
+              <div key={ev.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-sm">
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: ev.color || 'hsl(var(--primary))' }} />
+                <span className="flex-1 truncate">{ev.title}</span>
+                <span className="text-xs text-muted-foreground flex-shrink-0">{label}</span>
+              </div>
+            );
+          })
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Micro chat widget for dashboard
+function MicroChatDashboardWidget() {
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+
+  const handleSend = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = { role: 'user', content: input.trim() };
+    const allMsgs = [...messages, userMsg];
+    setMessages(allMsgs);
+    setInput('');
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('mascot-chat', { body: { messages: allMsgs } });
+      if (error) throw error;
+      setMessages(prev => [...prev, { role: 'assistant', content: data?.response || 'Sin respuesta' }]);
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: '⚡ Error, intenta de nuevo.' }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <img src={mascotImage} alt="Micro" className="w-5 h-5" /> Chat Micro
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1 flex flex-col min-h-0 gap-2">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="space-y-2 pr-2">
+            {messages.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-4">Pregúntale algo a Micro...</p>
+            )}
+            {messages.map((m, i) => (
+              <div key={i} className={cn('text-xs p-2 rounded-lg max-w-[90%]', m.role === 'user' ? 'bg-primary text-primary-foreground ml-auto' : 'bg-muted')}>
+                {m.content}
+              </div>
+            ))}
+            {loading && <div className="text-xs text-muted-foreground animate-pulse">Micro está pensando...</div>}
+          </div>
+        </ScrollArea>
+        <div className="flex gap-1.5">
+          <Input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSend()}
+            placeholder="Escribe..."
+            className="text-xs h-8"
+            disabled={loading}
+          />
+          <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleSend} disabled={!input.trim() || loading}>
+            <Send className="h-3 w-3" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Budget summary widget
+function BudgetSummaryWidget() {
+  const [stats, setStats] = useState({ pending: 0, approved: 0, total: 0 });
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('budget_requests').select('status').eq('user_id', user.id).then(({ data }) => {
+      if (!data) return;
+      setStats({
+        total: data.length,
+        pending: data.filter(d => d.status === 'pending').length,
+        approved: data.filter(d => d.status === 'approved').length,
+      });
+    });
+  }, [user]);
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Receipt className="h-4 w-4 text-primary" /> Presupuestos
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="p-2 rounded-lg bg-muted/50">
+            <p className="text-lg font-bold">{stats.total}</p>
+            <p className="text-[10px] text-muted-foreground">Total</p>
+          </div>
+          <div className="p-2 rounded-lg bg-destructive/10">
+            <p className="text-lg font-bold text-destructive">{stats.pending}</p>
+            <p className="text-[10px] text-muted-foreground">Pendientes</p>
+          </div>
+          <div className="p-2 rounded-lg bg-primary/10">
+            <p className="text-lg font-bold text-primary">{stats.approved}</p>
+            <p className="text-[10px] text-muted-foreground">Aprobados</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function WidgetContent({ widget, stats, leads, onViewLead, onTabChange }: {
@@ -45,12 +230,16 @@ function WidgetContent({ widget, stats, leads, onViewLead, onTabChange }: {
     case 'company-reminders': return <CompanyReminders />;
     case 'tickets': return <RecentTickets onNavigateToTickets={() => onTabChange?.('osticket')} />;
     case 'online-users': return <OnlineUsersWidget />;
+    case 'calendar-mini': return <MiniCalendarWidget />;
+    case 'micro-chat': return <MicroChatDashboardWidget />;
+    case 'budget-summary': return <BudgetSummaryWidget />;
+    case 'conversion-funnel': return <ConversionFunnel stats={stats} />;
     case 'inbox-preview':
-      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">📬 Inbox</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Acceso rápido a tu bandeja de entrada.</p></CardContent></Card>;
+      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">📬 Inbox</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Acceso rápido a tu bandeja de entrada.</p><Button variant="outline" size="sm" className="mt-2" onClick={() => onTabChange?.('email')}>Abrir Inbox</Button></CardContent></Card>;
     case 'whatsapp-preview':
-      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">💬 WhatsApp</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Vista rápida de tus conversaciones.</p></CardContent></Card>;
+      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">💬 WhatsApp</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Vista rápida de tus conversaciones.</p><Button variant="outline" size="sm" className="mt-2" onClick={() => onTabChange?.('whatsapp')}>Abrir WhatsApp</Button></CardContent></Card>;
     case 'ai-chat-quick':
-      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">🤖 Chat IA</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Asistente IA para consultas rápidas.</p></CardContent></Card>;
+      return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">🧠 Chat IA</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Asistente IA para consultas rápidas.</p><Button variant="outline" size="sm" className="mt-2" onClick={() => onTabChange?.('chat-ia')}>Abrir Chat IA</Button></CardContent></Card>;
     case 'map-preview':
       return <Card className="h-full"><CardHeader className="pb-2"><CardTitle className="text-sm">🗺️ Mapa</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">Distribución geográfica de leads.</p></CardContent></Card>;
     case 'activity-stats': return <ActivityStats />;
@@ -109,24 +298,38 @@ export function Dashboard({ onViewLead, onTabChange }: DashboardProps) {
                 <span className="hidden sm:inline">Bloques</span>
               </Button>
             </SheetTrigger>
-            <SheetContent className="w-80 bg-background z-[60]">
+            <SheetContent className="w-[340px] bg-background z-[60]">
               <SheetHeader><SheetTitle>Bloques del Dashboard</SheetTitle></SheetHeader>
               <p className="text-sm text-muted-foreground mt-1">Activa o desactiva widgets. Los cambios se reflejan en tiempo real.</p>
-              <div className="mt-4 space-y-2">
-                {widgets.map(w => (
-                  <div key={w.id} className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border transition-all",
-                    w.visible ? "bg-card border-primary/20" : "bg-muted/30 border-transparent opacity-60"
-                  )}>
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {w.visible ? <Eye className="h-4 w-4 text-primary flex-shrink-0" /> : <EyeOff className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                      <span className="text-sm font-medium truncate">{w.title}</span>
-                    </div>
-                    <Switch checked={w.visible} onCheckedChange={() => toggleWidget(w.id)} />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6">
+              <ScrollArea className="h-[calc(100vh-200px)] mt-4">
+                <div className="space-y-2 pr-2">
+                  {widgets.map(w => {
+                    const preview = WIDGET_PREVIEWS[w.type];
+                    const IconComp = ICON_MAP[w.icon];
+                    return (
+                      <div key={w.id} className={cn(
+                        "flex items-start gap-3 p-3 rounded-lg border transition-all",
+                        w.visible ? "bg-card border-primary/20" : "bg-muted/30 border-transparent opacity-70"
+                      )}>
+                        <div className={cn(
+                          "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-lg",
+                          w.visible ? "bg-primary/10" : "bg-muted"
+                        )}>
+                          {preview?.emoji || (IconComp ? <IconComp className="h-5 w-5 text-primary" /> : '📦')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium block">{w.title}</span>
+                          {preview && (
+                            <span className="text-[11px] text-muted-foreground line-clamp-2">{preview.description}</span>
+                          )}
+                        </div>
+                        <Switch checked={w.visible} onCheckedChange={() => toggleWidget(w.id)} className="flex-shrink-0 mt-0.5" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+              <div className="mt-4">
                 <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={resetToDefault}>
                   <RotateCcw className="h-3.5 w-3.5" /> Restaurar por defecto
                 </Button>
@@ -144,7 +347,7 @@ export function Dashboard({ onViewLead, onTabChange }: DashboardProps) {
         <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2.5 text-sm text-primary flex items-center gap-3">
           <Pencil className="h-4 w-4 flex-shrink-0" />
           <div className="flex-1">
-            <span>Modo edición activo — arrastra, redimensiona y activa/desactiva bloques. Los cambios se previsualizan en tiempo real.</span>
+            <span>Modo edición activo — arrastra, redimensiona y activa/desactiva bloques.</span>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <span className="text-xs bg-primary/20 px-2 py-0.5 rounded-full font-medium">{visibleWidgets.length}/{widgets.length} activos</span>
@@ -152,7 +355,7 @@ export function Dashboard({ onViewLead, onTabChange }: DashboardProps) {
         </div>
       )}
 
-      {/* Grid Layout — responsive breakpoints with adapted layouts */}
+      {/* Grid Layout */}
       <ResponsiveGridLayout
         className="layout"
         layouts={{
