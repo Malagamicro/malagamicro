@@ -50,12 +50,17 @@ export function MascotChatWidget() {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
   }, [messages]);
 
-  // Initialize position to bottom-right on mount
+  // Smart positioning: bottom-right, avoiding sidebar
   useLayoutEffect(() => {
     const isMobileView = window.innerWidth < 768;
+    const widgetW = isMobileView ? 80 : 360;
+    const widgetH = isMobileView ? 80 : 480;
+    // Offset from right/bottom edge, leaving space for potential sidebar
+    const rightMargin = 16;
+    const bottomMargin = 16;
     setPosition({
-      x: window.innerWidth - (isMobileView ? 80 : 384) - 16,
-      y: window.innerHeight - (isMobileView ? 80 : 524) - 16,
+      x: Math.max(0, window.innerWidth - widgetW - rightMargin),
+      y: Math.max(0, window.innerHeight - widgetH - bottomMargin),
     });
   }, []);
 
@@ -199,12 +204,13 @@ export function MascotChatWidget() {
   // Full chat widget
   return (
     <div
-      style={{ left: position.x, top: position.y, position: 'fixed' }}
+      style={{ left: position.x, top: position.y, position: 'fixed', resize: 'both' }}
       className={cn(
-        'z-50',
-        'w-[300px] max-w-[calc(100vw-2rem)] h-[400px] max-h-[calc(100vh-6rem)]',
+        'z-50 overflow-auto',
+        'min-w-[280px] min-h-[300px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)]',
+        'w-[340px] h-[460px]',
         'bg-background rounded-2xl shadow-2xl border',
-        'flex flex-col overflow-hidden'
+        'flex flex-col'
       )}
     >
       {/* Header - draggable */}

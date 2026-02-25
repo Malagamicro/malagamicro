@@ -24,6 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationContext } from '@/contexts/NotificationContext';
+import { useBadgeCounts } from '@/hooks/useBadgeCounts';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSidebarConfig, SidebarCategory, SidebarItem, SidebarPosition } from '@/hooks/useSidebarConfig';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -109,10 +110,11 @@ function SidebarToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle: 
 }
 
 // Collapsed Icon Button with Tooltip
-function CollapsedIconButton({ item, isActive, onClick, unreadCount }: { 
-  item: SidebarItem; isActive: boolean; onClick: () => void; unreadCount?: number;
+function CollapsedIconButton({ item, isActive, onClick, badgeCount }: { 
+  item: SidebarItem; isActive: boolean; onClick: () => void; badgeCount?: number;
 }) {
   const Icon = getIcon(item.icon);
+  const count = badgeCount || 0;
   return (
     <TooltipProvider delayDuration={0}>
       <Tooltip>
@@ -125,9 +127,9 @@ function CollapsedIconButton({ item, isActive, onClick, unreadCount }: {
               isActive && "bg-primary/15 shadow-sm ring-2 ring-primary/30"
             )}>
             <Icon className={cn("w-5 h-5", isActive ? "text-primary" : item.color)} />
-            {item.showBadge && unreadCount && unreadCount > 0 && (
+            {count > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1 animate-pulse">
-                {unreadCount > 99 ? '99+' : unreadCount}
+                {count > 99 ? '99+' : count}
               </span>
             )}
           </button>
@@ -321,6 +323,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const { unreadCount } = useNotificationContext();
+  const badgeCounts = useBadgeCounts();
   const isMobile = useIsMobile();
   const {
     categories, editMode, setEditMode, addCategory, addLinkItem, removeCategory,
@@ -432,11 +435,14 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         {item.isExternal && (
           <ExternalLink className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
         )}
-        {item.showBadge && unreadCount > 0 && (
-          <Badge variant="destructive" className={cn("h-5 min-w-[20px] flex items-center justify-center text-xs px-1.5", isMobile && "h-4 min-w-[16px] text-[10px] px-1")}>
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </Badge>
-        )}
+        {(() => {
+          const itemBadge = badgeCounts[item.id] || (item.showBadge ? unreadCount : 0);
+          return itemBadge > 0 ? (
+            <Badge variant="destructive" className={cn("h-5 min-w-[20px] flex items-center justify-center text-xs px-1.5", isMobile && "h-4 min-w-[16px] text-[10px] px-1")}>
+              {itemBadge > 99 ? '99+' : itemBadge}
+            </Badge>
+          ) : null;
+        })()}
       </button>
     );
   };
@@ -456,7 +462,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
               item={item}
               isActive={activeTab === item.id}
               onClick={() => handleItemClick(item)}
-              unreadCount={item.showBadge ? unreadCount : undefined}
+              badgeCount={badgeCounts[item.id] || (item.showBadge ? unreadCount : 0)}
             />
           ))}
         </div>
@@ -912,11 +918,14 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
                       <Icon className={cn("w-4 h-4 flex-shrink-0", isActive ? "text-primary" : item.color)} />
                       <span className="flex-1 text-left">{item.label}</span>
                       {item.isExternal && <ExternalLink className="w-3 h-3 text-muted-foreground/50" />}
-                      {item.showBadge && unreadCount > 0 && (
-                        <Badge variant="destructive" className="h-4 min-w-[16px] text-[10px] px-1">
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </Badge>
-                      )}
+                      {(() => {
+                        const hBadge = badgeCounts[item.id] || (item.showBadge ? unreadCount : 0);
+                        return hBadge > 0 ? (
+                          <Badge variant="destructive" className="h-4 min-w-[16px] text-[10px] px-1">
+                            {hBadge > 99 ? '99+' : hBadge}
+                          </Badge>
+                        ) : null;
+                      })()}
                     </button>
                   );
                 })}

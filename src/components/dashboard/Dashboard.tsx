@@ -111,9 +111,13 @@ export function Dashboard({ onViewLead, onTabChange }: DashboardProps) {
             </SheetTrigger>
             <SheetContent className="w-80 bg-background z-[60]">
               <SheetHeader><SheetTitle>Bloques del Dashboard</SheetTitle></SheetHeader>
+              <p className="text-sm text-muted-foreground mt-1">Activa o desactiva widgets. Los cambios se reflejan en tiempo real.</p>
               <div className="mt-4 space-y-2">
                 {widgets.map(w => (
-                  <div key={w.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                  <div key={w.id} className={cn(
+                    "flex items-center justify-between p-3 rounded-lg border transition-all",
+                    w.visible ? "bg-card border-primary/20" : "bg-muted/30 border-transparent opacity-60"
+                  )}>
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       {w.visible ? <Eye className="h-4 w-4 text-primary flex-shrink-0" /> : <EyeOff className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
                       <span className="text-sm font-medium truncate">{w.title}</span>
@@ -137,9 +141,14 @@ export function Dashboard({ onViewLead, onTabChange }: DashboardProps) {
       </div>
 
       {editMode && (
-        <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2 text-sm text-primary flex items-center gap-2">
+        <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-2.5 text-sm text-primary flex items-center gap-3">
           <Pencil className="h-4 w-4 flex-shrink-0" />
-          <span>Arrastra y redimensiona los bloques libremente. Haz click en <strong>"Bloquear"</strong> para guardar.</span>
+          <div className="flex-1">
+            <span>Modo edición activo — arrastra, redimensiona y activa/desactiva bloques. Los cambios se previsualizan en tiempo real.</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <span className="text-xs bg-primary/20 px-2 py-0.5 rounded-full font-medium">{visibleWidgets.length}/{widgets.length} activos</span>
+          </div>
         </div>
       )}
 
