@@ -1156,6 +1156,7 @@ export type Database = {
           email_unsubscribed: boolean | null
           equipment_count: number | null
           folder_id: string | null
+          google_place_id: string | null
           id: string
           last_contacted_at: string | null
           latitude: number | null
@@ -1185,6 +1186,7 @@ export type Database = {
           email_unsubscribed?: boolean | null
           equipment_count?: number | null
           folder_id?: string | null
+          google_place_id?: string | null
           id?: string
           last_contacted_at?: string | null
           latitude?: number | null
@@ -1214,6 +1216,7 @@ export type Database = {
           email_unsubscribed?: boolean | null
           equipment_count?: number | null
           folder_id?: string | null
+          google_place_id?: string | null
           id?: string
           last_contacted_at?: string | null
           latitude?: number | null

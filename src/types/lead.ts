@@ -32,6 +32,8 @@ export interface Lead {
   whatsappVerified?: boolean;
   // WhatsApp counter
   whatsappSentCount?: number;
+  // Google Place ID for deduplication
+  googlePlaceId?: string;
 }
 
 export interface LeadActivity {
