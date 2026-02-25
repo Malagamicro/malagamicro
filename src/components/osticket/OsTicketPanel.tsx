@@ -201,9 +201,11 @@ function WhatsAppEditor({
   isSending: boolean;
 }) {
   const { config } = useOsTicketConfig();
+  const ticketHeader = `📋 *Ticket #${ticket.ticket_number || ticket.ticket_id || '—'}*\n📌 Asunto: ${ticket.subject}\n👤 Cliente: ${ticket.customer_name || '—'}\n🏢 Depto: ${ticket.department || '—'}\n⚡ Prioridad: ${ticket.priority || 'Normal'}\n───────────────\n`;
+
   const [message, setMessage] = useState(() => {
     const tmpl = config?.message_template || '';
-    return tmpl
+    const body = tmpl
       .replace(/\{\{ticket_id\}\}/g, ticket.ticket_id || '')
       .replace(/\{\{number\}\}/g, ticket.ticket_number || '')
       .replace(/\{\{subject\}\}/g, ticket.subject || '')
@@ -212,6 +214,7 @@ function WhatsAppEditor({
       .replace(/\{\{department\}\}/g, ticket.department || '')
       .replace(/\{\{priority\}\}/g, ticket.priority || '')
       .replace(/\{\{ticket_url\}\}/g, `${config?.osticket_url || ''}/scp/tickets.php?id=${ticket.ticket_id}`);
+    return ticketHeader + body;
   });
   const [headerImageUrl, setHeaderImageUrl] = useState(config?.image_url || '');
   const [sendImage, setSendImage] = useState(config?.send_image !== false);
@@ -722,6 +725,7 @@ function TicketDetail({
   isDeleting: boolean;
 }) {
   const [isSending, setIsSending] = useState(false);
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
   const { config } = useOsTicketConfig();
   const priorityCfg = getPriorityCfg(ticket.priority);
 
@@ -899,15 +903,47 @@ function TicketDetail({
 
           <Separator />
 
-          {/* WhatsApp Editor */}
+          {/* Close ticket button */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="w-full gap-2">
+                <XCircle className="h-4 w-4" />
+                Cerrar y eliminar ticket
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Cerrar este ticket?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Se cerrará y eliminará el ticket #{ticket.ticket_number || ticket.ticket_id} del historial. Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onDelete(ticket.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Cerrar y eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <Separator />
+
+          {/* Collapsible WhatsApp Editor */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
+            <button
+              className="flex items-center gap-2 w-full text-left group"
+              onClick={() => setWhatsappOpen(!whatsappOpen)}
+            >
               <div className="w-6 h-6 rounded-full bg-green-500/15 flex items-center justify-center flex-shrink-0">
                 <MessageSquare className="h-3.5 w-3.5 text-green-600" />
               </div>
-              <h3 className="font-semibold text-sm">Editor de mensaje WhatsApp</h3>
-            </div>
-            <WhatsAppEditor ticket={ticket} onSend={handleSendWhatsApp} isSending={isSending} />
+              <h3 className="font-semibold text-sm flex-1">Editor de mensaje WhatsApp</h3>
+              {whatsappOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
+            {whatsappOpen && (
+              <WhatsAppEditor ticket={ticket} onSend={handleSendWhatsApp} isSending={isSending} />
+            )}
           </div>
         </div>
       </ScrollArea>
