@@ -50,7 +50,7 @@ import { useSeoArticles, SeoArticle } from '@/hooks/useSeoArticles';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
-import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, ArrowLeft, Megaphone, MailOpen, FileCode, Activity } from 'lucide-react';
+import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, ArrowLeft, Megaphone, MailOpen, FileCode, Activity, Brain } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +59,7 @@ import { Button } from '@/components/ui/button';
 import { CommandPalette } from '@/components/layout/CommandPalette';
 import { PerformanceDashboard } from '@/components/performance/PerformanceDashboard';
 import { useInteractionTracking } from '@/hooks/useInteractionTracking';
+import { AIMemoryManager } from '@/components/ai-memory/AIMemoryManager';
 
 const SeoGeneratorInline = () => {
   const { articles, loading, generating, generateArticle, deleteArticle } = useSeoArticles();
@@ -306,7 +307,7 @@ const IndexContent = () => {
 
   const selectedLead = leads.find(l => l.id === selectedLeadId);
 
-  const ADMIN_ONLY_TABS = ['dashboard', 'leads', 'lead-detail', 'pipeline', 'campaigns', 'rendimiento'];
+  const ADMIN_ONLY_TABS = ['dashboard', 'leads', 'lead-detail', 'pipeline', 'campaigns', 'rendimiento', 'ai-memory'];
 
   const renderAccessDenied = () => (
     <div className="flex-1 flex items-center justify-center p-8">
@@ -657,6 +658,20 @@ const IndexContent = () => {
             />
             <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6">
               <PerformanceDashboard />
+            </div>
+          </div>
+        );
+      case 'ai-memory':
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Memoria IA"
+              description="Gestiona el contexto y recuerdos de Micro"
+              icon={<Brain className="h-5 w-5 text-primary" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6">
+              <AIMemoryManager />
             </div>
           </div>
         );
