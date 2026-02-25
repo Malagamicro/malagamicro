@@ -69,8 +69,10 @@ export function MascotChatWidget() {
       const dy = e.clientY - d.sy;
       if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
       d.moved = true;
-      const nx = Math.max(0, Math.min(window.innerWidth - 60, d.ox + dx));
-      const ny = Math.max(0, Math.min(window.innerHeight - 60, d.oy + dy));
+      const ew = elRef.current.offsetWidth;
+      const eh = elRef.current.offsetHeight;
+      const nx = Math.max(0, Math.min(window.innerWidth - ew, d.ox + dx));
+      const ny = Math.max(0, Math.min(window.innerHeight - eh, d.oy + dy));
       posRef.current = { x: nx, y: ny };
       elRef.current.style.left = nx + 'px';
       elRef.current.style.top = ny + 'px';
