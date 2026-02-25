@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -6,13 +6,25 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGeneralReminders } from '@/hooks/useGeneralReminders';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import {
   PanelRightClose, PanelRight, CalendarDays, Bell, Bot,
-  Clock, AlertTriangle, CheckCircle2, ChevronRight,
+  Clock, AlertTriangle, CheckCircle2, ChevronRight, MessageSquare,
 } from 'lucide-react';
-import { format, isToday, isTomorrow, isPast } from 'date-fns';
+import { format, isToday, isTomorrow, isPast, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import mascotImage from '@/assets/mascot.png';
+
+interface RecentChatMessage {
+  id: string;
+  content: string | null;
+  message_type: string;
+  created_at: string;
+  sender_name: string;
+  conversation_name: string | null;
+  conversation_id: string;
+}
 
 interface RightSidebarProps {
   onNavigate: (tab: string) => void;
@@ -23,6 +35,77 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const { pendingReminders, overdueReminders } = useGeneralReminders();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const [recentMessages, setRecentMessages] = useState<RecentChatMessage[]>([]);
+
+  // Fetch recent internal chat messages
+  useEffect(() => {
+    if (!user?.id || !open) return;
+
+    const fetchRecentMessages = async () => {
+      // Get user's conversations
+      const { data: participations } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      if (!participations || participations.length === 0) {
+        setRecentMessages([]);
+        return;
+      }
+
+      const convIds = participations.map(p => p.conversation_id);
+
+      // Get recent messages from those conversations (not from current user)
+      const { data: messages } = await supabase
+        .from('internal_messages')
+        .select('id, content, message_type, created_at, sender_id, conversation_id')
+        .in('conversation_id', convIds)
+        .neq('sender_id', user.id)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!messages || messages.length === 0) {
+        setRecentMessages([]);
+        return;
+      }
+
+      // Get sender profiles and conversation names
+      const senderIds = [...new Set(messages.map(m => m.sender_id))];
+      const convIdsFromMsgs = [...new Set(messages.map(m => m.conversation_id))];
+
+      const [{ data: profiles }, { data: conversations }] = await Promise.all([
+        supabase.from('profiles').select('user_id, full_name').in('user_id', senderIds),
+        supabase.from('internal_conversations').select('id, name, is_group').in('id', convIdsFromMsgs),
+      ]);
+
+      const profileMap = new Map((profiles || []).map(p => [p.user_id, p.full_name]));
+      const convMap = new Map((conversations || []).map(c => [c.id, c]));
+
+      setRecentMessages(messages.map(m => ({
+        id: m.id,
+        content: m.content,
+        message_type: m.message_type,
+        created_at: m.created_at,
+        sender_name: profileMap.get(m.sender_id) || 'Usuario',
+        conversation_name: convMap.get(m.conversation_id)?.is_group ? convMap.get(m.conversation_id)?.name || null : null,
+        conversation_id: m.conversation_id,
+      })));
+    };
+
+    fetchRecentMessages();
+
+    // Subscribe to new messages
+    const channel = supabase
+      .channel('right-sidebar-chat')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'internal_messages' }, () => {
+        fetchRecentMessages();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, open]);
 
   // Show upcoming reminders (next 7 days + overdue)
   const relevantReminders = pendingReminders
@@ -168,6 +251,67 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
               size="sm"
               className="w-full mt-1 text-xs gap-1"
               onClick={() => onNavigate('reminders')}
+            >
+              Ver todos <ChevronRight className="h-3 w-3" />
+            </Button>
+          </div>
+
+          {/* Internal Chat - Recent messages */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-primary" />
+                <span className="text-xs font-semibold uppercase tracking-wide">Chat interno</span>
+              </div>
+              {recentMessages.length > 0 && (
+                <Badge className="text-[10px] px-1.5 py-0">
+                  {recentMessages.length} nuevos
+                </Badge>
+              )}
+            </div>
+
+            {recentMessages.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                <p className="text-xs">Sin mensajes recientes</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {recentMessages.map(m => {
+                  const preview = m.message_type === 'text'
+                    ? (m.content || 'Mensaje')
+                    : m.message_type === 'image'
+                      ? '📷 Imagen'
+                      : m.message_type === 'audio'
+                        ? '🎵 Audio'
+                        : '📎 Archivo';
+                  return (
+                    <div
+                      key={m.id}
+                      className="flex items-start gap-2 p-2 rounded-lg border text-xs transition-colors hover:bg-accent/50 cursor-pointer"
+                      onClick={() => onNavigate('mensajes')}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 mt-0.5 text-primary" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">
+                          {m.sender_name}
+                          {m.conversation_name && <span className="text-muted-foreground font-normal"> en {m.conversation_name}</span>}
+                        </p>
+                        <p className="text-muted-foreground truncate">{preview}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(m.created_at), { addSuffix: true, locale: es })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full mt-1 text-xs gap-1"
+              onClick={() => onNavigate('mensajes')}
             >
               Ver todos <ChevronRight className="h-3 w-3" />
             </Button>
