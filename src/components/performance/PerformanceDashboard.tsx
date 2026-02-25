@@ -263,36 +263,44 @@ export function PerformanceDashboard() {
                 <p className="text-center text-sm text-muted-foreground py-8">No hay accesos registrados aún</p>
               ) : (
                 loginLogs?.logs.map((log: any) => (
-                  <Card key={log.id} className="p-3 flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      {log.device_type === 'mobile' ? (
-                        <Smartphone className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Monitor className="h-4 w-4 text-primary" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">
-                          {log.profile_name || 'Usuario'}
-                        </p>
-                        <Badge variant="outline" className="text-[10px] shrink-0">
-                          {log.ip_address || '—'}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                        {log.city && (
-                          <span className="flex items-center gap-0.5">
-                            <MapPin className="h-3 w-3" />
-                            {log.city}{log.country ? `, ${log.country}` : ''}
-                          </span>
+                  <Card key={log.id} className="p-3 space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        {log.device_type === 'mobile' ? (
+                          <Smartphone className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Monitor className="h-4 w-4 text-primary" />
                         )}
-                        <span className="flex items-center gap-0.5">
-                          <Clock className="h-3 w-3" />
-                          {format(new Date(log.created_at), 'dd MMM yyyy HH:mm', { locale: es })}
-                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">
+                            {log.profile_name || 'Usuario'}
+                          </p>
+                          <Badge variant="outline" className="text-[10px] shrink-0">
+                            {log.ip_address || '—'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                          {log.city && (
+                            <span className="flex items-center gap-0.5">
+                              <MapPin className="h-3 w-3" />
+                              {log.city}{log.region ? `, ${log.region}` : ''}{log.country ? ` (${log.country})` : ''}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-0.5">
+                            <Clock className="h-3 w-3" />
+                            {format(new Date(log.created_at), 'dd MMM yyyy HH:mm:ss', { locale: es })}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    {log.user_agent && (
+                      <p className="text-[10px] text-muted-foreground truncate pl-12">
+                        <Globe className="h-3 w-3 inline mr-1" />
+                        {log.user_agent}
+                      </p>
+                    )}
                   </Card>
                 ))
               )}
@@ -341,21 +349,33 @@ export function PerformanceDashboard() {
                 <p className="text-center text-sm text-muted-foreground py-8">No hay interacciones registradas</p>
               ) : (
                 interactionLogs?.logs.map((log: any) => (
-                  <div key={log.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/50 text-xs">
-                    <span>{getActionIcon(log.action)}</span>
-                    <Badge variant="secondary" className={`text-[10px] px-1.5 ${getActionColor(log.action)}`}>
-                      {log.action}
-                    </Badge>
-                    <span className="text-muted-foreground truncate flex-1">
-                      {log.element || log.page || '—'}
-                    </span>
-                    <span className="text-muted-foreground shrink-0 text-[10px]">
-                      {log.profile_name?.split(' ')[0] || '—'}
-                    </span>
-                    <span className="text-muted-foreground shrink-0 text-[10px]">
-                      {format(new Date(log.created_at), 'HH:mm:ss', { locale: es })}
-                    </span>
-                  </div>
+                  <Card key={log.id} className="p-2.5 space-y-1">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span>{getActionIcon(log.action)}</span>
+                      <Badge variant="secondary" className={`text-[10px] px-1.5 ${getActionColor(log.action)}`}>
+                        {log.action}
+                      </Badge>
+                      <span className="font-medium truncate flex-1">
+                        {log.element || '—'}
+                      </span>
+                      <span className="text-muted-foreground shrink-0 text-[10px]">
+                        {log.profile_name?.split(' ')[0] || '—'}
+                      </span>
+                      <span className="text-muted-foreground shrink-0 text-[10px]">
+                        {format(new Date(log.created_at), 'dd/MM HH:mm:ss', { locale: es })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 pl-6 text-[10px] text-muted-foreground">
+                      {log.page && (
+                        <span className="truncate">📄 {log.page}</span>
+                      )}
+                      {log.metadata && Object.keys(log.metadata).length > 0 && (
+                        <span className="truncate text-muted-foreground/70">
+                          {Object.entries(log.metadata).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                        </span>
+                      )}
+                    </div>
+                  </Card>
                 ))
               )}
             </div>
