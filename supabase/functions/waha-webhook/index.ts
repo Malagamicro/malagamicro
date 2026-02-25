@@ -105,11 +105,18 @@ Deno.serve(async (req) => {
 
   // Authenticate webhook request
   const webhookSecret = Deno.env.get("EVOLUTION_WEBHOOK_SECRET") || Deno.env.get("WAHA_WEBHOOK_SECRET");
+  if (!webhookSecret) {
+    console.error("EVOLUTION_WEBHOOK_SECRET/WAHA_WEBHOOK_SECRET not configured");
+    return new Response(JSON.stringify({ error: "Webhook not configured" }), {
+      status: 503,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   const providedKey = req.headers.get("x-api-key") ||
     req.headers.get("authorization")?.replace("Bearer ", "") ||
     new URL(req.url).searchParams.get("api_key");
 
-  if (webhookSecret && webhookSecret !== providedKey) {
+  if (webhookSecret !== providedKey) {
     console.error("Unauthorized webhook request");
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,

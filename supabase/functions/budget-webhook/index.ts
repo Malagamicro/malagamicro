@@ -16,12 +16,17 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Optional: Verify webhook secret
+    // Verify webhook secret (mandatory)
     const webhookSecret = Deno.env.get('WAHA_WEBHOOK_SECRET');
+    if (!webhookSecret) {
+      console.error('WAHA_WEBHOOK_SECRET not configured');
+      return new Response(
+        JSON.stringify({ error: 'Webhook not configured' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const providedSecret = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '');
-    
-    // If secret is configured, verify it
-    if (webhookSecret && providedSecret !== webhookSecret) {
+    if (providedSecret !== webhookSecret) {
       console.log('Webhook secret mismatch');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
