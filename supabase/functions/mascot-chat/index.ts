@@ -359,6 +359,52 @@ const tools = [
   {
     type: "function",
     function: {
+      name: "get_ai_memories",
+      description: "Consultar los recuerdos/contexto almacenados sobre un lead o del usuario general. Úsalo al inicio de conversaciones para tener contexto.",
+      parameters: {
+        type: "object",
+        properties: {
+          lead_id: { type: "string", description: "ID del lead para buscar recuerdos específicos (opcional)" },
+          category: { type: "string", description: "Categoría: general, preference, interaction, note (opcional)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "save_ai_memory",
+      description: "Guardar un recuerdo o dato relevante sobre un lead o el usuario para futuras conversaciones. Úsalo automáticamente cuando detectes información importante.",
+      parameters: {
+        type: "object",
+        properties: {
+          lead_id: { type: "string", description: "ID del lead relacionado (opcional, null para recuerdos generales)" },
+          memory_key: { type: "string", description: "Clave descriptiva del recuerdo (ej: 'preferencia_contacto', 'ultimo_acuerdo')" },
+          memory_value: { type: "object", description: "Datos del recuerdo en formato JSON" },
+          category: { type: "string", description: "Categoría: general, preference, interaction, note (default: general)" },
+        },
+        required: ["memory_key", "memory_value"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_ai_memory",
+      description: "Eliminar un recuerdo almacenado por su ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          memory_id: { type: "string", description: "ID del recuerdo a eliminar" },
+        },
+        required: ["memory_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "get_apps_config",
       description: "Ver la configuración actual del hub de aplicaciones del usuario (categorías, apps, tamaño de iconos).",
       parameters: { type: "object", properties: {}, required: [] },
@@ -996,6 +1042,53 @@ async function executeToolCall(
         return JSON.stringify({ success: true, message: `Aplicaciones actualizadas: ${action}` });
       }
 
+      case "get_ai_memories": {
+        const leadId = args.lead_id ? String(args.lead_id) : null;
+        const cat = args.category ? String(args.category) : null;
+        let query = supabase.from("ai_memory").select("*").eq("user_id", userId).order("updated_at", { ascending: false }).limit(30);
+        if (leadId) query = query.eq("lead_id", leadId);
+        if (cat) query = query.eq("category", cat);
+        const { data, error } = await query;
+        if (error) throw error;
+        if (!data?.length) return JSON.stringify({ message: "No hay recuerdos almacenados." });
+        return JSON.stringify({
+          message: `${data.length} recuerdo(s) encontrados`,
+          memories: data.map((m: any) => ({ id: m.id, key: m.memory_key, value: m.memory_value, category: m.category, lead_id: m.lead_id, updated: m.updated_at })),
+        });
+      }
+
+      case "save_ai_memory": {
+        const memKey = String(args.memory_key || "");
+        const memValue = args.memory_value || {};
+        const cat = String(args.category || "general");
+        const leadId = args.lead_id ? String(args.lead_id) : null;
+        if (!memKey) return JSON.stringify({ error: "memory_key es obligatorio" });
+
+        // Upsert: check existing
+        let query = supabase.from("ai_memory").select("id").eq("user_id", userId).eq("memory_key", memKey);
+        if (leadId) query = query.eq("lead_id", leadId);
+        else query = query.is("lead_id", null);
+        const { data: existing } = await query.limit(1);
+
+        if (existing?.length) {
+          const { error } = await supabase.from("ai_memory").update({ memory_value: memValue, category: cat }).eq("id", (existing[0] as any).id);
+          if (error) throw error;
+          return JSON.stringify({ success: true, message: `Recuerdo "${memKey}" actualizado.`, action: "updated" });
+        }
+
+        const { error } = await supabase.from("ai_memory").insert({ user_id: userId, lead_id: leadId, memory_key: memKey, memory_value: memValue, category: cat });
+        if (error) throw error;
+        return JSON.stringify({ success: true, message: `Recuerdo "${memKey}" guardado.`, action: "created" });
+      }
+
+      case "delete_ai_memory": {
+        const memId = String(args.memory_id || "");
+        if (!memId) return JSON.stringify({ error: "memory_id es obligatorio" });
+        const { error } = await supabase.from("ai_memory").delete().eq("id", memId).eq("user_id", userId);
+        if (error) throw error;
+        return JSON.stringify({ success: true, message: "Recuerdo eliminado." });
+      }
+
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
@@ -1049,6 +1142,18 @@ serve(async (req) => {
 
     const today = new Date().toISOString().split('T')[0];
 
+    // Load user's AI memories for context
+    const { data: userMemories } = await supabase
+      .from("ai_memory")
+      .select("memory_key, memory_value, category, lead_id")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(20);
+
+    const memoryContext = userMemories?.length
+      ? `\n\nRECUERDOS ALMACENADOS (usa esta información para personalizar tus respuestas):\n${userMemories.map((m: any) => `- [${m.category}] ${m.memory_key}: ${JSON.stringify(m.memory_value)}${m.lead_id ? ` (lead: ${m.lead_id})` : ''}`).join('\n')}`
+      : '';
+
     const systemPrompt = `Eres Micro, el asistente virtual de MalagaMicro CRM. Eres un pequeño robot amigable y tienes las mismas capacidades que un administrador.
 
 Fecha actual: ${today}
@@ -1070,6 +1175,7 @@ HERRAMIENTAS DISPONIBLES:
 - sync_inbox_imap (sincronizar tu buzón ia@malagamicro.com desde el servidor)
 - read_email (leer el contenido completo de un correo)
 - search_emails (buscar correos por asunto, remitente o contenido)
+- get_ai_memories (consultar recuerdos almacenados sobre leads o usuario)
 
 ✍️ ESCRITURA (REQUIEREN CONFIRMACIÓN):
 - send_internal_message, send_email (envía desde ia@malagamicro.com), send_whatsapp
@@ -1078,8 +1184,17 @@ HERRAMIENTAS DISPONIBLES:
 - create_calendar_event (puede añadir participantes del equipo), delete_calendar_event
 - update_apps_config (personalizar el hub de aplicaciones: cambiar iconos, colores, categorías, tamaño)
 
+🧠 MEMORIA (ejecución directa, NO requieren confirmación):
+- save_ai_memory: Guarda automáticamente información relevante tras conversaciones (preferencias del cliente, acuerdos, datos clave). Categorías: general, preference, interaction, note.
+- delete_ai_memory: Eliminar un recuerdo obsoleto.
+
+INSTRUCCIONES DE MEMORIA:
+- Al detectar información importante sobre un lead o usuario durante la conversación, guárdala automáticamente con save_ai_memory.
+- Ejemplos: preferencias de contacto, acuerdos comerciales, datos relevantes mencionados, historial de interacciones clave.
+- Usa los recuerdos cargados al inicio para personalizar tus respuestas y dar contexto.
+
 REGLA CRÍTICA DE CONFIRMACIÓN:
-Para TODAS las acciones de escritura, DEBES seguir este flujo:
+Para TODAS las acciones de escritura (excepto memoria), DEBES seguir este flujo:
 1. Primera llamada: usa confirmed=false. La herramienta te devolverá un resumen para el usuario.
 2. Muestra ese resumen al usuario y pregunta si confirma.
 3. Cuando el usuario confirme ("sí", "confirma", "dale", "ok", "adelante"), ejecuta la herramienta de nuevo con confirmed=true.
@@ -1087,7 +1202,7 @@ Para TODAS las acciones de escritura, DEBES seguir este flujo:
 
 NUNCA ejecutes una acción de escritura con confirmed=true sin que el usuario haya confirmado explícitamente en el chat.
 
-Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplexity).`;
+Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplexity).${memoryContext}`;
 
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
     if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured");
