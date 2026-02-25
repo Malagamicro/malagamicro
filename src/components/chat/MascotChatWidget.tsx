@@ -31,10 +31,10 @@ export function MascotChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  // Ultra-simple drag: ref-based, no React state during drag
-  const elRef = useRef<HTMLElement | null>(null);
+  // Ultra-simple drag: direct DOM, mousemove for max speed
+  const elRef = useRef<HTMLDivElement | null>(null);
   const posRef = useRef({ x: Math.max(0, window.innerWidth - 80), y: Math.max(0, window.innerHeight - 80) });
-  const dragData = useRef<{ sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
 
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,10 +60,10 @@ export function MascotChatWidget() {
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
   useEffect(() => { if (isOpen && !isMinimized) inputRef.current?.focus(); }, [isOpen, isMinimized]);
 
-  // Attach native listeners for drag — no React overhead
+  // Attach native mousemove/mouseup for drag — fastest possible, no pointer capture issues
   useEffect(() => {
-    const onMove = (e: PointerEvent) => {
-      const d = dragData.current;
+    const onMove = (e: MouseEvent) => {
+      const d = dragRef.current;
       if (!d || !elRef.current) return;
       const dx = e.clientX - d.sx;
       const dy = e.clientY - d.sy;
@@ -74,27 +74,54 @@ export function MascotChatWidget() {
       const nx = Math.max(0, Math.min(window.innerWidth - ew, d.ox + dx));
       const ny = Math.max(0, Math.min(window.innerHeight - eh, d.oy + dy));
       posRef.current = { x: nx, y: ny };
-      elRef.current.style.left = nx + 'px';
-      elRef.current.style.top = ny + 'px';
+      elRef.current.style.transform = `translate(${nx}px, ${ny}px)`;
     };
     const onUp = () => {
-      // Keep moved flag accessible for onClick — clear data after a tick
-      setTimeout(() => { dragData.current = null; }, 0);
+      if (dragRef.current) {
+        const wasMoved = dragRef.current.moved;
+        setTimeout(() => { dragRef.current = null; }, 0);
+      }
     };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    // Also support touch
+    const onTouchMove = (e: TouchEvent) => {
+      const d = dragRef.current;
+      if (!d || !elRef.current) return;
+      const t = e.touches[0];
+      const dx = t.clientX - d.sx;
+      const dy = t.clientY - d.sy;
+      if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+      d.moved = true;
+      e.preventDefault();
+      const ew = elRef.current.offsetWidth;
+      const eh = elRef.current.offsetHeight;
+      const nx = Math.max(0, Math.min(window.innerWidth - ew, d.ox + dx));
+      const ny = Math.max(0, Math.min(window.innerHeight - eh, d.oy + dy));
+      posRef.current = { x: nx, y: ny };
+      elRef.current.style.transform = `translate(${nx}px, ${ny}px)`;
+    };
+    const onTouchEnd = () => {
+      setTimeout(() => { dragRef.current = null; }, 0);
+    };
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
     return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
     };
   }, []);
 
-  const startDrag = (e: React.PointerEvent) => {
+  const startDrag = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
-    dragData.current = { sx: e.clientX, sy: e.clientY, ox: posRef.current.x, oy: posRef.current.y, moved: false };
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    dragRef.current = { sx: clientX, sy: clientY, ox: posRef.current.x, oy: posRef.current.y, moved: false };
   };
 
-  const wasDragged = () => !!dragData.current?.moved;
+  const wasDragged = () => !!dragRef.current?.moved;
 
   const handleNewConversation = () => {
     setMessages([]);
@@ -130,42 +157,46 @@ export function MascotChatWidget() {
   // Closed — floating button
   if (!isOpen) {
     return (
-      <button
-        ref={el => { elRef.current = el; if (el) { el.style.left = posRef.current.x + 'px'; el.style.top = posRef.current.y + 'px'; } }}
-        onPointerDown={startDrag}
+      <div
+        ref={el => { elRef.current = el; if (el) { el.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`; } }}
+        onMouseDown={startDrag}
+        onTouchStart={startDrag}
         onClick={() => { if (!wasDragged()) setIsOpen(true); }}
-        style={{ position: 'fixed' }}
+        style={{ position: 'fixed', left: 0, top: 0, willChange: 'transform' }}
         className="z-50 touch-none w-14 h-14 rounded-full shadow-2xl bg-card border border-primary/20 flex items-center justify-center cursor-grab active:cursor-grabbing"
+        role="button"
         aria-label="Abrir chat con Micro"
       >
         <img src={mascotImage} alt="Micro" className="w-12 h-12 object-contain pointer-events-none" />
         <span className="absolute -top-2 -right-1 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full font-medium shadow pointer-events-none">
           {messages.length > 0 ? `${messages.length}` : '¡Hola!'}
         </span>
-      </button>
+      </div>
     );
   }
 
   // Minimized
   if (isMinimized) {
     return (
-      <button
-        ref={el => { elRef.current = el; if (el) { el.style.left = posRef.current.x + 'px'; el.style.top = posRef.current.y + 'px'; } }}
-        onPointerDown={startDrag}
+      <div
+        ref={el => { elRef.current = el; if (el) { el.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`; } }}
+        onMouseDown={startDrag}
+        onTouchStart={startDrag}
         onClick={() => { if (!wasDragged()) setIsMinimized(false); }}
-        style={{ position: 'fixed' }}
+        style={{ position: 'fixed', left: 0, top: 0, willChange: 'transform' }}
         className="z-50 touch-none w-12 h-12 rounded-full shadow-xl bg-primary text-primary-foreground flex items-center justify-center cursor-grab active:cursor-grabbing"
+        role="button"
       >
         <img src={mascotImage} alt="Micro" className="w-10 h-10 object-contain pointer-events-none" />
-      </button>
+      </div>
     );
   }
 
   // Open chat
   return (
     <div
-      ref={el => { elRef.current = el; if (el && !isMobile) { el.style.left = posRef.current.x + 'px'; el.style.top = posRef.current.y + 'px'; } }}
-      style={isMobile ? { position: 'fixed', inset: 0 } : { position: 'fixed' }}
+      ref={el => { elRef.current = el; if (el && !isMobile) { el.style.transform = `translate(${posRef.current.x}px, ${posRef.current.y}px)`; } }}
+      style={isMobile ? { position: 'fixed', inset: 0 } : { position: 'fixed', left: 0, top: 0, willChange: 'transform' }}
       className={cn(
         'z-50 flex flex-col bg-background shadow-2xl border',
         isMobile
@@ -175,7 +206,8 @@ export function MascotChatWidget() {
     >
       {/* Header — drag handle */}
       <div
-        onPointerDown={startDrag}
+        onMouseDown={startDrag}
+        onTouchStart={startDrag}
         className="flex items-center gap-3 p-4 border-b bg-gradient-to-r from-primary/10 to-primary/5 cursor-grab active:cursor-grabbing touch-none select-none"
       >
         <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center border shadow-sm pointer-events-none">
@@ -185,13 +217,13 @@ export function MascotChatWidget() {
           <h3 className="font-semibold text-sm">Micro</h3>
           <p className="text-xs text-muted-foreground">Asistente virtual 🤖</p>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onPointerDown={e => e.stopPropagation()} onClick={handleNewConversation} title="Nueva conversación">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onMouseDown={e => e.stopPropagation()} onClick={handleNewConversation} title="Nueva conversación">
           <Plus className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onPointerDown={e => e.stopPropagation()} onClick={() => setIsMinimized(true)}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onMouseDown={e => e.stopPropagation()} onClick={() => setIsMinimized(true)}>
           <Minimize2 className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onPointerDown={e => e.stopPropagation()} onClick={() => setIsOpen(false)}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onMouseDown={e => e.stopPropagation()} onClick={() => setIsOpen(false)}>
           <X className="h-4 w-4" />
         </Button>
       </div>
