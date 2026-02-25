@@ -1024,10 +1024,10 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!OPENROUTER_API_KEY) {
+      throw new Error("OPENROUTER_API_KEY is not configured");
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -1089,35 +1089,70 @@ NUNCA ejecutes una acción de escritura con confirmed=true sin que el usuario ha
 
 Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplexity).`;
 
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured");
+
+    const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+    const MODEL_CHAIN = [
+      "anthropic/claude-4-6-sonnet",
+      "google/gemini-2.0-pro",
+      "anthropic/claude-4-5-sonnet",
+    ];
+
+    const openRouterHeaders = {
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://malagamicro.lovable.app",
+      "X-Title": "MalagaMicro CRM",
+    };
+
+    // Helper: try models in fallback order
+    async function callWithFallback(msgs: any[], useTools = true) {
+      for (const model of MODEL_CHAIN) {
+        try {
+          console.log(`[mascot-chat] Trying model: ${model}`);
+          const body: Record<string, unknown> = { model, messages: msgs };
+          if (useTools) { body.tools = tools; body.tool_choice = "auto"; }
+
+          const resp = await fetch(OPENROUTER_URL, {
+            method: "POST",
+            headers: openRouterHeaders,
+            body: JSON.stringify(body),
+          });
+
+          if (resp.status === 429) {
+            return { error: true, status: 429, message: "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo." };
+          }
+          if (resp.status === 402) {
+            return { error: true, status: 402, message: "Créditos de IA agotados en OpenRouter." };
+          }
+          if (!resp.ok) {
+            const errText = await resp.text();
+            console.warn(`[mascot-chat] Model ${model} failed: ${resp.status} ${errText}`);
+            continue;
+          }
+
+          const data = await resp.json();
+          console.log(`[mascot-chat] Success with model: ${model}`);
+          return { error: false, data, model };
+        } catch (err) {
+          console.warn(`[mascot-chat] Model ${model} threw:`, err);
+          continue;
+        }
+      }
+      return { error: true, status: 502, message: "Todos los modelos de IA fallaron." };
+    }
+
     let chatMessages = [{ role: "system", content: systemPrompt }, ...(messages ?? [])];
 
-    let response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-3-flash-preview", messages: chatMessages, tools, tool_choice: "auto" }),
-    });
-
-    if (!response.ok) {
-      const status = response.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos de IA agotados. Añade créditos en la configuración." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errorText = await response.text();
-      console.error("AI Gateway error:", status, errorText);
-      return new Response(JSON.stringify({ error: "Error al conectar con Micro" }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    let result = await callWithFallback(chatMessages);
+    if (result.error) {
+      return new Response(JSON.stringify({ error: result.message }), {
+        status: result.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    let data = await response.json();
-    let assistantMessage = data.choices?.[0]?.message;
+    let assistantMessage = result.data.choices?.[0]?.message;
 
     const MAX_TOOL_ITERATIONS = 8;
     let iterations = 0;
@@ -1131,19 +1166,13 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
         let toolArgs: Record<string, unknown> = {};
         try { toolArgs = JSON.parse(toolCall.function.arguments || "{}"); } catch { toolArgs = {}; }
 
-        const result = await executeToolCall(supabase, userId, toolName, toolArgs);
-        chatMessages.push({ role: "tool", tool_call_id: toolCall.id, content: result });
+        const toolResult = await executeToolCall(supabase, userId, toolName, toolArgs);
+        chatMessages.push({ role: "tool", tool_call_id: toolCall.id, content: toolResult });
       }
 
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "google/gemini-3-flash-preview", messages: chatMessages, tools, tool_choice: "auto" }),
-      });
-
-      if (!response.ok) { console.error("AI tool loop error:", response.status); break; }
-      data = await response.json();
-      assistantMessage = data.choices?.[0]?.message;
+      result = await callWithFallback(chatMessages);
+      if (result.error) { console.error("AI tool loop error:", result.status); break; }
+      assistantMessage = result.data.choices?.[0]?.message;
     }
 
     const finalContent = assistantMessage?.content || "No tengo respuesta en este momento.";
