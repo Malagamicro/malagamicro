@@ -1,9 +1,15 @@
+import { useEffect } from 'react';
 import { WahaSessionManager } from './WahaSessionManager';
 import { WhatsAppSimpleForm } from './WhatsAppSimpleForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Send } from 'lucide-react';
 
-export function WhatsAppPanel() {
+interface WhatsAppPanelProps {
+  prefillPhone?: string | null;
+  onPrefillConsumed?: () => void;
+}
+
+export function WhatsAppPanel({ prefillPhone, onPrefillConsumed }: WhatsAppPanelProps) {
   return (
     <div className="space-y-4">
       <WahaSessionManager />
@@ -19,7 +25,7 @@ export function WhatsAppPanel() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <WhatsAppSimpleForm />
+          <WhatsAppSimpleForm prefillPhone={prefillPhone} onPrefillConsumed={onPrefillConsumed} />
         </CardContent>
       </Card>
     </div>

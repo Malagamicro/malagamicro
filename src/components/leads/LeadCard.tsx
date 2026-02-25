@@ -2,7 +2,8 @@ import { Lead } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
 import { LeadScoreBadge } from './LeadScoreBadge';
 import { Badge } from '@/components/ui/badge';
-import { Building2, MapPin, Phone, Mail, Monitor, ExternalLink, Smartphone, PhoneCall, MessageCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Building2, MapPin, Phone, Mail, Monitor, ExternalLink, Smartphone, PhoneCall, MessageCircle, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPhoneTypeDisplay } from '@/lib/phoneEnrichment';
 import {
@@ -15,9 +16,11 @@ import {
 interface LeadCardProps {
   lead: Lead;
   onClick: () => void;
+  onQuickWhatsApp?: (phone: string) => void;
+  onQuickEmail?: (email: string) => void;
 }
 
-export function LeadCard({ lead, onClick }: LeadCardProps) {
+export function LeadCard({ lead, onClick, onQuickWhatsApp, onQuickEmail }: LeadCardProps) {
   // Build Google Maps URL for address
   const getMapsUrl = () => {
     const query = lead.address || lead.city;
@@ -146,6 +149,41 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
             <span className="px-2 py-0.5 text-xs bg-muted text-muted-foreground rounded-md">
               +{lead.tags.length - 3}
             </span>
+          )}
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      {(onQuickWhatsApp || onQuickEmail) && (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+          {onQuickWhatsApp && (lead.phone || lead.mobilePhone) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-7 text-xs flex-1 text-green-600 border-green-500/30 hover:bg-green-500/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                const phone = lead.mobilePhone || lead.phone?.replace(/\D/g, '') || '';
+                onQuickWhatsApp(phone);
+              }}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              WhatsApp
+            </Button>
+          )}
+          {onQuickEmail && lead.email && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-7 text-xs flex-1 text-primary border-primary/30 hover:bg-primary/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                onQuickEmail(lead.email!);
+              }}
+            >
+              <Mail className="w-3.5 h-3.5" />
+              Email
+            </Button>
           )}
         </div>
       )}

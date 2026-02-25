@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useEmailTemplates, useEmailCampaigns } from '@/hooks/useEmailCampaigns';
 import { useEmailProfiles } from '@/hooks/useEmailProfiles';
 import { sanitizeHtml } from '@/lib/sanitize';
@@ -67,7 +67,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { EmailTemplateEditor, EmailBlock, generateEmailHtml } from './EmailTemplateEditor';
 import { AITemplateChat } from './AITemplateChat';
 
-export function EmailCampaigns() {
+interface EmailCampaignsProps {
+  prefillEmail?: string | null;
+  onPrefillConsumed?: () => void;
+}
+
+export function EmailCampaigns({ prefillEmail, onPrefillConsumed }: EmailCampaignsProps) {
   const { templates, addTemplate, deleteTemplate, isAddingTemplate } = useEmailTemplates();
   const { campaigns, createCampaign, sendCampaign, deleteCampaign, isCreatingCampaign, isSendingCampaign } = useEmailCampaigns();
   const { profiles, loading: profilesLoading } = useEmailProfiles();
@@ -90,6 +95,18 @@ export function EmailCampaigns() {
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+
+  // Handle prefill email from quick action
+  useEffect(() => {
+    if (prefillEmail) {
+      const matchingLead = leads.find(l => l.email === prefillEmail);
+      if (matchingLead) {
+        setSelectedLeadIds([matchingLead.id]);
+      }
+      setShowCampaignDialog(true);
+      onPrefillConsumed?.();
+    }
+  }, [prefillEmail, leads]);
 
   // Filter leads with valid email and not unsubscribed
   const eligibleLeads = leads.filter(l => l.email && !l.emailUnsubscribed);

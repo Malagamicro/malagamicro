@@ -22,6 +22,8 @@ import {
   AlertTriangle,
   FileSpreadsheet,
   X,
+  Mail,
+  MessageCircle,
 } from 'lucide-react';
 import {
   Select,
@@ -61,6 +63,8 @@ interface LeadsListProps {
   onAddLead: () => void;
   onImportLeads: () => void;
   onImportFromGoogleSheets: () => void;
+  onQuickWhatsApp?: (phone: string) => void;
+  onQuickEmail?: (email: string) => void;
   // Pagination props
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
@@ -74,6 +78,8 @@ export function LeadsList({
   onAddLead, 
   onImportLeads,
   onImportFromGoogleSheets,
+  onQuickWhatsApp,
+  onQuickEmail,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
@@ -384,7 +390,7 @@ export function LeadsList({
                     onClick={(e) => e.stopPropagation()}
                   />
                 </div>
-                <LeadCard lead={lead} onClick={() => onViewLead(lead.id)} />
+                <LeadCard lead={lead} onClick={() => onViewLead(lead.id)} onQuickWhatsApp={onQuickWhatsApp} onQuickEmail={onQuickEmail} />
               </div>
             ))}
           </div>
@@ -406,6 +412,7 @@ export function LeadsList({
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Teléfono</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Estado</th>
                 <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Segmento</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -439,6 +446,33 @@ export function LeadsList({
                     <span className="text-xs font-medium uppercase text-muted-foreground">
                       {lead.segment}
                     </span>
+                  </td>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                      {onQuickWhatsApp && (lead.phone || lead.mobilePhone) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                          onClick={() => {
+                            const phone = lead.mobilePhone || lead.phone?.replace(/\D/g, '') || '';
+                            onQuickWhatsApp(phone);
+                          }}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {onQuickEmail && lead.email && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-primary hover:bg-primary/10"
+                          onClick={() => onQuickEmail(lead.email!)}
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
