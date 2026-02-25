@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,10 +8,22 @@ import { MessageCircle, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { sendText } from "@/services/evolutionService";
 
-export function WhatsAppSimpleForm() {
+interface WhatsAppSimpleFormProps {
+  prefillPhone?: string | null;
+  onPrefillConsumed?: () => void;
+}
+
+export function WhatsAppSimpleForm({ prefillPhone, onPrefillConsumed }: WhatsAppSimpleFormProps) {
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+
+  useEffect(() => {
+    if (prefillPhone) {
+      setPhone(prefillPhone);
+      onPrefillConsumed?.();
+    }
+  }, [prefillPhone]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

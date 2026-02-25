@@ -164,6 +164,18 @@ const IndexContent = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isGoogleSheetsImportOpen, setIsGoogleSheetsImportOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [pendingWhatsAppPhone, setPendingWhatsAppPhone] = useState<string | null>(null);
+  const [pendingCampaignEmail, setPendingCampaignEmail] = useState<string | null>(null);
+
+  const handleQuickWhatsApp = (phone: string) => {
+    setPendingWhatsAppPhone(phone);
+    setActiveTab('whatsapp');
+  };
+
+  const handleQuickEmail = (email: string) => {
+    setPendingCampaignEmail(email);
+    setActiveTab('campaigns');
+  };
   const { trackNavigation, trackLogin } = useInteractionTracking();
 
   // Track login on mount
@@ -368,6 +380,8 @@ const IndexContent = () => {
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             onLoadMore={() => fetchNextPage()}
+            onQuickWhatsApp={handleQuickWhatsApp}
+            onQuickEmail={handleQuickEmail}
           />
         );
       case 'prospeccion':
@@ -412,7 +426,7 @@ const IndexContent = () => {
               onBack={goApps}
             />
             <div className="flex-1 min-h-0 overflow-auto">
-              <EmailCampaigns />
+              <EmailCampaigns prefillEmail={pendingCampaignEmail} onPrefillConsumed={() => setPendingCampaignEmail(null)} />
             </div>
           </div>
         );
@@ -473,7 +487,7 @@ const IndexContent = () => {
               onBack={goApps}
             />
             <div className="flex-1 min-h-0 p-3 sm:p-6">
-              <WhatsAppPanel />
+              <WhatsAppPanel prefillPhone={pendingWhatsAppPhone} onPrefillConsumed={() => setPendingWhatsAppPhone(null)} />
             </div>
           </div>
         );
