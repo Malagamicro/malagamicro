@@ -115,7 +115,7 @@ export function AIMemoryManager() {
             memory_key: formKey,
             memory_value: memoryValue,
             category: formCategory,
-            lead_id: formLeadId || null,
+            lead_id: null,
           })
           .eq('id', editingMemory.id) as any);
         if (error) throw error;
@@ -128,7 +128,7 @@ export function AIMemoryManager() {
             memory_key: formKey,
             memory_value: memoryValue,
             category: formCategory,
-            lead_id: formLeadId || null,
+            lead_id: null,
           }) as any);
         if (error) throw error;
         toast.success('Memoria añadida');
@@ -410,7 +410,7 @@ export function AIMemoryManager() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isAddOpen} onOpenChange={(open) => { if (!open) resetForm(); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg bg-background border shadow-lg [&>*]:bg-transparent">
           <DialogHeader>
             <DialogTitle>{editingMemory ? 'Editar memoria' : 'Añadir memoria'}</DialogTitle>
           </DialogHeader>
@@ -432,28 +432,13 @@ export function AIMemoryManager() {
                 rows={6}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Categoría</Label>
-                <Select value={formCategory} onValueChange={setFormCategory}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map(c => (
-                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Lead ID (opcional)</Label>
-                <Input
-                  placeholder="UUID del lead"
-                  value={formLeadId}
-                  onChange={(e) => setFormLeadId(e.target.value)}
-                />
-              </div>
+            <div>
+              <Label>Categoría</Label>
+              <Input
+                placeholder="ej: general, nota, preferencia..."
+                value={formCategory}
+                onChange={(e) => setFormCategory(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter>
@@ -468,7 +453,7 @@ export function AIMemoryManager() {
 
       {/* View Dialog */}
       <Dialog open={!!viewingMemory} onOpenChange={(open) => { if (!open) setViewingMemory(null); }}>
-        <DialogContent className="max-w-2xl max-h-[80vh]">
+        <DialogContent className="max-w-2xl max-h-[80vh] bg-background border shadow-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5" />
