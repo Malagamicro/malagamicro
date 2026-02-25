@@ -10,8 +10,8 @@ serve(async (req) => {
 
   try {
     const { prompt, currentTheme } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured");
 
     const systemPrompt = `Eres un diseñador de temas UI experto para un CRM. El usuario te describe cómo quiere que se vea su aplicación y tú generas un tema COMPLETO que incluye colores, sidebar, estados de leads, y configuración visual.
 
@@ -73,14 +73,19 @@ Reglas:
 - Adapta la organización del sidebar según el tipo de uso que describe el usuario
 - NO incluyas texto explicativo, SOLO el JSON`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured");
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://malagamicro.lovable.app",
+        "X-Title": "MalagaMicro CRM",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "anthropic/claude-4-6-sonnet",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Tema actual: ${JSON.stringify(currentTheme || {})}. Petición del usuario: ${prompt}` },
