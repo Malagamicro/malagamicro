@@ -46,6 +46,7 @@ function mapRowToLead(row: any): Lead {
     whatsappVerified: row.whatsapp_verified ?? undefined,
     // WhatsApp counter
     whatsappSentCount: row.whatsapp_sent_count ?? 0,
+    googlePlaceId: (row as any).google_place_id ?? undefined,
   };
 }
 
@@ -217,6 +218,7 @@ export function useLeads() {
         folder_id: lead.folderId || null,
         phone_type: phoneType,
         mobile_phone: phoneType === 'mobile' ? lead.phone?.replace(/\D/g, '').replace(/^34/, '') : null,
+        google_place_id: (lead as any).googlePlaceId || null,
       }).select('id, phone, website').single();
       
       if (error) throw error;

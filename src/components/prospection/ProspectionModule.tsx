@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   Search, Loader2, AlertCircle, Phone, Globe, Star,
   Building2, Plus, ChevronRight, Download, X, CheckCircle2,
+  Smartphone, PhoneCall, Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLeads } from '@/hooks/useLeads';
@@ -22,7 +23,9 @@ interface PlaceResult {
   address: string;
   website?: string;
   phone?: string;
+  phoneType?: 'mobile' | 'landline' | 'unknown';
   category: string;
+  googleTypes?: string[];
   rating?: number;
   userRatingsTotal?: number;
   placeId: string;
@@ -31,25 +34,52 @@ interface PlaceResult {
 
 const SECTORS = [
   { value: 'all', label: 'Todos los sectores' },
-  { value: 'restaurant', label: 'Restaurantes' },
-  { value: 'retail', label: 'Tiendas / Retail' },
-  { value: 'health', label: 'Salud / Clínicas' },
-  { value: 'professional', label: 'Servicios profesionales' },
-  { value: 'franchise', label: 'Franquicias' },
-  { value: 'gym', label: 'Gimnasios' },
-  { value: 'beauty', label: 'Peluquerías / Estética' },
-  { value: 'automotive', label: 'Talleres / Automóvil' },
-  { value: 'education', label: 'Educación / Academias' },
-  { value: 'hotel', label: 'Hoteles / Alojamiento' },
-  { value: 'tech', label: 'Tecnología / Informática' },
-  { value: 'construction', label: 'Construcción / Reformas' },
-  { value: 'real_estate', label: 'Inmobiliarias' },
+  { value: 'restaurant', label: '🍽️ Restaurantes' },
+  { value: 'retail', label: '🏪 Tiendas / Retail' },
+  { value: 'health', label: '🏥 Salud / Clínicas' },
+  { value: 'professional', label: '💼 Servicios profesionales' },
+  { value: 'franchise', label: '🏢 Franquicias' },
+  { value: 'gym', label: '💪 Gimnasios' },
+  { value: 'beauty', label: '💇 Peluquerías / Estética' },
+  { value: 'automotive', label: '🔧 Talleres / Automóvil' },
+  { value: 'education', label: '📚 Educación / Academias' },
+  { value: 'hotel', label: '🏨 Hoteles / Alojamiento' },
+  { value: 'tech', label: '💻 Tecnología / Informática' },
+  { value: 'construction', label: '🏗️ Construcción / Reformas' },
+  { value: 'real_estate', label: '🏠 Inmobiliarias' },
+  { value: 'supermarket', label: '🛒 Supermercados' },
+  { value: 'pharmacy', label: '💊 Farmacias' },
+  { value: 'bakery', label: '🍞 Panaderías' },
+  { value: 'dentist', label: '🦷 Dentistas' },
+  { value: 'veterinary', label: '🐾 Veterinarios' },
+  { value: 'laundry', label: '👕 Lavanderías' },
+  { value: 'gas_station', label: '⛽ Gasolineras' },
 ];
 
 const containerStyle = { width: '100%', height: '100%' };
 const defaultCenter = { lat: 36.7213, lng: -4.4214 };
 
 const LIBRARIES: ("places")[] = ['places'];
+
+function PhoneTypeBadge({ phoneType, phone }: { phoneType?: string; phone?: string }) {
+  if (!phone) return null;
+  
+  if (phoneType === 'mobile') {
+    return (
+      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-green-500/10 text-green-600 border-green-500/30">
+        <Smartphone className="w-2.5 h-2.5 mr-0.5" /> Móvil
+      </Badge>
+    );
+  }
+  if (phoneType === 'landline') {
+    return (
+      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-muted text-muted-foreground border-border">
+        <PhoneCall className="w-2.5 h-2.5 mr-0.5" /> Fijo
+      </Badge>
+    );
+  }
+  return null;
+}
 
 function ProspectionMap({ apiKey }: { apiKey: string }) {
   const [places, setPlaces] = useState<PlaceResult[]>([]);
@@ -58,23 +88,29 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('Málaga');
   const [sector, setSector] = useState('all');
-  const [radius, setRadius] = useState([5]); // km
+  const [radius, setRadius] = useState([5]);
   const [radiusEnabled, setRadiusEnabled] = useState(true);
   const [mapCenter, setMapCenter] = useState(defaultCenter);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
+  const [recursiveMode, setRecursiveMode] = useState(false);
+  const [totalFetched, setTotalFetched] = useState(0);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
 
   const { addLead, leads } = useLeads();
 
-  // Build a set of existing lead names for duplicate detection (case-insensitive)
+  // Build sets for duplicate detection by placeId and name
+  const existingPlaceIds = new Set(
+    (leads || []).map((l: any) => l.google_place_id || l.googlePlaceId).filter(Boolean)
+  );
   const existingLeadNames = new Set(
     (leads || []).map((l: any) => l.companyName?.toLowerCase().trim()).filter(Boolean)
   );
 
-  const isLeadSaved = (placeName: string) => existingLeadNames.has(placeName?.toLowerCase().trim());
+  const isLeadSaved = (place: PlaceResult) => 
+    existingPlaceIds.has(place.placeId) || existingLeadNames.has(place.name?.toLowerCase().trim());
 
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
@@ -88,7 +124,6 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
   }, []);
   const onUnmount = useCallback(() => setMap(null), []);
 
-  // Geocode location text to center the map
   const geocodeLocation = useCallback(async (loc: string) => {
     if (!geocoderRef.current || !loc.trim()) return;
     setIsGeocodingLocation(true);
@@ -117,7 +152,6 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
 
   const handleSearch = async (pageToken?: string) => {
     setIsSearching(true);
-    // If first search, geocode the location to center the map
     if (!pageToken && location.trim()) {
       await geocodeLocation(location);
     }
@@ -127,28 +161,37 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
         location: location.trim() || undefined,
         category: sector,
         pageToken,
+        recursive: recursiveMode && !pageToken,
       };
-      // If no location text, send circle center coords + radius
+
+      // Use Google type filter when sector is selected
+      if (sector && sector !== 'all') {
+        body.googleType = sector;
+      }
+
       if (!location.trim() && radiusEnabled) {
         body.lat = mapCenter.lat;
         body.lng = mapCenter.lng;
         body.radiusKm = radius[0];
       }
-      const { data, error } = await supabase.functions.invoke('search-places', {
-        body,
-      });
+      const { data, error } = await supabase.functions.invoke('search-places', { body });
 
       if (error) throw error;
 
       const newPlaces = data?.places || [];
       if (pageToken) {
-        setPlaces(prev => [...prev, ...newPlaces]);
+        setPlaces(prev => {
+          // Deduplicate by placeId when appending
+          const existingIds = new Set(prev.map(p => p.placeId));
+          const unique = newPlaces.filter((p: PlaceResult) => !existingIds.has(p.placeId));
+          return [...prev, ...unique];
+        });
       } else {
         setPlaces(newPlaces);
       }
       setNextPageToken(data?.nextPageToken || null);
+      setTotalFetched(data?.totalFetched || newPlaces.length);
 
-      // Fit map to results
       if (newPlaces.length > 0 && map && !pageToken) {
         const bounds = new google.maps.LatLngBounds();
         newPlaces.forEach((p: PlaceResult) => {
@@ -161,6 +204,8 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
 
       if (newPlaces.length === 0 && !pageToken) {
         toast.info('No se encontraron resultados para esta búsqueda');
+      } else if (recursiveMode && !pageToken) {
+        toast.success(`${newPlaces.length} resultados obtenidos (paginación completa)`);
       }
     } catch (err) {
       console.error(err);
@@ -171,7 +216,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
   };
 
   const handleAddAsLead = (place: PlaceResult) => {
-    if (isLeadSaved(place.name)) {
+    if (isLeadSaved(place)) {
       toast.error(`"${place.name}" ya está guardado como lead`);
       return;
     }
@@ -187,6 +232,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
       segment: 'pyme',
       latitude: place.location?.lat,
       longitude: place.location?.lng,
+      googlePlaceId: place.placeId,
     } as any);
     toast.success(`${place.name} añadido como lead`);
     setTimeout(() => setAddingId(null), 500);
@@ -206,28 +252,30 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
         { header: 'Nombre', key: 'name', width: 30 },
         { header: 'Dirección', key: 'address', width: 40 },
         { header: 'Teléfono', key: 'phone', width: 18 },
+        { header: 'Tipo Tel.', key: 'phoneType', width: 10 },
         { header: 'Web', key: 'website', width: 30 },
         { header: 'Valoración', key: 'rating', width: 12 },
         { header: 'Reseñas', key: 'reviews', width: 12 },
         { header: 'Categoría', key: 'category', width: 20 },
+        { header: 'Google Place ID', key: 'placeId', width: 30 },
         { header: 'Latitud', key: 'lat', width: 14 },
         { header: 'Longitud', key: 'lng', width: 14 },
       ];
-      // Style header
       sheet.getRow(1).eachCell(cell => {
-        cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
       });
       toExport.forEach(p => {
         sheet.addRow({
           name: p.name,
           address: p.address,
           phone: p.phone || '',
+          phoneType: p.phoneType === 'mobile' ? 'Móvil' : p.phoneType === 'landline' ? 'Fijo' : '',
           website: p.website || '',
           rating: p.rating || '',
           reviews: p.userRatingsTotal || '',
           category: p.category,
+          placeId: p.placeId,
           lat: p.location?.lat || '',
           lng: p.location?.lng || '',
         });
@@ -246,18 +294,18 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
     }
   };
 
-  // Export CSV
   const handleExportCSV = () => {
     const toExport = radiusEnabled ? filteredPlaces : places;
     if (toExport.length === 0) {
       toast.error('No hay resultados para exportar');
       return;
     }
-    const headers = ['Nombre', 'Dirección', 'Teléfono', 'Web', 'Valoración', 'Reseñas', 'Categoría', 'Latitud', 'Longitud'];
+    const headers = ['Nombre', 'Dirección', 'Teléfono', 'Tipo Tel.', 'Web', 'Valoración', 'Reseñas', 'Categoría', 'Google Place ID', 'Latitud', 'Longitud'];
     const rows = toExport.map(p => [
-      p.name, p.address, p.phone || '', p.website || '',
-      p.rating?.toString() || '', p.userRatingsTotal?.toString() || '',
-      p.category, p.location?.lat?.toString() || '', p.location?.lng?.toString() || '',
+      p.name, p.address, p.phone || '',
+      p.phoneType === 'mobile' ? 'Móvil' : p.phoneType === 'landline' ? 'Fijo' : '',
+      p.website || '', p.rating?.toString() || '', p.userRatingsTotal?.toString() || '',
+      p.category, p.placeId, p.location?.lat?.toString() || '', p.location?.lng?.toString() || '',
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(','))].join('\n');
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
@@ -283,12 +331,16 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
     return d <= radius[0];
   });
 
-  // Handle circle drag
   const handleCircleDragEnd = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       setMapCenter({ lat: e.latLng.lat(), lng: e.latLng.lng() });
     }
   };
+
+  // Stats
+  const mobileCount = filteredPlaces.filter(p => p.phoneType === 'mobile').length;
+  const landlineCount = filteredPlaces.filter(p => p.phoneType === 'landline').length;
+  const withPhoneCount = filteredPlaces.filter(p => p.phone).length;
 
   if (loadError) {
     return (
@@ -341,7 +393,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Sector</label>
+              <label className="text-xs font-medium text-muted-foreground">Sector (Google Type)</label>
               <Select value={sector} onValueChange={setSector}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
@@ -358,13 +410,11 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                 <label className="text-xs font-medium text-muted-foreground">
                   Radio: {radiusEnabled ? `${radius[0]} km` : 'Sin límite'}
                 </label>
-                <div className="flex items-center gap-1.5">
-                  <Switch
-                    checked={radiusEnabled}
-                    onCheckedChange={setRadiusEnabled}
-                    className="scale-75"
-                  />
-                </div>
+                <Switch
+                  checked={radiusEnabled}
+                  onCheckedChange={setRadiusEnabled}
+                  className="scale-75"
+                />
               </div>
               <Slider
                 value={radius}
@@ -376,10 +426,23 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                 disabled={!radiusEnabled}
               />
             </div>
-            <Button onClick={() => handleSearch()} disabled={isSearching} className="h-9">
-              {isSearching ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
-              Buscar
-            </Button>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={recursiveMode}
+                  onCheckedChange={setRecursiveMode}
+                  className="scale-75"
+                />
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <Zap className="w-3 h-3" />
+                  Máx. resultados
+                </label>
+              </div>
+              <Button onClick={() => handleSearch()} disabled={isSearching} className="h-9 w-full">
+                {isSearching ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
+                {recursiveMode ? 'Buscar todo' : 'Buscar'}
+              </Button>
+            </div>
             <div className="flex gap-1.5">
               <Button variant="outline" size="sm" className="h-9 flex-1" onClick={handleExport} disabled={filteredPlaces.length === 0}>
                 <Download className="w-3.5 h-3.5 mr-1.5" />
@@ -393,6 +456,35 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Stats bar */}
+      {filteredPlaces.length > 0 && (
+        <div className="flex flex-wrap gap-3 px-1">
+          <Badge variant="secondary" className="text-xs">
+            {filteredPlaces.length} resultados
+          </Badge>
+          {withPhoneCount > 0 && (
+            <Badge variant="outline" className="text-xs">
+              <Phone className="w-3 h-3 mr-1" /> {withPhoneCount} con teléfono
+            </Badge>
+          )}
+          {mobileCount > 0 && (
+            <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/30">
+              <Smartphone className="w-3 h-3 mr-1" /> {mobileCount} móviles
+            </Badge>
+          )}
+          {landlineCount > 0 && (
+            <Badge variant="outline" className="text-xs">
+              <PhoneCall className="w-3 h-3 mr-1" /> {landlineCount} fijos
+            </Badge>
+          )}
+          {filteredPlaces.filter(p => isLeadSaved(p)).length > 0 && (
+            <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30">
+              <CheckCircle2 className="w-3 h-3 mr-1" /> {filteredPlaces.filter(p => isLeadSaved(p)).length} ya guardados
+            </Badge>
+          )}
+        </div>
+      )}
 
       {/* Map + Results */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-[500px]">
@@ -433,7 +525,6 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                     draggable: true,
                   }}
                 />
-                {/* Center marker for the circle */}
                 <Marker
                   position={mapCenter}
                   draggable
@@ -460,7 +551,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                 onClick={() => setSelectedPlace(place)}
                 icon={{
                   path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-                  fillColor: '#ef4444',
+                  fillColor: place.phoneType === 'mobile' ? '#22c55e' : '#ef4444',
                   fillOpacity: 0.9,
                   strokeColor: '#fff',
                   strokeWeight: 1.5,
@@ -483,7 +574,18 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                       <span style={{ color: '#999' }}>({selectedPlace.userRatingsTotal})</span>
                     </div>
                   )}
-                  {isLeadSaved(selectedPlace.name) ? (
+                  {selectedPlace.phone && (
+                    <div className="flex items-center gap-1 text-xs">
+                      <span>{selectedPlace.phone}</span>
+                      <span style={{ 
+                        color: selectedPlace.phoneType === 'mobile' ? '#16a34a' : '#666',
+                        fontWeight: 500 
+                      }}>
+                        ({selectedPlace.phoneType === 'mobile' ? '📱 Móvil' : selectedPlace.phoneType === 'landline' ? '☎️ Fijo' : ''})
+                      </span>
+                    </div>
+                  )}
+                  {isLeadSaved(selectedPlace) ? (
                     <div className="flex items-center gap-1.5 mt-1 px-3 py-1.5 text-xs rounded" style={{ background: '#16a34a22', color: '#16a34a' }}>
                       <CheckCircle2 className="w-3.5 h-3.5" /> Ya guardado como lead
                     </div>
@@ -501,7 +603,6 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
             )}
           </GoogleMap>
 
-          {/* Results count overlay */}
           <div className="absolute top-3 left-3 z-10 bg-card/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md border border-border">
             <p className="text-xs font-medium">
               {filteredPlaces.length} resultado{filteredPlaces.length !== 1 ? 's' : ''}{radiusEnabled ? ' en zona' : ''}
@@ -537,7 +638,9 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
             {isSearching && places.length === 0 && (
               <div className="p-8 text-center">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-                <p className="text-sm text-muted-foreground mt-2">Buscando...</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {recursiveMode ? 'Obteniendo todos los resultados...' : 'Buscando...'}
+                </p>
               </div>
             )}
             {filteredPlaces.map(place => (
@@ -557,7 +660,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                       <div className="flex items-center gap-2">
                         <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
                         <p className="text-sm font-medium truncate">{place.name}</p>
-                        {isLeadSaved(place.name) && (
+                        {isLeadSaved(place) && (
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-green-500/10 text-green-600 border-green-500/30 shrink-0">
                             <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" /> Guardado
                           </Badge>
@@ -577,6 +680,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                             <span>{place.phone}</span>
                           </div>
                         )}
+                        <PhoneTypeBadge phoneType={place.phoneType} phone={place.phone} />
                         {place.website && (
                           <a
                             href={`https://${place.website}`}
@@ -591,7 +695,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
                         )}
                       </div>
                     </div>
-                    {isLeadSaved(place.name) ? (
+                    {isLeadSaved(place) ? (
                       <div className="h-7 w-7 flex items-center justify-center shrink-0">
                         <CheckCircle2 className="w-4 h-4 text-green-500" />
                       </div>
@@ -614,7 +718,7 @@ function ProspectionMap({ apiKey }: { apiKey: string }) {
               </div>
             ))}
           </div>
-          {nextPageToken && (
+          {nextPageToken && !recursiveMode && (
             <div className="p-2 border-t border-border">
               <Button
                 variant="outline"
