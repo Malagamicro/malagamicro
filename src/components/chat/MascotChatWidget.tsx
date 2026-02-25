@@ -88,8 +88,8 @@ export function MascotChatWidget() {
   }, []);
 
   const startDrag = (e: React.PointerEvent) => {
+    e.preventDefault();
     dragData.current = { sx: e.clientX, sy: e.clientY, ox: posRef.current.x, oy: posRef.current.y, moved: false };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const wasDragged = () => !!dragData.current?.moved;

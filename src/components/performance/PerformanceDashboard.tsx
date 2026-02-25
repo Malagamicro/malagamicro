@@ -42,7 +42,7 @@ export function PerformanceDashboard() {
   });
 
   // Login logs
-  const { data: loginLogs, isLoading: loginLoading } = useQuery({
+  const { data: loginLogs, isLoading: loginLoading, error: loginError } = useQuery({
     queryKey: ['login-logs', loginPage],
     queryFn: async () => {
       const from = (loginPage - 1) * pageSize;
@@ -61,7 +61,7 @@ export function PerformanceDashboard() {
   });
 
   // Interaction logs
-  const { data: interactionLogs, isLoading: interactionLoading } = useQuery({
+  const { data: interactionLogs, isLoading: interactionLoading, error: interactionError } = useQuery({
     queryKey: ['interaction-logs', interactionPage, interactionSearch],
     queryFn: async () => {
       const from = (interactionPage - 1) * pageSize;
@@ -227,6 +227,8 @@ export function PerformanceDashboard() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="h-14 rounded-lg bg-muted animate-pulse" />
                 ))
+              ) : loginError ? (
+                <p className="text-center text-sm text-destructive py-8">Error al cargar accesos: {(loginError as Error).message}</p>
               ) : loginLogs?.logs.length === 0 ? (
                 <p className="text-center text-sm text-muted-foreground py-8">No hay accesos registrados aún</p>
               ) : (
@@ -303,6 +305,8 @@ export function PerformanceDashboard() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="h-10 rounded bg-muted animate-pulse" />
                 ))
+              ) : interactionError ? (
+                <p className="text-center text-sm text-destructive py-8">Error al cargar interacciones: {(interactionError as Error).message}</p>
               ) : interactionLogs?.logs.length === 0 ? (
                 <p className="text-center text-sm text-muted-foreground py-8">No hay interacciones registradas</p>
               ) : (
