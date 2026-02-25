@@ -30,8 +30,8 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import logoFull from '@/assets/logo-full.png';
 import logoIcon from '@/assets/logo-icon.png';
 
-const APP_VERSION = 'v2.8.6';
-const APP_BUILD_DATE = '2026-02-18 14:00';
+const APP_VERSION = 'v2.9.0';
+const APP_BUILD_DATE = '2026-02-25 12:00';
 
 interface OpenTab {
   id: string;
