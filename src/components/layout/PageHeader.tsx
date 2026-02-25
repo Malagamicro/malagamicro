@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface PageAction {
@@ -20,9 +20,10 @@ interface PageHeaderProps {
   actions?: PageAction[];
   children?: ReactNode;
   className?: string;
+  onBack?: () => void;
 }
 
-export function PageHeader({ title, description, icon, actions = [], children, className }: PageHeaderProps) {
+export function PageHeader({ title, description, icon, actions = [], children, className, onBack }: PageHeaderProps) {
   const primaryActions = actions.filter(a => !a.overflow).slice(0, 4);
   const overflowActions = [
     ...actions.filter(a => a.overflow),
@@ -33,6 +34,11 @@ export function PageHeader({ title, description, icon, actions = [], children, c
     <div className={cn("px-4 sm:px-8 py-4 sm:py-5 border-b bg-card/50 flex-shrink-0", className)}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
+          {onBack && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
           {icon && (
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               {icon}
