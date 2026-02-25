@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserPlus, Trash2, Shield, ArrowLeft, Users } from 'lucide-react';
+import { Loader2, UserPlus, Trash2, Shield, ArrowLeft, Users, KeyRound } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -40,6 +40,12 @@ export default function AdminUsers() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<string>('user');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  
+  // Password change state
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordTarget, setPasswordTarget] = useState<{ id: string; email: string } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
 
@@ -217,6 +223,41 @@ export default function AdminUsers() {
     }
   };
 
+  const changePassword = async () => {
+    if (!passwordTarget || !newPassword) {
+      toast({ title: 'Error', description: 'La contraseña es requerida', variant: 'destructive' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: 'Error', description: 'La contraseña debe tener al menos 6 caracteres', variant: 'destructive' });
+      return;
+    }
+    try {
+      setChangingPassword(true);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=update-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId: passwordTarget.id, password: newPassword }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Error al cambiar contraseña');
+      toast({ title: 'Contraseña actualizada', description: `La contraseña de ${passwordTarget.email} ha sido cambiada` });
+      setPasswordDialogOpen(false);
+      setNewPassword('');
+      setPasswordTarget(null);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -378,7 +419,19 @@ export default function AdminUsers() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Cambiar contraseña"
+                          onClick={() => {
+                            setPasswordTarget({ id: u.id, email: u.email || '' });
+                            setNewPassword('');
+                            setPasswordDialogOpen(true);
+                          }}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
                         {u.email !== ADMIN_EMAIL && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -422,6 +475,39 @@ export default function AdminUsers() {
             )}
           </CardContent>
         </Card>
+
+        {/* Password Change Dialog */}
+        <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cambiar Contraseña</DialogTitle>
+              <DialogDescription>
+                Nueva contraseña para <strong>{passwordTarget?.email}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nueva Contraseña</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={changePassword} disabled={changingPassword || newPassword.length < 6}>
+                {changingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Cambiar Contraseña
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

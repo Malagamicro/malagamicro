@@ -31,8 +31,8 @@ export function MascotChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  // Simple drag state
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  // Simple drag state - use refs for zero-lag, only state for initial position
+  const posRef = useRef({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const didDragRef = useRef(false);
   const widgetRef = useRef<HTMLDivElement | null>(null);
@@ -61,21 +61,37 @@ export function MascotChatWidget() {
     const widgetH = mobileView ? 80 : 480;
     const x = Math.max(0, window.innerWidth - widgetW - 16);
     const y = Math.max(0, window.innerHeight - widgetH - 16);
-    setPosition({ x, y });
+    posRef.current = { x, y };
+    // Apply initial position
+    const el = btnRef.current || widgetRef.current;
+    if (el) {
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+    }
   }, []);
 
-  // When opening on mobile, center the widget to avoid keyboard overlap
+  // When opening on mobile, move to top
   useEffect(() => {
     if (isOpen && !isMinimized && isMobile) {
-      setPosition({ x: 0, y: 0 });
+      posRef.current = { x: 0, y: 0 };
     }
   }, [isOpen, isMinimized, isMobile]);
 
-  // Simple drag handlers
+  // Apply position whenever the rendered element changes (open/close/minimize)
+  useEffect(() => {
+    const el = widgetRef.current || btnRef.current;
+    if (el && !isMobile) {
+      el.style.left = posRef.current.x + 'px';
+      el.style.top = posRef.current.y + 'px';
+    }
+  }, [isOpen, isMinimized, isMobile]);
+
+  // Simple drag — direct DOM, no React re-renders
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     didDragRef.current = false;
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: position.x, origY: position.y };
-  }, [position]);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: posRef.current.x, origY: posRef.current.y };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return;
@@ -84,10 +100,17 @@ export function MascotChatWidget() {
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
     const newX = Math.max(0, Math.min(window.innerWidth - 60, dragRef.current.origX + dx));
     const newY = Math.max(0, Math.min(window.innerHeight - 60, dragRef.current.origY + dy));
-    setPosition({ x: newX, y: newY });
+    posRef.current = { x: newX, y: newY };
+    const el = widgetRef.current || btnRef.current;
+    if (el) {
+      el.style.left = newX + 'px';
+      el.style.top = newY + 'px';
+    }
   }, []);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     dragRef.current = null;
   }, []);
 
@@ -168,7 +191,7 @@ export function MascotChatWidget() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsOpen(true); }}
-        style={{ position: 'fixed', left: position.x, top: position.y }}
+        style={{ position: 'fixed' }}
         className={cn(
           'z-50 group touch-none',
           'w-14 h-14 rounded-full shadow-2xl',
@@ -195,7 +218,7 @@ export function MascotChatWidget() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsMinimized(false); }}
-        style={{ position: 'fixed', left: position.x, top: position.y }}
+        style={{ position: 'fixed' }}
         className={cn(
           'z-50 touch-none',
           'w-12 h-12 rounded-full shadow-xl',
@@ -215,7 +238,7 @@ export function MascotChatWidget() {
       ref={widgetRef}
       style={isMobile
         ? { position: 'fixed', inset: 0 }
-        : { position: 'fixed', left: position.x, top: position.y, resize: 'both' as const }
+        : { position: 'fixed', resize: 'both' as const }
       }
       className={cn(
         'z-50 flex flex-col bg-background shadow-2xl border',
