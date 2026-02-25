@@ -93,6 +93,16 @@ const DEFAULT_APP_CATEGORIES: AppCategory[] = [
       { id: 'editor', label: 'Editor IA', description: 'Documentos con IA', icon: 'FileEdit', color: '#10b981', bgGradient: 'from-emerald-500/20 to-emerald-600/10', size: 1 },
     ],
   },
+  {
+    id: 'administracion',
+    label: 'Administración',
+    icon: 'Shield',
+    color: '#ef4444',
+    items: [
+      { id: 'rendimiento', label: 'Rendimiento', description: 'Métricas y logs del sistema', icon: 'Activity', color: '#ef4444', bgGradient: 'from-red-500/20 to-red-600/10', size: 1 },
+      { id: 'settings', label: 'Ajustes', description: 'Configuración general', icon: 'Settings', color: '#64748b', bgGradient: 'from-slate-500/20 to-slate-600/10', size: 1 },
+    ],
+  },
 ];
 
 export function useAppsConfig() {
