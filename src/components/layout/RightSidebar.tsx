@@ -37,6 +37,30 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [recentMessages, setRecentMessages] = useState<RecentChatMessage[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+
+  // Fetch calendar events for the selected date and upcoming
+  useEffect(() => {
+    if (!user?.id || !open) return;
+
+    const fetchEvents = async () => {
+      const now = new Date();
+      const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      const { data } = await supabase
+        .from('calendar_events')
+        .select('id, title, event_date, start_time, end_time, color, all_day')
+        .gte('event_date', format(now, 'yyyy-MM-dd'))
+        .lte('event_date', format(weekFromNow, 'yyyy-MM-dd'))
+        .order('event_date', { ascending: true })
+        .order('start_time', { ascending: true })
+        .limit(6);
+
+      setCalendarEvents(data || []);
+    };
+
+    fetchEvents();
+  }, [user?.id, open, selectedDate]);
 
   // Fetch recent internal chat messages
   useEffect(() => {
@@ -198,6 +222,33 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
             >
               Ver calendario completo <ChevronRight className="h-3 w-3" />
             </Button>
+
+            {/* Events for upcoming days */}
+            {calendarEvents.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Próximos eventos</p>
+                {calendarEvents.map(ev => (
+                  <div
+                    key={ev.id}
+                    className="flex items-start gap-2 p-2 rounded-lg border text-xs hover:bg-accent/50 cursor-pointer"
+                    onClick={() => onNavigate('calendario')}
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full mt-1.5 shrink-0"
+                      style={{ backgroundColor: ev.color || 'hsl(var(--primary))' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{ev.title}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {format(new Date(ev.event_date), 'd MMM', { locale: es })}
+                        {!ev.all_day && ev.start_time && ` ${ev.start_time.slice(0, 5)}`}
+                        {!ev.all_day && ev.end_time && `–${ev.end_time.slice(0, 5)}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Reminders */}

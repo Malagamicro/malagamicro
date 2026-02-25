@@ -75,7 +75,10 @@ export function MascotChatWidget() {
       elRef.current.style.left = nx + 'px';
       elRef.current.style.top = ny + 'px';
     };
-    const onUp = () => { dragData.current = null; };
+    const onUp = () => {
+      // Keep moved flag accessible for onClick — clear data after a tick
+      setTimeout(() => { dragData.current = null; }, 0);
+    };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     return () => {
@@ -89,7 +92,7 @@ export function MascotChatWidget() {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  const wasDragged = () => dragData.current?.moved ?? false;
+  const wasDragged = () => !!dragData.current?.moved;
 
   const handleNewConversation = () => {
     setMessages([]);
