@@ -50,12 +50,27 @@ export function PerformanceDashboard() {
 
       const { data: logs, error, count } = await supabase
         .from('user_login_logs')
-        .select('*, profiles:user_id(full_name, avatar_url)', { count: 'exact' })
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(from, to);
 
       if (error) throw error;
-      return { logs: logs || [], total: count || 0 };
+
+      // Fetch profile names separately
+      const userIds = [...new Set((logs || []).map((l: any) => l.user_id))];
+      let profileMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, avatar_url')
+          .in('user_id', userIds);
+        profileMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p.full_name || 'Usuario']));
+      }
+
+      return {
+        logs: (logs || []).map((l: any) => ({ ...l, profile_name: profileMap[l.user_id] || 'Usuario' })),
+        total: count || 0,
+      };
     },
     enabled: !!user,
   });
@@ -69,7 +84,7 @@ export function PerformanceDashboard() {
 
       let query = supabase
         .from('user_interaction_logs')
-        .select('*, profiles:user_id(full_name)', { count: 'exact' })
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
       if (interactionSearch) {
@@ -78,7 +93,22 @@ export function PerformanceDashboard() {
 
       const { data, error, count } = await query.range(from, to);
       if (error) throw error;
-      return { logs: data || [], total: count || 0 };
+
+      // Fetch profile names separately
+      const userIds = [...new Set((data || []).map((l: any) => l.user_id))];
+      let profileMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, full_name')
+          .in('user_id', userIds);
+        profileMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p.full_name || 'Usuario']));
+      }
+
+      return {
+        logs: (data || []).map((l: any) => ({ ...l, profile_name: profileMap[l.user_id] || 'Usuario' })),
+        total: count || 0,
+      };
     },
     enabled: !!user,
   });
@@ -244,7 +274,7 @@ export function PerformanceDashboard() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium truncate">
-                          {(log as any).profiles?.full_name || 'Usuario'}
+                          {log.profile_name || 'Usuario'}
                         </p>
                         <Badge variant="outline" className="text-[10px] shrink-0">
                           {log.ip_address || '—'}
@@ -320,7 +350,7 @@ export function PerformanceDashboard() {
                       {log.element || log.page || '—'}
                     </span>
                     <span className="text-muted-foreground shrink-0 text-[10px]">
-                      {(log as any).profiles?.full_name?.split(' ')[0] || '—'}
+                      {log.profile_name?.split(' ')[0] || '—'}
                     </span>
                     <span className="text-muted-foreground shrink-0 text-[10px]">
                       {format(new Date(log.created_at), 'HH:mm:ss', { locale: es })}

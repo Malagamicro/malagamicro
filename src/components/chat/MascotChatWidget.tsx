@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { X, Send, Loader2, Minimize2, Mic, MicOff, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '@/hooks/useAuth';
@@ -195,75 +195,71 @@ export function MascotChatWidget() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div ref={scrollViewportRef} className="p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center py-8 space-y-4">
-                <div className="w-20 h-20 mx-auto">
-                  <img src={mascotImage} alt="Micro" className="w-full h-full object-contain" />
-                </div>
-                <div className="space-y-2">
-                  <h4 className="font-semibold">¡Hola! Soy Micro 🤖</h4>
-                  <p className="text-sm text-muted-foreground max-w-[250px] mx-auto">
-                    Tu asistente de MalagaMicro. Puedo enviar mensajes, emails, WhatsApp, buscar leads y más.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 justify-center pt-2">
-                  {['Ver leads', 'Ver correos', 'Recordatorios', 'Ayuda'].map((tip) => (
-                    <button
-                      key={tip}
-                      onClick={() => {
-                        const prompts: Record<string, string> = {
-                          'Ver leads': 'Muéstrame mis leads recientes',
-                          'Ver correos': 'Revisa mi bandeja de entrada',
-                          'Recordatorios': 'Muéstrame mis recordatorios pendientes',
-                          'Ayuda': '¿Qué puedes hacer?',
-                        };
-                        setInput(prompts[tip] || tip);
-                        inputRef.current?.focus();
-                      }}
-                      className="text-xs px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
-                    >
-                      {tip}
-                    </button>
-                  ))}
-                </div>
+      <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollViewportRef}>
+        <div className="p-4 space-y-4">
+          {messages.length === 0 ? (
+            <div className="text-center py-8 space-y-4">
+              <div className="w-20 h-20 mx-auto">
+                <img src={mascotImage} alt="Micro" className="w-full h-full object-contain" />
               </div>
-            ) : (
-              <>
-                {messages.map((message, i) => (
-                  <div key={i} className={cn('flex gap-2', message.role === 'user' ? 'justify-end' : 'justify-start')}>
-                    {message.role === 'assistant' && (
-                      <div className="w-7 h-7 rounded-full bg-card border flex items-center justify-center flex-shrink-0">
-                        <img src={mascotImage} alt="Micro" className="w-6 h-6 object-contain" />
-                      </div>
-                    )}
-                    <div className={cn('max-w-[80%] rounded-2xl px-4 py-2 text-sm', message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-muted rounded-bl-md')}>
-                      {message.role === 'assistant' ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0">
-                          <ReactMarkdown>{message.content}</ReactMarkdown>
-                        </div>
-                      ) : message.content}
-                    </div>
-                  </div>
+              <div className="space-y-2">
+                <h4 className="font-semibold">¡Hola! Soy Micro 🤖</h4>
+                <p className="text-sm text-muted-foreground max-w-[250px] mx-auto">
+                  Tu asistente de MalagaMicro. Puedo enviar mensajes, emails, WhatsApp, buscar leads y más.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center pt-2">
+                {['Ver leads', 'Ver correos', 'Recordatorios', 'Ayuda'].map((tip) => (
+                  <button
+                    key={tip}
+                    onClick={() => {
+                      const prompts: Record<string, string> = {
+                        'Ver leads': 'Muéstrame mis leads recientes',
+                        'Ver correos': 'Revisa mi bandeja de entrada',
+                        'Recordatorios': 'Muéstrame mis recordatorios pendientes',
+                        'Ayuda': '¿Qué puedes hacer?',
+                      };
+                      setInput(prompts[tip] || tip);
+                      inputRef.current?.focus();
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20"
+                  >
+                    {tip}
+                  </button>
                 ))}
-                {isLoading && (
-                  <div className="flex gap-2 justify-start">
+              </div>
+            </div>
+          ) : (
+            <>
+              {messages.map((message, i) => (
+                <div key={i} className={cn('flex gap-2', message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                  {message.role === 'assistant' && (
                     <div className="w-7 h-7 rounded-full bg-card border flex items-center justify-center flex-shrink-0">
                       <img src={mascotImage} alt="Micro" className="w-6 h-6 object-contain" />
                     </div>
-                    <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1.5">
-                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
+                  )}
+                  <div className={cn('max-w-[80%] rounded-2xl px-4 py-2 text-sm', message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-muted rounded-bl-md')}>
+                    {message.role === 'assistant' ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    ) : message.content}
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        </ScrollArea>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex gap-2 justify-start">
+                  <div className="w-7 h-7 rounded-full bg-card border flex items-center justify-center flex-shrink-0">
+                    <img src={mascotImage} alt="Micro" className="w-6 h-6 object-contain" />
+                  </div>
+                  <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3 text-xs text-muted-foreground">
+                    Escribiendo...
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Input */}
