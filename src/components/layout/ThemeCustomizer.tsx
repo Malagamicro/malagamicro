@@ -91,13 +91,12 @@ function ColorPickerInput({
 
   return (
     <div className="flex items-center gap-2">
-      <div className="relative">
+      <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-border flex-shrink-0">
         <input
           type="color"
           value={hslToHex(value)}
           onChange={(e) => onChange(hexToHsl(e.target.value))}
-          className="w-8 h-8 rounded-lg cursor-pointer border border-border overflow-hidden"
-          style={{ padding: 0 }}
+          className="absolute inset-0 w-[150%] h-[150%] -top-1 -left-1 cursor-pointer border-0 p-0"
         />
       </div>
       <span className="text-xs text-muted-foreground flex-1 truncate">{label}</span>
