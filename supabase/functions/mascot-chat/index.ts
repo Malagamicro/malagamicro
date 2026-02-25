@@ -181,7 +181,7 @@ const tools = [
     type: "function",
     function: {
       name: "create_reminder",
-      description: "Crear un nuevo recordatorio general. REQUIERE CONFIRMACIÓN.",
+      description: "Crear un nuevo recordatorio general. REQUIERE CONFIRMACIÓN. Puede asignar a otros usuarios del equipo.",
       parameters: {
         type: "object",
         properties: {
@@ -190,6 +190,11 @@ const tools = [
           reminder_date: { type: "string", description: "Fecha y hora (formato ISO o YYYY-MM-DD HH:MM)" },
           priority: { type: "string", description: "Prioridad: low, normal, high, urgent (default: normal)" },
           category: { type: "string", description: "Categoría (default: general)" },
+          target_users: {
+            type: "array",
+            description: "Nombres de usuarios a los que asignar el recordatorio. Usa get_team_users para obtener los nombres.",
+            items: { type: "string" },
+          },
           confirmed: { type: "boolean", description: "Si el usuario ya confirmó" },
         },
         required: ["title", "reminder_date"],
@@ -261,7 +266,7 @@ const tools = [
     type: "function",
     function: {
       name: "create_calendar_event",
-      description: "Crear un nuevo evento en el calendario. REQUIERE CONFIRMACIÓN.",
+      description: "Crear un nuevo evento en el calendario. REQUIERE CONFIRMACIÓN. Puede añadir participantes (usuarios del equipo).",
       parameters: {
         type: "object",
         properties: {
@@ -273,9 +278,36 @@ const tools = [
           all_day: { type: "boolean", description: "Si es un evento de todo el día" },
           color: { type: "string", description: "Color del evento (hex, default #3b82f6)" },
           reminder_minutes: { type: "number", description: "Minutos antes para recordatorio (default 15)" },
+          participants: {
+            type: "array",
+            description: "Usuarios a invitar al evento. Usa get_team_users para obtener los nombres.",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string", description: "Nombre del usuario a invitar" },
+                permission: { type: "string", description: "'view' (solo ver) o 'edit' (puede editar). Default: 'view'" },
+              },
+              required: ["name"],
+            },
+          },
           confirmed: { type: "boolean", description: "Si el usuario ya confirmó" },
         },
         required: ["title", "event_date", "start_time"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_calendar_event",
+      description: "Eliminar un evento del calendario. REQUIERE CONFIRMACIÓN.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "Título o parte del título del evento a eliminar" },
+          confirmed: { type: "boolean", description: "Si el usuario ya confirmó" },
+        },
+        required: ["search"],
       },
     },
   },
@@ -361,7 +393,7 @@ function needsConfirmation(toolName: string, args: Record<string, unknown>): str
   const writeTools = [
     "send_internal_message", "send_email", "send_whatsapp",
     "create_lead", "update_lead", "create_reminder", "complete_reminder",
-    "create_calendar_event", "update_apps_config",
+    "create_calendar_event", "delete_calendar_event", "update_apps_config",
   ];
   if (!writeTools.includes(toolName)) return null;
   if (args.confirmed === true) return null;
@@ -377,12 +409,22 @@ function needsConfirmation(toolName: string, args: Record<string, unknown>): str
       return `📋 **Crear lead**\n- **Empresa:** ${args.company_name}\n- **Contacto:** ${args.contact_name || "-"}\n- **Email:** ${args.email || "-"}\n- **Teléfono:** ${args.phone || "-"}\n\n¿Confirmas?`;
     case "update_lead":
       return `✏️ **Actualizar lead** "${args.search}"\n- Cambios: ${Object.entries(args).filter(([k]) => !["search", "confirmed"].includes(k)).map(([k, v]) => `${k}: ${v}`).join(", ")}\n\n¿Confirmas?`;
-    case "create_reminder":
-      return `🔔 **Crear recordatorio**\n- **Título:** ${args.title}\n- **Fecha:** ${args.reminder_date}\n- **Prioridad:** ${args.priority || "normal"}\n\n¿Confirmas?`;
+    case "create_reminder": {
+      const targetUsers = Array.isArray(args.target_users) && args.target_users.length > 0
+        ? `\n- **Asignado a:** ${(args.target_users as string[]).join(", ")}`
+        : '';
+      return `🔔 **Crear recordatorio**\n- **Título:** ${args.title}\n- **Fecha:** ${args.reminder_date}\n- **Prioridad:** ${args.priority || "normal"}${targetUsers}\n\n¿Confirmas?`;
+    }
     case "complete_reminder":
       return `✅ **Completar recordatorio** "${args.search}"\n\n¿Confirmas?`;
-    case "create_calendar_event":
-      return `📅 **Crear evento**\n- **Título:** ${args.title}\n- **Fecha:** ${args.event_date} a las ${args.start_time}\n\n¿Confirmas?`;
+    case "create_calendar_event": {
+      const participants = Array.isArray(args.participants) && args.participants.length > 0
+        ? `\n- **Participantes:** ${(args.participants as any[]).map((p: any) => `${p.name} (${p.permission || 'view'})`).join(", ")}`
+        : '';
+      return `📅 **Crear evento**\n- **Título:** ${args.title}\n- **Fecha:** ${args.event_date} a las ${args.start_time}${participants}\n\n¿Confirmas?`;
+    }
+    case "delete_calendar_event":
+      return `🗑️ **Eliminar evento** "${args.search}"\n\n¿Confirmas?`;
     case "update_apps_config":
       return `🎨 **Modificar aplicaciones**\n- **Acción:** ${args.action}\n${args.category_name ? `- **Categoría:** ${args.category_name}\n` : ''}${args.icon ? `- **Icono:** ${args.icon}\n` : ''}${args.color ? `- **Color:** ${args.color}\n` : ''}${args.icon_size ? `- **Tamaño:** ${args.icon_size}\n` : ''}\n¿Confirmas?`;
     default:
@@ -701,6 +743,20 @@ async function executeToolCall(
         const reminderDate = String(args.reminder_date || "");
         if (!title || !reminderDate) return JSON.stringify({ success: false, error: "title y reminder_date son obligatorios." });
 
+        // Resolve target users by name
+        let targetUserIds: string[] = [];
+        const targetUserNames: string[] = [];
+        if (Array.isArray(args.target_users) && args.target_users.length > 0) {
+          const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").neq("user_id", userId);
+          for (const name of args.target_users as string[]) {
+            const match = profiles?.find((p: any) => p.full_name?.toLowerCase().includes(name.toLowerCase()));
+            if (match) {
+              targetUserIds.push(match.user_id);
+              targetUserNames.push(match.full_name || name);
+            }
+          }
+        }
+
         const { data, error } = await supabase.from("general_reminders").insert({
           user_id: userId,
           title,
@@ -708,10 +764,13 @@ async function executeToolCall(
           reminder_date: reminderDate,
           priority: args.priority || "normal",
           category: args.category || "general",
+          target_user_ids: targetUserIds.length > 0 ? targetUserIds : [],
         }).select("id, title, reminder_date").single();
 
         if (error) throw error;
-        return JSON.stringify({ success: true, message: `Recordatorio "${(data as any).title}" creado para ${(data as any).reminder_date}` });
+        let msg = `Recordatorio "${(data as any).title}" creado para ${(data as any).reminder_date}`;
+        if (targetUserNames.length > 0) msg += `. Asignado a: ${targetUserNames.join(", ")}`;
+        return JSON.stringify({ success: true, message: msg });
       }
 
       case "complete_reminder": {
@@ -804,7 +863,45 @@ async function executeToolCall(
           reminder_minutes: args.reminder_minutes ?? 15,
         }).select("id, title, event_date, start_time").single();
         if (error) throw error;
-        return JSON.stringify({ success: true, message: `Evento "${(data as any).title}" creado para el ${(data as any).event_date} a las ${(data as any).start_time}`, event_id: (data as any).id });
+
+        const eventId = (data as any).id;
+        const addedParticipants: string[] = [];
+
+        // Add participants if provided
+        if (Array.isArray(args.participants) && args.participants.length > 0) {
+          const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").neq("user_id", userId);
+          for (const p of args.participants as any[]) {
+            const pName = String(p.name || "").toLowerCase();
+            const match = profiles?.find((pr: any) => pr.full_name?.toLowerCase().includes(pName));
+            if (match) {
+              await supabase.from("event_participants").insert({
+                event_id: eventId,
+                user_id: match.user_id,
+                permission: p.permission === "edit" ? "edit" : "view",
+              });
+              addedParticipants.push(match.full_name || pName);
+            }
+          }
+        }
+
+        let msg = `Evento "${(data as any).title}" creado para el ${(data as any).event_date} a las ${(data as any).start_time}`;
+        if (addedParticipants.length > 0) msg += `. Participantes: ${addedParticipants.join(", ")}`;
+        return JSON.stringify({ success: true, message: msg, event_id: eventId });
+      }
+
+      case "delete_calendar_event": {
+        const search = String(args.search || "");
+        if (!search) return JSON.stringify({ success: false, error: "Necesito el título del evento." });
+
+        const { data: events } = await supabase.from("calendar_events").select("id, title, event_date").eq("creator_id", userId).ilike("title", `%${search}%`).order("event_date", { ascending: false }).limit(1);
+        if (!events?.length) return JSON.stringify({ success: false, error: `No encontré un evento con "${search}"` });
+        const evt = events[0] as any;
+
+        // Delete participants first
+        await supabase.from("event_participants").delete().eq("event_id", evt.id);
+        const { error } = await supabase.from("calendar_events").delete().eq("id", evt.id);
+        if (error) throw error;
+        return JSON.stringify({ success: true, message: `Evento "${evt.title}" (${evt.event_date}) eliminado 🗑️` });
       }
 
       case "get_apps_config": {
@@ -977,8 +1074,8 @@ HERRAMIENTAS DISPONIBLES:
 ✍️ ESCRITURA (REQUIEREN CONFIRMACIÓN):
 - send_internal_message, send_email (envía desde ia@malagamicro.com), send_whatsapp
 - create_lead, update_lead
-- create_reminder, complete_reminder
-- create_calendar_event
+- create_reminder (puede asignar a otros usuarios), complete_reminder
+- create_calendar_event (puede añadir participantes del equipo), delete_calendar_event
 - update_apps_config (personalizar el hub de aplicaciones: cambiar iconos, colores, categorías, tamaño)
 
 REGLA CRÍTICA DE CONFIRMACIÓN:
