@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DocumentEditor } from '@/components/editor/DocumentEditor';
 import { FileTreeSidebar } from '@/components/editor/FileTreeSidebar';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +16,7 @@ function sanitizeFileName(name: string): string {
 
 const DocumentEditorPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [initialContent, setInitialContent] = useState('');
   const [initialTitle, setInitialTitle] = useState('');
   const [fileId, setFileId] = useState<string | null>(null);
@@ -34,9 +36,13 @@ const DocumentEditorPage = () => {
       sessionStorage.removeItem('editor_file_title');
       sessionStorage.removeItem('editor_file_type');
       sessionStorage.removeItem('editor_file_id');
+    } else {
+      // No file data in sessionStorage — go back to main app
+      navigate('/', { replace: true });
+      return;
     }
     setReady(true);
-  }, []);
+  }, [navigate]);
 
   const handleOpenFile = useCallback(async (file: SharedFile) => {
     try {
