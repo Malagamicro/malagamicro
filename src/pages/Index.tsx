@@ -18,6 +18,7 @@ import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBann
 import { SessionTimeoutWarning } from '@/components/auth/SessionTimeoutWarning';
 import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
 import { ProfileSettings } from '@/components/settings/ProfileSettings';
+import { AppUpdateCard } from '@/components/settings/AppUpdateCard';
 import { PasswordChangeCard } from '@/components/settings/PasswordChangeCard';
 import { NotificationPreferencesCard } from '@/components/settings/NotificationPreferencesCard';
 import { TwoFactorAuthCard } from '@/components/settings/TwoFactorAuthCard';
@@ -627,6 +628,7 @@ const IndexContent = () => {
               onBack={goApps}
             />
             <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6 space-y-4">
+              <AppUpdateCard />
               <ProfileSettings />
               <ThemeToggleCard />
               <div className="pt-2 sm:pt-4">

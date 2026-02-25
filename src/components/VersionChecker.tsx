@@ -3,7 +3,7 @@ import { AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // This version must match the APP_VERSION in Sidebar.tsx
-const CURRENT_VERSION = 'v2.8.6';
+const CURRENT_VERSION = 'v2.9.0';
 
 export function VersionChecker() {
   const [showBanner, setShowBanner] = useState(false);
