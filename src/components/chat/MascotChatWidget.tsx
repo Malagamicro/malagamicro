@@ -31,7 +31,7 @@ export function MascotChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const isMobile = useIsMobile();
 
-  // Drag: use refs for direct DOM manipulation during drag, state only for initial render
+  // Drag: GPU-composited transform for zero-lag movement
   const [initPos] = useState(() => {
     const mobileView = window.innerWidth < 768;
     const w = mobileView ? 80 : 360;
@@ -42,7 +42,7 @@ export function MascotChatWidget() {
     };
   });
   const posRef = useRef(initPos);
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number; el: HTMLElement } | null>(null);
   const didDragRef = useRef(false);
   const widgetRef = useRef<HTMLDivElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
@@ -70,42 +70,64 @@ export function MascotChatWidget() {
     }
   }, [isOpen, isMinimized, isMobile]);
 
-  // Apply position whenever the rendered element changes (open/close/minimize)
+  // Apply position via transform whenever the rendered element changes
+  const applyPos = useCallback((el: HTMLElement | null) => {
+    if (el) {
+      el.style.transform = `translate3d(${posRef.current.x}px, ${posRef.current.y}px, 0)`;
+    }
+  }, []);
+
   useEffect(() => {
     const el = widgetRef.current || btnRef.current;
-    if (el && !isMobile) {
-      el.style.left = posRef.current.x + 'px';
-      el.style.top = posRef.current.y + 'px';
-    }
-  }, [isOpen, isMinimized, isMobile]);
+    if (el && !isMobile) applyPos(el);
+  }, [isOpen, isMinimized, isMobile, applyPos]);
 
-  // Simple drag — direct DOM, no React re-renders
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    didDragRef.current = false;
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: posRef.current.x, origY: posRef.current.y };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, []);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
-    const newX = Math.max(0, Math.min(window.innerWidth - 60, dragRef.current.origX + dx));
-    const newY = Math.max(0, Math.min(window.innerHeight - 60, dragRef.current.origY + dy));
-    posRef.current = { x: newX, y: newY };
+  // Native pointer events for maximum performance — bypass React synthetic events
+  useEffect(() => {
     const el = widgetRef.current || btnRef.current;
-    if (el) {
-      el.style.left = newX + 'px';
-      el.style.top = newY + 'px';
-    }
-  }, []);
+    if (!el) return;
 
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    if (!dragRef.current) return;
-    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    dragRef.current = null;
-  }, []);
+    const onDown = (e: PointerEvent) => {
+      didDragRef.current = false;
+      dragRef.current = { startX: e.clientX, startY: e.clientY, origX: posRef.current.x, origY: posRef.current.y, el };
+      el.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    };
+
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      if (!didDragRef.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) didDragRef.current = true;
+      const nx = Math.max(0, Math.min(window.innerWidth - 60, d.origX + dx));
+      const ny = Math.max(0, Math.min(window.innerHeight - 60, d.origY + dy));
+      posRef.current.x = nx;
+      posRef.current.y = ny;
+      d.el.style.transform = `translate3d(${nx}px, ${ny}px, 0)`;
+    };
+
+    const onUp = (e: PointerEvent) => {
+      if (!dragRef.current) return;
+      el.releasePointerCapture(e.pointerId);
+      dragRef.current = null;
+    };
+
+    // Only attach to the drag handle (header) for open widget, or the button itself
+    const handle = isOpen && !isMinimized
+      ? el.querySelector<HTMLElement>('[data-drag-handle]') || el
+      : el;
+
+    handle.addEventListener('pointerdown', onDown, { passive: false });
+    el.addEventListener('pointermove', onMove, { passive: true });
+    el.addEventListener('pointerup', onUp);
+
+    return () => {
+      handle.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+    };
+  }, [isOpen, isMinimized]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollViewportRef.current) {
@@ -180,11 +202,8 @@ export function MascotChatWidget() {
     return (
       <button
         ref={btnRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsOpen(true); }}
-        style={{ position: 'fixed', left: initPos.x, top: initPos.y }}
+        style={{ position: 'fixed', left: 0, top: 0, transform: `translate3d(${initPos.x}px, ${initPos.y}px, 0)`, willChange: 'transform' }}
         className={cn(
           'z-50 group touch-none',
           'w-14 h-14 rounded-full shadow-2xl',
@@ -207,11 +226,8 @@ export function MascotChatWidget() {
     return (
       <button
         ref={btnRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
         onClick={() => { if (!didDragRef.current) setIsMinimized(false); }}
-        style={{ position: 'fixed', left: initPos.x, top: initPos.y }}
+        style={{ position: 'fixed', left: 0, top: 0, transform: `translate3d(${initPos.x}px, ${initPos.y}px, 0)`, willChange: 'transform' }}
         className={cn(
           'z-50 touch-none',
           'w-12 h-12 rounded-full shadow-xl',
@@ -231,7 +247,7 @@ export function MascotChatWidget() {
       ref={widgetRef}
       style={isMobile
         ? { position: 'fixed', inset: 0 }
-        : { position: 'fixed', left: initPos.x, top: initPos.y, resize: 'both' as const }
+        : { position: 'fixed', left: 0, top: 0, transform: `translate3d(${initPos.x}px, ${initPos.y}px, 0)`, willChange: 'transform', resize: 'both' as const }
       }
       className={cn(
         'z-50 flex flex-col bg-background shadow-2xl border',
@@ -242,9 +258,7 @@ export function MascotChatWidget() {
     >
       {/* Header - draggable */}
       <div
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
+        data-drag-handle
         className="flex items-center gap-3 p-4 border-b bg-gradient-to-r from-primary/10 to-primary/5 cursor-grab active:cursor-grabbing touch-none select-none"
       >
         <div className="w-10 h-10 rounded-full bg-card flex items-center justify-center border shadow-sm">
