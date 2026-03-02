@@ -31,7 +31,22 @@ interface RemotePeer {
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
+  // Free TURN servers for NAT traversal (critical for mobile/corporate networks)
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
 export function VideoCallModal({ 
@@ -58,6 +73,7 @@ export function VideoCallModal({
   const announceTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const retryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const connectedPeersRef = useRef<Set<string>>(new Set());
+  const iceCandidateBufferRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   onCloseRef.current = onClose;
 
   const updateRemotePeer = useCallback((peerId: string, update: Partial<{ stream: MediaStream | null; displayName: string; isScreenSharing: boolean }>) => {
@@ -333,6 +349,13 @@ export function VideoCallModal({
           
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            // Flush buffered ICE candidates
+            const buffered = iceCandidateBufferRef.current.get(payload.from) || [];
+            for (const candidate of buffered) {
+              try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+            }
+            iceCandidateBufferRef.current.delete(payload.from);
+            
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             channel.send({
@@ -354,6 +377,12 @@ export function VideoCallModal({
           if (pc && pc.signalingState === 'have-local-offer') {
             try {
               await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+              // Flush buffered ICE candidates
+              const buffered = iceCandidateBufferRef.current.get(payload.from) || [];
+              for (const candidate of buffered) {
+                try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+              }
+              iceCandidateBufferRef.current.delete(payload.from);
               updateRemotePeer(payload.from, { displayName: payload.displayName });
             } catch (err) {
               console.error('[WebRTC] Error setting answer:', err);
@@ -361,12 +390,17 @@ export function VideoCallModal({
           }
         });
 
-        // Handle ICE candidates
+        // Handle ICE candidates - buffer if remoteDescription not yet set
         channel.on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
           if (destroyedRef.current || payload.to !== myPeerId) return;
           const pc = peersRef.current.get(payload.from);
           if (pc && pc.remoteDescription) {
             try { await pc.addIceCandidate(new RTCIceCandidate(payload.candidate)); } catch {}
+          } else {
+            // Buffer the candidate for later
+            const buffer = iceCandidateBufferRef.current.get(payload.from) || [];
+            buffer.push(payload.candidate);
+            iceCandidateBufferRef.current.set(payload.from, buffer);
           }
         });
 
@@ -406,7 +440,7 @@ export function VideoCallModal({
         // Re-announce at staggered intervals for reliability
         announceTimersRef.current.forEach(t => clearTimeout(t));
         announceTimersRef.current = [];
-        const announceTimes = [500, 1500, 3000, 6000, 10000, 20000, 35000, 50000];
+        const announceTimes = [500, 2000, 5000, 12000];
         for (const delay of announceTimes) {
           const timer = setTimeout(() => {
             if (destroyedRef.current) return;
@@ -460,6 +494,7 @@ export function VideoCallModal({
     retryTimersRef.current.forEach(t => clearTimeout(t));
     retryTimersRef.current.clear();
     connectedPeersRef.current.clear();
+    iceCandidateBufferRef.current.clear();
 
     // Announce leave
     channelRef.current?.send({
