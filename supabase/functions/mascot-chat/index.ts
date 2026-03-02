@@ -1291,7 +1291,47 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
       assistantMessage = result.data.choices?.[0]?.message;
     }
 
-    const finalContent = assistantMessage?.content || "No tengo respuesta en este momento.";
+    let finalContent = assistantMessage?.content || "No tengo respuesta en este momento.";
+
+    // SAFETY CHECK: Detect when the model claims to have performed an action but didn't actually call the tool
+    const actionClaimPatterns = /(?:¡?listo|enviado|correo enviado|email enviado|mensaje enviado|whatsapp enviado|lead creado|evento creado|recordatorio creado).*?✅/i;
+    const hadToolCalls = chatMessages.some(m => m.role === "tool");
+    
+    if (actionClaimPatterns.test(finalContent) && !hadToolCalls && iterations === 0) {
+      console.warn("[mascot-chat] SAFETY: Model claimed action completion without any tool calls! Forcing correction.");
+      // Force the model to actually use tools
+      chatMessages.push({ role: "assistant", content: finalContent });
+      chatMessages.push({ 
+        role: "user", 
+        content: "SISTEMA: Has afirmado haber completado una acción pero NO has ejecutado ninguna herramienta. DEBES llamar a la herramienta correspondiente con confirmed=true AHORA. No puedes decir que algo está hecho sin ejecutar la herramienta." 
+      });
+      
+      result = await callWithFallback(chatMessages);
+      if (!result.error) {
+        assistantMessage = result.data.choices?.[0]?.message;
+        // Process any tool calls from the retry
+        let retryIterations = 0;
+        while (assistantMessage?.tool_calls && retryIterations < 3) {
+          retryIterations++;
+          chatMessages.push(assistantMessage);
+          for (const toolCall of assistantMessage.tool_calls) {
+            const toolName = toolCall.function.name;
+            let toolArgs: Record<string, unknown> = {};
+            try { toolArgs = JSON.parse(toolCall.function.arguments || "{}"); } catch { toolArgs = {}; }
+            console.log(`[mascot-chat] RETRY Tool call: ${toolName}, args: ${JSON.stringify(toolArgs)}`);
+            const toolResult = await executeToolCall(supabase, userId, toolName, toolArgs);
+            console.log(`[mascot-chat] RETRY Tool result (${toolName}): ${toolResult.slice(0, 200)}`);
+            chatMessages.push({ role: "tool", tool_call_id: toolCall.id, content: toolResult });
+          }
+          result = await callWithFallback(chatMessages);
+          if (result.error) break;
+          assistantMessage = result.data.choices?.[0]?.message;
+        }
+        finalContent = assistantMessage?.content || finalContent;
+      }
+    }
+
+    console.log(`[mascot-chat] Final response (tool_calls_made: ${hadToolCalls}, iterations: ${iterations})`);
     return new Response(JSON.stringify({ response: finalContent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
