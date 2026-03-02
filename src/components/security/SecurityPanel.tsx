@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShieldAlert, ShieldCheck, Unlock, Clock, Globe, RefreshCw, Users, Brain, CheckCircle2, AlertTriangle, XCircle, Ban, Shield, Info } from 'lucide-react';
+import { Loader2, ShieldAlert, ShieldCheck, Unlock, Clock, Globe, RefreshCw, Users, Brain, CheckCircle2, AlertTriangle, XCircle, Ban, Shield, Info, FileDown, FolderUp } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface SecurityBlock {
   id: string;
@@ -25,14 +27,23 @@ interface SecurityBlock {
   alert_details: any;
 }
 
+interface BlockRecommendation {
+  ip: string;
+  user: string;
+  reason: string;
+  urgency: string;
+  duration_hours: number;
+}
+
 interface IPAnalysis {
   summary: string;
   risk_level: string;
   familiar_ips: Array<{ ip: string; reason: string; user: string }>;
-  suspicious_ips: Array<{ ip: string; reason: string; user: string; recommendation: string }>;
-  dangerous_ips: Array<{ ip: string; reason: string; user: string; recommendation: string }>;
+  suspicious_ips: Array<{ ip: string; reason: string; user: string; recommendation: string; should_block?: boolean }>;
+  dangerous_ips: Array<{ ip: string; reason: string; user: string; recommendation: string; should_block?: boolean }>;
   user_analysis: Array<{ user: string; status: string; notes: string }>;
   recommendations: string[];
+  block_recommendations?: BlockRecommendation[];
 }
 
 const SECURITY_RECOMMENDATIONS = [
@@ -77,6 +88,7 @@ export function SecurityPanel() {
   const [blockingIP, setBlockingIP] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<IPAnalysis | null>(null);
+  const [savingToFiles, setSavingToFiles] = useState(false);
 
   const fetchBlocks = async () => {
     setLoading(true);
@@ -130,7 +142,7 @@ export function SecurityPanel() {
     }
   };
 
-  const handleBlockIP = async (ip: string, reason: string, userEmail?: string) => {
+  const handleBlockIP = async (ip: string, reason: string, userEmail?: string, durationHours: number = 24) => {
     setBlockingIP(ip);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -143,11 +155,11 @@ export function SecurityPanel() {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ip_address: ip, reason, user_email: userEmail, duration_hours: 24 }),
+        body: JSON.stringify({ ip_address: ip, reason, user_email: userEmail, duration_hours: durationHours }),
       });
 
       if (!res.ok) throw new Error('Failed to block IP');
-      toast.success(`IP ${ip} bloqueada por 24h`);
+      toast.success(`IP ${ip} bloqueada por ${durationHours}h`);
       fetchBlocks();
     } catch {
       toast.error('Error al bloquear IP');
@@ -186,11 +198,228 @@ export function SecurityPanel() {
     }
   };
 
-  // FIXED: Only show truly active blocks (is_active=true AND not expired AND not resolved)
+  // Generate PDF report
+  const generatePDF = () => {
+    if (!analysis) {
+      toast.error('Primero ejecuta el análisis de IPs');
+      return;
+    }
+
+    const doc = new jsPDF();
+    const now = format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es });
+
+    // Header
+    doc.setFontSize(18);
+    doc.setTextColor(33, 33, 33);
+    doc.text('Informe de Seguridad - Análisis de IPs', 14, 20);
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generado: ${now}`, 14, 28);
+    doc.text(`Nivel de riesgo: ${analysis.risk_level === 'low' ? 'Bajo' : analysis.risk_level === 'medium' ? 'Medio' : 'Alto'}`, 14, 34);
+
+    // Summary
+    doc.setFontSize(12);
+    doc.setTextColor(33, 33, 33);
+    doc.text('Resumen Ejecutivo', 14, 44);
+    doc.setFontSize(9);
+    doc.setTextColor(66, 66, 66);
+    const summaryLines = doc.splitTextToSize(analysis.summary, 180);
+    doc.text(summaryLines, 14, 52);
+
+    let yPos = 52 + summaryLines.length * 5 + 8;
+
+    // Block Recommendations from AI
+    if (analysis.block_recommendations?.length) {
+      doc.setFontSize(12);
+      doc.setTextColor(200, 0, 0);
+      doc.text('🚨 Recomendaciones de Bloqueo de la IA', 14, yPos);
+      yPos += 6;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['IP', 'Usuario', 'Urgencia', 'Duración', 'Motivo']],
+        body: analysis.block_recommendations.map(r => [
+          r.ip,
+          r.user,
+          r.urgency === 'immediate' ? 'Inmediato' : r.urgency === 'soon' ? 'Pronto' : 'Monitorear',
+          `${r.duration_hours}h`,
+          r.reason,
+        ]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [200, 0, 0] },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // Dangerous IPs
+    if (analysis.dangerous_ips?.length) {
+      if (yPos > 250) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12);
+      doc.setTextColor(200, 0, 0);
+      doc.text('IPs Peligrosas', 14, yPos);
+      yPos += 6;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['IP', 'Usuario', 'Motivo', 'Recomendación']],
+        body: analysis.dangerous_ips.map(ip => [ip.ip, ip.user, ip.reason, ip.recommendation]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [220, 38, 38] },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // Suspicious IPs
+    if (analysis.suspicious_ips?.length) {
+      if (yPos > 250) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12);
+      doc.setTextColor(180, 130, 0);
+      doc.text('IPs Sospechosas', 14, yPos);
+      yPos += 6;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['IP', 'Usuario', 'Motivo', 'Recomendación']],
+        body: analysis.suspicious_ips.map(ip => [ip.ip, ip.user, ip.reason, ip.recommendation]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [234, 179, 8] },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // Familiar IPs
+    if (analysis.familiar_ips?.length) {
+      if (yPos > 250) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12);
+      doc.setTextColor(0, 150, 0);
+      doc.text('IPs Familiares', 14, yPos);
+      yPos += 6;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['IP', 'Usuario', 'Motivo']],
+        body: analysis.familiar_ips.map(ip => [ip.ip, ip.user, ip.reason]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [34, 197, 94] },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // User Analysis
+    if (analysis.user_analysis?.length) {
+      if (yPos > 250) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12);
+      doc.setTextColor(33, 33, 33);
+      doc.text('Análisis por Usuario', 14, yPos);
+      yPos += 6;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Usuario', 'Estado', 'Observaciones']],
+        body: analysis.user_analysis.map(ua => [
+          ua.user,
+          ua.status === 'safe' ? 'Seguro' : ua.status === 'monitored' ? 'Monitorizado' : 'En riesgo',
+          ua.notes,
+        ]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [59, 130, 246] },
+      });
+      yPos = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // Recommendations
+    if (analysis.recommendations?.length) {
+      if (yPos > 250) { doc.addPage(); yPos = 20; }
+      doc.setFontSize(12);
+      doc.setTextColor(33, 33, 33);
+      doc.text('Recomendaciones', 14, yPos);
+      yPos += 6;
+      doc.setFontSize(9);
+      doc.setTextColor(66, 66, 66);
+      analysis.recommendations.forEach((rec, i) => {
+        if (yPos > 280) { doc.addPage(); yPos = 20; }
+        const lines = doc.splitTextToSize(`${i + 1}. ${rec}`, 180);
+        doc.text(lines, 14, yPos);
+        yPos += lines.length * 5 + 2;
+      });
+    }
+
+    // Active blocks
+    if (activeBlocks.length) {
+      doc.addPage();
+      yPos = 20;
+      doc.setFontSize(12);
+      doc.setTextColor(33, 33, 33);
+      doc.text('Bloqueos Activos', 14, yPos);
+      yPos += 6;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Usuario', 'IP', 'Motivo', 'Expira']],
+        body: activeBlocks.map(b => [
+          b.user_email,
+          b.ip_address || '—',
+          b.reason,
+          format(new Date(b.expires_at), 'dd/MM/yyyy HH:mm', { locale: es }),
+        ]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [239, 68, 68] },
+      });
+    }
+
+    return doc;
+  };
+
+  const handleExportPDF = () => {
+    const doc = generatePDF();
+    if (!doc) return;
+    const fileName = `informe-seguridad-${format(new Date(), 'yyyy-MM-dd-HHmm')}.pdf`;
+    doc.save(fileName);
+    toast.success('Informe PDF descargado');
+  };
+
+  const handleSaveToFiles = async () => {
+    const doc = generatePDF();
+    if (!doc) return;
+
+    setSavingToFiles(true);
+    try {
+      const fileName = `informe-seguridad-${format(new Date(), 'yyyy-MM-dd-HHmm')}.pdf`;
+      const pdfBlob = doc.output('blob');
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+      const filePath = `security-reports/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('shared-files')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Save record in shared_files table
+      const { error: dbError } = await supabase.from('shared_files').insert({
+        file_name: fileName,
+        file_path: filePath,
+        file_size: pdfBlob.size,
+        file_type: 'application/pdf',
+        description: `Informe de seguridad - Análisis IA - Riesgo: ${analysis?.risk_level === 'low' ? 'Bajo' : analysis?.risk_level === 'medium' ? 'Medio' : 'Alto'}`,
+        user_id: user!.id,
+      });
+
+      if (dbError) throw dbError;
+
+      toast.success('Informe guardado en Archivos Compartidos');
+    } catch (err: any) {
+      console.error('Error saving to files:', err);
+      toast.error('Error al guardar el informe');
+    } finally {
+      setSavingToFiles(false);
+    }
+  };
+
+  // Only show truly active blocks
   const activeBlocks = blocks.filter(b => b.is_active && !b.resolved_at && new Date(b.expires_at) > new Date());
   const resolvedBlocks = blocks.filter(b => !b.is_active || b.resolved_at || new Date(b.expires_at) <= new Date());
 
-  // Check if an IP is already blocked
   const isIPBlocked = (ip: string) => activeBlocks.some(b => b.ip_address === ip);
 
   const riskColor = (level: string) => {
@@ -226,6 +455,14 @@ export function SecurityPanel() {
       case 'high': return 'border-orange-500/30 bg-orange-500/5';
       case 'medium': return 'border-yellow-500/30 bg-yellow-500/5';
       default: return 'border-border bg-muted/30';
+    }
+  };
+
+  const urgencyLabel = (u: string) => {
+    switch (u) {
+      case 'immediate': return { text: 'Inmediato', className: 'bg-red-500/10 text-red-600 border-red-500/30' };
+      case 'soon': return { text: 'Pronto', className: 'bg-orange-500/10 text-orange-600 border-orange-500/30' };
+      default: return { text: 'Monitorear', className: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' };
     }
   };
 
@@ -280,14 +517,27 @@ export function SecurityPanel() {
               <p className="text-xs text-muted-foreground">IA analiza patrones de login, geolocalización y comportamiento</p>
             </div>
           </div>
-          <Button
-            onClick={handleAnalyzeIPs}
-            disabled={analyzing}
-            className="gap-2 shrink-0"
-          >
-            {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
-            {analyzing ? 'Analizando...' : 'Analizar IPs con IA'}
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={handleAnalyzeIPs}
+              disabled={analyzing}
+              className="gap-2 shrink-0"
+            >
+              {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+              {analyzing ? 'Analizando...' : 'Analizar IPs con IA'}
+            </Button>
+            {analysis && (
+              <>
+                <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-1.5">
+                  <FileDown className="w-4 h-4" /> Exportar PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleSaveToFiles} disabled={savingToFiles} className="gap-1.5">
+                  {savingToFiles ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderUp className="w-4 h-4" />}
+                  Guardar en Archivos
+                </Button>
+              </>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -311,7 +561,52 @@ export function SecurityPanel() {
               <p>{analysis.summary}</p>
             </div>
 
-            {/* Dangerous IPs - with BLOCK button */}
+            {/* AI Block Recommendations */}
+            {analysis.block_recommendations?.length ? (
+              <div>
+                <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
+                  <Ban className="w-4 h-4 text-red-500" /> Recomendaciones de bloqueo ({analysis.block_recommendations.length})
+                </h4>
+                <div className="space-y-2">
+                  {analysis.block_recommendations.map((rec, i) => {
+                    const urgency = urgencyLabel(rec.urgency);
+                    return (
+                      <div key={i} className="p-3 rounded-lg bg-red-500/5 border border-red-500/20 text-sm">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs font-mono bg-red-500/10 px-1.5 py-0.5 rounded">{rec.ip}</code>
+                            <span className="text-xs text-muted-foreground">· {rec.user}</span>
+                            <Badge variant="outline" className={`text-[9px] h-4 ${urgency.className}`}>
+                              {urgency.text}
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground">({rec.duration_hours}h)</span>
+                          </div>
+                          {isIPBlocked(rec.ip) ? (
+                            <Badge variant="destructive" className="text-[10px] gap-1">
+                              <Ban className="w-3 h-3" /> Ya bloqueada
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="gap-1.5 h-7 text-xs"
+                              disabled={blockingIP === rec.ip}
+                              onClick={() => handleBlockIP(rec.ip, rec.reason, rec.user, rec.duration_hours)}
+                            >
+                              {blockingIP === rec.ip ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                              Bloquear {rec.duration_hours}h
+                            </Button>
+                          )}
+                        </div>
+                        <p className="text-xs mt-1.5">{rec.reason}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Dangerous IPs */}
             {analysis.dangerous_ips?.length > 0 && (
               <div>
                 <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
@@ -324,6 +619,11 @@ export function SecurityPanel() {
                         <div className="flex items-center gap-2">
                           <code className="text-xs font-mono bg-red-500/10 px-1.5 py-0.5 rounded">{ip.ip}</code>
                           <span className="text-xs text-muted-foreground">· {ip.user}</span>
+                          {ip.should_block && (
+                            <Badge variant="outline" className="text-[9px] h-4 bg-red-500/10 text-red-600 border-red-500/30">
+                              IA recomienda bloquear
+                            </Badge>
+                          )}
                         </div>
                         {isIPBlocked(ip.ip) ? (
                           <Badge variant="destructive" className="text-[10px] gap-1">
@@ -350,7 +650,7 @@ export function SecurityPanel() {
               </div>
             )}
 
-            {/* Suspicious IPs - with BLOCK button */}
+            {/* Suspicious IPs */}
             {analysis.suspicious_ips?.length > 0 && (
               <div>
                 <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
@@ -363,6 +663,11 @@ export function SecurityPanel() {
                         <div className="flex items-center gap-2">
                           <code className="text-xs font-mono bg-yellow-500/10 px-1.5 py-0.5 rounded">{ip.ip}</code>
                           <span className="text-xs text-muted-foreground">· {ip.user}</span>
+                          {ip.should_block && (
+                            <Badge variant="outline" className="text-[9px] h-4 bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+                              IA recomienda bloquear
+                            </Badge>
+                          )}
                         </div>
                         {isIPBlocked(ip.ip) ? (
                           <Badge variant="secondary" className="text-[10px] gap-1">
