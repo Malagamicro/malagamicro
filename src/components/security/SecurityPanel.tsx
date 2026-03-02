@@ -5,12 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShieldAlert, ShieldCheck, Unlock, Clock, Globe, RefreshCw, Users, Brain, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2, ShieldAlert, ShieldCheck, Unlock, Clock, Globe, RefreshCw, Users, Brain, CheckCircle2, AlertTriangle, XCircle, Ban, Shield, Info } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
 
 interface SecurityBlock {
   id: string;
@@ -36,12 +35,46 @@ interface IPAnalysis {
   recommendations: string[];
 }
 
+const SECURITY_RECOMMENDATIONS = [
+  {
+    priority: 'critical',
+    title: 'Verificar logins desde ubicaciones inusuales',
+    description: 'Contactar con los usuarios que presenten logins desde países o ciudades no habituales para verificar la autenticidad. Si no son legítimos, forzar el reseteo de contraseña y revisar la actividad de la cuenta.',
+    icon: Globe,
+  },
+  {
+    priority: 'high',
+    title: 'Detección de anomalías geográficas',
+    description: 'El sistema detecta cambios bruscos de ubicación (ej. login desde España y minutos después desde EE.UU.) y bloquea automáticamente o solicita verificación adicional (MFA).',
+    icon: Shield,
+  },
+  {
+    priority: 'high',
+    title: 'Protección contra fuerza bruta activa',
+    description: 'Rate limiting, bloqueos temporales de IP y alertas automáticas están configurados. Se bloquea tras >10 intentos/hora o >5 IPs distintas/hora. Verificar si los bloqueos son ataques reales o errores humanos.',
+    icon: Ban,
+  },
+  {
+    priority: 'medium',
+    title: 'Monitorización de IPs sospechosas',
+    description: 'Las IPs detectadas como peligrosas por la IA pueden ser bloqueadas manualmente desde este panel. Monitorear patrones persistentes de acceso no autorizado.',
+    icon: AlertTriangle,
+  },
+  {
+    priority: 'medium',
+    title: 'Multi-Factor Authentication (MFA)',
+    description: 'Considerar la implementación de MFA para todos los usuarios, especialmente para accesos desde IPs externas a la red corporativa o situaciones de viaje.',
+    icon: ShieldCheck,
+  },
+];
+
 export function SecurityPanel() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [blocks, setBlocks] = useState<SecurityBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [unlocking, setUnlocking] = useState<string | null>(null);
+  const [blockingIP, setBlockingIP] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<IPAnalysis | null>(null);
 
@@ -97,6 +130,32 @@ export function SecurityPanel() {
     }
   };
 
+  const handleBlockIP = async (ip: string, reason: string, userEmail?: string) => {
+    setBlockingIP(ip);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${supabaseUrl}/functions/v1/admin-users?action=block-ip`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ip_address: ip, reason, user_email: userEmail, duration_hours: 24 }),
+      });
+
+      if (!res.ok) throw new Error('Failed to block IP');
+      toast.success(`IP ${ip} bloqueada por 24h`);
+      fetchBlocks();
+    } catch {
+      toast.error('Error al bloquear IP');
+    } finally {
+      setBlockingIP(null);
+    }
+  };
+
   const handleAnalyzeIPs = async () => {
     setAnalyzing(true);
     try {
@@ -127,8 +186,12 @@ export function SecurityPanel() {
     }
   };
 
-  const activeBlocks = blocks.filter(b => b.is_active && new Date(b.expires_at) > new Date());
-  const resolvedBlocks = blocks.filter(b => !b.is_active || new Date(b.expires_at) <= new Date());
+  // FIXED: Only show truly active blocks (is_active=true AND not expired AND not resolved)
+  const activeBlocks = blocks.filter(b => b.is_active && !b.resolved_at && new Date(b.expires_at) > new Date());
+  const resolvedBlocks = blocks.filter(b => !b.is_active || b.resolved_at || new Date(b.expires_at) <= new Date());
+
+  // Check if an IP is already blocked
+  const isIPBlocked = (ip: string) => activeBlocks.some(b => b.ip_address === ip);
 
   const riskColor = (level: string) => {
     switch (level) {
@@ -154,6 +217,15 @@ export function SecurityPanel() {
       case 'monitored': return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
       case 'at_risk': return <XCircle className="w-4 h-4 text-red-500" />;
       default: return <Globe className="w-4 h-4 text-muted-foreground" />;
+    }
+  };
+
+  const priorityColor = (p: string) => {
+    switch (p) {
+      case 'critical': return 'border-red-500/30 bg-red-500/5';
+      case 'high': return 'border-orange-500/30 bg-orange-500/5';
+      case 'medium': return 'border-yellow-500/30 bg-yellow-500/5';
+      default: return 'border-border bg-muted/30';
     }
   };
 
@@ -239,7 +311,7 @@ export function SecurityPanel() {
               <p>{analysis.summary}</p>
             </div>
 
-            {/* Dangerous IPs */}
+            {/* Dangerous IPs - with BLOCK button */}
             {analysis.dangerous_ips?.length > 0 && (
               <div>
                 <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
@@ -247,10 +319,28 @@ export function SecurityPanel() {
                 </h4>
                 <div className="space-y-2">
                   {analysis.dangerous_ips.map((ip, i) => (
-                    <div key={i} className="p-2 rounded-lg bg-red-500/5 border border-red-500/20 text-sm">
-                      <div className="flex items-center gap-2">
-                        <code className="text-xs font-mono bg-red-500/10 px-1.5 py-0.5 rounded">{ip.ip}</code>
-                        <span className="text-xs text-muted-foreground">· {ip.user}</span>
+                    <div key={i} className="p-3 rounded-lg bg-red-500/5 border border-red-500/20 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs font-mono bg-red-500/10 px-1.5 py-0.5 rounded">{ip.ip}</code>
+                          <span className="text-xs text-muted-foreground">· {ip.user}</span>
+                        </div>
+                        {isIPBlocked(ip.ip) ? (
+                          <Badge variant="destructive" className="text-[10px] gap-1">
+                            <Ban className="w-3 h-3" /> Bloqueada
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="gap-1.5 h-7 text-xs"
+                            disabled={blockingIP === ip.ip}
+                            onClick={() => handleBlockIP(ip.ip, ip.reason, ip.user)}
+                          >
+                            {blockingIP === ip.ip ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                            Bloquear IP
+                          </Button>
+                        )}
                       </div>
                       <p className="text-xs mt-1">{ip.reason}</p>
                       <p className="text-xs text-red-500 mt-1 font-medium">→ {ip.recommendation}</p>
@@ -260,7 +350,7 @@ export function SecurityPanel() {
               </div>
             )}
 
-            {/* Suspicious IPs */}
+            {/* Suspicious IPs - with BLOCK button */}
             {analysis.suspicious_ips?.length > 0 && (
               <div>
                 <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
@@ -268,10 +358,28 @@ export function SecurityPanel() {
                 </h4>
                 <div className="space-y-2">
                   {analysis.suspicious_ips.map((ip, i) => (
-                    <div key={i} className="p-2 rounded-lg bg-yellow-500/5 border border-yellow-500/20 text-sm">
-                      <div className="flex items-center gap-2">
-                        <code className="text-xs font-mono bg-yellow-500/10 px-1.5 py-0.5 rounded">{ip.ip}</code>
-                        <span className="text-xs text-muted-foreground">· {ip.user}</span>
+                    <div key={i} className="p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs font-mono bg-yellow-500/10 px-1.5 py-0.5 rounded">{ip.ip}</code>
+                          <span className="text-xs text-muted-foreground">· {ip.user}</span>
+                        </div>
+                        {isIPBlocked(ip.ip) ? (
+                          <Badge variant="secondary" className="text-[10px] gap-1">
+                            <Ban className="w-3 h-3" /> Bloqueada
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 h-7 text-xs border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/10"
+                            disabled={blockingIP === ip.ip}
+                            onClick={() => handleBlockIP(ip.ip, ip.reason, ip.user)}
+                          >
+                            {blockingIP === ip.ip ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                            Bloquear
+                          </Button>
+                        )}
                       </div>
                       <p className="text-xs mt-1">{ip.reason}</p>
                       <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 font-medium">→ {ip.recommendation}</p>
@@ -331,10 +439,10 @@ export function SecurityPanel() {
               </div>
             )}
 
-            {/* Recommendations */}
+            {/* AI Recommendations */}
             {analysis.recommendations?.length > 0 && (
               <div>
-                <h4 className="text-sm font-bold mb-2">Recomendaciones</h4>
+                <h4 className="text-sm font-bold mb-2">Recomendaciones de la IA</h4>
                 <ul className="space-y-1">
                   {analysis.recommendations.map((rec, i) => (
                     <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
@@ -426,6 +534,38 @@ export function SecurityPanel() {
         </CardContent>
       </Card>
 
+      {/* Security Recommendations */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Info className="w-5 h-5 text-primary" />
+            Recomendaciones de seguridad
+          </CardTitle>
+          <CardDescription>Políticas y medidas de protección activas y recomendadas</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {SECURITY_RECOMMENDATIONS.map((rec, i) => {
+            const Icon = rec.icon;
+            return (
+              <div key={i} className={`p-3 rounded-lg border ${priorityColor(rec.priority)} flex items-start gap-3`}>
+                <div className="mt-0.5 shrink-0">
+                  <Icon className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h4 className="text-sm font-semibold">{rec.title}</h4>
+                    <Badge variant="outline" className="text-[9px] h-4">
+                      {rec.priority === 'critical' ? 'Crítico' : rec.priority === 'high' ? 'Alta' : 'Media'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{rec.description}</p>
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
       {/* History */}
       {resolvedBlocks.length > 0 && (
         <Card>
@@ -442,6 +582,7 @@ export function SecurityPanel() {
                 <TableRow>
                   <TableHead>Usuario</TableHead>
                   <TableHead>Motivo</TableHead>
+                  <TableHead>IP</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
@@ -450,7 +591,8 @@ export function SecurityPanel() {
                 {resolvedBlocks.slice(0, 20).map(block => (
                   <TableRow key={block.id} className="opacity-70">
                     <TableCell className="font-medium text-sm">{block.user_email}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{block.reason}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{block.reason}</TableCell>
+                    <TableCell className="text-xs font-mono">{block.ip_address || '—'}</TableCell>
                     <TableCell className="text-xs">
                       {format(new Date(block.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}
                     </TableCell>

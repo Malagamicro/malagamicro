@@ -308,6 +308,45 @@ serve(async (req) => {
       );
     }
 
+    // BLOCK IP - manually block an IP address
+    if (req.method === 'POST' && action === 'block-ip') {
+      const { ip_address, reason, user_email, duration_hours } = await req.json();
+
+      if (!ip_address || !reason) {
+        return new Response(
+          JSON.stringify({ error: 'ip_address and reason are required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Find user_id by email if provided, otherwise use a placeholder
+      let targetUserId = user.id;
+      if (user_email) {
+        const { data: { users } } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        const found = users?.find(u => u.email === user_email);
+        if (found) targetUserId = found.id;
+      }
+
+      const hours = duration_hours || 24;
+      const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+
+      const { error: blockError } = await adminClient.from('login_security_blocks').insert({
+        user_id: targetUserId,
+        ip_address,
+        reason: `[Bloqueo manual por IA] ${reason}`,
+        alert_details: { blocked_by: user.email, source: 'ai_analysis', original_reason: reason },
+        expires_at: expiresAt,
+        is_active: true,
+      });
+
+      if (blockError) throw blockError;
+
+      return new Response(
+        JSON.stringify({ message: `IP ${ip_address} bloqueada por ${hours}h`, expires_at: expiresAt }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: 'Invalid action' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
