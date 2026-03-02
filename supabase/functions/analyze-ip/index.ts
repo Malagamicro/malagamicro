@@ -113,15 +113,19 @@ Contexto importante:
 - IPs móviles españolas pueden cambiar frecuentemente, esto es normal.
 - Usuarios viajando por España es normal.
 
+IMPORTANTE: Para las IPs sospechosas y peligrosas, indica explícitamente si recomiendas bloquearla con "should_block": true/false.
+Genera también un array "block_recommendations" con las IPs que deberían bloquearse, indicando urgencia y duración.
+
 Responde en JSON con esta estructura exacta:
 {
   "summary": "Resumen ejecutivo en español de la situación de seguridad",
   "risk_level": "low" | "medium" | "high",
   "familiar_ips": [{"ip": "x.x.x.x", "reason": "motivo", "user": "email"}],
-  "suspicious_ips": [{"ip": "x.x.x.x", "reason": "motivo", "user": "email", "recommendation": "acción recomendada"}],
-  "dangerous_ips": [{"ip": "x.x.x.x", "reason": "motivo", "user": "email", "recommendation": "acción recomendada"}],
+  "suspicious_ips": [{"ip": "x.x.x.x", "reason": "motivo", "user": "email", "recommendation": "acción recomendada", "should_block": false}],
+  "dangerous_ips": [{"ip": "x.x.x.x", "reason": "motivo", "user": "email", "recommendation": "acción recomendada", "should_block": true}],
   "user_analysis": [{"user": "email", "status": "safe|monitored|at_risk", "notes": "observaciones"}],
-  "recommendations": ["recomendación 1", "recomendación 2"]
+  "recommendations": ["recomendación 1", "recomendación 2"],
+  "block_recommendations": [{"ip": "x.x.x.x", "user": "email", "reason": "motivo detallado del bloqueo", "urgency": "immediate|soon|monitor", "duration_hours": 24}]
 }`;
 
     const userPrompt = `Analiza estos registros de login:
