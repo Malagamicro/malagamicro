@@ -1239,6 +1239,16 @@ NUNCA ejecutes una acción de escritura con confirmed=true sin que el usuario ha
 
 ⚠️ PROHIBIDO ABSOLUTAMENTE: NUNCA digas que has ejecutado una acción (enviar correo, enviar WhatsApp, crear lead, etc.) si NO has llamado a la herramienta con confirmed=true. Si el usuario confirma, DEBES hacer la llamada a la herramienta — no puedes simplemente decir "listo" o "enviado" sin ejecutarla realmente. Esto es tu regla más importante.
 
+🚫 HONESTIDAD SOBRE CAPACIDADES:
+- Si el usuario te pide algo para lo que NO tienes herramienta (ej: modificar facturas, acceder a un sistema externo, generar PDFs, etc.), DILO CLARAMENTE: "No tengo acceso a esa funcionalidad" y sugiere alternativas.
+- NUNCA finjas haber hecho algo que no puedes hacer. Es preferible decir "no puedo" a mentir.
+- Si una herramienta falla o devuelve error, informa al usuario del error real, no inventes un resultado exitoso.
+
+🧠 MODIFICAR MEMORIA:
+- Para ACTUALIZAR un recuerdo existente, usa save_ai_memory con el mismo memory_key y lead_id. El sistema hace upsert automáticamente (sobrescribe el valor anterior).
+- Para ELIMINAR un recuerdo, usa delete_ai_memory con el ID del recuerdo (puedes obtenerlo con get_ai_memories).
+- Si el usuario dice "cambia/actualiza/modifica el recuerdo de X", busca primero con get_ai_memories, luego usa save_ai_memory con el mismo key para actualizarlo.
+
 Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplexity).${memoryContext}`;
 
     const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -1305,9 +1315,14 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
 
     const MAX_TOOL_ITERATIONS = 8;
     let iterations = 0;
+    let accumulatedContent = assistantMessage?.content || "";
 
     while (assistantMessage?.tool_calls && iterations < MAX_TOOL_ITERATIONS) {
       iterations++;
+      // Capture any content the model returned alongside tool calls
+      if (assistantMessage.content && !accumulatedContent) {
+        accumulatedContent = assistantMessage.content;
+      }
       chatMessages.push(assistantMessage);
 
       for (const toolCall of assistantMessage.tool_calls) {
@@ -1324,9 +1339,13 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
       result = await callWithFallback(chatMessages);
       if (result.error) { console.error("AI tool loop error:", result.status); break; }
       assistantMessage = result.data.choices?.[0]?.message;
+      // Update accumulated content if model provided new text
+      if (assistantMessage?.content) {
+        accumulatedContent = assistantMessage.content;
+      }
     }
 
-    let finalContent = assistantMessage?.content || "No tengo respuesta en este momento.";
+    let finalContent = accumulatedContent || assistantMessage?.content || "No tengo respuesta en este momento.";
 
     // SAFETY CHECK: Detect when the model claims to have performed an action but didn't actually call the tool
     const actionClaimPatterns = /(?:¡?listo|enviado|correo enviado|email enviado|mensaje enviado|whatsapp enviado|lead creado|evento creado|recordatorio creado).*?✅/i;
