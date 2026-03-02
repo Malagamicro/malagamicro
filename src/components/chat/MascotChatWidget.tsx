@@ -36,6 +36,20 @@ export function MascotChatWidget() {
   const posRef = useRef({ x: Math.max(0, window.innerWidth - 80), y: Math.max(0, window.innerHeight - 80) });
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
 
+  // Clamp helper: keep element fully inside viewport
+  const clampToViewport = useCallback(() => {
+    const el = elRef.current;
+    if (!el) return;
+    const ew = el.offsetWidth;
+    const eh = el.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const nx = Math.max(0, Math.min(vw - ew, posRef.current.x));
+    const ny = Math.max(0, Math.min(vh - eh, posRef.current.y));
+    posRef.current = { x: nx, y: ny };
+    el.style.transform = `translate(${nx}px, ${ny}px)`;
+  }, []);
+
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
@@ -59,6 +73,20 @@ export function MascotChatWidget() {
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
   useEffect(() => { if (isOpen && !isMinimized) inputRef.current?.focus(); }, [isOpen, isMinimized]);
+
+  // Re-clamp on window resize
+  useEffect(() => {
+    const onResize = () => clampToViewport();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [clampToViewport]);
+
+  // Re-clamp when widget changes size (open/close/minimize)
+  useEffect(() => {
+    // Small delay so the DOM has updated dimensions
+    const t = setTimeout(() => clampToViewport(), 50);
+    return () => clearTimeout(t);
+  }, [isOpen, isMinimized, clampToViewport]);
 
   // Attach native mousemove/mouseup for drag — fastest possible, no pointer capture issues
   useEffect(() => {
