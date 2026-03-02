@@ -867,15 +867,15 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
 
   // Horizontal sidebar content (top/bottom) with category popovers
   const horizontalContent = (
-    <div className="flex items-center h-full w-full px-3 gap-1.5">
+    <div className="flex items-center h-full w-full px-3 gap-1.5 min-h-[48px]">
       <button
         onClick={() => onTabChange('dashboard')}
-        className="h-9 rounded-lg overflow-hidden flex items-center justify-center bg-white px-2 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0"
+        className="h-9 w-[120px] rounded-lg overflow-hidden flex items-center justify-center bg-white px-2 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0"
       >
-        <img src={logoFull} alt="MalagaMicro CRM" className="h-7 object-contain" />
+        <img src={logoFull} alt="MalagaMicro CRM" className="h-7 w-auto object-contain" loading="eager" />
       </button>
       <div className="h-6 w-px bg-sidebar-border mx-1 flex-shrink-0" />
-      <nav className="flex items-center gap-0.5 overflow-x-auto flex-1 scrollbar-none">
+      <nav className="flex items-center gap-0.5 overflow-x-auto flex-1 scrollbar-none min-h-[40px]">
         {categories.map(cat => {
           const visibleItems = cat.items.filter(i => !i.hidden);
           if (visibleItems.length === 0) return null;
@@ -1015,13 +1015,13 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
       <aside
         data-sidebar
         className={cn(
-          "bg-sidebar text-sidebar-foreground transition-all duration-300 flex",
+          "bg-sidebar text-sidebar-foreground transition-all duration-300 ease-out flex will-change-[width,transform]",
           // Vertical sidebar (left/right)
           (position === 'left' || position === 'right') && "flex-col",
           (position === 'left' || position === 'right') && !isMobile && "h-screen",
           (position === 'left' || position === 'right') && !isMobile && (collapsed ? "w-[60px]" : "w-64"),
-          // Horizontal sidebar (top/bottom)
-          (position === 'top' || position === 'bottom') && !isMobile && "w-full flex-row items-center h-12 overflow-hidden",
+          // Horizontal sidebar (top/bottom) - fixed height to prevent CLS
+          (position === 'top' || position === 'bottom') && !isMobile && "w-full flex-row items-center h-12 min-h-[48px] overflow-hidden",
           // Mobile always left
           isMobile && "fixed inset-y-0 left-0 z-50 w-60 flex-col",
           isMobile && (mobileOpen ? "translate-x-0" : "-translate-x-full")

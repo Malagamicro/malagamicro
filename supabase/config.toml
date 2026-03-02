@@ -119,3 +119,6 @@ verify_jwt = false
 
 [functions.spreadsheet-nlp]
 verify_jwt = false
+
+[functions.analyze-ip]
+verify_jwt = false

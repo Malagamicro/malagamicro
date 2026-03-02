@@ -727,10 +727,10 @@ const IndexContent = () => {
           openTabs={openTabs}
           onCloseTab={handleCloseTab}
         />
-        <div className="flex-1 flex flex-col overflow-hidden md:ml-0" style={{ minHeight: 0 }}>
+        <div className="flex-1 flex flex-col overflow-hidden md:ml-0 min-h-0">
           <EmailVerificationBanner />
-          <main className="flex-1 overflow-auto pt-14 md:pt-0" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <main className="flex-1 overflow-auto pt-14 md:pt-0 flex flex-col min-h-0">
+            <div className="flex-1 min-h-0 flex flex-col">
               {renderContent()}
             </div>
           </main>
