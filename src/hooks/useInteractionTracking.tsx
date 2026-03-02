@@ -50,19 +50,28 @@ export function useInteractionTracking() {
     trackEvent('navigation', tab, { tab });
   }, [trackEvent]);
 
-  // Track login
-  const trackLogin = useCallback(async () => {
-    if (!user) return;
+  // Track login - returns block info if user is blocked
+  const trackLogin = useCallback(async (): Promise<{ blocked?: boolean; reason?: string } | null> => {
+    if (!user) return null;
     try {
       const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-      await supabase.functions.invoke('track-login', {
+      const { data, error } = await supabase.functions.invoke('track-login', {
         body: {
           user_agent: navigator.userAgent,
           device_type: isMobile ? 'mobile' : 'desktop',
         },
       });
+      if (error) {
+        console.error('Login tracking failed:', error);
+        return null;
+      }
+      if (data?.blocked) {
+        return { blocked: true, reason: data.reason };
+      }
+      return null;
     } catch (err) {
       console.error('Login tracking failed:', err);
+      return null;
     }
   }, [user]);
 

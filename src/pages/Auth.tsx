@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Eye, EyeOff, MessageSquareWarning, Send, Clock } from 'lucide-react';
+import { Loader2, Eye, EyeOff, MessageSquareWarning, Send, Clock, ShieldAlert, LifeBuoy } from 'lucide-react';
 import { z } from 'zod';
 import { RateLimitWarning } from '@/components/auth/RateLimitWarning';
 import { ForgotPasswordModal } from '@/components/auth/ForgotPasswordModal';
@@ -20,7 +20,7 @@ const authSchema = z.object({
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
 });
 
-const SUPPORT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const SUPPORT_COOLDOWN_MS = 5 * 60 * 1000;
 const SUPPORT_COOLDOWN_KEY = 'login_support_last_sent';
 
 function getDeviceInfo() {
@@ -43,9 +43,7 @@ function getDeviceInfo() {
   else if (/Tablet|iPad/i.test(ua)) device = 'Tablet';
 
   return {
-    browser,
-    os,
-    device,
+    browser, os, device,
     screen: `${window.screen.width}x${window.screen.height}`,
     userAgent: ua,
   };
@@ -58,6 +56,13 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  
+  // Security block state
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
+  const [showBlockSupport, setShowBlockSupport] = useState(false);
+  const [blockSupportMessage, setBlockSupportMessage] = useState('');
+  const [isSendingBlockSupport, setIsSendingBlockSupport] = useState(false);
   
   // Support panel
   const [showSupport, setShowSupport] = useState(false);
@@ -105,10 +110,10 @@ export default function Auth() {
   }, [supportCooldownEnd]);
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && !isBlocked) {
       navigate('/', { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, isBlocked]);
 
   const validateForm = () => {
     try {
@@ -148,6 +153,28 @@ export default function Auth() {
         });
       } else {
         resetAttempts();
+        
+        // After successful sign-in, track login and check for blocks
+        try {
+          const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+          const { data } = await supabase.functions.invoke('track-login', {
+            body: {
+              user_agent: navigator.userAgent,
+              device_type: isMobile ? 'mobile' : 'desktop',
+            },
+          });
+          
+          if (data?.blocked) {
+            // Sign out the user immediately
+            await supabase.auth.signOut();
+            setIsBlocked(true);
+            setBlockReason(data.reason || 'Actividad sospechosa detectada');
+            return;
+          }
+        } catch (trackErr) {
+          console.error('Track login error:', trackErr);
+          // Don't block login if tracking fails
+        }
       }
     } finally {
       setIsLoading(false);
@@ -166,7 +193,6 @@ export default function Auth() {
 
     setIsSendingSupport(true);
     try {
-      // Get IP and location
       let ip = 'No disponible';
       let location = 'No disponible';
       try {
@@ -178,13 +204,9 @@ export default function Auth() {
         }
       } catch { /* ignore */ }
 
-      const deviceInfo = {
-        ...getDeviceInfo(),
-        ip,
-        location,
-      };
+      const deviceInfo = { ...getDeviceInfo(), ip, location };
 
-      const { data, error } = await supabase.functions.invoke('login-support', {
+      const { error } = await supabase.functions.invoke('login-support', {
         body: { message: supportMessage.trim(), deviceInfo },
       });
 
@@ -203,6 +225,46 @@ export default function Auth() {
     }
   };
 
+  const handleSendBlockSupport = async () => {
+    if (!blockSupportMessage.trim()) {
+      toast({ title: 'Error', description: 'Escribe un mensaje.', variant: 'destructive' });
+      return;
+    }
+
+    setIsSendingBlockSupport(true);
+    try {
+      let ip = 'No disponible';
+      let location = 'No disponible';
+      try {
+        const ipRes = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(5000) });
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          ip = ipData.ip || 'No disponible';
+          location = [ipData.city, ipData.region, ipData.country_name].filter(Boolean).join(', ') || 'No disponible';
+        }
+      } catch { /* ignore */ }
+
+      const deviceInfo = { ...getDeviceInfo(), ip, location };
+
+      const { error } = await supabase.functions.invoke('login-support', {
+        body: {
+          message: `[SOLICITUD DE DESBLOQUEO] Email: ${email}\nMotivo del bloqueo: ${blockReason}\nMensaje del usuario: ${blockSupportMessage.trim()}`,
+          deviceInfo,
+        },
+      });
+
+      if (error) throw error;
+
+      setBlockSupportMessage('');
+      setShowBlockSupport(false);
+      toast({ title: 'Solicitud enviada', description: 'Un administrador revisará tu caso lo antes posible.' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'No se pudo enviar la solicitud.', variant: 'destructive' });
+    } finally {
+      setIsSendingBlockSupport(false);
+    }
+  };
+
   const isCooldownActive = cooldownRemaining > 0;
   const cooldownMinutes = Math.ceil(cooldownRemaining / 60000);
   const cooldownSeconds = Math.ceil((cooldownRemaining % 60000) / 1000);
@@ -215,16 +277,108 @@ export default function Auth() {
     );
   }
 
+  // ===== BLOCKED SCREEN =====
+  if (isBlocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-destructive/5 to-background p-4">
+        <div className="w-full max-w-md space-y-4">
+          <div className="flex justify-center">
+            <img src={logoLogin} alt="Málaga Micro" className="h-16 object-contain opacity-50" />
+          </div>
+
+          <Card className="border-destructive/30 shadow-xl">
+            <CardHeader className="text-center pb-2">
+              <div className="flex justify-center mb-3">
+                <div className="p-3 rounded-full bg-destructive/10">
+                  <ShieldAlert className="h-8 w-8 text-destructive" />
+                </div>
+              </div>
+              <h1 className="text-xl font-bold text-foreground">Acceso Bloqueado</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Se ha detectado actividad sospechosa en tu cuenta
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+                <p className="text-sm font-medium text-destructive mb-1">Motivo del bloqueo:</p>
+                <p className="text-sm text-muted-foreground">{blockReason}</p>
+              </div>
+
+              <div className="p-3 rounded-lg bg-muted text-sm text-muted-foreground">
+                <p>Tu acceso ha sido bloqueado temporalmente por seguridad. El bloqueo se levantará automáticamente en un máximo de 2 horas.</p>
+                <p className="mt-2">Si crees que es un error, puedes solicitar ayuda al administrador.</p>
+              </div>
+
+              {!showBlockSupport ? (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowBlockSupport(true)}
+                >
+                  <LifeBuoy className="mr-2 h-4 w-4" />
+                  Solicitar desbloqueo
+                </Button>
+              ) : (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <Textarea
+                    placeholder="Explica por qué crees que es un error..."
+                    value={blockSupportMessage}
+                    onChange={(e) => setBlockSupportMessage(e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    disabled={isSendingBlockSupport}
+                    className="resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowBlockSupport(false)}
+                      disabled={isSendingBlockSupport}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSendBlockSupport}
+                      disabled={isSendingBlockSupport || !blockSupportMessage.trim()}
+                      className="flex-1"
+                    >
+                      {isSendingBlockSupport ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Send className="mr-1 h-3 w-3" />
+                      )}
+                      Enviar solicitud
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground"
+                onClick={() => {
+                  setIsBlocked(false);
+                  setBlockReason('');
+                }}
+              >
+                Volver al inicio de sesión
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
       <div className="w-full max-w-md space-y-4">
         {/* Logo */}
         <div className="flex justify-center">
-          <img 
-            src={logoLogin} 
-            alt="Málaga Micro" 
-            className="h-20 object-contain"
-          />
+          <img src={logoLogin} alt="Málaga Micro" className="h-20 object-contain" />
         </div>
 
         <Card className="border-border/50 shadow-xl">
