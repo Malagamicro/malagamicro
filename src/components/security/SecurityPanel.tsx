@@ -38,13 +38,17 @@ export function SecurityPanel() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await supabase.functions.invoke('admin-users', {
-        body: { action: 'list-blocks' },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${supabaseUrl}/functions/v1/admin-users?action=list-blocks`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (res.error) throw res.error;
-      setBlocks(res.data?.blocks || []);
+      if (!res.ok) throw new Error('Failed to fetch blocks');
+      const data = await res.json();
+      setBlocks(data?.blocks || []);
     } catch (err: any) {
       toast.error('Error al cargar bloqueos');
     } finally {
@@ -60,12 +64,17 @@ export function SecurityPanel() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await supabase.functions.invoke('admin-users', {
-        body: { action: 'unblock', blockId },
-        headers: { Authorization: `Bearer ${session.access_token}` },
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${supabaseUrl}/functions/v1/admin-users?action=unblock`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ blockId }),
       });
 
-      if (res.error) throw res.error;
+      if (!res.ok) throw new Error('Failed to unblock');
       toast.success('Usuario desbloqueado');
       fetchBlocks();
     } catch {
