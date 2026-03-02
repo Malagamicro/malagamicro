@@ -1197,10 +1197,12 @@ REGLA CRÍTICA DE CONFIRMACIÓN:
 Para TODAS las acciones de escritura (excepto memoria), DEBES seguir este flujo:
 1. Primera llamada: usa confirmed=false. La herramienta te devolverá un resumen para el usuario.
 2. Muestra ese resumen al usuario y pregunta si confirma.
-3. Cuando el usuario confirme ("sí", "confirma", "dale", "ok", "adelante"), ejecuta la herramienta de nuevo con confirmed=true.
+3. Cuando el usuario confirme ("sí", "confirma", "dale", "ok", "adelante"), DEBES ejecutar la herramienta de nuevo con confirmed=true. ESTO ES OBLIGATORIO.
 4. Si el usuario dice "no" o "cancela", cancela la acción.
 
 NUNCA ejecutes una acción de escritura con confirmed=true sin que el usuario haya confirmado explícitamente en el chat.
+
+⚠️ PROHIBIDO ABSOLUTAMENTE: NUNCA digas que has ejecutado una acción (enviar correo, enviar WhatsApp, crear lead, etc.) si NO has llamado a la herramienta con confirmed=true. Si el usuario confirma, DEBES hacer la llamada a la herramienta — no puedes simplemente decir "listo" o "enviado" sin ejecutarla realmente. Esto es tu regla más importante.
 
 Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplexity).${memoryContext}`;
 
@@ -1278,7 +1280,9 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
         let toolArgs: Record<string, unknown> = {};
         try { toolArgs = JSON.parse(toolCall.function.arguments || "{}"); } catch { toolArgs = {}; }
 
+        console.log(`[mascot-chat] Tool call: ${toolName}, args: ${JSON.stringify(toolArgs)}`);
         const toolResult = await executeToolCall(supabase, userId, toolName, toolArgs);
+        console.log(`[mascot-chat] Tool result (${toolName}): ${toolResult.slice(0, 200)}`);
         chatMessages.push({ role: "tool", tool_call_id: toolCall.id, content: toolResult });
       }
 
