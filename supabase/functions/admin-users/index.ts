@@ -232,6 +232,82 @@ serve(async (req) => {
       );
     }
 
+    // LIST SECURITY BLOCKS
+    if (req.method === 'GET' && action === 'list-blocks') {
+      const { data: blocks, error: blocksError } = await adminClient
+        .from('login_security_blocks')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (blocksError) throw blocksError;
+
+      // Enrich with user emails
+      const userIds = [...new Set((blocks || []).map(b => b.user_id))];
+      const enriched = await Promise.all((blocks || []).map(async (block) => {
+        const { data: userData } = await adminClient.auth.admin.getUserById(block.user_id);
+        return { ...block, user_email: userData?.user?.email || 'Desconocido' };
+      }));
+
+      return new Response(
+        JSON.stringify({ blocks: enriched }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // UNBLOCK USER
+    if (req.method === 'POST' && action === 'unblock') {
+      const { blockId, userId } = await req.json();
+
+      if (blockId) {
+        const { error: unblockError } = await adminClient
+          .from('login_security_blocks')
+          .update({ is_active: false, resolved_at: new Date().toISOString(), resolved_by: user.id })
+          .eq('id', blockId);
+        if (unblockError) throw unblockError;
+      } else if (userId) {
+        const { error: unblockError } = await adminClient
+          .from('login_security_blocks')
+          .update({ is_active: false, resolved_at: new Date().toISOString(), resolved_by: user.id })
+          .eq('user_id', userId)
+          .eq('is_active', true);
+        if (unblockError) throw unblockError;
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'blockId or userId required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ message: 'User unblocked successfully' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // CHECK USER BLOCKS (for admin users panel)
+    if (req.method === 'GET' && action === 'check-blocks') {
+      const targetUserId = new URL(req.url).searchParams.get('userId');
+      if (!targetUserId) {
+        return new Response(
+          JSON.stringify({ error: 'userId required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const { data: activeBlock } = await adminClient
+        .from('login_security_blocks')
+        .select('id, reason, expires_at')
+        .eq('user_id', targetUserId)
+        .eq('is_active', true)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+
+      return new Response(
+        JSON.stringify({ blocked: !!activeBlock, block: activeBlock }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: 'Invalid action' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
