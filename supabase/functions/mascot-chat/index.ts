@@ -1117,10 +1117,10 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!OPENROUTER_API_KEY) {
+      throw new Error("OPENROUTER_API_KEY is not configured");
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -1204,16 +1204,18 @@ NUNCA ejecutes una acción de escritura con confirmed=true sin que el usuario ha
 
 Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplexity).${memoryContext}`;
 
-    const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
     const MODEL_CHAIN = [
+      "anthropic/claude-sonnet-4.5",
       "google/gemini-2.5-flash",
       "openai/gpt-5-mini",
-      "google/gemini-3-flash-preview",
     ];
 
-    const aiHeaders = {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+    const openRouterHeaders = {
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
+      "HTTP-Referer": "https://malagamicro.lovable.app",
+      "X-Title": "MalagaMicro CRM",
     };
 
     // Helper: try models in fallback order
@@ -1224,9 +1226,9 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
           const body: Record<string, unknown> = { model, messages: msgs };
           if (useTools) { body.tools = tools; body.tool_choice = "auto"; }
 
-          const resp = await fetch(AI_GATEWAY_URL, {
+          const resp = await fetch(OPENROUTER_URL, {
             method: "POST",
-            headers: aiHeaders,
+            headers: openRouterHeaders,
             body: JSON.stringify(body),
           });
 
