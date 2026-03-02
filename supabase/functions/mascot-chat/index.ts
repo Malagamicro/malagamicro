@@ -1188,10 +1188,45 @@ HERRAMIENTAS DISPONIBLES:
 - save_ai_memory: Guarda automáticamente información relevante tras conversaciones (preferencias del cliente, acuerdos, datos clave). Categorías: general, preference, interaction, note.
 - delete_ai_memory: Eliminar un recuerdo obsoleto.
 
-INSTRUCCIONES DE MEMORIA:
-- Al detectar información importante sobre un lead o usuario durante la conversación, guárdala automáticamente con save_ai_memory.
-- Ejemplos: preferencias de contacto, acuerdos comerciales, datos relevantes mencionados, historial de interacciones clave.
-- Usa los recuerdos cargados al inicio para personalizar tus respuestas y dar contexto.
+INSTRUCCIONES DE MEMORIA INTELIGENTE:
+Debes guardar información automáticamente con save_ai_memory (SIN pedir confirmación) cuando detectes cualquiera de estos patrones en la conversación:
+
+📌 GUARDAR SIEMPRE (categoría "preference"):
+- Preferencias de contacto del usuario ("prefiero que me llamen por la mañana", "no me mandes correos los viernes")
+- Preferencias de formato o estilo ("siempre quiero los correos formales", "usa tuteo")
+- Configuraciones repetidas ("siempre envío a este email", "mi firma es...")
+
+📌 GUARDAR SIEMPRE (categoría "interaction"):
+- Acuerdos comerciales mencionados ("cerramos trato con X por 5000€", "descuento del 10% para Y")
+- Resultados de reuniones o llamadas ("hablé con X, le interesa el producto Z")
+- Seguimientos importantes ("X me pidió presupuesto, se lo envío el lunes")
+- Datos de contacto nuevos mencionados en conversación ("el móvil de Juan es 666...")
+
+📌 GUARDAR SIEMPRE (categoría "note"):
+- Datos clave sobre leads/clientes ("Empresa X tiene 50 empleados", "facturan 2M al año")
+- Problemas o quejas recurrentes ("el cliente Y se quejó del plazo de entrega")
+- Oportunidades detectadas ("X mencionó que necesitan proveedor de mantenimiento")
+
+📌 GUARDAR SIEMPRE (categoría "general"):
+- Instrucciones recurrentes del usuario ("cuando cree leads ponles siempre estado contactado")
+- Flujos de trabajo del usuario ("primero creo el lead, luego envío correo de bienvenida")
+- Contexto de negocio ("nuestro producto estrella es X", "temporada alta es de junio a septiembre")
+
+⚠️ NO GUARDAR:
+- Saludos o charla casual sin información útil
+- Datos que ya están guardados en los recuerdos cargados (evita duplicados)
+- Información temporal sin valor futuro ("¿qué hora es?")
+
+FORMATO DE GUARDADO:
+- memory_key: nombre descriptivo en snake_case (ej: "preferencia_horario_contacto", "acuerdo_empresa_x")
+- memory_value: objeto JSON con campos claros: { "detalle": "...", "contexto": "...", "fecha": "YYYY-MM-DD" }
+- Si hay un lead relacionado, incluye su lead_id
+- Guarda el recuerdo AL FINAL de tu respuesta, después de responder al usuario
+- Puedes guardar múltiples recuerdos en una misma conversación si detectas varios datos importantes
+
+USAR RECUERDOS:
+- Usa los recuerdos cargados al inicio para personalizar tus respuestas y dar contexto
+- Si el usuario pregunta algo relacionado con un recuerdo previo, referéncialo naturalmente
 
 REGLA CRÍTICA DE CONFIRMACIÓN:
 Para TODAS las acciones de escritura (excepto memoria), DEBES seguir este flujo:
