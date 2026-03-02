@@ -10,9 +10,9 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 // Default fallback chain
 const DEFAULT_MODEL_CHAIN = [
-  "anthropic/claude-4-6-sonnet",
-  "google/gemini-2.0-pro",
-  "anthropic/claude-4-5-sonnet",
+  "anthropic/claude-sonnet-4.5",
+  "google/gemini-2.5-flash",
+  "openai/gpt-5-mini",
 ];
 
 serve(async (req) => {
