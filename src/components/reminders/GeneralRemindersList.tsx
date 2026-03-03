@@ -289,6 +289,7 @@ export function GeneralRemindersList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewReminder, setViewReminder] = useState<GeneralReminder | null>(null);
+  const [activeTab, setActiveTab] = useState('pending');
 
   const {
     pendingReminders, completedReminders, overdueReminders, snoozedReminders,
@@ -325,7 +326,7 @@ export function GeneralRemindersList() {
             </Button>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="pending" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-4">
                 <TabsTrigger value="pending" className="flex items-center gap-2">
                   <Clock className="h-4 w-4" /> Pendientes ({pendingReminders.length})
@@ -345,7 +346,7 @@ export function GeneralRemindersList() {
                 ) : (
                   pendingReminders.map((reminder) => (
                     <ReminderCard key={reminder.id} reminder={reminder}
-                      onToggle={() => toggleComplete(reminder.id, reminder.is_completed)}
+                      onToggle={() => { toggleComplete(reminder.id, reminder.is_completed); if (!reminder.is_completed) setTimeout(() => setActiveTab('completed'), 300); }}
                       onDelete={() => setDeleteId(reminder.id)}
                       onView={() => setViewReminder(reminder)}
                       onSnooze={snoozeReminder}
@@ -363,7 +364,7 @@ export function GeneralRemindersList() {
                 ) : (
                   completedReminders.map((reminder) => (
                     <ReminderCard key={reminder.id} reminder={reminder}
-                      onToggle={() => toggleComplete(reminder.id, reminder.is_completed)}
+                      onToggle={() => { toggleComplete(reminder.id, reminder.is_completed); if (reminder.is_completed) setTimeout(() => setActiveTab('pending'), 300); }}
                       onDelete={() => setDeleteId(reminder.id)}
                       onView={() => setViewReminder(reminder)}
                       onSnooze={snoozeReminder}
