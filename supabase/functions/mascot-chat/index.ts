@@ -451,7 +451,7 @@ const tools = [
     type: "function",
     function: {
       name: "view_ai_memory_file",
-      description: "Leer el contenido de un archivo almacenado en la Memoria IA. Busca por nombre de archivo o clave de memoria. Para imágenes devuelve la URL pública. Para texto/documentos devuelve el contenido. Úsalo cuando el usuario pregunte por un archivo, imagen o documento guardado en la memoria IA.",
+      description: "Leer el contenido de un archivo almacenado en la Memoria IA. Soporta TODOS los formatos: PDF, DOCX, Excel, imágenes, texto, CSV, etc. El texto de documentos binarios (PDF, DOCX, etc.) se extrae automáticamente al subirse. Busca por nombre de archivo o clave de memoria. Para imágenes devuelve la URL pública. Para documentos devuelve el contenido textual completo. Úsalo cuando el usuario pregunte por un archivo, imagen o documento guardado en la memoria IA.",
       parameters: {
         type: "object",
         properties: {
@@ -1348,10 +1348,12 @@ HERRAMIENTAS DISPONIBLES:
 - search_emails (buscar correos por asunto, remitente o contenido)
 - get_ai_memories (consultar recuerdos almacenados sobre leads o usuario)
 - view_shared_file (ver/describir un archivo o imagen compartida - busca por nombre)
-- view_ai_memory_file (leer archivos/imágenes guardados en la Memoria IA - busca por nombre)
+- view_ai_memory_file (leer archivos de la Memoria IA: PDF, DOCX, Excel, imágenes, texto, CSV y más - el texto se extrae automáticamente al subirse)
 
-🖼️ CAPACIDAD VISUAL:
+🖼️ CAPACIDAD VISUAL Y DOCUMENTAL:
 - Puedes recibir y analizar imágenes que el usuario adjunte directamente en el chat.
+- Puedes leer el contenido COMPLETO de PDFs, DOCX, Excel y otros documentos subidos a la Memoria IA.
+- Los documentos binarios (PDF, DOCX, etc.) tienen su texto extraído automáticamente al subirse, así que puedes acceder a su contenido textual completo.
 - Puedes buscar y ver imágenes/archivos del sistema usando view_shared_file O view_ai_memory_file.
 - Cuando recibas una imagen, descríbela con detalle: colores, texto visible, logos, contenido.
 - Si el usuario pregunta por "el logo" o cualquier imagen/archivo, busca PRIMERO en view_ai_memory_file (memoria IA) y LUEGO en view_shared_file (archivos compartidos).
