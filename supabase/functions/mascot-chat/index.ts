@@ -432,8 +432,22 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "view_shared_file",
+      description: "Ver/descargar un archivo compartido para analizar su contenido. Para imágenes devuelve la URL pública para que puedas describir la imagen. Para archivos de texto devuelve el contenido.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_name: { type: "string", description: "Nombre (o parte) del archivo a buscar" },
+          file_id: { type: "string", description: "ID del archivo si se conoce" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
-
 // Confirmation check for write operations
 function needsConfirmation(toolName: string, args: Record<string, unknown>): string | null {
   const writeTools = [
@@ -1089,6 +1103,49 @@ async function executeToolCall(
         return JSON.stringify({ success: true, message: "Recuerdo eliminado." });
       }
 
+      case "view_shared_file": {
+        const fileName = String(args.file_name || "");
+        const fileId = String(args.file_id || "");
+        
+        let query = supabase.from("shared_files").select("id, file_name, file_path, file_type, file_size, description");
+        if (fileId) {
+          query = query.eq("id", fileId);
+        } else if (fileName) {
+          query = query.ilike("file_name", `%${fileName}%`);
+        } else {
+          return JSON.stringify({ error: "Necesitas indicar file_name o file_id" });
+        }
+        
+        const { data: files, error: fileErr } = await query.limit(1).maybeSingle();
+        if (fileErr || !files) return JSON.stringify({ error: "Archivo no encontrado" });
+        
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const publicUrl = `${supabaseUrl}/storage/v1/object/public/shared-files/${files.file_path}`;
+        
+        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(files.file_name);
+        const isText = /\.(txt|md|csv|json|xml|html|css|js|ts|log|sql|yaml|yml)$/i.test(files.file_name);
+        
+        if (isText) {
+          // Fetch and return text content
+          try {
+            const res = await fetch(publicUrl);
+            const text = await res.text();
+            return JSON.stringify({
+              file: { nombre: files.file_name, tipo: files.file_type, url: publicUrl },
+              content: text.substring(0, 30000),
+            });
+          } catch {
+            return JSON.stringify({ file: { nombre: files.file_name, url: publicUrl }, error: "No se pudo leer el contenido" });
+          }
+        }
+        
+        return JSON.stringify({
+          file: { nombre: files.file_name, tipo: files.file_type, tamaño: formatBytes(files.file_size), url: publicUrl, descripcion: files.description },
+          is_image: isImage,
+          message: isImage ? "Usa la URL para ver/describir la imagen" : "Archivo disponible en la URL",
+        });
+      }
+
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
@@ -1176,6 +1233,13 @@ HERRAMIENTAS DISPONIBLES:
 - read_email (leer el contenido completo de un correo)
 - search_emails (buscar correos por asunto, remitente o contenido)
 - get_ai_memories (consultar recuerdos almacenados sobre leads o usuario)
+- view_shared_file (ver/describir un archivo o imagen compartida - busca por nombre)
+
+🖼️ CAPACIDAD VISUAL:
+- Puedes recibir y analizar imágenes que el usuario adjunte directamente en el chat.
+- Puedes buscar y ver imágenes/archivos del sistema usando view_shared_file.
+- Cuando recibas una imagen, descríbela con detalle: colores, texto visible, logos, contenido.
+- Si el usuario pregunta por "el logo" o cualquier imagen del sistema, usa view_shared_file para buscarla.
 
 ✍️ ESCRITURA (REQUIEREN CONFIRMACIÓN):
 - send_internal_message, send_email (envía desde ia@malagamicro.com), send_whatsapp

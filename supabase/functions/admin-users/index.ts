@@ -259,13 +259,31 @@ serve(async (req) => {
     if (req.method === 'POST' && action === 'unblock') {
       const { blockId, userId } = await req.json();
 
+      let unblockedIPs: string[] = [];
+
       if (blockId) {
+        // Get the block's IP before updating
+        const { data: blockData } = await adminClient
+          .from('login_security_blocks')
+          .select('ip_address')
+          .eq('id', blockId)
+          .single();
+        if (blockData?.ip_address) unblockedIPs.push(blockData.ip_address);
+
         const { error: unblockError } = await adminClient
           .from('login_security_blocks')
           .update({ is_active: false, resolved_at: new Date().toISOString(), resolved_by: user.id })
           .eq('id', blockId);
         if (unblockError) throw unblockError;
       } else if (userId) {
+        // Get all active block IPs for this user
+        const { data: blocksData } = await adminClient
+          .from('login_security_blocks')
+          .select('ip_address')
+          .eq('user_id', userId)
+          .eq('is_active', true);
+        unblockedIPs = (blocksData || []).map(b => b.ip_address).filter(Boolean);
+
         const { error: unblockError } = await adminClient
           .from('login_security_blocks')
           .update({ is_active: false, resolved_at: new Date().toISOString(), resolved_by: user.id })
@@ -279,8 +297,18 @@ serve(async (req) => {
         );
       }
 
+      // Add unblocked IPs to whitelist so they are never auto-blocked again
+      for (const ipAddr of unblockedIPs) {
+        await adminClient
+          .from('ip_whitelist')
+          .upsert(
+            { ip_address: ipAddr, reason: 'Desbloqueado manualmente por admin', added_by: user.id },
+            { onConflict: 'ip_address' }
+          );
+      }
+
       return new Response(
-        JSON.stringify({ message: 'User unblocked successfully' }),
+        JSON.stringify({ message: 'User unblocked successfully', whitelisted_ips: unblockedIPs }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

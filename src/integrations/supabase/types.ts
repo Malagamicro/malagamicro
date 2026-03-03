@@ -1083,6 +1083,30 @@ export type Database = {
           },
         ]
       }
+      ip_whitelist: {
+        Row: {
+          added_by: string
+          created_at: string
+          id: string
+          ip_address: string
+          reason: string | null
+        }
+        Insert: {
+          added_by: string
+          created_at?: string
+          id?: string
+          ip_address: string
+          reason?: string | null
+        }
+        Update: {
+          added_by?: string
+          created_at?: string
+          id?: string
+          ip_address?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       lead_activities: {
         Row: {
           created_at: string

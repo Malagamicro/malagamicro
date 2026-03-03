@@ -133,7 +133,9 @@ export function SecurityPanel() {
       });
 
       if (!res.ok) throw new Error('Failed to unblock');
-      toast.success('Usuario desbloqueado');
+      const result = await res.json();
+      const whitelistedIPs = result.whitelisted_ips || [];
+      toast.success(`Usuario desbloqueado${whitelistedIPs.length ? ` · IP${whitelistedIPs.length > 1 ? 's' : ''} ${whitelistedIPs.join(', ')} añadida${whitelistedIPs.length > 1 ? 's' : ''} a whitelist` : ''}`);
       fetchBlocks();
     } catch {
       toast.error('Error al desbloquear');

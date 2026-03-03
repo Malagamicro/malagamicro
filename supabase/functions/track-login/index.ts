@@ -266,8 +266,18 @@ serve(async (req) => {
     let blocked = false;
     let blockReason = '';
     if (blockReasons.length > 0) {
+      // Check if IP is whitelisted (admin previously unblocked it)
+      const { data: whitelisted } = await supabase
+        .from('ip_whitelist')
+        .select('id')
+        .eq('ip_address', ip)
+        .limit(1)
+        .maybeSingle();
+
+      if (whitelisted) {
+        console.log(`Skipping block for whitelisted IP: ${ip}`);
+      } else {
       // Check if user was recently unblocked (grace period of 1 hour)
-      // This prevents re-blocking immediately after an admin unblock
       const oneHourAgoISO = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
       const { data: recentUnblock } = await supabase
         .from('login_security_blocks')
@@ -294,6 +304,7 @@ serve(async (req) => {
       } else {
         console.log(`Skipping re-block for user ${user.id}: recently unblocked at ${recentUnblock.resolved_at}`);
       }
+      } // end whitelisted check
     }
 
     // Send alert email if any checks triggered
