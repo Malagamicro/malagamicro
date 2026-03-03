@@ -104,9 +104,10 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
     setItemSize(categoryId, itemId, currentSize >= 4 ? 1 : currentSize + 1);
   };
 
-  const handleAppClick = (app: AppItem, categoryId?: string) => {
+  const handleAppClick = (app: AppItem, categoryId?: string, popoverKey?: string) => {
     if (editMode) {
-      setActiveAppPopover(activeAppPopover === app.id ? null : app.id);
+      const key = popoverKey || app.id;
+      setActiveAppPopover(activeAppPopover === key ? null : key);
       return;
     }
     if (app.externalUrl) window.open(app.externalUrl, '_blank', 'noopener,noreferrer');
@@ -137,17 +138,18 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
   };
 
   // List view item renderer
-  const renderListItem = (app: AppItem, categoryId: string) => {
+  const renderListItem = (app: AppItem, categoryId: string, popoverKey?: string) => {
     const Icon = getIconComponent(app.icon);
     const iconColor = getIconColor(app.color);
     const desc = app.customDescription || app.description;
-    const isPopoverOpen = editMode && activeAppPopover === app.id;
+    const key = popoverKey || app.id;
+    const isPopoverOpen = editMode && activeAppPopover === key;
 
     return (
-      <Popover key={app.id} open={isPopoverOpen} onOpenChange={(open) => { if (!open) setActiveAppPopover(null); }}>
+      <Popover key={key} open={isPopoverOpen} onOpenChange={(open) => { if (!open) setActiveAppPopover(null); }}>
         <PopoverTrigger asChild>
           <button
-            onClick={() => handleAppClick(app, categoryId)}
+            onClick={() => handleAppClick(app, categoryId, key)}
             className={cn(
               'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border/30',
               'bg-card/30 hover:bg-card/60 hover:border-primary/20 transition-all group',
@@ -185,20 +187,20 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
     );
   };
 
-  const renderAppCard = (app: AppItem, categoryId: string, isDragging?: boolean) => {
+  const renderAppCard = (app: AppItem, categoryId: string, isDragging?: boolean, popoverKey?: string) => {
     const Icon = getIconComponent(app.icon);
     const size = app.size || defaultSize || 1;
     const sc = ITEM_SIZE[size as keyof typeof ITEM_SIZE] || ITEM_SIZE[1];
     const iconColor = getIconColor(app.color);
-
-    const isPopoverOpen = editMode && activeAppPopover === app.id;
+    const key = popoverKey || app.id;
+    const isPopoverOpen = editMode && activeAppPopover === key;
 
     return (
       <div className="relative group/card h-full">
         <Popover open={isPopoverOpen} onOpenChange={(open) => { if (!open) setActiveAppPopover(null); }}>
           <PopoverTrigger asChild>
             <button
-              onClick={() => handleAppClick(app, categoryId)}
+              onClick={() => handleAppClick(app, categoryId, key)}
               className={cn(
                 'w-full h-full flex flex-col items-center justify-center', sc.gap, sc.padding,
                 'rounded-2xl border border-border/50',
@@ -432,13 +434,13 @@ export function AppsHub({ onOpenApp }: AppsHubProps) {
           </div>
           {viewMode === 'list' ? (
             <div className="space-y-1">
-              {favoriteApps.map(({ app, categoryId }) => renderListItem(app, categoryId))}
+              {favoriteApps.map(({ app, categoryId }) => renderListItem(app, categoryId, `fav-${app.id}`))}
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
               {favoriteApps.map(({ app, categoryId }) => (
                 <div key={app.id} className={cn(ITEM_SIZE[(app.size || 1) as keyof typeof ITEM_SIZE]?.minW)} style={{ flex: '0 0 auto' }}>
-                  {renderAppCard(app, categoryId)}
+                  {renderAppCard(app, categoryId, false, `fav-${app.id}`)}
                 </div>
               ))}
             </div>

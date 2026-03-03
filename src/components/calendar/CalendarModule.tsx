@@ -327,7 +327,7 @@ export function CalendarModule() {
             </div>
           </TooltipProvider>
 
-          <Button size="sm" onClick={() => openNewEvent()}>
+          <Button size="sm" onClick={() => openNewEvent(selectedDate || undefined)}>
             <Plus className="w-4 h-4 mr-1" /> Nuevo
           </Button>
         </div>
