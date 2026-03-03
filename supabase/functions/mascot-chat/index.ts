@@ -447,6 +447,21 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "view_ai_memory_file",
+      description: "Leer el contenido de un archivo almacenado en la Memoria IA. Busca por nombre de archivo o clave de memoria. Para imágenes devuelve la URL pública. Para texto/documentos devuelve el contenido. Úsalo cuando el usuario pregunte por un archivo, imagen o documento guardado en la memoria IA.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "Nombre del archivo o clave de memoria a buscar (ej: 'logo', 'manual', 'contrato')" },
+          memory_id: { type: "string", description: "ID específico de la memoria si se conoce" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 // Confirmation check for write operations
 function needsConfirmation(toolName: string, args: Record<string, unknown>): string | null {
@@ -1103,6 +1118,105 @@ async function executeToolCall(
         return JSON.stringify({ success: true, message: "Recuerdo eliminado." });
       }
 
+      case "view_ai_memory_file": {
+        const searchTerm = String(args.search || "");
+        const memoryId = String(args.memory_id || "");
+        
+        let memQuery = supabase.from("ai_memory").select("*").eq("user_id", userId);
+        if (memoryId) {
+          memQuery = memQuery.eq("id", memoryId);
+        } else if (searchTerm) {
+          memQuery = memQuery.or(`memory_key.ilike.%${searchTerm}%,category.in.(image,document)`);
+        } else {
+          return JSON.stringify({ error: "Necesitas indicar search o memory_id" });
+        }
+        
+        const { data: memFiles, error: memErr } = await memQuery.limit(10);
+        if (memErr) throw memErr;
+        
+        // Filter to find matching file memories
+        const fileMemories = (memFiles || []).filter((m: any) => {
+          const val = m.memory_value;
+          if (!val) return false;
+          const hasFile = val.file_url || val.content || val.source === 'file_upload';
+          if (memoryId) return hasFile;
+          if (searchTerm) {
+            const s = searchTerm.toLowerCase();
+            return hasFile && (
+              m.memory_key.toLowerCase().includes(s) ||
+              (val.file_name && val.file_name.toLowerCase().includes(s)) ||
+              JSON.stringify(val).toLowerCase().includes(s)
+            );
+          }
+          return hasFile;
+        });
+        
+        if (!fileMemories.length) {
+          // Fallback: search all memory with file data
+          const { data: allMem } = await supabase.from("ai_memory").select("*").eq("user_id", userId)
+            .in("category", ["image", "document"]).limit(20);
+          const matches = (allMem || []).filter((m: any) => {
+            if (!searchTerm) return true;
+            const s = searchTerm.toLowerCase();
+            return m.memory_key.toLowerCase().includes(s) || 
+              (m.memory_value?.file_name && m.memory_value.file_name.toLowerCase().includes(s));
+          });
+          if (!matches.length) return JSON.stringify({ error: "No se encontró ningún archivo en la memoria IA con ese nombre" });
+          
+          const results = matches.map((m: any) => {
+            const val = m.memory_value;
+            return {
+              id: m.id,
+              key: m.memory_key,
+              category: m.category,
+              file_name: val.file_name,
+              file_url: val.file_url,
+              has_content: !!val.content,
+              content_preview: val.content ? val.content.substring(0, 5000) : undefined,
+            };
+          });
+          return JSON.stringify({ message: `${results.length} archivo(s) encontrados en memoria IA`, files: results });
+        }
+        
+        // Return file data with content
+        const results = await Promise.all(fileMemories.map(async (m: any) => {
+          const val = m.memory_value;
+          const result: any = {
+            id: m.id,
+            key: m.memory_key,
+            category: m.category,
+            file_name: val.file_name,
+            file_type: val.file_type,
+          };
+          
+          if (val.file_url) {
+            result.file_url = val.file_url;
+            const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(val.file_name || '') || (val.file_type && val.file_type.startsWith('image/'));
+            result.is_image = isImage;
+            if (isImage) {
+              result.message = "URL de imagen disponible. Descríbela al usuario.";
+            } else {
+              // Try to fetch text content for non-image files
+              try {
+                const res = await fetch(val.file_url);
+                const text = await res.text();
+                result.content = text.substring(0, 20000);
+              } catch {
+                result.message = "Archivo disponible en la URL pero no se pudo leer su contenido";
+              }
+            }
+          }
+          
+          if (val.content) {
+            result.content = val.content.substring(0, 20000);
+          }
+          
+          return result;
+        }));
+        
+        return JSON.stringify({ message: `${results.length} archivo(s) de memoria IA`, files: results });
+      }
+
       case "view_shared_file": {
         const fileName = String(args.file_name || "");
         const fileId = String(args.file_id || "");
@@ -1234,12 +1348,14 @@ HERRAMIENTAS DISPONIBLES:
 - search_emails (buscar correos por asunto, remitente o contenido)
 - get_ai_memories (consultar recuerdos almacenados sobre leads o usuario)
 - view_shared_file (ver/describir un archivo o imagen compartida - busca por nombre)
+- view_ai_memory_file (leer archivos/imágenes guardados en la Memoria IA - busca por nombre)
 
 🖼️ CAPACIDAD VISUAL:
 - Puedes recibir y analizar imágenes que el usuario adjunte directamente en el chat.
-- Puedes buscar y ver imágenes/archivos del sistema usando view_shared_file.
+- Puedes buscar y ver imágenes/archivos del sistema usando view_shared_file O view_ai_memory_file.
 - Cuando recibas una imagen, descríbela con detalle: colores, texto visible, logos, contenido.
-- Si el usuario pregunta por "el logo" o cualquier imagen del sistema, usa view_shared_file para buscarla.
+- Si el usuario pregunta por "el logo" o cualquier imagen/archivo, busca PRIMERO en view_ai_memory_file (memoria IA) y LUEGO en view_shared_file (archivos compartidos).
+- Para archivos de la memoria IA (subidos por el admin), usa view_ai_memory_file.
 
 ✍️ ESCRITURA (REQUIEREN CONFIRMACIÓN):
 - send_internal_message, send_email (envía desde ia@malagamicro.com), send_whatsapp

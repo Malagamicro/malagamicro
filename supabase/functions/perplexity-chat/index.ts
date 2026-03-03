@@ -596,6 +596,37 @@ const tools = [
       },
     },
   },
+  // AI Memory tools
+  {
+    type: "function",
+    function: {
+      name: "get_ai_memories",
+      description: "Consultar los recuerdos/contexto almacenados en la Memoria IA sobre un lead o del usuario general.",
+      parameters: {
+        type: "object",
+        properties: {
+          lead_id: { type: "string", description: "ID del lead para buscar recuerdos específicos (opcional)" },
+          category: { type: "string", description: "Categoría: general, preference, interaction, note, document, image (opcional)" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "view_ai_memory_file",
+      description: "Leer el contenido de un archivo almacenado en la Memoria IA. Busca por nombre de archivo o clave. Para imágenes devuelve la URL pública. Para texto/documentos devuelve el contenido. Úsalo cuando pregunten por archivos, imágenes o documentos guardados en la memoria IA.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "Nombre del archivo o clave de memoria a buscar" },
+          memory_id: { type: "string", description: "ID específico de la memoria si se conoce" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 // Map endpoint paths to their required root JSON key for POST/PUT
@@ -1531,6 +1562,92 @@ async function executeToolCall(
         });
       }
 
+      case "get_ai_memories": {
+        const leadId = args.lead_id ? String(args.lead_id) : null;
+        const cat = args.category ? String(args.category) : null;
+        let memQuery = supabase.from("ai_memory").select("*").eq("user_id", userId).order("updated_at", { ascending: false }).limit(30);
+        if (leadId) memQuery = memQuery.eq("lead_id", leadId);
+        if (cat) memQuery = memQuery.eq("category", cat);
+        const { data: memData, error: memErr } = await memQuery;
+        if (memErr) throw memErr;
+        if (!memData?.length) return JSON.stringify({ message: "No hay recuerdos almacenados." });
+        return JSON.stringify({
+          message: `${memData.length} recuerdo(s) encontrados`,
+          memories: memData.map((m: any) => ({ id: m.id, key: m.memory_key, value: m.memory_value, category: m.category, lead_id: m.lead_id, updated: m.updated_at })),
+        });
+      }
+
+      case "view_ai_memory_file": {
+        const searchTerm = String(args.search || "");
+        const memoryId = String(args.memory_id || "");
+        
+        let memFileQuery = supabase.from("ai_memory").select("*").eq("user_id", userId);
+        if (memoryId) {
+          memFileQuery = memFileQuery.eq("id", memoryId);
+        } else if (searchTerm) {
+          memFileQuery = memFileQuery.or(`memory_key.ilike.%${searchTerm}%,category.in.(image,document)`);
+        } else {
+          return JSON.stringify({ error: "Necesitas indicar search o memory_id" });
+        }
+        
+        const { data: memFiles2, error: memErr2 } = await memFileQuery.limit(10);
+        if (memErr2) throw memErr2;
+        
+        const fileMemories = (memFiles2 || []).filter((m: any) => {
+          const val = m.memory_value;
+          if (!val) return false;
+          const hasFile = val.file_url || val.content || val.source === 'file_upload';
+          if (memoryId) return hasFile;
+          if (searchTerm) {
+            const s = searchTerm.toLowerCase();
+            return hasFile && (
+              m.memory_key.toLowerCase().includes(s) ||
+              (val.file_name && val.file_name.toLowerCase().includes(s)) ||
+              JSON.stringify(val).toLowerCase().includes(s)
+            );
+          }
+          return hasFile;
+        });
+        
+        if (!fileMemories.length) {
+          const { data: allMem2 } = await supabase.from("ai_memory").select("*").eq("user_id", userId)
+            .in("category", ["image", "document"]).limit(20);
+          const matches = (allMem2 || []).filter((m: any) => {
+            if (!searchTerm) return true;
+            const s = searchTerm.toLowerCase();
+            return m.memory_key.toLowerCase().includes(s) || 
+              (m.memory_value?.file_name && m.memory_value.file_name.toLowerCase().includes(s));
+          });
+          if (!matches.length) return JSON.stringify({ error: "No se encontró ningún archivo en la memoria IA con ese nombre" });
+          
+          const results = matches.map((m: any) => ({
+            id: m.id, key: m.memory_key, category: m.category,
+            file_name: m.memory_value.file_name, file_url: m.memory_value.file_url,
+            has_content: !!m.memory_value.content,
+            content_preview: m.memory_value.content ? m.memory_value.content.substring(0, 5000) : undefined,
+          }));
+          return JSON.stringify({ message: `${results.length} archivo(s) encontrados en memoria IA`, files: results });
+        }
+        
+        const results2 = await Promise.all(fileMemories.map(async (m: any) => {
+          const val = m.memory_value;
+          const result: any = { id: m.id, key: m.memory_key, category: m.category, file_name: val.file_name, file_type: val.file_type };
+          
+          if (val.file_url) {
+            result.file_url = val.file_url;
+            const isImg = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(val.file_name || '') || (val.file_type && val.file_type.startsWith('image/'));
+            result.is_image = isImg;
+            if (!isImg) {
+              try { const r = await fetch(val.file_url); result.content = (await r.text()).substring(0, 20000); } catch {}
+            }
+          }
+          if (val.content) result.content = val.content.substring(0, 20000);
+          return result;
+        }));
+        
+        return JSON.stringify({ message: `${results2.length} archivo(s) de memoria IA`, files: results2 });
+      }
+
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
@@ -1612,6 +1729,12 @@ Puedes:
 **ARCHIVOS Y DOCUMENTOS:**
 - Ver archivos compartidos y carpetas
 - Ver plantillas de email
+- **Leer archivos e imágenes de la Memoria IA** (documentos, logos, imágenes subidas por el admin)
+
+**MEMORIA IA:**
+- Consultar recuerdos almacenados (get_ai_memories)
+- Leer archivos/imágenes de la memoria IA (view_ai_memory_file)
+- Si el usuario pregunta por un archivo, imagen o logo, busca PRIMERO en view_ai_memory_file y LUEGO en view_shared_file
 
 **CAMPAÑAS:**
 - Ver campañas de email y sus estadísticas
