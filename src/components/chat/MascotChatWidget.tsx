@@ -3,17 +3,24 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-import { X, Send, Loader2, Minimize2, Mic, MicOff, Plus } from 'lucide-react';
+import { X, Send, Loader2, Minimize2, Mic, MicOff, Plus, Paperclip, Image as ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import mascotImage from '@/assets/mascot.png';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { toast } from 'sonner';
+
+interface PendingImage {
+  name: string;
+  dataUrl: string;
+}
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  images?: string[]; // data URLs of attached images
 }
 
 const STORAGE_KEY = 'micro_chat_messages';
@@ -52,7 +59,9 @@ export function MascotChatWidget() {
 
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
 
   const { isRecording, isTranscribing, startRecording, stopRecording } = useAudioRecorder({
     onTranscription: (text) => {
@@ -156,15 +165,51 @@ export function MascotChatWidget() {
     sessionStorage.removeItem(STORAGE_KEY);
   };
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) { toast.error(`${file.name} excede 10MB`); continue; }
+      if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)) { toast.error(`${file.name}: solo imágenes`); continue; }
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      setPendingImages(prev => [...prev, { name: file.name, dataUrl }]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
-    const userMessage: Message = { role: 'user', content: input.trim() };
-    const requestMessages = [...messages, userMessage];
+    if ((!input.trim() && pendingImages.length === 0) || isLoading) return;
+    const currentImages = [...pendingImages];
+    const userMessage: Message = { 
+      role: 'user', 
+      content: input.trim() || `📎 ${currentImages.map(i => i.name).join(', ')}`,
+      images: currentImages.length > 0 ? currentImages.map(i => i.dataUrl) : undefined,
+    };
+    
+    // Build messages for the API - include image data as multimodal content
+    const apiMessages = [...messages, userMessage].map(m => {
+      if (m.images && m.images.length > 0) {
+        // Multimodal message with images
+        const content: any[] = [];
+        if (m.content) content.push({ type: 'text', text: m.content });
+        for (const img of m.images) {
+          content.push({ type: 'image_url', image_url: { url: img } });
+        }
+        return { role: m.role, content };
+      }
+      return { role: m.role, content: m.content };
+    });
+    
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setPendingImages([]);
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('mascot-chat', { body: { messages: requestMessages } });
+      const { data, error } = await supabase.functions.invoke('mascot-chat', { body: { messages: apiMessages } });
       if (error) throw error;
       setMessages(prev => [...prev, { role: 'assistant', content: data?.response || data?.error || 'Sin respuesta' }]);
     } catch (error) {
@@ -301,6 +346,13 @@ export function MascotChatWidget() {
                     </div>
                   )}
                   <div className={cn('max-w-[80%] rounded-2xl px-4 py-2 text-sm', message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-muted rounded-bl-md')}>
+                    {message.images && message.images.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {message.images.map((img, idx) => (
+                          <img key={idx} src={img} alt="Adjunto" className="max-w-[120px] max-h-[120px] rounded-lg object-cover" />
+                        ))}
+                      </div>
+                    )}
                     {message.role === 'assistant' ? (
                       <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0">
                         <ReactMarkdown>{message.content}</ReactMarkdown>
@@ -326,6 +378,20 @@ export function MascotChatWidget() {
 
       {/* Input */}
       <div className="p-3 border-t bg-muted/30">
+        {pendingImages.length > 0 && (
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {pendingImages.map((img, i) => (
+              <div key={i} className="relative">
+                <img src={img.dataUrl} alt={img.name} className="w-12 h-12 rounded-lg object-cover border" />
+                <button
+                  onClick={() => setPendingImages(prev => prev.filter((_, idx) => idx !== i))}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-[10px]"
+                >×</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
         <div className="flex gap-2">
           <Button
             variant={isRecording ? "destructive" : "ghost"}
@@ -337,6 +403,16 @@ export function MascotChatWidget() {
           >
             {isTranscribing ? <Loader2 className="h-4 w-4 animate-spin" /> : isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            className="rounded-full shrink-0"
+            title="Adjuntar imagen"
+          >
+            <ImageIcon className="h-4 w-4" />
+          </Button>
           <Input
             ref={inputRef}
             value={input}
@@ -346,7 +422,7 @@ export function MascotChatWidget() {
             disabled={isLoading || isRecording}
             className="flex-1 rounded-full bg-background"
           />
-          <Button size="icon" onClick={handleSend} disabled={!input.trim() || isLoading} className="rounded-full">
+          <Button size="icon" onClick={handleSend} disabled={(!input.trim() && pendingImages.length === 0) || isLoading} className="rounded-full">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>

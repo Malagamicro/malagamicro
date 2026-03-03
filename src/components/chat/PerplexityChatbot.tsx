@@ -170,7 +170,7 @@ export function PerplexityChatbot() {
     return session?.access_token;
   };
 
-  const streamChat = async (userMessages: { role: string; content: string }[], sessionId: string) => {
+  const streamChat = async (userMessages: { role: string; content: string | any[] }[], sessionId: string) => {
     const token = await getAuthToken();
     
     const resp = await fetch(CHAT_URL, {
@@ -386,10 +386,29 @@ export function PerplexityChatbot() {
     });
 
     try {
-      // Send full content (with file data) to AI, but display only user text
+      // Send full content (with file data) to AI - use multimodal for images
       const aiMessages = newMessages.map((m, i) => {
         if (i === newMessages.length - 1 && m.role === 'user') {
+          // Check if there are image attachments
+          const imageAttachments = currentFiles.filter(f => isImageFile(f.name) && f.url);
+          if (imageAttachments.length > 0) {
+            const content: any[] = [];
+            if (fullContent) content.push({ type: 'text', text: fullContent });
+            for (const img of imageAttachments) {
+              content.push({ type: 'image_url', image_url: { url: img.url! } });
+            }
+            return { role: m.role, content };
+          }
           return { role: m.role, content: fullContent };
+        }
+        // Also handle past messages with image attachments
+        if (m.attachments?.some(a => isImageFile(a.name) && a.url)) {
+          const content: any[] = [];
+          if (m.content) content.push({ type: 'text', text: m.content });
+          for (const a of m.attachments.filter(a => isImageFile(a.name) && a.url)) {
+            content.push({ type: 'image_url', image_url: { url: a.url! } });
+          }
+          return { role: m.role, content };
         }
         return { role: m.role, content: m.content };
       });
