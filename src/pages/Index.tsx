@@ -50,7 +50,7 @@ import { useSeoArticles, SeoArticle } from '@/hooks/useSeoArticles';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
-import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, ArrowLeft, Megaphone, MailOpen, FileCode, Activity, Brain } from 'lucide-react';
+import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, ArrowLeft, Megaphone, MailOpen, FileCode, Activity, Brain, StickyNote } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +62,7 @@ import { PerformanceDashboard } from '@/components/performance/PerformanceDashbo
 import { useInteractionTracking } from '@/hooks/useInteractionTracking';
 import { AIMemoryManager } from '@/components/ai-memory/AIMemoryManager';
 import { SecurityPanel } from '@/components/security/SecurityPanel';
+import { QuickNotesApp } from '@/components/notes/QuickNotesApp';
 
 const SeoGeneratorInline = () => {
   const { articles, loading, generating, generateArticle, deleteArticle } = useSeoArticles();
@@ -702,6 +703,20 @@ const IndexContent = () => {
             />
             <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6">
               <SecurityPanel />
+            </div>
+          </div>
+        );
+      case 'notas':
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <PageHeader
+              title="Notas"
+              description="Tus notas rápidas y apuntes personales"
+              icon={<StickyNote className="h-5 w-5 text-amber-500" />}
+              onBack={goApps}
+            />
+            <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6 max-w-6xl mx-auto w-full">
+              <QuickNotesApp />
             </div>
           </div>
         );
