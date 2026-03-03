@@ -84,6 +84,18 @@ export default function Auth() {
     maxAttempts,
   } = useLoginRateLimit(email);
 
+  // Clear all client-side login rate limits on page load
+  useEffect(() => {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('login_rate_limit_')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  }, []);
+
   // Load cooldown from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(SUPPORT_COOLDOWN_KEY);
