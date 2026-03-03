@@ -9,9 +9,10 @@ import {
   GripVertical, Plus, RotateCcw, Trash2, FolderPlus, Check,
   Calendar as CalendarIcon, Palette, Eye, EyeOff,
   PanelLeft as PanelLeftIcon, PanelRight, PanelTop, PanelBottom,
-  ExternalLink, Link, FileEdit, LayoutGrid,
+  ExternalLink, Link, FileEdit, LayoutGrid, StickyNote,
 } from 'lucide-react';
 import { ThemeCustomizer } from '@/components/layout/ThemeCustomizer';
+import { QuickNotesPopover } from '@/components/notes/QuickNotesPopover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -56,7 +57,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   MapPin, Settings, Kanban, BarChart3, Inbox, FileText, Globe,
   Ticket, FolderOpen, Bot, Cloud, Calculator, Bell, Megaphone,
   Briefcase, Wrench, MessageCircle, Sparkles, FolderPlus, Calendar: CalendarIcon,
-  ExternalLink, Link, FileEdit, LayoutGrid,
+  ExternalLink, Link, FileEdit, LayoutGrid, StickyNote,
 };
 
 const ICON_OPTIONS = Object.keys(ICON_MAP);
@@ -795,6 +796,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
       <div className="p-3 border-t border-sidebar-border space-y-1">
         <ThemeCustomizer />
         {editToggle}
+        <QuickNotesPopover onOpenFullApp={() => handleTabChange('notas')} />
         {user && (
           <div className="px-3 py-2 text-xs text-sidebar-foreground/70 truncate">{user.email}</div>
         )}
@@ -842,6 +844,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
       <div className="p-2 border-t border-sidebar-border space-y-0.5">
         <ThemeCustomizer />
         {editToggle}
+        <QuickNotesPopover onOpenFullApp={() => handleTabChange('notas')} />
         {user && (
           <div className="px-2 py-1 text-[10px] text-sidebar-foreground/70 truncate">{user.email}</div>
         )}
