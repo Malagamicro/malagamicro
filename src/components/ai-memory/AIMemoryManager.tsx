@@ -157,73 +157,108 @@ export function AIMemoryManager() {
     }
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]); // Remove data:...;base64, prefix
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const extractDocumentText = async (file: File): Promise<string | null> => {
+    try {
+      toast.info(`Extrayendo texto de "${file.name}"... esto puede tardar unos segundos`);
+      const base64 = await fileToBase64(file);
+      const { data, error } = await supabase.functions.invoke('extract-document-text', {
+        body: { file_base64: base64, file_type: file.type, file_name: file.name },
+      });
+      if (error) throw error;
+      return data?.text || null;
+    } catch (err) {
+      console.error('Text extraction error:', err);
+      return null;
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    // 20MB limit
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('El archivo es demasiado grande (máx 20MB)');
+      return;
+    }
+
     setUploading(true);
     try {
       const isImage = file.type.startsWith('image/');
-      const isPdf = file.type === 'application/pdf';
-      const isText = file.type.startsWith('text/') || file.name.endsWith('.md') || file.name.endsWith('.txt');
+      const isText = file.type.startsWith('text/') || /\.(md|txt|csv|json|xml|yaml|yml|log|ini|cfg|conf)$/i.test(file.name);
+      const isBinaryDoc = /\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(file.name) || 
+        ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+         'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+         'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+         'application/rtf'].includes(file.type);
+
+      // Upload to storage first (for all file types)
+      const path = `ai-memory/${user.id}/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('shared-files')
+        .upload(path, file);
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('shared-files')
+        .getPublicUrl(path);
+
+      let extractedContent: string | null = null;
 
       if (isText) {
-        const text = await file.text();
-        const memValue = { 
-          source: 'file_upload',
-          file_name: file.name, 
-          file_type: file.type,
-          content: text.slice(0, 50000),
-          uploaded_at: new Date().toISOString(),
-        };
-        
-        const { error } = await (supabase
-          .from('ai_memory' as any)
-          .insert({
-            user_id: user.id,
-            memory_key: `doc_${file.name}`,
-            memory_value: memValue,
-            category: 'document',
-            lead_id: formLeadId || null,
-          }) as any);
-        if (error) throw error;
-        toast.success(`Archivo "${file.name}" añadido como memoria`);
-      } else if (isImage || isPdf) {
-        // Upload to storage
-        const path = `ai-memory/${user.id}/${Date.now()}_${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('shared-files')
-          .upload(path, file);
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from('shared-files')
-          .getPublicUrl(path);
-
-        const memValue = {
-          source: 'file_upload',
-          file_name: file.name,
-          file_type: file.type,
-          file_url: urlData.publicUrl,
-          file_size: file.size,
-          uploaded_at: new Date().toISOString(),
-        };
-
-        const { error } = await (supabase
-          .from('ai_memory' as any)
-          .insert({
-            user_id: user.id,
-            memory_key: `${isImage ? 'img' : 'pdf'}_${file.name}`,
-            memory_value: memValue,
-            category: isImage ? 'image' : 'document',
-            lead_id: formLeadId || null,
-          }) as any);
-        if (error) throw error;
-        toast.success(`${isImage ? 'Imagen' : 'PDF'} "${file.name}" añadido`);
-      } else {
-        toast.error('Formato no soportado. Usa texto, PDF o imágenes.');
-        return;
+        // Read text directly
+        extractedContent = (await file.text()).slice(0, 100000);
+      } else if (isBinaryDoc) {
+        // Use AI to extract text from PDF, DOCX, etc.
+        extractedContent = await extractDocumentText(file);
       }
+      // For images, no text extraction needed - AI sees the URL directly
+
+      const memValue: any = {
+        source: 'file_upload',
+        file_name: file.name,
+        file_type: file.type,
+        file_url: urlData.publicUrl,
+        file_size: file.size,
+        uploaded_at: new Date().toISOString(),
+      };
+
+      if (extractedContent) {
+        memValue.content = extractedContent.slice(0, 100000);
+      }
+
+      const category = isImage ? 'image' : 'document';
+      const prefix = isImage ? 'img' : 'doc';
+
+      const { error } = await (supabase
+        .from('ai_memory' as any)
+        .insert({
+          user_id: user.id,
+          memory_key: `${prefix}_${file.name}`,
+          memory_value: memValue,
+          category,
+          lead_id: formLeadId || null,
+        }) as any);
+      if (error) throw error;
+
+      const hasContent = !!extractedContent;
+      toast.success(
+        hasContent 
+          ? `"${file.name}" añadido con texto extraído (${extractedContent!.length.toLocaleString()} caracteres)`
+          : `"${file.name}" añadido a la memoria IA`
+      );
 
       fetchMemories();
     } catch (err) {
@@ -314,7 +349,7 @@ export function AIMemoryManager() {
             <input
               type="file"
               className="hidden"
-              accept=".txt,.md,.pdf,.png,.jpg,.jpeg,.webp"
+              accept=".txt,.md,.pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.json,.xml,.rtf,.odt,.ods,.odp,.yaml,.yml"
               onChange={handleFileUpload}
               disabled={uploading}
             />

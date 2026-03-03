@@ -616,7 +616,7 @@ const tools = [
     type: "function",
     function: {
       name: "view_ai_memory_file",
-      description: "Leer el contenido de un archivo almacenado en la Memoria IA. Busca por nombre de archivo o clave. Para imágenes devuelve la URL pública. Para texto/documentos devuelve el contenido. Úsalo cuando pregunten por archivos, imágenes o documentos guardados en la memoria IA.",
+      description: "Leer el contenido de un archivo almacenado en la Memoria IA. Soporta TODOS los formatos: PDF, DOCX, Excel, imágenes, texto, CSV, etc. El texto de documentos binarios se extrae automáticamente al subirse. Busca por nombre de archivo o clave. Para imágenes devuelve la URL pública. Para documentos devuelve el contenido textual completo.",
       parameters: {
         type: "object",
         properties: {
