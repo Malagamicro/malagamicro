@@ -1,0 +1,1 @@
+UPDATE public.login_security_blocks SET is_active = false, resolved_at = now(), resolved_by = '38bd833c-3b85-4952-9f26-f03c67ccb160' WHERE user_id = '38bd833c-3b85-4952-9f26-f03c67ccb160' AND is_active = true;
