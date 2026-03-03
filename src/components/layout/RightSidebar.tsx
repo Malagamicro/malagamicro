@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -18,6 +18,7 @@ import {
 import { format, isToday, isTomorrow, isPast, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import mascotImage from '@/assets/mascot.png';
+import { openNoteWidget } from '@/components/notes/noteWidgetHelper';
 
 interface RecentChatMessage {
   id: string;
@@ -163,22 +164,34 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
     return format(d, "d MMM HH:mm", { locale: es });
   };
 
+  const handleWidgetSave = useCallback((id: string, title: string, content: string) => {
+    // We don't have updateNote here, so use postMessage pattern handled by QuickNotesApp
+    // But we can directly call supabase
+    supabase.from('quick_notes').update({ title, content, updated_at: new Date().toISOString() }).eq('id', id).then(() => {});
+  }, []);
+
   const openNoteAsWidget = (note: QuickNote) => {
     if (widgetWindows[note.id] && !widgetWindows[note.id]!.closed) {
       widgetWindows[note.id]!.close();
       setWidgetWindows(prev => ({ ...prev, [note.id]: null }));
       return;
     }
-    const width = 340, height = 400;
-    const left = window.screen.width - width - 30;
-    const popup = window.open('', `note-widget-${note.id}`, `width=${width},height=${height},left=${left},top=80,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`);
+    const popup = openNoteWidget(note, handleWidgetSave);
     if (!popup) return;
-    const bgColor = note.color || '#fef3c7';
-    popup.document.write(`<!DOCTYPE html><html><head><title>${note.title || 'Nota'}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:${bgColor}90;padding:16px;height:100vh;display:flex;flex-direction:column;overflow:hidden}.header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid rgba(0,0,0,0.1);margin-bottom:12px;flex-shrink:0}.title{font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}.back-btn{background:rgba(0,0,0,0.08);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;margin-left:8px}.back-btn:hover{background:rgba(0,0,0,0.15)}.content{flex:1;overflow-y:auto;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word}.footer{flex-shrink:0;padding-top:8px;border-top:1px solid rgba(0,0,0,0.1);margin-top:12px;font-size:11px;color:rgba(0,0,0,0.45)}</style></head><body><div class="header"><div class="title">📝 ${note.title || 'Sin título'}</div><button class="back-btn" onclick="window.close()">✕ Cerrar</button></div><div class="content">${note.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div><div class="footer">Última edición: ${format(new Date(note.updated_at), "d MMM yyyy, HH:mm", { locale: es })}</div></body></html>`);
-    popup.document.close();
     setWidgetWindows(prev => ({ ...prev, [note.id]: popup }));
     const interval = setInterval(() => { if (popup.closed) { clearInterval(interval); setWidgetWindows(prev => ({ ...prev, [note.id]: null })); } }, 1000);
   };
+
+  // Listen for save messages from widget windows
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'NOTE_WIDGET_SAVE') {
+        handleWidgetSave(e.data.noteId, e.data.title, e.data.content);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [handleWidgetSave]);
 
   const isWidgetOpen = (noteId: string) => widgetWindows[noteId] && !widgetWindows[noteId]!.closed;
 

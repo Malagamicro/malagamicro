@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuickNotes, QuickNote, NOTE_COLORS } from '@/hooks/useQuickNotes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { openNoteWidget } from './noteWidgetHelper';
 
 export function QuickNotesApp() {
   const { notes, isLoading, addNote, updateNote, deleteNote, togglePin } = useQuickNotes();
@@ -85,7 +86,6 @@ export function QuickNotesApp() {
   };
 
   const openAsWidget = (note: QuickNote) => {
-    // Close existing widget for this note if any
     if (widgetWindows[note.id] && !widgetWindows[note.id]!.closed) {
       widgetWindows[note.id]!.close();
       setWidgetWindows(prev => ({ ...prev, [note.id]: null }));
@@ -93,112 +93,15 @@ export function QuickNotesApp() {
       return;
     }
 
-    const width = 340;
-    const height = 400;
-    const left = window.screen.width - width - 30;
-    const top = 80;
-
-    const popup = window.open(
-      '',
-      `note-widget-${note.id}`,
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`
-    );
-
+    const popup = openNoteWidget(note, handleWidgetSave);
     if (!popup) {
       toast.error('Permite las ventanas emergentes para usar widgets');
       return;
     }
 
-    const bgColor = note.color || '#fef3c7';
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    popup.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${note.title || 'Nota'}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: ${bgColor}90;
-            color: ${isDark ? '#e2e8f0' : '#1a202c'};
-            padding: 16px;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-          }
-          .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
-            margin-bottom: 12px;
-            flex-shrink: 0;
-          }
-          .title {
-            font-weight: 700;
-            font-size: 15px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            flex: 1;
-          }
-          .back-btn {
-            background: rgba(0,0,0,0.08);
-            border: none;
-            border-radius: 6px;
-            padding: 5px 10px;
-            cursor: pointer;
-            font-size: 12px;
-            color: inherit;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            flex-shrink: 0;
-            margin-left: 8px;
-          }
-          .back-btn:hover { background: rgba(0,0,0,0.15); }
-          .content {
-            flex: 1;
-            overflow-y: auto;
-            font-size: 14px;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-break: break-word;
-          }
-          .footer {
-            flex-shrink: 0;
-            padding-top: 8px;
-            border-top: 1px solid rgba(0,0,0,0.1);
-            margin-top: 12px;
-            font-size: 11px;
-            color: rgba(0,0,0,0.45);
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">📝 ${note.title || 'Sin título'}</div>
-          <button class="back-btn" onclick="window.close()">
-            ✕ Cerrar
-          </button>
-        </div>
-        <div class="content">${note.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-        <div class="footer">
-          Última edición: ${format(new Date(note.updated_at), "d MMM yyyy, HH:mm", { locale: es })}
-        </div>
-      </body>
-      </html>
-    `);
-    popup.document.close();
-
     setWidgetWindows(prev => ({ ...prev, [note.id]: popup }));
     toast.success('Nota abierta como widget');
 
-    // Clean up when popup closes
     const interval = setInterval(() => {
       if (popup.closed) {
         clearInterval(interval);
@@ -206,6 +109,21 @@ export function QuickNotesApp() {
       }
     }, 1000);
   };
+
+  const handleWidgetSave = useCallback((id: string, title: string, content: string) => {
+    updateNote.mutate({ id, title, content });
+  }, [updateNote]);
+
+  // Listen for save messages from widget windows
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'NOTE_WIDGET_SAVE') {
+        handleWidgetSave(e.data.noteId, e.data.title, e.data.content);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [handleWidgetSave]);
 
   const isWidgetOpen = (noteId: string) => {
     return widgetWindows[noteId] && !widgetWindows[noteId]!.closed;
