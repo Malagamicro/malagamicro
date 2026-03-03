@@ -194,5 +194,19 @@ export function useCalendarEvents() {
     }
   };
 
-  return { events, isLoading, users, createEvent, updateEvent, deleteEvent, fetchEvents };
+  const fetchEventParticipants = async (eventId: string): Promise<{ user_id: string; permission: 'view' | 'edit' }[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('event_participants')
+        .select('user_id, permission')
+        .eq('event_id', eventId);
+      if (error) throw error;
+      return (data || []).map(p => ({ user_id: p.user_id, permission: p.permission as 'view' | 'edit' }));
+    } catch (err) {
+      console.error('Error fetching participants:', err);
+      return [];
+    }
+  };
+
+  return { events, isLoading, users, createEvent, updateEvent, deleteEvent, fetchEvents, fetchEventParticipants };
 }

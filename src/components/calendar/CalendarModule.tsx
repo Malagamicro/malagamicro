@@ -51,7 +51,7 @@ const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 7:00 - 22:00
 
 export function CalendarModule() {
   const { user } = useAuth();
-  const { events, isLoading, users, createEvent, updateEvent, deleteEvent } = useCalendarEvents();
+  const { events, isLoading, users, createEvent, updateEvent, deleteEvent, fetchEventParticipants } = useCalendarEvents();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -145,8 +145,10 @@ export function CalendarModule() {
     setShowForm(true);
   };
 
-  const openEditEvent = (event: CalendarEvent) => {
+  const openEditEvent = async (event: CalendarEvent) => {
     setEditingEvent(event);
+    // Load existing participants
+    const participants = await fetchEventParticipants(event.id);
     setFormData({
       title: event.title,
       description: event.description || '',
@@ -156,7 +158,7 @@ export function CalendarModule() {
       all_day: event.all_day,
       color: event.color,
       reminder_minutes: event.reminder_minutes,
-      selectedUsers: [],
+      selectedUsers: participants,
     });
     setShowForm(true);
   };
@@ -809,7 +811,36 @@ export function CalendarModule() {
               </div>
               {/* User multiselect */}
               <div>
-                <Label className="flex items-center gap-1"><Users className="w-4 h-4" /> Compartir con</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-1"><Users className="w-4 h-4" /> Compartir con</Label>
+                  {users.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        const allSelected = users.every(u => formData.selectedUsers.some(s => s.user_id === u.id));
+                        if (allSelected) {
+                          setFormData(p => ({ ...p, selectedUsers: [] }));
+                        } else {
+                          setFormData(p => ({
+                            ...p,
+                            selectedUsers: users.map(u => {
+                              const existing = p.selectedUsers.find(s => s.user_id === u.id);
+                              return existing || { user_id: u.id, permission: 'view' as const };
+                            }),
+                          }));
+                        }
+                      }}
+                    >
+                      <Users className="w-3 h-3 mr-1" />
+                      {users.every(u => formData.selectedUsers.some(s => s.user_id === u.id))
+                        ? 'Quitar todos'
+                        : 'Compartir con todos'}
+                    </Button>
+                  )}
+                </div>
                 {users.length === 0 ? (
                   <p className="text-sm text-muted-foreground mt-1">No hay otros usuarios</p>
                 ) : (
