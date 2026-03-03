@@ -7,16 +7,18 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Plus, Search, Trash2, Pin, PinOff, Loader2, StickyNote, Edit2, Save, X
+  Plus, Search, Trash2, Pin, PinOff, Loader2, StickyNote, Edit2, Save, X, ExternalLink, Minimize2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function QuickNotesApp() {
   const { notes, isLoading, addNote, updateNote, deleteNote, togglePin } = useQuickNotes();
   const [searchQuery, setSearchQuery] = useState('');
+  const [widgetWindows, setWidgetWindows] = useState<Record<string, Window | null>>({});
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<QuickNote | null>(null);
   const [formTitle, setFormTitle] = useState('');
@@ -82,6 +84,133 @@ export function QuickNotesApp() {
     }
   };
 
+  const openAsWidget = (note: QuickNote) => {
+    // Close existing widget for this note if any
+    if (widgetWindows[note.id] && !widgetWindows[note.id]!.closed) {
+      widgetWindows[note.id]!.close();
+      setWidgetWindows(prev => ({ ...prev, [note.id]: null }));
+      toast.info('Widget cerrado');
+      return;
+    }
+
+    const width = 340;
+    const height = 400;
+    const left = window.screen.width - width - 30;
+    const top = 80;
+
+    const popup = window.open(
+      '',
+      `note-widget-${note.id}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`
+    );
+
+    if (!popup) {
+      toast.error('Permite las ventanas emergentes para usar widgets');
+      return;
+    }
+
+    const bgColor = note.color || '#fef3c7';
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    popup.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${note.title || 'Nota'}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: ${bgColor}90;
+            color: ${isDark ? '#e2e8f0' : '#1a202c'};
+            padding: 16px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            margin-bottom: 12px;
+            flex-shrink: 0;
+          }
+          .title {
+            font-weight: 700;
+            font-size: 15px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+          }
+          .back-btn {
+            background: rgba(0,0,0,0.08);
+            border: none;
+            border-radius: 6px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            color: inherit;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+            margin-left: 8px;
+          }
+          .back-btn:hover { background: rgba(0,0,0,0.15); }
+          .content {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+          }
+          .footer {
+            flex-shrink: 0;
+            padding-top: 8px;
+            border-top: 1px solid rgba(0,0,0,0.1);
+            margin-top: 12px;
+            font-size: 11px;
+            color: rgba(0,0,0,0.45);
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">📝 ${note.title || 'Sin título'}</div>
+          <button class="back-btn" onclick="window.close()">
+            ✕ Cerrar
+          </button>
+        </div>
+        <div class="content">${note.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+        <div class="footer">
+          Última edición: ${format(new Date(note.updated_at), "d MMM yyyy, HH:mm", { locale: es })}
+        </div>
+      </body>
+      </html>
+    `);
+    popup.document.close();
+
+    setWidgetWindows(prev => ({ ...prev, [note.id]: popup }));
+    toast.success('Nota abierta como widget');
+
+    // Clean up when popup closes
+    const interval = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(interval);
+        setWidgetWindows(prev => ({ ...prev, [note.id]: null }));
+      }
+    }, 1000);
+  };
+
+  const isWidgetOpen = (noteId: string) => {
+    return widgetWindows[noteId] && !widgetWindows[noteId]!.closed;
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -144,20 +273,36 @@ export function QuickNotesApp() {
                   <span className="text-[10px] text-muted-foreground">
                     {format(new Date(note.updated_at), "d MMM yyyy, HH:mm", { locale: es })}
                   </span>
-                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={e => { e.stopPropagation(); togglePin.mutate({ id: note.id, is_pinned: !note.is_pinned }); }}
-                      className="p-1.5 rounded-md hover:bg-background/60"
-                    >
-                      {note.is_pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); handleDelete(note.id); }}
-                      className="p-1.5 rounded-md hover:bg-destructive/20 text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                         <button
+                           onClick={e => { e.stopPropagation(); openAsWidget(note); }}
+                           className={cn(
+                             "p-1.5 rounded-md hover:bg-background/60",
+                             isWidgetOpen(note.id) && "text-primary bg-primary/10"
+                           )}
+                         >
+                           {isWidgetOpen(note.id) ? <Minimize2 className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
+                         </button>
+                       </TooltipTrigger>
+                       <TooltipContent side="top" className="text-xs">
+                         {isWidgetOpen(note.id) ? 'Cerrar widget' : 'Abrir como widget'}
+                       </TooltipContent>
+                     </Tooltip>
+                     <button
+                       onClick={e => { e.stopPropagation(); togglePin.mutate({ id: note.id, is_pinned: !note.is_pinned }); }}
+                       className="p-1.5 rounded-md hover:bg-background/60"
+                     >
+                       {note.is_pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                     </button>
+                     <button
+                       onClick={e => { e.stopPropagation(); handleDelete(note.id); }}
+                       className="p-1.5 rounded-md hover:bg-destructive/20 text-destructive"
+                     >
+                       <Trash2 className="h-3.5 w-3.5" />
+                     </button>
+                   </div>
                 </div>
               </div>
             </Card>
