@@ -796,7 +796,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
       <div className="p-3 border-t border-sidebar-border space-y-1">
         <ThemeCustomizer />
         {editToggle}
-        <QuickNotesPopover onOpenFullApp={() => handleTabChange('notas')} />
+        
         {user && (
           <div className="px-3 py-2 text-xs text-sidebar-foreground/70 truncate">{user.email}</div>
         )}
@@ -844,7 +844,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
       <div className="p-2 border-t border-sidebar-border space-y-0.5">
         <ThemeCustomizer />
         {editToggle}
-        <QuickNotesPopover onOpenFullApp={() => handleTabChange('notas')} />
+        
         {user && (
           <div className="px-2 py-1 text-[10px] text-sidebar-foreground/70 truncate">{user.email}</div>
         )}
