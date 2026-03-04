@@ -514,6 +514,7 @@ const TOOLS: N8nTool[] = [
 
 function generateN8nJson(tool: N8nTool): object {
   const hasBody = tool.bodyFields && tool.bodyFields.length > 0;
+  const hasQuery = tool.queryParams && tool.queryParams.length > 0;
   const url = `${BASE_URL_PLACEHOLDER}${tool.path}`;
 
   const node: any = {
@@ -535,10 +536,27 @@ function generateN8nJson(tool: N8nTool): object {
   // Clean undefined
   if (!node.parameters.method || node.parameters.method === 'GET') delete node.parameters.method;
 
+  // Add query parameters directly into the node
+  if (hasQuery) {
+    node.parameters.sendQuery = true;
+    node.parameters.queryParameters = {
+      parameters: tool.queryParams!.map(p => ({
+        name: p.name,
+        value: `={{ $json.${p.name} || '' }}`,
+      })),
+    };
+  }
+
+  // Add body fields directly into the node
   if (hasBody) {
     node.parameters.sendBody = true;
-    node.parameters.specifyBody = 'json';
-    node.parameters.jsonBody = `={{ JSON.stringify($json) }}`;
+    node.parameters.specifyBody = 'keypair';
+    node.parameters.bodyParameters = {
+      parameters: tool.bodyFields!.map(f => ({
+        name: f.name,
+        value: `={{ $json.${f.name} || '' }}`,
+      })),
+    };
   }
 
   return {
