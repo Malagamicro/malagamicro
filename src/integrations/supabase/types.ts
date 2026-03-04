@@ -1850,6 +1850,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_api_keys: {
+        Row: {
+          api_key: string
+          created_at: string
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          name: string
+          user_id: string
+        }
+        Insert: {
+          api_key?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          name?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_dashboard_config: {
         Row: {
           created_at: string
@@ -2232,6 +2262,7 @@ export type Database = {
         Args: { _event_id: string; _user_id: string }
         Returns: boolean
       }
+      validate_api_key: { Args: { _api_key: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"

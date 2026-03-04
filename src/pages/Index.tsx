@@ -43,6 +43,7 @@ import { ReportsModule } from '@/components/reports/ReportsModule';
 import { AppsHub } from '@/components/apps/AppsHub';
 import { GeneralRemindersList } from '@/components/reminders/GeneralRemindersList';
 import { SeoArticleGenerator } from '@/components/seo/SeoArticleGenerator';
+import { N8nIntegrationPage } from '@/components/n8n/N8nIntegrationPage';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { SeoArticleCard } from '@/components/seo/SeoArticleCard';
 import { SeoArticleViewer } from '@/components/seo/SeoArticleViewer';
@@ -50,7 +51,7 @@ import { useSeoArticles, SeoArticle } from '@/hooks/useSeoArticles';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
-import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, ArrowLeft, Megaphone, MailOpen, FileCode, Activity, Brain, StickyNote } from 'lucide-react';
+import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, ArrowLeft, Megaphone, MailOpen, FileCode, Activity, Brain, StickyNote, Workflow } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -689,6 +690,14 @@ const IndexContent = () => {
             />
             <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6">
               <AIMemoryManager />
+            </div>
+          </div>
+        );
+      case 'n8n-integration':
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <div className="flex-1 min-h-0 overflow-auto">
+              <N8nIntegrationPage />
             </div>
           </div>
         );
