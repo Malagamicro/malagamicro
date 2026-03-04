@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
-import { Copy, Search, Download, BookOpen, Zap, Users, Calendar, Bell, FileText, MessageSquare, Mail, Brain, Ticket, Building2 } from 'lucide-react';
+import { Copy, Search, Download, BookOpen, Zap, Users, Calendar, Bell, FileText, MessageSquare, Mail, Brain, Ticket, Building2, Shield, Globe, FolderOpen, BarChart3, Sparkles, Eye, Lock, MessagesSquare, Newspaper } from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiKeysManager } from './ApiKeysManager';
 
@@ -238,6 +238,277 @@ const TOOLS: N8nTool[] = [
     id: 'get-profile', name: 'Mi Perfil', description: 'Obtiene el perfil del usuario autenticado',
     toolDescription: 'Obtiene los datos del perfil del usuario asociado a la API Key.',
     method: 'GET', path: '/profile', icon: <Users className="w-4 h-4" />, category: 'Perfil',
+  },
+
+  // ===== CHAT INTERNO =====
+  {
+    id: 'list-conversations', name: 'Listar Conversaciones', description: 'Obtiene las conversaciones del chat interno',
+    toolDescription: 'Lista todas las conversaciones del chat interno en las que participa el usuario.',
+    method: 'GET', path: '/conversations', icon: <MessagesSquare className="w-4 h-4" />, category: 'Chat Interno',
+  },
+  {
+    id: 'get-conversation-messages', name: 'Mensajes de Conversación', description: 'Obtiene los mensajes de una conversación',
+    toolDescription: 'Lista los mensajes de una conversación específica del chat interno.',
+    method: 'GET', path: '/conversations/{conversation_id}', icon: <MessagesSquare className="w-4 h-4" />, category: 'Chat Interno',
+    queryParams: [{ name: 'limit', type: 'number', description: 'Límite de mensajes (default: 100)' }],
+  },
+  {
+    id: 'create-conversation', name: 'Crear Conversación', description: 'Crea una nueva conversación',
+    toolDescription: 'Crea una nueva conversación en el chat interno y añade participantes.',
+    method: 'POST', path: '/conversations', icon: <MessagesSquare className="w-4 h-4" />, category: 'Chat Interno',
+    bodyFields: [
+      { name: 'name', type: 'string', required: false, description: 'Nombre de la conversación (para grupos)' },
+      { name: 'is_group', type: 'boolean', required: false, description: 'true para grupo, false para 1:1' },
+      { name: 'participant_ids', type: 'array', required: true, description: 'Array de UUIDs de los participantes' },
+    ],
+  },
+  {
+    id: 'send-internal-message', name: 'Enviar Mensaje Interno', description: 'Envía un mensaje en una conversación',
+    toolDescription: 'Envía un mensaje de texto a una conversación del chat interno.',
+    method: 'POST', path: '/send-message', icon: <MessagesSquare className="w-4 h-4" />, category: 'Chat Interno',
+    bodyFields: [
+      { name: 'conversation_id', type: 'string', required: true, description: 'ID de la conversación' },
+      { name: 'content', type: 'string', required: true, description: 'Texto del mensaje' },
+    ],
+  },
+
+  // ===== SEGURIDAD =====
+  {
+    id: 'list-audit-logs', name: 'Listar Auditoría', description: 'Obtiene los logs de auditoría',
+    toolDescription: 'Lista los registros de auditoría del sistema. Puedes filtrar por usuario, acción o tipo de entidad.',
+    method: 'GET', path: '/audit-logs', icon: <Shield className="w-4 h-4" />, category: 'Seguridad',
+    queryParams: [
+      { name: 'user_id', type: 'string', description: 'Filtrar por ID de usuario' },
+      { name: 'action', type: 'string', description: 'Filtrar por acción (ej: login, create, update)' },
+      { name: 'entity_type', type: 'string', description: 'Filtrar por tipo de entidad' },
+      { name: 'limit', type: 'number', description: 'Límite de resultados (default: 100)' },
+    ],
+  },
+  {
+    id: 'create-audit-log', name: 'Registrar Auditoría', description: 'Crea un registro de auditoría manual',
+    toolDescription: 'Registra una entrada manual en el log de auditoría del sistema.',
+    method: 'POST', path: '/audit-logs', icon: <Shield className="w-4 h-4" />, category: 'Seguridad',
+    bodyFields: [
+      { name: 'action', type: 'string', required: true, description: 'Acción realizada' },
+      { name: 'entity_type', type: 'string', required: true, description: 'Tipo de entidad afectada' },
+      { name: 'entity_id', type: 'string', required: false, description: 'ID de la entidad' },
+      { name: 'details', type: 'object', required: false, description: 'Detalles adicionales (JSON)' },
+    ],
+  },
+  {
+    id: 'list-login-logs', name: 'Listar Logins', description: 'Obtiene el historial de inicios de sesión',
+    toolDescription: 'Lista los registros de inicios de sesión con IP, ubicación y dispositivo.',
+    method: 'GET', path: '/login-logs', icon: <Eye className="w-4 h-4" />, category: 'Seguridad',
+    queryParams: [
+      { name: 'user_id', type: 'string', description: 'Filtrar por ID de usuario' },
+      { name: 'limit', type: 'number', description: 'Límite de resultados (default: 50)' },
+    ],
+  },
+  {
+    id: 'list-security-blocks', name: 'Listar Bloqueos', description: 'Obtiene los bloqueos de seguridad activos',
+    toolDescription: 'Lista todos los bloqueos de seguridad activos en el sistema.',
+    method: 'GET', path: '/security-blocks', icon: <Lock className="w-4 h-4" />, category: 'Seguridad',
+  },
+  {
+    id: 'resolve-security-block', name: 'Resolver Bloqueo', description: 'Desactiva un bloqueo de seguridad',
+    toolDescription: 'Desactiva un bloqueo de seguridad existente, permitiendo el acceso nuevamente.',
+    method: 'PATCH', path: '/security-blocks/{id}', icon: <Lock className="w-4 h-4" />, category: 'Seguridad',
+  },
+  {
+    id: 'list-ip-whitelist', name: 'Listar IPs Permitidas', description: 'Obtiene la lista blanca de IPs',
+    toolDescription: 'Lista todas las direcciones IP en la lista blanca de seguridad.',
+    method: 'GET', path: '/ip-whitelist', icon: <Globe className="w-4 h-4" />, category: 'Seguridad',
+  },
+  {
+    id: 'add-ip-whitelist', name: 'Añadir IP a Lista Blanca', description: 'Añade una IP a la lista blanca',
+    toolDescription: 'Añade una dirección IP a la lista blanca de seguridad.',
+    method: 'POST', path: '/ip-whitelist', icon: <Globe className="w-4 h-4" />, category: 'Seguridad',
+    bodyFields: [
+      { name: 'ip_address', type: 'string', required: true, description: 'Dirección IP' },
+      { name: 'reason', type: 'string', required: false, description: 'Motivo' },
+    ],
+  },
+
+  // ===== ARCHIVOS COMPARTIDOS =====
+  {
+    id: 'list-shared-files', name: 'Listar Archivos', description: 'Obtiene los archivos compartidos',
+    toolDescription: 'Lista los archivos compartidos del equipo. Filtra por carpeta con folder_id.',
+    method: 'GET', path: '/shared-files', icon: <FolderOpen className="w-4 h-4" />, category: 'Archivos',
+    queryParams: [{ name: 'folder_id', type: 'string', description: 'ID de carpeta (vacío = raíz)' }],
+  },
+  {
+    id: 'list-shared-folders', name: 'Listar Carpetas', description: 'Obtiene las carpetas compartidas',
+    toolDescription: 'Lista todas las carpetas compartidas del equipo.',
+    method: 'GET', path: '/shared-folders', icon: <FolderOpen className="w-4 h-4" />, category: 'Archivos',
+  },
+  {
+    id: 'create-shared-folder', name: 'Crear Carpeta', description: 'Crea una carpeta compartida',
+    toolDescription: 'Crea una nueva carpeta en el sistema de archivos compartidos.',
+    method: 'POST', path: '/shared-folders', icon: <FolderOpen className="w-4 h-4" />, category: 'Archivos',
+    bodyFields: [
+      { name: 'name', type: 'string', required: true, description: 'Nombre de la carpeta' },
+      { name: 'parent_id', type: 'string', required: false, description: 'ID de carpeta padre (vacío = raíz)' },
+      { name: 'color', type: 'string', required: false, description: 'Color hex (ej: #3b82f6)' },
+    ],
+  },
+
+  // ===== CAMPAÑAS EMAIL =====
+  {
+    id: 'list-campaigns', name: 'Listar Campañas', description: 'Obtiene las campañas de email',
+    toolDescription: 'Lista todas las campañas de email marketing del usuario.',
+    method: 'GET', path: '/campaigns', icon: <Mail className="w-4 h-4" />, category: 'Email Marketing',
+  },
+  {
+    id: 'create-campaign', name: 'Crear Campaña', description: 'Crea una nueva campaña de email',
+    toolDescription: 'Crea una nueva campaña de email marketing.',
+    method: 'POST', path: '/campaigns', icon: <Mail className="w-4 h-4" />, category: 'Email Marketing',
+    bodyFields: [
+      { name: 'name', type: 'string', required: true, description: 'Nombre de la campaña' },
+      { name: 'template_id', type: 'string', required: false, description: 'ID de la plantilla' },
+      { name: 'status', type: 'string', required: false, description: 'Estado: draft, scheduled, sent' },
+    ],
+  },
+  {
+    id: 'list-email-templates', name: 'Listar Plantillas Email', description: 'Obtiene las plantillas de email',
+    toolDescription: 'Lista todas las plantillas de email del usuario.',
+    method: 'GET', path: '/email-templates', icon: <Mail className="w-4 h-4" />, category: 'Email Marketing',
+  },
+  {
+    id: 'create-email-template', name: 'Crear Plantilla Email', description: 'Crea una plantilla de email',
+    toolDescription: 'Crea una nueva plantilla de email reutilizable.',
+    method: 'POST', path: '/email-templates', icon: <Mail className="w-4 h-4" />, category: 'Email Marketing',
+    bodyFields: [
+      { name: 'name', type: 'string', required: true, description: 'Nombre de la plantilla' },
+      { name: 'subject', type: 'string', required: true, description: 'Asunto del email' },
+      { name: 'body', type: 'string', required: true, description: 'Cuerpo HTML del email' },
+    ],
+  },
+
+  // ===== PLANTILLAS WHATSAPP =====
+  {
+    id: 'list-message-templates', name: 'Listar Plantillas WhatsApp', description: 'Obtiene las plantillas de mensajes',
+    toolDescription: 'Lista todas las plantillas de mensajes predefinidas para WhatsApp.',
+    method: 'GET', path: '/message-templates', icon: <MessageSquare className="w-4 h-4" />, category: 'Comunicación',
+  },
+  {
+    id: 'create-message-template', name: 'Crear Plantilla WhatsApp', description: 'Crea una plantilla de mensaje',
+    toolDescription: 'Crea una nueva plantilla de mensaje para WhatsApp.',
+    method: 'POST', path: '/message-templates', icon: <MessageSquare className="w-4 h-4" />, category: 'Comunicación',
+    bodyFields: [
+      { name: 'name', type: 'string', required: true, description: 'Nombre de la plantilla' },
+      { name: 'content', type: 'string', required: true, description: 'Contenido del mensaje' },
+      { name: 'category', type: 'string', required: false, description: 'Categoría' },
+    ],
+  },
+
+  // ===== WHATSAPP CHATS =====
+  {
+    id: 'list-whatsapp-chats', name: 'Listar Chats WhatsApp', description: 'Obtiene los chats de WhatsApp',
+    toolDescription: 'Lista todos los chats de WhatsApp con sus últimos mensajes.',
+    method: 'GET', path: '/whatsapp-chats', icon: <MessageSquare className="w-4 h-4" />, category: 'Comunicación',
+  },
+  {
+    id: 'list-whatsapp-messages', name: 'Mensajes WhatsApp', description: 'Obtiene mensajes de un chat de WhatsApp',
+    toolDescription: 'Lista los mensajes de un chat específico de WhatsApp.',
+    method: 'GET', path: '/whatsapp-messages', icon: <MessageSquare className="w-4 h-4" />, category: 'Comunicación',
+    queryParams: [
+      { name: 'chat_id', type: 'string', description: 'ID del chat (requerido)' },
+      { name: 'limit', type: 'number', description: 'Límite de mensajes (default: 100)' },
+    ],
+  },
+
+  // ===== PRESUPUESTOS =====
+  {
+    id: 'list-budget-requests', name: 'Listar Solicitudes Presupuesto', description: 'Obtiene las solicitudes de presupuesto',
+    toolDescription: 'Lista todas las solicitudes de presupuesto del usuario.',
+    method: 'GET', path: '/budget-requests', icon: <FileText className="w-4 h-4" />, category: 'Presupuestos',
+  },
+  {
+    id: 'list-budgets-received', name: 'Listar Presupuestos Recibidos', description: 'Obtiene los presupuestos recibidos de proveedores',
+    toolDescription: 'Lista los presupuestos recibidos de proveedores, filtrable por solicitud.',
+    method: 'GET', path: '/budgets-received', icon: <FileText className="w-4 h-4" />, category: 'Presupuestos',
+    queryParams: [{ name: 'request_id', type: 'string', description: 'Filtrar por ID de solicitud' }],
+  },
+
+  // ===== INFORMES =====
+  {
+    id: 'list-reports', name: 'Listar Informes', description: 'Obtiene los informes generados',
+    toolDescription: 'Lista todos los informes generados por el usuario.',
+    method: 'GET', path: '/reports', icon: <BarChart3 className="w-4 h-4" />, category: 'Informes',
+  },
+  {
+    id: 'create-report', name: 'Crear Informe', description: 'Genera un nuevo informe',
+    toolDescription: 'Crea un nuevo informe con contenido personalizado.',
+    method: 'POST', path: '/reports', icon: <BarChart3 className="w-4 h-4" />, category: 'Informes',
+    bodyFields: [
+      { name: 'title', type: 'string', required: true, description: 'Título del informe' },
+      { name: 'content', type: 'string', required: true, description: 'Contenido del informe' },
+      { name: 'report_type', type: 'string', required: false, description: 'Tipo: exit_report, weekly, custom' },
+    ],
+  },
+
+  // ===== SEO =====
+  {
+    id: 'list-seo-articles', name: 'Listar Artículos SEO', description: 'Obtiene los artículos SEO generados',
+    toolDescription: 'Lista todos los artículos SEO generados por el usuario.',
+    method: 'GET', path: '/seo-articles', icon: <Newspaper className="w-4 h-4" />, category: 'SEO',
+  },
+
+  // ===== NOTAS TICKETS =====
+  {
+    id: 'list-ticket-notes', name: 'Notas de Ticket', description: 'Obtiene las notas de un ticket',
+    toolDescription: 'Lista las notas de un ticket de soporte específico.',
+    method: 'GET', path: '/ticket-notes', icon: <Ticket className="w-4 h-4" />, category: 'Soporte',
+    queryParams: [{ name: 'ticket_id', type: 'string', description: 'ID del ticket (requerido)' }],
+  },
+  {
+    id: 'create-ticket-note', name: 'Crear Nota de Ticket', description: 'Añade una nota a un ticket',
+    toolDescription: 'Añade una nota/comentario a un ticket de soporte.',
+    method: 'POST', path: '/ticket-notes', icon: <Ticket className="w-4 h-4" />, category: 'Soporte',
+    bodyFields: [
+      { name: 'ticket_id', type: 'string', required: true, description: 'ID del ticket' },
+      { name: 'content', type: 'string', required: true, description: 'Contenido de la nota' },
+    ],
+  },
+
+  // ===== CARPETAS LEADS =====
+  {
+    id: 'list-lead-folders', name: 'Listar Carpetas de Leads', description: 'Obtiene las carpetas de leads',
+    toolDescription: 'Lista todas las carpetas de organización de leads del usuario.',
+    method: 'GET', path: '/lead-folders', icon: <FolderOpen className="w-4 h-4" />, category: 'Leads',
+  },
+  {
+    id: 'create-lead-folder', name: 'Crear Carpeta de Leads', description: 'Crea una carpeta para organizar leads',
+    toolDescription: 'Crea una nueva carpeta para organizar leads.',
+    method: 'POST', path: '/lead-folders', icon: <FolderOpen className="w-4 h-4" />, category: 'Leads',
+    bodyFields: [
+      { name: 'name', type: 'string', required: true, description: 'Nombre de la carpeta' },
+      { name: 'color', type: 'string', required: false, description: 'Color hex (ej: #6366f1)' },
+    ],
+  },
+
+  // ===== IA =====
+  {
+    id: 'ai-completion', name: 'Completar con IA', description: 'Genera texto con IA',
+    toolDescription: 'Envía un prompt a la IA y recibe una respuesta generada. Útil para generar textos, resumir, analizar o responder preguntas.',
+    method: 'POST', path: '/ai-completion', icon: <Sparkles className="w-4 h-4" />, category: 'IA',
+    bodyFields: [
+      { name: 'prompt', type: 'string', required: true, description: 'El prompt o pregunta para la IA' },
+      { name: 'model', type: 'string', required: false, description: 'Modelo: google/gemini-2.5-flash (default), openai/gpt-5-mini, etc.' },
+      { name: 'system_prompt', type: 'string', required: false, description: 'Instrucciones del sistema para la IA' },
+    ],
+  },
+
+  // ===== PRESENCIA =====
+  {
+    id: 'list-online-users', name: 'Usuarios Online', description: 'Obtiene los usuarios conectados',
+    toolDescription: 'Lista los usuarios actualmente conectados al sistema.',
+    method: 'GET', path: '/user-presence', icon: <Eye className="w-4 h-4" />, category: 'Perfil',
+  },
+  {
+    id: 'list-profiles', name: 'Listar Perfiles', description: 'Obtiene todos los perfiles del equipo',
+    toolDescription: 'Lista todos los perfiles de usuarios registrados en el sistema.',
+    method: 'GET', path: '/profiles', icon: <Users className="w-4 h-4" />, category: 'Perfil',
   },
 ];
 
