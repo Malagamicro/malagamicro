@@ -117,6 +117,7 @@ export type Database = {
           category: string
           created_at: string
           id: string
+          is_shared: boolean
           lead_id: string | null
           memory_key: string
           memory_value: Json
@@ -127,6 +128,7 @@ export type Database = {
           category?: string
           created_at?: string
           id?: string
+          is_shared?: boolean
           lead_id?: string | null
           memory_key: string
           memory_value?: Json
@@ -137,6 +139,7 @@ export type Database = {
           category?: string
           created_at?: string
           id?: string
+          is_shared?: boolean
           lead_id?: string | null
           memory_key?: string
           memory_value?: Json
