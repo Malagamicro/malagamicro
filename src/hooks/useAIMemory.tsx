@@ -9,6 +9,7 @@ interface AIMemory {
   memory_key: string;
   memory_value: Record<string, unknown>;
   category: string;
+  is_shared: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -25,7 +26,6 @@ export function useAIMemory() {
       let query = supabase
         .from('ai_memory' as any)
         .select('*')
-        .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
       if (leadId) query = query.eq('lead_id', leadId);
@@ -48,7 +48,8 @@ export function useAIMemory() {
     memoryKey: string,
     memoryValue: Record<string, unknown>,
     category = 'general',
-    leadId?: string
+    leadId?: string,
+    isShared = false
   ) => {
     if (!user) return null;
     try {
@@ -58,6 +59,7 @@ export function useAIMemory() {
         memory_value: memoryValue,
         category,
         lead_id: leadId || null,
+        is_shared: isShared,
       };
 
       // Upsert by key+lead

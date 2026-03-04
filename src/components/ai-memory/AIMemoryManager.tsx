@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Brain, Plus, Search, Trash2, Edit2, FileText, Image, Upload,
-  Loader2, Filter, Calendar, Tag, X, Save, Eye
+  Loader2, Filter, Calendar, Tag, X, Save, Eye, Globe, Lock, Users
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -25,6 +27,7 @@ interface AIMemory {
   memory_key: string;
   memory_value: any;
   category: string;
+  is_shared: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -44,6 +47,7 @@ export function AIMemoryManager() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<string>('shared');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingMemory, setEditingMemory] = useState<AIMemory | null>(null);
   const [viewingMemory, setViewingMemory] = useState<AIMemory | null>(null);
@@ -54,7 +58,7 @@ export function AIMemoryManager() {
   const [formValue, setFormValue] = useState('');
   const [formCategory, setFormCategory] = useState('general');
   const [formLeadId, setFormLeadId] = useState('');
-
+  const [formIsShared, setFormIsShared] = useState(true);
   const fetchMemories = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -62,7 +66,6 @@ export function AIMemoryManager() {
       let query = supabase
         .from('ai_memory' as any)
         .select('*')
-        .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
       if (filterCategory !== 'all') {
@@ -85,6 +88,10 @@ export function AIMemoryManager() {
   }, [fetchMemories]);
 
   const filteredMemories = memories.filter(m => {
+    // Filter by tab
+    if (activeTab === 'shared' && !m.is_shared) return false;
+    if (activeTab === 'personal' && (m.is_shared || m.user_id !== user?.id)) return false;
+    
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -116,6 +123,7 @@ export function AIMemoryManager() {
             memory_value: memoryValue,
             category: formCategory,
             lead_id: null,
+            is_shared: formIsShared,
           })
           .eq('id', editingMemory.id) as any);
         if (error) throw error;
@@ -129,6 +137,7 @@ export function AIMemoryManager() {
             memory_value: memoryValue,
             category: formCategory,
             lead_id: null,
+            is_shared: formIsShared,
           }) as any);
         if (error) throw error;
         toast.success('Memoria añadida');
@@ -250,6 +259,7 @@ export function AIMemoryManager() {
           memory_value: memValue,
           category,
           lead_id: formLeadId || null,
+          is_shared: formIsShared,
         }) as any);
       if (error) throw error;
 
@@ -275,6 +285,7 @@ export function AIMemoryManager() {
     setFormValue('');
     setFormCategory('general');
     setFormLeadId('');
+    setFormIsShared(activeTab === 'shared');
     setIsAddOpen(false);
     setEditingMemory(null);
   };
@@ -289,6 +300,7 @@ export function AIMemoryManager() {
     );
     setFormCategory(memory.category);
     setFormLeadId(memory.lead_id || '');
+    setFormIsShared(memory.is_shared);
     setIsAddOpen(true);
   };
 
@@ -311,6 +323,20 @@ export function AIMemoryManager() {
 
   return (
     <div className="space-y-4">
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="shared" className="gap-2">
+            <Globe className="h-4 w-4" />
+            Compartida
+          </TabsTrigger>
+          <TabsTrigger value="personal" className="gap-2">
+            <Lock className="h-4 w-4" />
+            Personal
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -398,6 +424,20 @@ export function AIMemoryManager() {
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h4 className="font-medium text-sm truncate">{memory.memory_key}</h4>
                       {getCategoryBadge(memory.category)}
+                      {memory.is_shared ? (
+                        <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                          <Globe className="h-3 w-3 mr-1" />Compartida
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs bg-orange-500/10 text-orange-700 dark:text-orange-400">
+                          <Lock className="h-3 w-3 mr-1" />Personal
+                        </Badge>
+                      )}
+                      {memory.user_id !== user?.id && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Users className="h-3 w-3 mr-1" />Otro usuario
+                        </Badge>
+                      )}
                       {memory.lead_id && (
                         <Badge variant="secondary" className="text-xs">Lead vinculado</Badge>
                       )}
@@ -419,22 +459,26 @@ export function AIMemoryManager() {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openEdit(memory)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => handleDelete(memory.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {memory.user_id === user?.id && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEdit(memory)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(memory.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -474,6 +518,18 @@ export function AIMemoryManager() {
                 value={formCategory}
                 onChange={(e) => setFormCategory(e.target.value)}
               />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label className="flex items-center gap-2">
+                  {formIsShared ? <Globe className="h-4 w-4 text-emerald-600" /> : <Lock className="h-4 w-4 text-orange-600" />}
+                  {formIsShared ? 'Memoria compartida' : 'Memoria personal'}
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {formIsShared ? 'Todos los usuarios podrán ver esta memoria' : 'Solo tú podrás ver esta memoria'}
+                </p>
+              </div>
+              <Switch checked={formIsShared} onCheckedChange={setFormIsShared} />
             </div>
           </div>
           <DialogFooter>
