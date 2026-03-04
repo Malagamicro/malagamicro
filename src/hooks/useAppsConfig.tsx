@@ -102,6 +102,7 @@ const DEFAULT_APP_CATEGORIES: AppCategory[] = [
       { id: 'rendimiento', label: 'Rendimiento', description: 'Métricas y logs del sistema', icon: 'Activity', color: '#ef4444', bgGradient: 'from-red-500/20 to-red-600/10', size: 1 },
       { id: 'seguridad', label: 'Seguridad', description: 'Bloqueos y auditoría de accesos', icon: 'ShieldAlert', color: '#f43f5e', bgGradient: 'from-rose-500/20 to-rose-600/10', size: 1 },
       { id: 'ai-memory', label: 'Memoria IA', description: 'Gestionar contexto y recuerdos de Micro', icon: 'Brain', color: '#8b5cf6', bgGradient: 'from-violet-500/20 to-violet-600/10', size: 1 },
+      { id: 'n8n-integration', label: 'n8n', description: 'API y herramientas para agentes', icon: 'Workflow', color: '#f97316', bgGradient: 'from-orange-500/20 to-orange-600/10', size: 1 },
       { id: 'settings', label: 'Ajustes', description: 'Configuración general', icon: 'Settings', color: '#64748b', bgGradient: 'from-slate-500/20 to-slate-600/10', size: 1 },
     ],
   },
