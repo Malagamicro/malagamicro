@@ -1088,7 +1088,7 @@ export function useCustomTheme() {
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
-  }, [customTheme.colorPreset]);
+  }, [customTheme.colorPreset, customTheme.customColors]);
 
   const saveTheme = useCallback(async (theme: CustomTheme) => {
     if (!user?.id || saving.current) return;
