@@ -810,14 +810,69 @@ function applyColorPreset(preset: ColorPreset, isDark: boolean, customColors?: C
   if (!config) return;
   const mode = isDark ? config.dark : config.light;
   const root = document.documentElement;
+
+  // Build a derived color map that fills in missing variables from custom colors
+  // This ensures popover, input, ring, foreground variants all stay in sync
+  const derivedCustom: Partial<Record<keyof ColorSystem, string>> = {};
+  if (preset === 'custom' && customColors) {
+    // Direct mappings from CustomColors
+    if (customColors.primary) derivedCustom.primary = customColors.primary;
+    if (customColors.primaryForeground) derivedCustom.primaryForeground = customColors.primaryForeground;
+    if (customColors.secondary) derivedCustom.secondary = customColors.secondary;
+    if (customColors.secondaryForeground) derivedCustom.secondaryForeground = customColors.secondaryForeground;
+    if (customColors.accent) derivedCustom.accent = customColors.accent;
+    if (customColors.accentForeground) derivedCustom.accentForeground = customColors.accentForeground;
+    if (customColors.background) derivedCustom.background = customColors.background;
+    if (customColors.foreground) derivedCustom.foreground = customColors.foreground;
+    if (customColors.card) derivedCustom.card = customColors.card;
+    if (customColors.cardForeground) derivedCustom.cardForeground = customColors.cardForeground;
+    if (customColors.muted) derivedCustom.muted = customColors.muted;
+    if (customColors.mutedForeground) derivedCustom.mutedForeground = customColors.mutedForeground;
+    if (customColors.border) derivedCustom.border = customColors.border;
+    if (customColors.sidebarBackground) derivedCustom.sidebarBackground = customColors.sidebarBackground;
+    if (customColors.sidebarForeground) derivedCustom.sidebarForeground = customColors.sidebarForeground;
+    if (customColors.sidebarAccent) derivedCustom.sidebarAccent = customColors.sidebarAccent;
+    if (customColors.sidebarBorder) derivedCustom.sidebarBorder = customColors.sidebarBorder;
+
+    // Derive missing variables from custom colors so ALL UI elements stay consistent
+    // Popover follows card, which follows background
+    derivedCustom.popover = customColors.card || customColors.background || mode.popover;
+    derivedCustom.popoverForeground = customColors.cardForeground || customColors.foreground || mode.popoverForeground;
+    // Card foreground follows foreground if not set
+    if (!derivedCustom.cardForeground && customColors.foreground) {
+      derivedCustom.cardForeground = customColors.foreground;
+    }
+    // Input border follows border
+    derivedCustom.input = customColors.border || mode.input;
+    // Ring follows primary
+    derivedCustom.ring = customColors.primary || mode.ring;
+    // Primary foreground: auto-derive if not set
+    if (!derivedCustom.primaryForeground) derivedCustom.primaryForeground = mode.primaryForeground;
+    // Secondary foreground: auto-derive if not set
+    if (!derivedCustom.secondaryForeground) derivedCustom.secondaryForeground = mode.secondaryForeground;
+    // Accent foreground: auto-derive if not set
+    if (!derivedCustom.accentForeground) derivedCustom.accentForeground = mode.accentForeground;
+    // Muted foreground: auto-derive if not set
+    if (!derivedCustom.mutedForeground) derivedCustom.mutedForeground = mode.mutedForeground;
+    // Destructive: keep defaults
+    derivedCustom.destructive = mode.destructive;
+    derivedCustom.destructiveForeground = mode.destructiveForeground;
+    // Sidebar derived values
+    derivedCustom.sidebarPrimary = customColors.primary || mode.sidebarPrimary;
+    derivedCustom.sidebarPrimaryForeground = customColors.primaryForeground || mode.sidebarPrimaryForeground;
+    derivedCustom.sidebarAccentForeground = customColors.sidebarForeground || mode.sidebarAccentForeground;
+  }
+
   for (const [key, cssVar] of Object.entries(CSS_VAR_MAP)) {
-    if (preset === 'custom' && customColors && customColors[key as keyof CustomColors]) {
-      root.style.setProperty(cssVar, customColors[key as keyof CustomColors]!);
+    const k = key as keyof ColorSystem;
+    if (preset === 'custom' && derivedCustom[k]) {
+      root.style.setProperty(cssVar, derivedCustom[k]!);
     } else {
-      const value = mode[key as keyof ColorSystem];
+      const value = mode[k];
       if (value) root.style.setProperty(cssVar, value);
     }
   }
+
   // Apply custom status & semantic colors
   if (customColors) {
     if (customColors.statusNew) root.style.setProperty('--status-new', customColors.statusNew);
@@ -1033,7 +1088,7 @@ export function useCustomTheme() {
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
-  }, [customTheme.colorPreset]);
+  }, [customTheme.colorPreset, customTheme.customColors]);
 
   const saveTheme = useCallback(async (theme: CustomTheme) => {
     if (!user?.id || saving.current) return;
