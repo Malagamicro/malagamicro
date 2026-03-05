@@ -180,46 +180,74 @@ serve(async (req) => {
       );
     }
 
-    // Process images - find base64 or regular URLs
-    let finalImageUrl: string | null = null;
+    // Process ALL images
+    const resolvedImages: { url: string; altText: string }[] = [];
     const images = normalized.images;
+    let failedCount = 0;
 
-    if (Array.isArray(images) && images.length > 0) {
-      const firstImage = images[0];
-      // Handle nested objects: image_url could be string, {url: "..."}, or the value itself
-      let imageUrl: string | null = null;
-      if (typeof firstImage === 'string') {
-        imageUrl = firstImage;
-      } else if (firstImage?.url) {
-        // url might be a string or another object like {url: "data:..."}
-        imageUrl = typeof firstImage.url === 'string' ? firstImage.url : firstImage.url?.url || null;
-      } else if (firstImage?.image_url) {
-        imageUrl = typeof firstImage.image_url === 'string' ? firstImage.image_url : firstImage.image_url?.url || null;
+    function extractUrl(img: any): string | null {
+      if (typeof img === 'string') return img;
+      // Support: {url: "..."}, {"url image/images": "..."}, {image_url: "..."}
+      for (const key of Object.keys(img || {})) {
+        const val = img[key];
+        if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('data:image'))) return val;
+        if (typeof val === 'object' && val?.url && typeof val.url === 'string') return val.url;
       }
-
-      console.log('Resolved image URL type:', typeof imageUrl, 'starts with:', imageUrl?.substring(0, 30));
-
-      if (imageUrl && typeof imageUrl === 'string' && imageUrl !== '[object Object]') {
-        if (imageUrl.startsWith('data:image')) {
-          finalImageUrl = await uploadBase64Image(supabase, imageUrl, articleId);
-        } else if (imageUrl.startsWith('http')) {
-          finalImageUrl = imageUrl;
-        } else {
-          console.warn('Unrecognized image URL format:', imageUrl.substring(0, 50));
-        }
-      } else {
-        console.warn('Image URL resolved to invalid value:', imageUrl);
-      }
-    } else if (typeof images === 'string' && images.startsWith('data:image')) {
-      finalImageUrl = await uploadBase64Image(supabase, images, articleId);
+      return null;
     }
 
-    // Build final HTML with embedded image
-    const altText = normalized.title || 'Imagen del artículo SEO';
-    let finalHtml = normalized.htmlContent;
+    if (Array.isArray(images)) {
+      for (let i = 0; i < images.length; i++) {
+        const rawUrl = extractUrl(images[i]);
+        if (!rawUrl || rawUrl === '[object Object]') { failedCount++; continue; }
 
-    if (finalImageUrl) {
-      finalHtml = buildHtmlWithImage(normalized.title || '', finalHtml, finalImageUrl, altText);
+        let finalUrl: string | null = null;
+        if (rawUrl.startsWith('data:image')) {
+          // Upload base64 with unique name per image
+          const match = rawUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+          if (match) {
+            const ext = match[1].split('/')[1] || 'png';
+            const fileName = `${articleId}/img-${i}.${ext}`;
+            const bytes = base64ToUint8Array(match[2]);
+            const { error } = await supabase.storage.from('seo-images').upload(fileName, bytes, { contentType: match[1], upsert: true });
+            if (!error) {
+              const { data: pub } = supabase.storage.from('seo-images').getPublicUrl(fileName);
+              finalUrl = pub.publicUrl;
+            }
+          }
+        } else if (rawUrl.startsWith('http')) {
+          finalUrl = rawUrl;
+        }
+
+        if (finalUrl) {
+          resolvedImages.push({ url: finalUrl, altText: `${normalized.title || 'Artículo SEO'} - imagen ${i + 1}` });
+        } else {
+          failedCount++;
+        }
+      }
+    } else if (typeof images === 'string' && images.startsWith('data:image')) {
+      const uploaded = await uploadBase64Image(supabase, images, articleId);
+      if (uploaded) resolvedImages.push({ url: uploaded, altText: normalized.title || 'Imagen del artículo SEO' });
+      else failedCount++;
+    }
+
+    console.log(`Processed ${resolvedImages.length} images, ${failedCount} failed`);
+
+    // Build final HTML with all images embedded
+    let finalHtml = normalized.htmlContent;
+    if (resolvedImages.length > 0) {
+      // Insert hero image after first heading
+      finalHtml = buildHtmlWithImage(normalized.title || '', finalHtml, resolvedImages[0].url, resolvedImages[0].altText);
+      // Append remaining images as a gallery at the end
+      if (resolvedImages.length > 1) {
+        const galleryHtml = resolvedImages.slice(1).map(img =>
+          `<figure style="margin:1.5rem 0;text-align:center;">
+            <img src="${img.url}" alt="${img.altText}" style="max-width:100%;height:auto;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.12);" />
+            <figcaption style="margin-top:0.5rem;font-size:0.875rem;color:#666;">${img.altText}</figcaption>
+          </figure>`
+        ).join('\n');
+        finalHtml = finalHtml + '\n' + galleryHtml;
+      }
     }
 
     // Build update object
@@ -233,10 +261,11 @@ serve(async (req) => {
       workflow_id: normalized.workflowId || null,
     };
 
-    if (finalImageUrl) {
-      updateData.images = [{ url: finalImageUrl, altText }];
-      updateData.images_success_count = 1;
-      updateData.images_failed_count = 0;
+    if (resolvedImages.length > 0) {
+      updateData.images = resolvedImages;
+      updateData.images_success_count = resolvedImages.length;
+      updateData.images_failed_count = failedCount;
+      updateData.image_count = resolvedImages.length;
     }
 
     if (normalized.research) {
