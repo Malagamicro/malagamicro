@@ -897,6 +897,35 @@ export type Database = {
           },
         ]
       }
+      general_reminder_completions: {
+        Row: {
+          completed_at: string
+          id: string
+          reminder_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          reminder_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          reminder_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "general_reminder_completions_reminder_id_fkey"
+            columns: ["reminder_id"]
+            isOneToOne: false
+            referencedRelation: "general_reminders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       general_reminders: {
         Row: {
           category: string | null

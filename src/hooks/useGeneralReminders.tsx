@@ -9,7 +9,7 @@ export interface GeneralReminder {
   title: string;
   description: string | null;
   reminder_date: string;
-  is_completed: boolean;
+  is_completed: boolean; // computed per-user
   priority: 'low' | 'normal' | 'high' | 'urgent';
   category: string | null;
   recurrence_type: string;
@@ -19,6 +19,7 @@ export interface GeneralReminder {
   note: string | null;
   created_at: string;
   updated_at: string;
+  is_owner: boolean; // whether current user created it
 }
 
 interface CreateReminderData {
@@ -54,6 +55,23 @@ export function useGeneralReminders() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch user's completions
+  const { data: completions = [] } = useQuery({
+    queryKey: ['general-reminder-completions'],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('general_reminder_completions' as any)
+        .select('reminder_id')
+        .eq('user_id', user.id);
+      if (error) throw error;
+      return (data || []).map((c: any) => c.reminder_id as string);
+    },
+    enabled: !!user?.id,
+  });
+
+  const completedSet = new Set(completions);
+
   const { data: reminders = [], isLoading } = useQuery({
     queryKey: ['general-reminders'],
     queryFn: async () => {
@@ -65,20 +83,26 @@ export function useGeneralReminders() {
         .order('reminder_date', { ascending: true });
 
       if (error) throw error;
-      return data as unknown as GeneralReminder[];
+      return (data || []) as any[];
     },
     enabled: !!user?.id,
   });
 
+  // Enrich reminders with per-user completion status
+  const enrichedReminders: GeneralReminder[] = reminders.map((r: any) => ({
+    ...r,
+    is_completed: completedSet.has(r.id),
+    is_owner: r.user_id === user?.id,
+  }));
+
   const now = new Date();
-  const pendingReminders = reminders.filter(r => {
+  const pendingReminders = enrichedReminders.filter(r => {
     if (r.is_completed) return false;
-    // If snoozed, hide until snooze expires
     if (r.snooze_until && new Date(r.snooze_until) > now) return false;
     return true;
   });
-  const snoozedReminders = reminders.filter(r => !r.is_completed && r.snooze_until && new Date(r.snooze_until) > now);
-  const completedReminders = reminders.filter(r => r.is_completed);
+  const snoozedReminders = enrichedReminders.filter(r => !r.is_completed && r.snooze_until && new Date(r.snooze_until) > now);
+  const completedReminders = enrichedReminders.filter(r => r.is_completed);
   const upcomingReminders = pendingReminders.filter(r => new Date(r.reminder_date) >= now);
   const overdueReminders = pendingReminders.filter(r => new Date(r.reminder_date) < now);
 
@@ -119,13 +143,13 @@ export function useGeneralReminders() {
       if (data.reminderDate !== undefined) updateData.reminder_date = data.reminderDate.toISOString();
       if (data.priority !== undefined) updateData.priority = data.priority;
       if (data.category !== undefined) updateData.category = data.category;
-      if (data.is_completed !== undefined) updateData.is_completed = data.is_completed;
       if (data.recurrence_type !== undefined) updateData.recurrence_type = data.recurrence_type;
       if (data.snooze_until !== undefined) updateData.snooze_until = data.snooze_until;
       if (data.linked_entity_type !== undefined) updateData.linked_entity_type = data.linked_entity_type;
       if (data.linked_entity_id !== undefined) updateData.linked_entity_id = data.linked_entity_id;
       if (data.note !== undefined) updateData.note = data.note;
 
+      // Don't update is_completed on the main table anymore
       const { error } = await supabase
         .from('general_reminders')
         .update(updateData as any)
@@ -162,12 +186,42 @@ export function useGeneralReminders() {
     },
   });
 
+  // Per-user toggle: insert/delete from general_reminder_completions
+  const toggleCompleteMutation = useMutation({
+    mutationFn: async ({ id, isCompleted }: { id: string; isCompleted: boolean }) => {
+      if (!user?.id) throw new Error('No autenticado');
+
+      if (isCompleted) {
+        // Uncomplete: delete the completion record
+        const { error } = await supabase
+          .from('general_reminder_completions' as any)
+          .delete()
+          .eq('reminder_id', id)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      } else {
+        // Complete: insert a completion record
+        const { error } = await supabase
+          .from('general_reminder_completions' as any)
+          .insert({ reminder_id: id, user_id: user.id } as any);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['general-reminder-completions'] });
+      queryClient.invalidateQueries({ queryKey: ['general-reminders'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const toggleComplete = (id: string, isCompleted: boolean) => {
-    updateReminderMutation.mutate({ id, is_completed: !isCompleted });
+    toggleCompleteMutation.mutate({ id, isCompleted });
   };
 
   return {
-    reminders,
+    reminders: enrichedReminders,
     pendingReminders,
     completedReminders,
     upcomingReminders,
