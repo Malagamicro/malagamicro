@@ -133,10 +133,10 @@ export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerPro
             {article.word_count && (
               <Badge variant="outline">{article.word_count} palabras</Badge>
             )}
-            {article.images_success_count !== undefined && (
+            {article.images && Array.isArray(article.images) && (article.images as any[]).length > 0 && (
               <Badge variant="outline">
                 <ImageIcon className="h-3 w-3 mr-1" />
-                {article.images_success_count} imágenes
+                {(article.images as any[]).length} imágenes
               </Badge>
             )}
           </div>
