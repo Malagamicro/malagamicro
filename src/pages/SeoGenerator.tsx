@@ -44,43 +44,24 @@ const SeoGenerator = () => {
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-6 items-start">
-            {/* Left: Title + Description */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
-                  <Sparkles className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-                    Generador SEO
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    Artículos optimizados con IA
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
-                  🔍 Investigación web
-                </Badge>
-                <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
-                  🖼️ Imágenes IA
-                </Badge>
-                <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
-                  📊 Score SEO
-                </Badge>
-              </div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/20">
+              <Sparkles className="h-6 w-6 text-primary-foreground" />
             </div>
-
-            {/* Right: Generator Form */}
             <div>
-              <SeoArticleGenerator 
-                onGenerate={generateArticle} 
-                generating={generating} 
-              />
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+                Generador SEO
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Chatbot de artículos optimizados con IA
+              </p>
             </div>
           </div>
+
+          <SeoArticleGenerator 
+            onGenerate={generateArticle} 
+            generating={generating} 
+          />
         </div>
       </div>
 
