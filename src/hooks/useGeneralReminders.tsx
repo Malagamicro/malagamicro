@@ -202,7 +202,6 @@ export function useGeneralReminders() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['general-reminder-completions'] });
       queryClient.invalidateQueries({ queryKey: ['general-reminders'] });
     },
     onError: (error: Error) => {
