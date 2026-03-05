@@ -55,38 +55,32 @@ export function useGeneralReminders() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch user's completions
-  const { data: completions = [] } = useQuery({
-    queryKey: ['general-reminder-completions'],
+  // Single query that fetches both reminders and user's completions
+  const { data, isLoading } = useQuery({
+    queryKey: ['general-reminders', user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from('general_reminder_completions' as any)
-        .select('reminder_id')
-        .eq('user_id', user.id);
-      if (error) throw error;
-      return (data || []).map((c: any) => c.reminder_id as string);
-    },
-    enabled: !!user?.id,
-  });
-
-  const completedSet = new Set(completions);
-
-  const { data: reminders = [], isLoading } = useQuery({
-    queryKey: ['general-reminders'],
-    queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id) return { reminders: [], completedIds: [] };
       
-      const { data, error } = await supabase
-        .from('general_reminders')
-        .select('*')
-        .order('reminder_date', { ascending: true });
+      const [remindersRes, completionsRes] = await Promise.all([
+        supabase
+          .from('general_reminders')
+          .select('*')
+          .order('reminder_date', { ascending: true }),
+        supabase
+          .from('general_reminder_completions' as any)
+          .select('reminder_id')
+          .eq('user_id', user.id),
+      ]);
 
-      if (error) throw error;
-      return (data || []) as any[];
+      if (remindersRes.error) throw remindersRes.error;
+      const completedIds = (completionsRes.data || []).map((c: any) => c.reminder_id as string);
+      return { reminders: (remindersRes.data || []) as any[], completedIds };
     },
     enabled: !!user?.id,
   });
+
+  const reminders = data?.reminders || [];
+  const completedSet = new Set(data?.completedIds || []);
 
   // Enrich reminders with per-user completion status
   const enrichedReminders: GeneralReminder[] = reminders.map((r: any) => ({
