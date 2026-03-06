@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useFileManager, SavedFile } from "@/hooks/useFileManager";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { cn } from "@/lib/utils";
 
 interface ClipboardItem {
@@ -82,6 +83,7 @@ export default function FileManager() {
   const [moveDialogFile, setMoveDialogFile] = useState<SavedFile | null>(null);
   const [moveTargetFolder, setMoveTargetFolder] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "file" | "folder"; id: string; name: string; hasContent: boolean } | null>(null);
 
   // Filter files
   const filteredFiles = files.filter((file) => {
@@ -102,22 +104,46 @@ export default function FileManager() {
     toast.success(`Descargado: ${file.name}`);
   };
 
-  const handleDelete = (fileId: string) => {
+  const requestDeleteFile = (fileId: string) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file) return;
+    const hasContent = !!(file.content && file.content.trim().length > 0);
+    if (hasContent) {
+      setDeleteConfirm({ type: "file", id: fileId, name: file.name, hasContent: true });
+    } else {
+      confirmDeleteFile(fileId);
+    }
+  };
+
+  const confirmDeleteFile = (fileId: string) => {
     deleteFile(fileId);
     setSelectedFiles((prev) => {
       const next = new Set(prev);
       next.delete(fileId);
       return next;
     });
+    setDeleteConfirm(null);
     toast.success("Archivo eliminado");
   };
 
-  const handleDeleteFolder = (folderId: string) => {
+  const requestDeleteFolder = (folderId: string) => {
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return;
+    const folderFiles = files.filter(f => f.folder === folder.name);
+    if (folderFiles.length > 0) {
+      setDeleteConfirm({ type: "folder", id: folderId, name: folder.name, hasContent: true });
+    } else {
+      confirmDeleteFolder(folderId);
+    }
+  };
+
+  const confirmDeleteFolder = (folderId: string) => {
     const folder = folders.find(f => f.id === folderId);
     deleteFolder(folderId, true);
     if (selectedFolder === folder?.name) {
       setSelectedFolder(null);
     }
+    setDeleteConfirm(null);
     toast.success("Carpeta eliminada");
   };
 
@@ -290,7 +316,7 @@ export default function FileManager() {
           Descargar
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem onClick={() => handleDelete(file.id)} className="text-destructive">
+        <ContextMenuItem onClick={() => requestDeleteFile(file.id)} className="text-destructive">
           <Trash2 className="h-4 w-4 mr-2" />
           Eliminar
         </ContextMenuItem>
@@ -418,7 +444,7 @@ export default function FileManager() {
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem onClick={() => handleDeleteFolder(folder.id)} className="text-destructive">
+                <ContextMenuItem onClick={() => requestDeleteFolder(folder.id)} className="text-destructive">
                   <Trash2 className="h-4 w-4 mr-2" />
                   Eliminar carpeta
                 </ContextMenuItem>
@@ -538,7 +564,7 @@ export default function FileManager() {
                           Descargar
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(file.id)} className="text-destructive">
+                        <DropdownMenuItem onClick={() => requestDeleteFile(file.id)} className="text-destructive">
                           <Trash2 className="h-4 w-4 mr-2" />
                           Eliminar
                         </DropdownMenuItem>
@@ -653,6 +679,25 @@ export default function FileManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={() => setDeleteConfirm(null)}
+        title={deleteConfirm?.type === "folder" ? "Eliminar carpeta" : "Eliminar archivo"}
+        description={
+          deleteConfirm?.type === "folder"
+            ? `La carpeta "${deleteConfirm?.name}" contiene archivos. ¿Estás seguro de que quieres eliminarla junto con todo su contenido?`
+            : `El archivo "${deleteConfirm?.name}" tiene contenido. ¿Estás seguro de que quieres eliminarlo?`
+        }
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => {
+          if (!deleteConfirm) return;
+          if (deleteConfirm.type === "file") confirmDeleteFile(deleteConfirm.id);
+          else confirmDeleteFolder(deleteConfirm.id);
+        }}
+      />
     </div>
   );
 }

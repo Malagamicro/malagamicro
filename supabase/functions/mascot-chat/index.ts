@@ -481,13 +481,31 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "create_file",
+      description: "Crear un archivo en el sistema de archivos compartidos con contenido. Soporta cualquier formato de texto: .md, .txt, .csv, .json, .html, .css, .js, .ts, .xml, .yaml, .sql, .log, etc. REQUIERE CONFIRMACIÓN.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_name: { type: "string", description: "Nombre del archivo con extensión (ej: 'notas.md', 'datos.csv', 'config.json')" },
+          content: { type: "string", description: "Contenido del archivo. Para Markdown usa sintaxis MD, para CSV usa comas, etc." },
+          folder_name: { type: "string", description: "Nombre de la carpeta donde guardarlo (opcional, si no existe se crea)" },
+          description: { type: "string", description: "Descripción del archivo (opcional)" },
+          confirmed: { type: "boolean", description: "Si el usuario ya confirmó la acción" },
+        },
+        required: ["file_name", "content"],
+      },
+    },
+  },
 ];
 // Confirmation check for write operations
 function needsConfirmation(toolName: string, args: Record<string, unknown>): string | null {
   const writeTools = [
     "send_internal_message", "send_email", "send_whatsapp",
     "create_lead", "update_lead", "create_reminder", "complete_reminder",
-    "send_notification",
+    "send_notification", "create_file",
     "create_calendar_event", "delete_calendar_event", "update_apps_config",
   ];
   if (!writeTools.includes(toolName)) return null;
@@ -522,6 +540,8 @@ function needsConfirmation(toolName: string, args: Record<string, unknown>): str
       return `🗑️ **Eliminar evento** "${args.search}"\n\n¿Confirmas?`;
     case "update_apps_config":
       return `🎨 **Modificar aplicaciones**\n- **Acción:** ${args.action}\n${args.category_name ? `- **Categoría:** ${args.category_name}\n` : ''}${args.icon ? `- **Icono:** ${args.icon}\n` : ''}${args.color ? `- **Color:** ${args.color}\n` : ''}${args.icon_size ? `- **Tamaño:** ${args.icon_size}\n` : ''}\n¿Confirmas?`;
+    case "create_file":
+      return `📄 **Crear archivo**\n- **Nombre:** ${args.file_name}\n- **Contenido:** ${String(args.content).slice(0, 200)}${String(args.content).length > 200 ? '...' : ''}\n${args.folder_name ? `- **Carpeta:** ${args.folder_name}\n` : ''}\n¿Confirmas?`;
     default:
       return null;
   }
@@ -1280,6 +1300,78 @@ async function executeToolCall(
         });
       }
 
+      case "create_file": {
+        const fileName = String(args.file_name || "");
+        const content = String(args.content || "");
+        const folderName = args.folder_name ? String(args.folder_name) : null;
+        const description = args.description ? String(args.description) : null;
+        if (!fileName) return JSON.stringify({ error: "file_name es obligatorio" });
+        if (!content) return JSON.stringify({ error: "content es obligatorio" });
+
+        // Sanitize file name
+        const sanitizedName = fileName.replace(/[^a-zA-Z0-9._\-áéíóúñÁÉÍÓÚÑ ]/g, "_");
+        const filePath = folderName 
+          ? `${folderName.replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ ]/g, "_")}/${sanitizedName}`
+          : sanitizedName;
+
+        // Upload file content to storage
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const encoder = new TextEncoder();
+        const fileBytes = encoder.encode(content);
+        
+        // Determine content type
+        const ext = sanitizedName.split('.').pop()?.toLowerCase() || 'txt';
+        const mimeTypes: Record<string, string> = {
+          md: "text/markdown", txt: "text/plain", csv: "text/csv", json: "application/json",
+          html: "text/html", css: "text/css", js: "application/javascript", ts: "application/typescript",
+          xml: "application/xml", yaml: "text/yaml", yml: "text/yaml", sql: "text/sql", log: "text/plain",
+        };
+        const contentType = mimeTypes[ext] || "text/plain";
+
+        const { error: uploadErr } = await supabase.storage
+          .from("shared-files")
+          .upload(filePath, fileBytes, { contentType, upsert: true });
+        if (uploadErr) return JSON.stringify({ error: `Error al subir archivo: ${uploadErr.message}` });
+
+        // If folder specified, ensure folder exists
+        let folderId: string | null = null;
+        if (folderName) {
+          const { data: existingFolder } = await supabase
+            .from("shared_folders")
+            .select("id")
+            .eq("name", folderName)
+            .maybeSingle();
+          if (existingFolder) {
+            folderId = existingFolder.id;
+          } else {
+            const { data: newFolder, error: folderErr } = await supabase
+              .from("shared_folders")
+              .insert({ name: folderName, user_id: userId })
+              .select("id")
+              .single();
+            if (!folderErr && newFolder) folderId = (newFolder as any).id;
+          }
+        }
+
+        // Insert metadata record
+        const { error: dbErr } = await supabase.from("shared_files").insert({
+          file_name: sanitizedName,
+          file_path: filePath,
+          file_size: fileBytes.length,
+          file_type: contentType,
+          description: description,
+          folder_id: folderId,
+          user_id: userId,
+        });
+        if (dbErr) return JSON.stringify({ error: `Error al registrar archivo: ${dbErr.message}` });
+
+        return JSON.stringify({ 
+          success: true, 
+          message: `Archivo "${sanitizedName}" creado correctamente${folderName ? ` en carpeta "${folderName}"` : ''}`,
+          file_name: sanitizedName,
+        });
+      }
+
       case "send_notification": {
         const title = String(args.title || "");
         const message = String(args.message || "");
@@ -1412,6 +1504,7 @@ HERRAMIENTAS DISPONIBLES:
 - create_reminder (puede asignar a otros usuarios), complete_reminder
 - create_calendar_event (puede añadir participantes del equipo), delete_calendar_event
 - update_apps_config (personalizar el hub de aplicaciones: cambiar iconos, colores, categorías, tamaño)
+- create_file (crear archivos .md, .txt, .csv, .json, etc. CON CONTENIDO dentro en archivos compartidos)
 
 🧠 MEMORIA (ejecución directa, NO requieren confirmación):
 - save_ai_memory: Guarda automáticamente información relevante tras conversaciones (preferencias del cliente, acuerdos, datos clave). Categorías: general, preference, interaction, note.
