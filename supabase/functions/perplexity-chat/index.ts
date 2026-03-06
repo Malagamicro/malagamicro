@@ -21,6 +21,41 @@ interface ToolCall {
   };
 }
 
+// Helper: upload base64 image to Supabase storage and return public URL
+async function uploadBase64ToStorage(supabase: any, dataUrl: string, supabaseUrl: string): Promise<string | null> {
+  try {
+    // Parse data URL: data:image/png;base64,iVBOR...
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return null;
+    
+    const mimeType = match[1];
+    const base64Data = match[2];
+    const ext = mimeType.split('/')[1] || 'png';
+    const fileName = `ai-gen/${crypto.randomUUID()}.${ext}`;
+    
+    // Decode base64 to Uint8Array
+    const binaryStr = atob(base64Data);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    
+    const { error } = await supabase.storage
+      .from('chat-files')
+      .upload(fileName, bytes, { contentType: mimeType, upsert: false });
+    
+    if (error) {
+      console.error('Storage upload error:', error);
+      return null;
+    }
+    
+    return `${supabaseUrl}/storage/v1/object/public/chat-files/${fileName}`;
+  } catch (e) {
+    console.error('Base64 upload error:', e);
+    return null;
+  }
+}
+
 const STEL_API_BASE = 'https://app.stelorder.com/app';
 
 const tools = [
@@ -1724,28 +1759,22 @@ serve(async (req) => {
         : [];
 
       if (agentType === 'image') {
-        // Image generation via Lovable AI Gateway (gemini-2.5-flash-image)
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        if (!LOVABLE_API_KEY) {
-          return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured for image generation" }), {
-            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        const imageModel = "google/gemini-2.5-flash-image";
-        const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        // Image generation via OpenRouter
+        const imageResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
             "Content-Type": "application/json",
+            "HTTP-Referer": supabaseUrl,
+            "X-Title": "Malaga Micro CRM - Image Subagent",
           },
           body: JSON.stringify({
-            model: imageModel,
+            model: agentModel,
             messages: [
               { role: "system", content: agentPrompt || "You are an AI image generation assistant. Generate images based on user descriptions." },
               { role: "user", content: userMessage },
             ],
-            modalities: ["image", "text"],
+            stream: false,
           }),
         });
 
@@ -1758,10 +1787,68 @@ serve(async (req) => {
         }
 
         const imageData = await imageResponse.json();
+        const messageData = imageData.choices?.[0]?.message;
+        
+        // Extract base64 images and upload to storage
+        const uploadedUrls: string[] = [];
+        
+        // Check for images in content array (multimodal response)
+        if (Array.isArray(messageData?.content)) {
+          for (const part of messageData.content) {
+            if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
+              const url = await uploadBase64ToStorage(supabase, part.image_url.url, supabaseUrl);
+              if (url) uploadedUrls.push(url);
+            }
+          }
+        }
+        
+        // Check for images array (Lovable AI / some providers)
+        if (Array.isArray(messageData?.images)) {
+          for (const img of messageData.images) {
+            const imgUrl = img.image_url?.url || img.url || (typeof img === 'string' ? img : null);
+            if (imgUrl?.startsWith('data:')) {
+              const url = await uploadBase64ToStorage(supabase, imgUrl, supabaseUrl);
+              if (url) uploadedUrls.push(url);
+            } else if (imgUrl) {
+              uploadedUrls.push(imgUrl);
+            }
+          }
+        }
+        
+        // Check for base64 in text content (markdown images)
+        let textContent = '';
+        if (typeof messageData?.content === 'string') {
+          textContent = messageData.content;
+        } else if (Array.isArray(messageData?.content)) {
+          textContent = messageData.content.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('\n');
+        }
+
+        // Extract markdown image URLs
+        if (textContent) {
+          const mdImages = textContent.match(/!\[.*?\]\(([^\)]+)\)/g);
+          if (mdImages) {
+            for (const mdImg of mdImages) {
+              const urlMatch = mdImg.match(/\(([^\)]+)\)/);
+              if (urlMatch?.[1] && !urlMatch[1].startsWith('data:')) {
+                uploadedUrls.push(urlMatch[1]);
+              }
+            }
+          }
+        }
+
+        // Build clean response with public URLs instead of base64
         return new Response(JSON.stringify({ 
           subagent: agentName, 
           type: 'image',
-          response: imageData 
+          response: {
+            choices: [{
+              message: {
+                role: 'assistant',
+                content: textContent || 'Imagen generada',
+                images: uploadedUrls.map(u => ({ image_url: { url: u } })),
+              }
+            }]
+          }
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
