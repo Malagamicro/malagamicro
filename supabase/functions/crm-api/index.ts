@@ -126,8 +126,8 @@ serve(async (req) => {
       });
     }
 
-    // Validate idOrAction as UUID if present
-    if (idOrAction && !isValidUuid(idOrAction)) {
+    // Validate idOrAction as UUID if present, or allow action-like strings for some resources
+    if (idOrAction && !isValidUuid(idOrAction) && !/^[a-z0-9-]+$/.test(idOrAction)) {
       return new Response(JSON.stringify({ error: 'Invalid resource ID format' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
