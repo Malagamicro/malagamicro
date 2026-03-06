@@ -1866,7 +1866,10 @@ serve(async (req) => {
 
     // Build subagent info for system prompt
     const subagentList = Array.isArray(clientSubagents) && clientSubagents.length > 0
-      ? clientSubagents.map((s: any) => `- **${s.name}** (${s.agent_type}): ${s.description || s.role_prompt?.substring(0, 80) || 'Sin descripción'}. Modelo: ${s.model}`).join('\n')
+      ? clientSubagents.map((s: any) => {
+          const toolsInfo = Array.isArray(s.tools) && s.tools.length > 0 ? ` Herramientas: ${s.tools.join(', ')}` : ' Sin herramientas propias';
+          return `- **${s.name}** (${s.agent_type}): ${s.description || s.role_prompt?.substring(0, 80) || 'Sin descripción'}. Modelo: ${s.model}.${toolsInfo}`;
+        }).join('\n')
       : '';
 
     const delegationInstructions = subagentList 
