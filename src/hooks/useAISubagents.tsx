@@ -9,6 +9,7 @@ export interface AISubagentTeam {
   name: string;
   description: string | null;
   is_active: boolean;
+  orchestrator_model: string;
   created_at: string;
   updated_at: string;
 }

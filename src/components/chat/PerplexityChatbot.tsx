@@ -57,15 +57,7 @@ const MODELS = [
   { id: 'google/gemini-2.5-pro', name: 'Gemini Pro', icon: Brain, color: 'text-indigo-500' },
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet', icon: Brain, color: 'text-orange-500' },
   { id: 'openai/gpt-5.2', name: 'GPT-5.2', icon: Sparkles, color: 'text-cyan-500' },
-];
-
-const QUICK_ACTIONS = [
-  { icon: BarChart3, label: 'Estadísticas', prompt: '¿Cuáles son mis estadísticas de leads?' },
-  { icon: Search, label: 'Buscar leads', prompt: 'Busca mis leads más recientes' },
-  { icon: Plus, label: 'Crear lead', prompt: 'Quiero crear un nuevo lead' },
-  { icon: Bell, label: 'Recordatorios', prompt: '¿Qué recordatorios tengo pendientes?' },
-  { icon: MessageSquare, label: 'WhatsApp', prompt: 'Muéstrame mis chats de WhatsApp recientes' },
-  { icon: FileIcon, label: 'Presupuestos STEL', prompt: 'Lista mis presupuestos de STEL Order' },
+  { id: 'custom', name: 'Personalizado', icon: Pencil, color: 'text-muted-foreground' },
 ];
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/perplexity-chat`;
