@@ -1,0 +1,1 @@
+ALTER TABLE public.ai_subagent_teams ADD COLUMN orchestrator_model text NOT NULL DEFAULT 'openai/gpt-5-nano';
