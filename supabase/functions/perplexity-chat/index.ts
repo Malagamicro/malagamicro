@@ -783,6 +783,17 @@ async function callStelApi(endpoint: string, method = 'GET', payload?: any): Pro
   return { ok: res.ok, status: res.status, data };
 }
 
+function getMimeType(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  const mimeMap: Record<string, string> = {
+    'csv': 'text/csv', 'txt': 'text/plain', 'md': 'text/markdown',
+    'json': 'application/json', 'html': 'text/html', 'xml': 'application/xml',
+    'pdf': 'application/pdf', 'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
+  return mimeMap[ext] || 'application/octet-stream';
+}
+
 async function executeToolCall(
   supabase: any,
   userId: string,
