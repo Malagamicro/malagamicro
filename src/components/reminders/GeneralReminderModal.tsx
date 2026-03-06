@@ -54,7 +54,7 @@ interface UserProfile {
   full_name: string | null;
 }
 
-export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModalProps) {
+export function GeneralReminderModal({ open, onOpenChange, editReminder }: GeneralReminderModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState<Date>();
@@ -67,7 +67,26 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [showUserPicker, setShowUserPicker] = useState(false);
 
-  const { addReminder, isAddingReminder } = useGeneralReminders();
+  const { addReminder, isAddingReminder, updateReminder, isUpdatingReminder } = useGeneralReminders();
+
+  const isEditing = !!editReminder;
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editReminder && open) {
+      setTitle(editReminder.title);
+      setDescription(editReminder.description || '');
+      const rDate = new Date(editReminder.reminder_date);
+      setDate(rDate);
+      setTime(`${rDate.getHours().toString().padStart(2, '0')}:${rDate.getMinutes().toString().padStart(2, '0')}`);
+      setPriority(editReminder.priority);
+      setCategory(editReminder.category || 'general');
+      setRecurrence(editReminder.recurrence_type || 'once');
+      setNote(editReminder.note || '');
+    } else if (!editReminder && open) {
+      resetForm();
+    }
+  }, [editReminder, open]);
 
   // Fetch all users for the picker
   useEffect(() => {
@@ -87,19 +106,35 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
     const reminderDate = new Date(date);
     reminderDate.setHours(hours, minutes, 0, 0);
 
-    addReminder(
-      {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        reminderDate,
-        priority,
-        category,
-        recurrence_type: recurrence,
-        note: note.trim() || undefined,
-        target_user_ids: selectedUserIds.length > 0 ? selectedUserIds : undefined,
-      },
-      { onSuccess: () => { onOpenChange(false); resetForm(); } }
-    );
+    if (isEditing) {
+      updateReminder(
+        {
+          id: editReminder!.id,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          reminderDate,
+          priority,
+          category,
+          recurrence_type: recurrence,
+          note: note.trim() || undefined,
+        },
+        { onSuccess: () => { onOpenChange(false); resetForm(); } }
+      );
+    } else {
+      addReminder(
+        {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          reminderDate,
+          priority,
+          category,
+          recurrence_type: recurrence,
+          note: note.trim() || undefined,
+          target_user_ids: selectedUserIds.length > 0 ? selectedUserIds : undefined,
+        },
+        { onSuccess: () => { onOpenChange(false); resetForm(); } }
+      );
+    }
   };
 
   const resetForm = () => {
