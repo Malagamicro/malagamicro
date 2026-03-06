@@ -46,6 +46,11 @@ const queryClient = new QueryClient({
   },
 });
 
+function NotificationPopupLayer() {
+  const { popupQueue, dismissPopup } = useCustomNotifications();
+  return <NotificationPopupStack popups={popupQueue} onDismiss={dismissPopup} />;
+}
+
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
     <QueryClientProvider client={queryClient}>
@@ -126,6 +131,7 @@ const App = () => (
             <MascotChatWidget />
             <GlobalCallListener />
             <EventReminderMonitor />
+            <NotificationPopupLayer />
           </BrowserRouter>
           </TooltipProvider>
           </ActiveCallsProvider>
