@@ -481,6 +481,24 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "create_file",
+      description: "Crear un archivo en el sistema de archivos compartidos con contenido. Soporta cualquier formato de texto: .md, .txt, .csv, .json, .html, .css, .js, .ts, .xml, .yaml, .sql, .log, etc. REQUIERE CONFIRMACIÓN.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_name: { type: "string", description: "Nombre del archivo con extensión (ej: 'notas.md', 'datos.csv', 'config.json')" },
+          content: { type: "string", description: "Contenido del archivo. Para Markdown usa sintaxis MD, para CSV usa comas, etc." },
+          folder_name: { type: "string", description: "Nombre de la carpeta donde guardarlo (opcional, si no existe se crea)" },
+          description: { type: "string", description: "Descripción del archivo (opcional)" },
+          confirmed: { type: "boolean", description: "Si el usuario ya confirmó la acción" },
+        },
+        required: ["file_name", "content"],
+      },
+    },
+  },
 ];
 // Confirmation check for write operations
 function needsConfirmation(toolName: string, args: Record<string, unknown>): string | null {
