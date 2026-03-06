@@ -661,6 +661,10 @@ export function PerplexityChatbot() {
               </SelectContent>
             </Select>
             
+            <Button variant="ghost" size="icon" onClick={() => setShowSubagentPanel(!showSubagentPanel)} className="h-9 w-9" title="Subagentes IA">
+              <Settings2 className={cn("h-4 w-4", showSubagentPanel && "text-primary")} />
+            </Button>
+
             {messages.length > 0 && (
               <Button variant="ghost" size="icon" onClick={handleNewChat} className="h-9 w-9">
                 <RotateCcw className="h-4 w-4" />
