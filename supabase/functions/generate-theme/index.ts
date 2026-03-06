@@ -73,23 +73,13 @@ Reglas:
 - sidebarConfig.sidebarPosition: left, right, top, bottom
 - NO incluyas texto explicativo, SOLO el JSON`;
 
-    let apiUrl: string;
-    let apiKey: string;
-    let model: string;
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-
-    if (LOVABLE_API_KEY) {
-      apiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
-      apiKey = LOVABLE_API_KEY;
-      model = "google/gemini-2.5-flash";
-    } else {
-      apiUrl = "https://openrouter.ai/api/v1/chat/completions";
-      apiKey = OPENROUTER_API_KEY!;
-      model = "google/gemini-2.5-flash";
-      headers["HTTP-Referer"] = "https://malagamicro.lovable.app";
-      headers["X-Title"] = "MalagaMicro CRM";
-    }
-    headers["Authorization"] = `Bearer ${apiKey}`;
+    const apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+      "HTTP-Referer": "https://malagamicro.lovable.app",
+      "X-Title": "MalagaMicro CRM",
+    };
 
     const response = await fetch(apiUrl, {
       method: "POST",
