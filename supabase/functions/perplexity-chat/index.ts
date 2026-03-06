@@ -1970,8 +1970,12 @@ serve(async (req) => {
 Tienes acceso a subagentes especializados. Cuando una tarea se beneficie de un agente especializado, usa la herramienta delegate_to_subagent.
 ${subagentList}
 
-IMPORTANTE: Cuando delegues a un subagente, indica claramente al usuario que estás delegando la tarea. Ejemplo: "🔄 Delegando a **Artista** para generar la imagen..."
-Solo delega cuando la tarea encaje claramente con la especialidad del subagente.`
+**REGLAS DE DELEGACIÓN CRÍTICAS:**
+1. Cuando delegues, NO escribas un mensaje largo explicando qué vas a hacer. Simplemente llama a delegate_to_subagent INMEDIATAMENTE.
+2. NO envíes texto de confirmación antes de delegar (nada de "voy a generar...", "delegando a...", "te la mostraré...").
+3. El subagente se encarga de todo. Tu trabajo es SOLO llamar a delegate_to_subagent con los parámetros correctos.
+4. Después de delegar, NO añadas texto adicional. El resultado del subagente se mostrará directamente.
+5. Para imágenes: pasa la descripción detallada en task_description. El subagente generará la imagen directamente.`
       : '';
 
     const systemPrompt = `Eres un asistente de CRM inteligente con acceso COMPLETO a toda la aplicación. 
@@ -2118,6 +2122,28 @@ Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`
 
     // Execute tool calls if any
     if (toolCalls.length > 0 && userId) {
+      // Check if any tool call is a delegation — handle it specially
+      const delegationCall = toolCalls.find(tc => tc.function.name === 'delegate_to_subagent');
+      if (delegationCall) {
+        // Return a special SSE stream that tells the client to delegate
+        let args: any = {};
+        try { args = JSON.parse(delegationCall.function.arguments); } catch {}
+        
+        // Send a minimal stream with just the delegation info
+        const sseData = `data: ${JSON.stringify({
+          choices: [{
+            delta: {
+              content: null,
+              tool_calls: [{ function: { name: 'delegate_to_subagent', arguments: JSON.stringify(args) } }]
+            }
+          }]
+        })}\n\ndata: [DONE]\n\n`;
+        
+        return new Response(sseData, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+        });
+      }
+
       const toolResults: ChatMessage[] = [];
 
       for (const tc of toolCalls) {

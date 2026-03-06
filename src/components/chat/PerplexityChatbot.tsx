@@ -241,52 +241,59 @@ export function PerplexityChatbot() {
       }
     }
 
-    // Save assistant message to DB
-    if (assistantContent) {
-      await addMessage.mutateAsync({ sessionId, role: 'assistant', content: assistantContent });
-    }
-
-    // If delegation was detected, show notice and execute subagent
+    // If delegation was detected, replace orchestrator text with delegation notice and execute subagent
     if (delegationDetected) {
       const agent = activeSubagents.find(s => s.name.toLowerCase() === delegationDetected!.agent_name.toLowerCase());
       if (agent) {
-        // Insert delegation notice message
-        const noticeId = crypto.randomUUID();
-        setMessages(prev => [...prev, {
-          id: noticeId, role: 'assistant', 
-          content: `🔄 Delegando tarea a **${agent.name}** ${agent.avatar_emoji || '🤖'}`,
-          timestamp: new Date(),
-          isDelegationNotice: true,
-          subagent: agent.name,
-          subagentEmoji: agent.avatar_emoji,
-          subagentColor: agent.avatar_color,
-        }]);
+        // Remove the orchestrator's text message and replace with a clean delegation notice
+        setMessages(prev => prev.map(m => 
+          m.id === assistantId ? {
+            ...m,
+            content: `🔄 Delegando tarea a **${agent.name}**...`,
+            isDelegationNotice: true,
+            subagent: agent.name,
+            subagentEmoji: agent.avatar_emoji,
+            subagentColor: agent.avatar_color,
+          } : m
+        ));
+        // Save minimal delegation message to DB
+        if (assistantContent) {
+          await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[Delegado a ${agent.name}]` });
+        }
         await executeSubagentCall(agent, delegationDetected.task, sessionId, userMessages);
+        return; // Don't continue — subagent handles the rest
       }
     }
 
-    // Check if content mentions delegation pattern
+    // Check if content mentions delegation pattern (fallback)
     if (!delegationDetected && (assistantContent.includes('🔄 Delegando') || assistantContent.includes('delegation_requested'))) {
       const match = assistantContent.match(/Delegando a \*\*(.+?)\*\*/);
       if (match) {
         const agentName = match[1];
         const agent = activeSubagents.find(s => s.name.toLowerCase() === agentName.toLowerCase());
         if (agent) {
-          const noticeId = crypto.randomUUID();
-          setMessages(prev => [...prev, {
-            id: noticeId, role: 'assistant',
-            content: `🔄 Delegando tarea a **${agent.name}** ${agent.avatar_emoji || '🤖'}`,
-            timestamp: new Date(),
-            isDelegationNotice: true,
-            subagent: agent.name,
-            subagentEmoji: agent.avatar_emoji,
-            subagentColor: agent.avatar_color,
-          }]);
+          // Replace orchestrator text with delegation notice
+          setMessages(prev => prev.map(m => 
+            m.id === assistantId ? {
+              ...m,
+              content: `🔄 Delegando tarea a **${agent.name}**...`,
+              isDelegationNotice: true,
+              subagent: agent.name,
+              subagentEmoji: agent.avatar_emoji,
+              subagentColor: agent.avatar_color,
+            } : m
+          ));
           const lastUserMsg = userMessages[userMessages.length - 1];
           const task = typeof lastUserMsg.content === 'string' ? lastUserMsg.content : '';
           await executeSubagentCall(agent, task, sessionId, userMessages);
+          return;
         }
       }
+    }
+
+    // Save assistant message to DB (only if no delegation)
+    if (assistantContent) {
+      await addMessage.mutateAsync({ sessionId, role: 'assistant', content: assistantContent });
     }
 
     if (assistantContent.toLowerCase().includes('creado') || assistantContent.toLowerCase().includes('actualizado')) {
