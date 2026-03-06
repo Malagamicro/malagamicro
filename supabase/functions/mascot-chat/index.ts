@@ -505,7 +505,7 @@ function needsConfirmation(toolName: string, args: Record<string, unknown>): str
   const writeTools = [
     "send_internal_message", "send_email", "send_whatsapp",
     "create_lead", "update_lead", "create_reminder", "complete_reminder",
-    "send_notification",
+    "send_notification", "create_file",
     "create_calendar_event", "delete_calendar_event", "update_apps_config",
   ];
   if (!writeTools.includes(toolName)) return null;
