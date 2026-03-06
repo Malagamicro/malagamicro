@@ -85,7 +85,7 @@ Reglas:
       method: "POST",
       headers,
       body: JSON.stringify({
-        model,
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Tema actual: ${JSON.stringify(currentTheme || {})}. Petición del usuario: ${prompt}` },
