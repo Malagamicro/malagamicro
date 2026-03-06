@@ -104,22 +104,46 @@ export default function FileManager() {
     toast.success(`Descargado: ${file.name}`);
   };
 
-  const handleDelete = (fileId: string) => {
+  const requestDeleteFile = (fileId: string) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file) return;
+    const hasContent = !!(file.content && file.content.trim().length > 0);
+    if (hasContent) {
+      setDeleteConfirm({ type: "file", id: fileId, name: file.name, hasContent: true });
+    } else {
+      confirmDeleteFile(fileId);
+    }
+  };
+
+  const confirmDeleteFile = (fileId: string) => {
     deleteFile(fileId);
     setSelectedFiles((prev) => {
       const next = new Set(prev);
       next.delete(fileId);
       return next;
     });
+    setDeleteConfirm(null);
     toast.success("Archivo eliminado");
   };
 
-  const handleDeleteFolder = (folderId: string) => {
+  const requestDeleteFolder = (folderId: string) => {
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return;
+    const folderFiles = files.filter(f => f.folder === folder.name);
+    if (folderFiles.length > 0) {
+      setDeleteConfirm({ type: "folder", id: folderId, name: folder.name, hasContent: true });
+    } else {
+      confirmDeleteFolder(folderId);
+    }
+  };
+
+  const confirmDeleteFolder = (folderId: string) => {
     const folder = folders.find(f => f.id === folderId);
     deleteFolder(folderId, true);
     if (selectedFolder === folder?.name) {
       setSelectedFolder(null);
     }
+    setDeleteConfirm(null);
     toast.success("Carpeta eliminada");
   };
 
