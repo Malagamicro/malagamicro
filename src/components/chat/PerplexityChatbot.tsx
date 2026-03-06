@@ -687,7 +687,7 @@ export function PerplexityChatbot() {
       <ResizableHandle withHandle />
 
       {/* Main Chat */}
-      <ResizablePanel defaultSize={64} minSize={30}>
+      <ResizablePanel defaultSize={82} minSize={30}>
         <div className="flex-1 flex flex-col w-full h-full">
           {renderHeader()}
           {renderMessages()}
