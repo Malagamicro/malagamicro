@@ -1715,8 +1715,13 @@ serve(async (req) => {
 
     // --- Subagent delegation mode ---
     if (delegateToSubagent) {
-      const { agentName, agentModel, agentPrompt, agentType, userMessage } = delegateToSubagent;
-      console.log(`[perplexity-chat] Delegating to subagent: ${agentName} (${agentModel})`);
+      const { agentName, agentModel, agentPrompt, agentType, agentTools, userMessage } = delegateToSubagent;
+      console.log(`[perplexity-chat] Delegating to subagent: ${agentName} (${agentModel}), tools: ${JSON.stringify(agentTools || [])}`);
+
+      // Filter tools to only those assigned to this subagent
+      const allowedTools = Array.isArray(agentTools) && agentTools.length > 0
+        ? tools.filter(t => agentTools.includes(t.function.name))
+        : [];
 
       if (agentType === 'image') {
         // Image generation via OpenRouter (models that support image generation)
@@ -1756,7 +1761,22 @@ serve(async (req) => {
         });
       }
 
-      // Text/Audio subagent - stream
+      // Text/Audio subagent - if it has tools, do a non-streaming call first to check for tool calls
+      const subRequestBody: any = {
+        model: agentModel,
+        messages: [
+          { role: "system", content: agentPrompt + (allowedTools.length > 0 ? '\n\nTienes acceso a herramientas del CRM. Úsalas cuando sea necesario para obtener datos reales.' : '') },
+          ...messages.filter((m: any) => m.role !== 'system'),
+          { role: "user", content: userMessage },
+        ],
+        stream: allowedTools.length === 0,
+      };
+
+      if (allowedTools.length > 0) {
+        subRequestBody.tools = allowedTools;
+        subRequestBody.tool_choice = "auto";
+      }
+
       const subResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -1765,15 +1785,7 @@ serve(async (req) => {
           "HTTP-Referer": supabaseUrl,
           "X-Title": "Malaga Micro CRM - Subagent",
         },
-        body: JSON.stringify({
-          model: agentModel,
-          messages: [
-            { role: "system", content: agentPrompt },
-            ...messages.filter((m: any) => m.role !== 'system'),
-            { role: "user", content: userMessage },
-          ],
-          stream: true,
-        }),
+        body: JSON.stringify(subRequestBody),
       });
 
       if (!subResponse.ok) {
@@ -1783,6 +1795,67 @@ serve(async (req) => {
         });
       }
 
+      // If subagent has tools, handle tool calls non-streaming then re-stream
+      if (allowedTools.length > 0) {
+        const subData = await subResponse.json();
+        const choice = subData.choices?.[0];
+        const subToolCalls = choice?.message?.tool_calls;
+
+        if (subToolCalls && subToolCalls.length > 0 && userId) {
+          // Execute tool calls
+          const subToolResults: ChatMessage[] = [];
+          for (const tc of subToolCalls) {
+            if (!tc.function?.name) continue;
+            let args = {};
+            try { args = JSON.parse(tc.function.arguments); } catch {}
+            const result = await executeToolCall(supabase, userId, tc.function.name, args);
+            subToolResults.push({ role: "tool", content: result, tool_call_id: tc.id });
+          }
+
+          // Follow-up with tool results
+          const followUp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": supabaseUrl,
+              "X-Title": "Malaga Micro CRM - Subagent",
+            },
+            body: JSON.stringify({
+              model: agentModel,
+              messages: [
+                ...subRequestBody.messages,
+                { role: "assistant", content: choice.message.content || null, tool_calls: subToolCalls },
+                ...subToolResults,
+              ],
+              stream: true,
+            }),
+          });
+
+          if (!followUp.ok) throw new Error("Subagent follow-up failed");
+          return new Response(followUp.body, {
+            headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Subagent": agentName },
+          });
+        }
+
+        // No tool calls - re-stream the response
+        const reStream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": supabaseUrl,
+            "X-Title": "Malaga Micro CRM - Subagent",
+          },
+          body: JSON.stringify({ ...subRequestBody, stream: true, tools: undefined, tool_choice: undefined }),
+        });
+
+        return new Response(reStream.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Subagent": agentName },
+        });
+      }
+
+      // No tools - just stream directly
       return new Response(subResponse.body, {
         headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Subagent": agentName },
       });
