@@ -457,9 +457,11 @@ export function PerplexityChatbot() {
       }
     } catch (error) {
       console.error('Subagent error:', error);
+      const errMsg = `❌ Error del subagente ${agent.name}: ${error instanceof Error ? error.message : 'Error desconocido'}`;
       setMessages(prev => prev.map(m =>
-        m.id === subagentMsgId ? { ...m, content: `❌ Error del subagente ${agent.name}: ${error instanceof Error ? error.message : 'Error desconocido'}` } : m
+        m.id === subagentMsgId ? { ...m, content: errMsg } : m
       ));
+      return errMsg;
     } finally {
       setActiveSubagent(null);
     }
