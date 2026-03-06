@@ -2228,6 +2228,47 @@ Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`
       });
     }
 
+    // --- SERVER-SIDE FORCED DELEGATION ---
+    // If the model responded with text instead of delegating for image/audio requests,
+    // detect and force delegation automatically
+    const lastUserMsg = messages[messages.length - 1]?.content?.toLowerCase() || '';
+    const imageKeywords = ['imagen', 'foto', 'dibujo', 'ilustracion', 'ilustración', 'genera una imagen', 'crea una imagen', 'dibuja', 'generar imagen', 'crear imagen', 'diseña', 'image', 'picture', 'draw', 'generate image', 'crearme una imagen', 'créame', 'creame'];
+    const audioKeywords = ['audio', 'voz', 'narración', 'narracion', 'texto a voz', 'tts', 'lee en voz alta', 'genera audio'];
+    
+    const isImageRequest = imageKeywords.some(kw => lastUserMsg.includes(kw));
+    const isAudioRequest = audioKeywords.some(kw => lastUserMsg.includes(kw));
+    
+    const refusalPatterns = ['no puedo generar', 'no tengo habilitad', 'no tengo la herramienta', 'no puedo crear imagen', 'no tengo capacidad', 'cannot generate', 'i cannot create', 'no tengo aquí', 'prompt listo', 'prompt perfecto para'];
+    const didRefuse = refusalPatterns.some(p => fullContent.toLowerCase().includes(p));
+    
+    if ((isImageRequest || isAudioRequest) && (toolCalls.length === 0 || didRefuse)) {
+      const targetSubagent = isImageRequest ? imageSubagent : audioSubagent;
+      
+      if (targetSubagent) {
+        console.log(`[perplexity-chat] FORCED DELEGATION: Model refused/missed delegation for ${isImageRequest ? 'image' : 'audio'} request. Forcing to ${targetSubagent.name}`);
+        
+        const forcedDelegation = {
+          agent_name: targetSubagent.name,
+          task_description: typeof messages[messages.length - 1]?.content === 'string' ? messages[messages.length - 1].content : lastUserMsg,
+        };
+        
+        const sseData = `data: ${JSON.stringify({
+          choices: [{
+            delta: {
+              content: null,
+              tool_calls: [{ 
+                function: { name: 'delegate_to_subagent', arguments: JSON.stringify(forcedDelegation) } 
+              }]
+            }
+          }]
+        })}\n\ndata: [DONE]\n\n`;
+        
+        return new Response(sseData, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+        });
+      }
+    }
+
     // No tool calls - recreate stream
     const newResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
