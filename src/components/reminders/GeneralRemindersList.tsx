@@ -165,6 +165,10 @@ function ReminderCard({ reminder, onToggle, onDelete, onView, onSnooze, onEdit }
           {reminder.is_completed && <Check className="h-3 w-3" />}
         </button>
         {!reminder.is_completed && <SnoozeButton reminderId={reminder.id} onSnooze={onSnooze} />}
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}>
           <Trash2 className="h-3.5 w-3.5" />
