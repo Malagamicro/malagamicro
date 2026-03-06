@@ -590,7 +590,7 @@ export function PerplexityChatbot() {
             <SubagentManager />
           </ScrollArea>
         </div>
-      )
+      )}
 
       {showSidebar && (
         <div className="absolute inset-0 bg-background/40 backdrop-blur-sm z-10 md:hidden" onClick={() => setShowSidebar(false)} />
