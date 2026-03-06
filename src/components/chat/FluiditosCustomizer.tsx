@@ -117,7 +117,7 @@ export function FluiditosCustomizer({ config, onChange, onClose }: Props) {
   );
 
   return (
-    <div className="absolute inset-0 z-10 bg-background flex flex-col">
+    <div className="flex-1 flex flex-col min-h-0 bg-background">
       <div className="flex items-center justify-between p-3 border-b">
         <h3 className="font-semibold text-sm">Personalizar Fluiditos</h3>
         <div className="flex items-center gap-1">
