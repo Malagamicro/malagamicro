@@ -1906,7 +1906,7 @@ serve(async (req) => {
           ...messages.filter((m: any) => m.role !== 'system'),
           { role: "user", content: userMessage },
         ],
-        stream: allowedTools.length === 0,
+        stream: isAudioAgent ? false : (allowedTools.length === 0),
       };
 
       if (allowedTools.length > 0) {
