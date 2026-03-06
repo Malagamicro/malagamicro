@@ -673,7 +673,7 @@ const tools = [
         properties: {
           agent_name: { type: "string", description: "Nombre exacto del subagente al que delegar" },
           task_description: { type: "string", description: "Descripción clara de la tarea a realizar por el subagente" },
-          depends_on: { type: "string", description: "Nombre del subagente cuyo resultado se necesita antes de ejecutar este. Si se indica, el output del agente previo se añade al task_description automáticamente." },
+          depends_on: { type: "string", description: "Nombre del subagente cuyo resultado se necesita antes de ejecutar este." },
         },
         required: ["agent_name", "task_description"],
       },
@@ -683,7 +683,7 @@ const tools = [
     type: "function",
     function: {
       name: "send_notification",
-      description: "Enviar una notificación personalizada (popup o silenciosa) a un usuario del CRM. Útil para alertas, avisos o información importante.",
+      description: "Enviar una notificación personalizada (popup o silenciosa) a un usuario del CRM.",
       parameters: {
         type: "object",
         properties: {
@@ -694,6 +694,41 @@ const tools = [
           target_user: { type: "string", description: "Nombre del usuario destinatario (si no se especifica, se envía al actual)" },
         },
         required: ["title", "message"],
+      },
+    },
+  },
+  // File creation tool
+  {
+    type: "function",
+    function: {
+      name: "create_file",
+      description: "Crear un archivo (CSV, TXT, MD, JSON, HTML) y subirlo a Archivos Compartidos del CRM. Para PDF/Excel usa formato especial. Ideal para generar reportes, listas, documentos, etc.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_name: { type: "string", description: "Nombre del archivo con extensión (ej: reporte.csv, notas.md, datos.txt, informe.json)" },
+          content: { type: "string", description: "Contenido del archivo. Para CSV usa delimitador coma. Para MD usa Markdown. Para JSON usa JSON válido." },
+          folder_name: { type: "string", description: "Nombre de la carpeta en Archivos Compartidos donde subir (opcional, si no existe se crea)" },
+          description: { type: "string", description: "Descripción del archivo (opcional)" },
+        },
+        required: ["file_name", "content"],
+      },
+    },
+  },
+  // File deletion tool  
+  {
+    type: "function",
+    function: {
+      name: "delete_shared_file",
+      description: "Eliminar un archivo de Archivos Compartidos del CRM. Busca por nombre o ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_name: { type: "string", description: "Nombre del archivo a eliminar (búsqueda parcial)" },
+          file_id: { type: "string", description: "ID exacto del archivo a eliminar" },
+          confirmed: { type: "boolean", description: "Si el usuario ya confirmó la eliminación" },
+        },
+        required: [],
       },
     },
   },
