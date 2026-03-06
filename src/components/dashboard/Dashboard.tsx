@@ -51,7 +51,7 @@ const WIDGET_PREVIEWS: Record<string, { description: string; emoji: string }> = 
   'tickets': { description: 'Últimos tickets de soporte recibidos', emoji: '🎫' },
   'online-users': { description: 'Miembros del equipo conectados', emoji: '🟢' },
   'calendar-mini': { description: 'Eventos de hoy y próximos días', emoji: '📅' },
-  'micro-chat': { description: 'Chat rápido con el asistente Micro', emoji: '🤖' },
+  'micro-chat': { description: 'Chat rápido con Fluiditos', emoji: '🤖' },
   'inbox-preview': { description: 'Acceso rápido a tu bandeja de email', emoji: '📬' },
   'whatsapp-preview': { description: 'Vista rápida de conversaciones WA', emoji: '💬' },
   'ai-chat-quick': { description: 'Consultas rápidas al asistente IA', emoji: '🧠' },
