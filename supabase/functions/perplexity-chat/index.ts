@@ -1760,11 +1760,12 @@ serve(async (req) => {
         : [];
 
       if (agentType === 'image') {
-        // Image generation via OpenRouter
-        const imageModel = agentModel || 'google/gemini-2.0-flash-exp:free';
+        // Image generation via OpenRouter with modalities parameter
+        const imageModel = agentModel || 'google/gemini-2.5-flash-image-preview';
         
         const imageRequestBody: any = {
           model: imageModel,
+          modalities: ["text", "image"],
           messages: [
             { role: "system", content: agentPrompt || "You are an AI image generation assistant. Generate images based on user descriptions. Always generate the image directly." },
             { role: "user", content: userMessage },
@@ -1794,22 +1795,17 @@ serve(async (req) => {
         }
 
         const imageData = await imageResponse.json();
+        console.log('[perplexity-chat] Image response keys:', JSON.stringify(Object.keys(imageData)));
         const messageData = imageData.choices?.[0]?.message;
+        console.log('[perplexity-chat] Message keys:', messageData ? JSON.stringify(Object.keys(messageData)) : 'null');
+        if (messageData?.images) {
+          console.log('[perplexity-chat] Images array length:', messageData.images.length);
+        }
         
         // Extract base64 images and upload to storage
         const uploadedUrls: string[] = [];
         
-        // Check for images in content array (multimodal response)
-        if (Array.isArray(messageData?.content)) {
-          for (const part of messageData.content) {
-            if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
-              const url = await uploadBase64ToStorage(supabase, part.image_url.url, supabaseUrl);
-              if (url) uploadedUrls.push(url);
-            }
-          }
-        }
-        
-        // Check for images array (Lovable AI / some providers)
+        // Check for images in message.images array (OpenRouter standard for image gen models)
         if (Array.isArray(messageData?.images)) {
           for (const img of messageData.images) {
             const imgUrl = img.image_url?.url || img.url || (typeof img === 'string' ? img : null);
@@ -1818,6 +1814,16 @@ serve(async (req) => {
               if (url) uploadedUrls.push(url);
             } else if (imgUrl) {
               uploadedUrls.push(imgUrl);
+            }
+          }
+        }
+        
+        // Check for images in content array (multimodal response)
+        if (Array.isArray(messageData?.content)) {
+          for (const part of messageData.content) {
+            if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
+              const url = await uploadBase64ToStorage(supabase, part.image_url.url, supabaseUrl);
+              if (url) uploadedUrls.push(url);
             }
           }
         }
