@@ -462,6 +462,25 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "send_notification",
+      description: "Enviar una notificación personalizada (popup o silenciosa) a un usuario. Útil para alertas, avisos o información importante. REQUIERE CONFIRMACIÓN.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título de la notificación" },
+          message: { type: "string", description: "Mensaje/cuerpo de la notificación" },
+          type: { type: "string", enum: ["info", "success", "warning", "error", "ai"], description: "Tipo de notificación (default: ai)" },
+          is_popup: { type: "boolean", description: "Si debe mostrarse como popup flotante (default: true)" },
+          target_user: { type: "string", description: "Nombre del usuario destinatario (si no se especifica, se envía al usuario actual)" },
+          confirmed: { type: "boolean", description: "Si el usuario ya confirmó" },
+        },
+        required: ["title", "message"],
+      },
+    },
+  },
 ];
 // Confirmation check for write operations
 function needsConfirmation(toolName: string, args: Record<string, unknown>): string | null {
