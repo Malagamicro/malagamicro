@@ -439,7 +439,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   const badgeCounts = useBadgeCounts();
   const isMobile = useIsMobile();
   const {
-    categories, editMode, setEditMode, addCategory, addLinkItem, removeCategory,
+    categories, editMode, setEditMode, addCategory, addLinkItem, addAppItem, removeCategory,
     renameCategory, reorderCategories, moveItem, reorderItems, resetToDefault,
     sidebarPosition, setSidebarPosition, setCategoryBgColor, toggleItemVisibility,
   } = useSidebarConfig();
