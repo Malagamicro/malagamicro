@@ -328,13 +328,47 @@ export function PerplexityChatbot() {
       if (agent.agent_type === 'image') {
         const data = await resp.json();
         const imageContent = data.response?.choices?.[0]?.message?.content || 'Imagen generada';
-        const imageUrls = data.response?.choices?.[0]?.message?.images?.map((img: any) => img.image_url?.url) || [];
+        // Extract image URLs from various model response formats
+        let imageUrls: string[] = [];
+        // OpenRouter image models may return images in different formats
+        const messageData = data.response?.choices?.[0]?.message;
+        if (messageData?.images) {
+          imageUrls = messageData.images.map((img: any) => img.image_url?.url || img.url || img).filter(Boolean);
+        }
+        // Some models return base64 inline in content parts
+        if (Array.isArray(messageData?.content)) {
+          for (const part of messageData.content) {
+            if (part.type === 'image_url') imageUrls.push(part.image_url?.url);
+            if (part.type === 'image' && part.source?.data) imageUrls.push(`data:${part.source.media_type || 'image/png'};base64,${part.source.data}`);
+          }
+        }
+        // Check for markdown image URLs in text content
+        if (typeof imageContent === 'string') {
+          const mdImages = imageContent.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g);
+          if (mdImages) {
+            for (const mdImg of mdImages) {
+              const urlMatch = mdImg.match(/\((https?:\/\/[^\)]+)\)/);
+              if (urlMatch) imageUrls.push(urlMatch[1]);
+            }
+          }
+        }
         
         setMessages(prev => prev.map(m => 
-          m.id === subagentMsgId ? { ...m, content: imageContent, isImage: true, imageUrls } : m
+          m.id === subagentMsgId ? { ...m, content: typeof imageContent === 'string' ? imageContent : 'Imagen generada', isImage: true, imageUrls } : m
         ));
         
-        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${imageContent}` });
+        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${typeof imageContent === 'string' ? imageContent : 'Imagen generada'}` });
+      } else if (agent.agent_type === 'audio') {
+        // Audio subagent - handle TTS or audio generation
+        const data = await resp.json();
+        const audioContent = data.response?.choices?.[0]?.message?.content || 'Audio generado';
+        const audioUrl = data.response?.choices?.[0]?.message?.audio?.url || null;
+        
+        setMessages(prev => prev.map(m => 
+          m.id === subagentMsgId ? { ...m, content: audioContent, isAudio: !!audioUrl, audioUrl } : m
+        ));
+        
+        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${audioContent}` });
       } else {
         // Stream text response
         const reader = resp.body!.getReader();
