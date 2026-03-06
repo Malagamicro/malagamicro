@@ -405,13 +405,14 @@ export function GeneralRemindersList() {
         </div>
       </div>
 
-      <GeneralReminderModal open={modalOpen} onOpenChange={setModalOpen} />
+      <GeneralReminderModal open={modalOpen || !!editReminder} onOpenChange={(open) => { if (!open) { setModalOpen(false); setEditReminder(null); } }} editReminder={editReminder} />
 
       <ReminderDetailModal reminder={viewReminder} open={!!viewReminder}
         onOpenChange={(open) => !open && setViewReminder(null)}
         onToggle={() => { if (viewReminder) { toggleComplete(viewReminder.id, viewReminder.is_completed); setViewReminder(null); } }}
         onDelete={() => { if (viewReminder) { setDeleteId(viewReminder.id); setViewReminder(null); } }}
         onSnooze={(id, min) => { snoozeReminder(id, min); setViewReminder(null); }}
+        onEdit={() => { if (viewReminder) { setEditReminder(viewReminder); setViewReminder(null); } }}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
