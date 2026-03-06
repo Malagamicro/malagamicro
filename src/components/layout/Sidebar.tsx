@@ -441,7 +441,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   const {
     categories, editMode, setEditMode, addCategory, addLinkItem, addAppItem, removeCategory,
     renameCategory, reorderCategories, moveItem, reorderItems, resetToDefault,
-    sidebarPosition, setSidebarPosition, setCategoryBgColor, toggleItemVisibility,
+    sidebarPosition, setSidebarPosition, setCategoryBgColor, toggleItemVisibility, removeItem,
   } = useSidebarConfig();
 
   useEffect(() => {
@@ -703,6 +703,13 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
                               {item.hidden
                                 ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
                                 : <Eye className="w-3.5 h-3.5 text-muted-foreground" />}
+                            </button>
+                            <button
+                              onClick={() => removeItem(category.id, item.id)}
+                              className="p-1 rounded hover:bg-destructive/20 flex-shrink-0"
+                              title="Eliminar del sidebar"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
                             </button>
                           </div>
                         </div>
