@@ -6,9 +6,83 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// --- Security Utilities ---
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SQL_INJECTION_PATTERNS = [
+  /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|TRUNCATE|GRANT|REVOKE)\b)/i,
+  /(--|\/\*|\*\/|xp_|sp_)/i,
+  /('|")\s*(OR|AND)\s*('|")/i,
+  /(\bOR\b\s+\d+\s*=\s*\d+)/i,
+  /(WAITFOR\s+DELAY|BENCHMARK\s*\(|SLEEP\s*\()/i,
+];
+
+function containsSqlInjection(input: string): boolean {
+  return SQL_INJECTION_PATTERNS.some(p => p.test(input));
+}
+
+function sanitizeSearchParam(input: string): string {
+  return input
+    .replace(/[;'"\\`]/g, '')
+    .replace(/--/g, '')
+    .replace(/\/\*/g, '')
+    .replace(/\*\//g, '')
+    .trim()
+    .slice(0, 200);
+}
+
+function isValidUuid(input: string): boolean {
+  return UUID_REGEX.test(input);
+}
+
+function sanitizeBodyForDb(obj: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  const allowedKeyPattern = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+  for (const [key, value] of Object.entries(obj)) {
+    if (!allowedKeyPattern.test(key)) continue;
+    if (typeof value === 'string') {
+      if (containsSqlInjection(value)) {
+        sanitized[key] = value.replace(/[;'"\\`]/g, '').replace(/--/g, '').trim();
+      } else {
+        sanitized[key] = value;
+      }
+    } else if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
+      sanitized[key] = value;
+    } else if (Array.isArray(value)) {
+      sanitized[key] = value;
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeBodyForDb(value as Record<string, unknown>);
+    }
+  }
+  return sanitized;
+}
+
+// --- Rate limiting per IP ---
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW = 60_000; // 1 minute
+const RATE_LIMIT_MAX = 120; // 120 requests per minute per IP
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= RATE_LIMIT_MAX;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Rate limiting
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  if (!checkRateLimit(clientIp)) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), {
+      status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 
   try {
@@ -16,6 +90,13 @@ serve(async (req) => {
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (!token) {
       return new Response(JSON.stringify({ error: 'Missing Bearer token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Validate token format (prevent injection via token)
+    if (token.length > 200 || containsSqlInjection(token)) {
+      return new Response(JSON.stringify({ error: 'Invalid token format' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -38,12 +119,35 @@ serve(async (req) => {
     const resource = pathParts[1] || '';
     const idOrAction = pathParts[2] || '';
 
-    let body: Record<string, unknown> = {};
-    if (req.method !== 'GET' && req.method !== 'DELETE') {
-      try { body = await req.json(); } catch { body = {}; }
+    // Validate resource name (alphanumeric and hyphens only)
+    if (resource && !/^[a-z0-9-]+$/.test(resource)) {
+      return new Response(JSON.stringify({ error: 'Invalid resource' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    const params = Object.fromEntries(url.searchParams.entries());
+    // Validate idOrAction as UUID if present
+    if (idOrAction && !isValidUuid(idOrAction)) {
+      return new Response(JSON.stringify({ error: 'Invalid resource ID format' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    let body: Record<string, unknown> = {};
+    if (req.method !== 'GET' && req.method !== 'DELETE') {
+      try { body = sanitizeBodyForDb(await req.json()); } catch { body = {}; }
+    }
+
+    // Sanitize query params
+    const rawParams = Object.fromEntries(url.searchParams.entries());
+    const params: Record<string, string> = {};
+    for (const [k, v] of Object.entries(rawParams)) {
+      if (containsSqlInjection(v)) {
+        params[k] = sanitizeSearchParam(v);
+      } else {
+        params[k] = v.slice(0, 500);
+      }
+    }
     let result: unknown;
 
     switch (resource) {
