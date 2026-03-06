@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 const AGENT_TYPE_OPTIONS = [
   { value: 'text', label: 'Texto', icon: Bot, description: 'Responde con texto' },
   { value: 'image', label: 'Imagen', icon: ImageIcon, description: 'Genera imágenes' },
-  { value: 'audio', label: 'Audio', icon: AudioLines, description: 'Genera audio' },
 ];
 
 const EMOJI_OPTIONS = ['🤖', '🎨', '🎵', '📊', '🧠', '✍️', '🔍', '💡', '🌐', '⚡', '🎭', '📝'];
