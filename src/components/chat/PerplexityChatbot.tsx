@@ -503,10 +503,10 @@ export function PerplexityChatbot() {
   };
 
   return (
-    <div className="relative flex w-full min-h-[70vh] md:h-[calc(100vh-12rem)] overflow-hidden">
+    <div className="relative flex w-full h-full overflow-hidden">
       {/* Sessions Sidebar */}
       {showSidebar && (
-        <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
+        <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-56 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
           <div className="p-3 border-b flex items-center justify-between gap-2">
             <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
               <MessageSquare className="h-4 w-4 shrink-0" />
@@ -571,10 +571,24 @@ export function PerplexityChatbot() {
             )}
           </ScrollArea>
 
-          {/* Subagent Manager at bottom of sidebar */}
-          <div className="border-t p-3">
-            <SubagentManager />
+        </div>
+      )}
+
+      {/* Subagent Panel - separate from conversations */}
+      {showSubagentPanel && (
+        <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
+          <div className="p-3 border-b flex items-center justify-between gap-2">
+            <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
+              <Settings2 className="h-4 w-4 shrink-0" />
+              <span className="truncate">Subagentes IA</span>
+            </h3>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSubagentPanel(false)}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
+          <ScrollArea className="flex-1 p-3">
+            <SubagentManager />
+          </ScrollArea>
         </div>
       )}
 
@@ -647,6 +661,10 @@ export function PerplexityChatbot() {
               </SelectContent>
             </Select>
             
+            <Button variant="ghost" size="icon" onClick={() => setShowSubagentPanel(!showSubagentPanel)} className="h-9 w-9" title="Subagentes IA">
+              <Settings2 className={cn("h-4 w-4", showSubagentPanel && "text-primary")} />
+            </Button>
+
             {messages.length > 0 && (
               <Button variant="ghost" size="icon" onClick={handleNewChat} className="h-9 w-9">
                 <RotateCcw className="h-4 w-4" />

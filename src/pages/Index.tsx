@@ -610,13 +610,7 @@ const IndexContent = () => {
       case 'chat-ai':
         return (
           <div className="flex flex-col animate-fade-in h-full">
-            <PageHeader
-              title="Chat IA"
-              description="Asistente inteligente con búsqueda en tiempo real"
-              icon={<Bot className="h-5 w-5 text-primary" />}
-              onBack={goApps}
-            />
-            <div className="flex-1 min-h-0 p-3 sm:p-6 w-full max-w-none md:max-w-4xl md:mx-auto">
+            <div className="flex-1 min-h-0">
               <PerplexityChatbot />
             </div>
           </div>
