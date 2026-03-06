@@ -431,7 +431,10 @@ export function PerplexityChatbot() {
           m.id === subagentMsgId ? { ...m, content: imageContent, isImage: true, imageUrls } : m
         ));
         
-        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${imageContent}` });
+        // Save image URLs as markdown in DB so they persist through refetch
+        const imageMarkdown = imageUrls.map(url => `![Imagen generada](${url})`).join('\n');
+        const dbContent = `[${agent.name}] ${imageContent}${imageMarkdown ? '\n' + imageMarkdown : ''}`;
+        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: dbContent });
         return imageContent;
       } else if (agent.agent_type === 'audio') {
         // Audio subagent - handle TTS or audio generation
