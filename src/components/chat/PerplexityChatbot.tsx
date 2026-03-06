@@ -700,7 +700,7 @@ export function PerplexityChatbot() {
       {/* Subagent Panel */}
       <ResizablePanel
         ref={subagentPanelRef}
-        defaultSize={28}
+        defaultSize={0}
         minSize={15}
         maxSize={45}
         collapsible
