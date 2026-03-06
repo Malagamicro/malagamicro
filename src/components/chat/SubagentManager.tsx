@@ -68,6 +68,8 @@ export function SubagentManager() {
   const [customModel, setCustomModel] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamDescription, setTeamDescription] = useState('');
+  const [teamModel, setTeamModel] = useState('openai/gpt-5-nano');
+  const [teamCustomModel, setTeamCustomModel] = useState('');
   const [editingTeam, setEditingTeam] = useState<AISubagentTeam | null>(null);
   const [activeTab, setActiveTab] = useState('agents');
   const [expandedToolCategories, setExpandedToolCategories] = useState<string[]>([]);
