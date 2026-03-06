@@ -506,7 +506,7 @@ export function PerplexityChatbot() {
     <div className="relative flex w-full h-full overflow-hidden">
       {/* Sessions Sidebar */}
       {showSidebar && (
-        <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
+        <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-56 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
           <div className="p-3 border-b flex items-center justify-between gap-2">
             <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
               <MessageSquare className="h-4 w-4 shrink-0" />
