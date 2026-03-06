@@ -254,7 +254,7 @@ export function MascotChatWidget() {
         className="z-50 touch-none w-14 h-14 rounded-full shadow-xl bg-card/80 backdrop-blur-sm border border-primary/20 flex items-center justify-center cursor-grab active:cursor-grabbing"
         role="button"
       >
-        <FluiditosAvatar config={fluiditosConfig} size={48} animated />
+        <FluiditosAvatar config={fluiditosConfig} size={48} animated animState="idle" />
       </div>
     );
   }
