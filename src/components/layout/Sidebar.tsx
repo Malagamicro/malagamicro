@@ -441,7 +441,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   const {
     categories, editMode, setEditMode, addCategory, addLinkItem, addAppItem, removeCategory,
     renameCategory, reorderCategories, moveItem, reorderItems, resetToDefault,
-    sidebarPosition, setSidebarPosition, setCategoryBgColor, toggleItemVisibility,
+    sidebarPosition, setSidebarPosition, setCategoryBgColor, toggleItemVisibility, removeItem,
   } = useSidebarConfig();
 
   useEffect(() => {
