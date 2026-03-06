@@ -246,9 +246,16 @@ function ReminderDetailModal({ reminder, open, onOpenChange, onToggle, onDelete,
                 </DropdownMenu>
               )}
             </div>
-            <Button variant="destructive" size="sm" onClick={() => { onOpenChange(false); onDelete(); }}>
-              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
-            </Button>
+            <div className="flex gap-2">
+              {onEdit && (
+                <Button variant="outline" size="sm" onClick={() => { onOpenChange(false); onEdit(); }}>
+                  <Pencil className="h-4 w-4 mr-1" /> Editar
+                </Button>
+              )}
+              <Button variant="destructive" size="sm" onClick={() => { onOpenChange(false); onDelete(); }}>
+                <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
