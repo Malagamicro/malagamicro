@@ -663,7 +663,7 @@ export function PerplexityChatbot() {
         collapsedSize={0}
         onCollapse={() => setShowSidebar(false)}
         onExpand={() => setShowSidebar(true)}
-        className={cn('transition-all', !showSidebar && 'hidden')}
+        className="transition-all"
       >
         <div className="h-full flex flex-col bg-muted/30">
           <div className="p-3 border-b flex items-center justify-between gap-2">
