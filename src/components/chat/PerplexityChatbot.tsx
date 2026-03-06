@@ -129,9 +129,33 @@ export function PerplexityChatbot() {
 
   useEffect(() => {
     if (sessionMessages) {
-      setMessages(sessionMessages.map(m => ({
-        id: m.id, role: m.role, content: m.content, timestamp: m.createdAt,
-      })));
+      setMessages(prev => {
+        // Preserve local-only properties (imageUrls, isImage, audioUrl, isAudio) that aren't in DB
+        const localExtras = new Map<string, Partial<Message>>();
+        for (const m of prev) {
+          if (m.imageUrls?.length || m.isImage || m.audioUrl || m.isAudio) {
+            localExtras.set(m.id, { imageUrls: m.imageUrls, isImage: m.isImage, audioUrl: m.audioUrl, isAudio: m.isAudio });
+          }
+        }
+        return sessionMessages.map(m => {
+          const extras = localExtras.get(m.id) || {};
+          // Also parse markdown images from content for messages loaded fresh from DB
+          const mdImageMatches = m.content.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g);
+          const parsedImageUrls: string[] = [];
+          if (mdImageMatches) {
+            for (const mdImg of mdImageMatches) {
+              const urlMatch = mdImg.match(/\(([^\)]+)\)/);
+              if (urlMatch?.[1]) parsedImageUrls.push(urlMatch[1]);
+            }
+          }
+          const hasImages = (extras.imageUrls?.length || 0) > 0 || parsedImageUrls.length > 0;
+          return {
+            id: m.id, role: m.role, content: m.content, timestamp: m.createdAt,
+            ...extras,
+            ...(parsedImageUrls.length > 0 && !extras.imageUrls?.length ? { imageUrls: parsedImageUrls, isImage: true } : {}),
+          };
+        });
+      });
     } else if (!activeSessionId) {
       setMessages([]);
     }
@@ -407,7 +431,10 @@ export function PerplexityChatbot() {
           m.id === subagentMsgId ? { ...m, content: imageContent, isImage: true, imageUrls } : m
         ));
         
-        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${imageContent}` });
+        // Save image URLs as markdown in DB so they persist through refetch
+        const imageMarkdown = imageUrls.map(url => `![Imagen generada](${url})`).join('\n');
+        const dbContent = `[${agent.name}] ${imageContent}${imageMarkdown ? '\n' + imageMarkdown : ''}`;
+        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: dbContent });
         return imageContent;
       } else if (agent.agent_type === 'audio') {
         // Audio subagent - handle TTS or audio generation
@@ -1102,7 +1129,7 @@ export function PerplexityChatbot() {
                       message.content ? (
                         <>
                           <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                            <ReactMarkdown>{message.imageUrls?.length ? message.content.replace(/!\[.*?\]\([^\)]+\)/g, '').trim() : message.content}</ReactMarkdown>
                           </div>
                           {message.imageUrls && message.imageUrls.length > 0 && (
                             <div className="mt-3 space-y-2">
