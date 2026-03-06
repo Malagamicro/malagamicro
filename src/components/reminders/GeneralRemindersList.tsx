@@ -374,6 +374,7 @@ export function GeneralRemindersList() {
                       onDelete={() => setDeleteId(reminder.id)}
                       onView={() => setViewReminder(reminder)}
                       onSnooze={snoozeReminder}
+                      onEdit={() => setEditReminder(reminder)}
                     />
                   ))
                 )}
