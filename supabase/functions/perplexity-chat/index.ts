@@ -662,17 +662,18 @@ const tools = [
       },
     },
   },
-  // Subagent delegation
+  // Subagent delegation (single or chained)
   {
     type: "function",
     function: {
       name: "delegate_to_subagent",
-      description: "Delegar una tarea a un subagente especializado. Úsalo cuando la petición del usuario encaje mejor con un subagente disponible (ej: generar imágenes, análisis especializado, etc.).",
+      description: "Delegar una tarea a un subagente especializado. Puedes llamar esta herramienta VARIAS VECES en paralelo para usar múltiples subagentes. Si necesitas encadenar (output de uno como input de otro), usa el campo 'depends_on' con el nombre del agente cuyo resultado necesitas.",
       parameters: {
         type: "object",
         properties: {
           agent_name: { type: "string", description: "Nombre exacto del subagente al que delegar" },
           task_description: { type: "string", description: "Descripción clara de la tarea a realizar por el subagente" },
+          depends_on: { type: "string", description: "Nombre del subagente cuyo resultado se necesita antes de ejecutar este. Si se indica, el output del agente previo se añade al task_description automáticamente." },
         },
         required: ["agent_name", "task_description"],
       },
