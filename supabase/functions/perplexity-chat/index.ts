@@ -583,54 +583,6 @@ const tools = [
   },
 ];
 
-// Map endpoint paths to their required root JSON key for POST/PUT
-const STEL_ROOT_KEY_MAP: Record<string, string> = {
-  'salesEstimates': 'est_quote',
-  'ordinaryInvoices': 'est_ordinary_invoice',
-  'salesOrders': 'est_sales_order',
-  'clients': 'client',
-  'contacts': 'contact',
-  'products': 'product',
-  'services': 'service',
-  'suppliers': 'supplier',
-  'potentialClients': 'potential_client',
-};
-
-function getStelRootKey(endpoint: string): string | null {
-  for (const [path, key] of Object.entries(STEL_ROOT_KEY_MAP)) {
-    if (endpoint.startsWith(path)) return key;
-  }
-  return null;
-}
-
-// Helper to call STEL Order API
-async function callStelApi(endpoint: string, method = 'GET', payload?: any): Promise<any> {
-  const apiKey = Deno.env.get('STELORDER_API_KEY');
-  if (!apiKey) throw new Error('STELORDER_API_KEY not configured');
-
-  const headers: Record<string, string> = {
-    'APIKEY': apiKey,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-
-  const sep = endpoint.includes('?') ? '&' : '?';
-  const fullUrl = `${STEL_API_BASE}/${endpoint}${sep}APIKEY=${encodeURIComponent(apiKey)}`;
-
-  const opts: RequestInit = { method, headers };
-  if (payload && (method === 'POST' || method === 'PUT')) {
-    // Wrap payload in root key as required by STEL Order API
-    const rootKey = getStelRootKey(endpoint);
-    const wrappedPayload = rootKey ? { [rootKey]: payload } : payload;
-    console.log('[STEL AI] Payload:', JSON.stringify(wrappedPayload));
-    opts.body = JSON.stringify(wrappedPayload);
-  }
-
-  const res = await fetch(fullUrl, opts);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) console.error('[STEL AI] Error ' + res.status + ':', JSON.stringify(data));
-  return { ok: res.ok, status: res.status, data };
-}
 
 function getMimeType(fileName: string): string {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
