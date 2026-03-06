@@ -285,6 +285,7 @@ export function useSidebarConfig() {
     setEditMode,
     addCategory,
     addLinkItem,
+    addAppItem,
     removeCategory,
     renameCategory,
     reorderCategories,
