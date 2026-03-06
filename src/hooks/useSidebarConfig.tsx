@@ -271,6 +271,16 @@ export function useSidebarConfig() {
     saveConfig(updated);
   };
 
+  const removeItem = (categoryId: string, itemId: string) => {
+    const updated = categories.map(c => {
+      if (c.id !== categoryId) return c;
+      return { ...c, items: c.items.filter(i => i.id !== itemId) };
+    });
+    setCategories(updated);
+    saveConfig(updated);
+    toast.success('Aplicación eliminada del sidebar');
+  };
+
   return {
     categories,
     sidebarPosition,
