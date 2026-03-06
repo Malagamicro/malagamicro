@@ -131,7 +131,7 @@ export function PerplexityChatbot() {
     if (sessionMessages) {
       setMessages(prev => {
         // Preserve local-only properties (imageUrls, isImage, audioUrl, isAudio) that aren't in DB
-        const localExtras = new Map<string, Partial<ChatMessage>>();
+        const localExtras = new Map<string, Partial<Message>>();
         for (const m of prev) {
           if (m.imageUrls?.length || m.isImage || m.audioUrl || m.isAudio) {
             localExtras.set(m.id, { imageUrls: m.imageUrls, isImage: m.isImage, audioUrl: m.audioUrl, isAudio: m.isAudio });
