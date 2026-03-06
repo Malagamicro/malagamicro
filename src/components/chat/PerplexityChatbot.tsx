@@ -841,7 +841,37 @@ export function PerplexityChatbot() {
             </div>
           ) : (
             <div className="py-6 space-y-6">
-              {messages.map((message) => (
+              {messages.map((message) => {
+                // Delegation notice - special rendering
+                if (message.isDelegationNotice) {
+                  return (
+                    <div key={message.id} className="flex justify-center animate-fade-in">
+                      <div 
+                        className="flex items-center gap-3 px-5 py-3 rounded-2xl border-2 shadow-lg animate-pulse"
+                        style={{ 
+                          borderColor: (message.subagentColor || '#6C63FF') + '60',
+                          backgroundColor: (message.subagentColor || '#6C63FF') + '08',
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg"
+                            style={{ backgroundColor: (message.subagentColor || '#6C63FF') + '25' }}>
+                            {message.subagentEmoji || '🤖'}
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold" style={{ color: message.subagentColor || 'hsl(var(--primary))' }}>
+                              Orquestador → {message.subagent}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">Delegando tarea al subagente...</p>
+                          </div>
+                        </div>
+                        <Loader2 className="h-4 w-4 animate-spin" style={{ color: message.subagentColor || 'hsl(var(--primary))' }} />
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
                 <div key={message.id} className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <Avatar className={cn('h-9 w-9', 
                     message.role === 'user' ? 'bg-primary' :
@@ -884,8 +914,15 @@ export function PerplexityChatbot() {
                             {message.imageUrls && message.imageUrls.length > 0 && (
                               <div className="mt-3 space-y-2">
                                 {message.imageUrls.map((url, idx) => (
-                                  <img key={idx} src={url} alt="Imagen generada" className="max-w-full rounded-lg" />
+                                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
+                                    <img src={url} alt="Imagen generada" className="max-w-full rounded-lg hover:opacity-90 transition-opacity cursor-pointer" />
+                                  </a>
                                 ))}
+                              </div>
+                            )}
+                            {message.isAudio && message.audioUrl && (
+                              <div className="mt-3">
+                                <audio controls src={message.audioUrl} className="max-w-full" preload="metadata" />
                               </div>
                             )}
                           </>
@@ -916,7 +953,8 @@ export function PerplexityChatbot() {
                     </p>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>
