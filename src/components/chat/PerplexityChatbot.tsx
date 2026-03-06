@@ -503,7 +503,7 @@ export function PerplexityChatbot() {
   };
 
   return (
-    <div className="relative flex w-full min-h-[70vh] md:h-[calc(100vh-12rem)] overflow-hidden">
+    <div className="relative flex w-full h-full overflow-hidden">
       {/* Sessions Sidebar */}
       {showSidebar && (
         <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
