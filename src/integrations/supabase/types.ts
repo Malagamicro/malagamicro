@@ -156,6 +156,51 @@ export type Database = {
           },
         ]
       }
+      ai_subagents: {
+        Row: {
+          agent_type: string
+          avatar_color: string | null
+          avatar_emoji: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          model: string
+          name: string
+          role_prompt: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_type?: string
+          avatar_color?: string | null
+          avatar_emoji?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          model: string
+          name: string
+          role_prompt?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_type?: string
+          avatar_color?: string | null
+          avatar_emoji?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          model?: string
+          name?: string
+          role_prompt?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
