@@ -155,8 +155,8 @@ export function GeneralReminderModal({ open, onOpenChange, editReminder }: Gener
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nuevo Recordatorio</DialogTitle>
-          <DialogDescription>Programa un recordatorio general para la empresa.</DialogDescription>
+          <DialogTitle>{isEditing ? 'Editar Recordatorio' : 'Nuevo Recordatorio'}</DialogTitle>
+          <DialogDescription>{isEditing ? 'Modifica los detalles del recordatorio.' : 'Programa un recordatorio general para la empresa.'}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
