@@ -626,9 +626,9 @@ async function executeToolCall(
         const microUserId = (microProfile as any)?.user_id || userId;
         const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, folder, has_attachments").eq("profile_id", MICRO_EMAIL_PROFILE_ID).eq("folder", "inbox").eq("is_deleted", false).order("date", { ascending: false }).limit(limit);
         if (error) throw error;
-        if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada de Micro." });
+        if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada de Fluiditos." });
         return JSON.stringify({
-          message: `${data.length} correo(s) recientes en el buzón de Micro (ia@malagamicro.com)`,
+          message: `${data.length} correo(s) recientes en el buzón de Fluiditos (ia@malagamicro.com)`,
           emails: data.map((e: any) => ({ id: e.id, asunto: e.subject || "(Sin asunto)", de: e.from_name || e.from_address, fecha: e.date, leido: e.is_read, adjuntos: e.has_attachments })),
         });
       }
