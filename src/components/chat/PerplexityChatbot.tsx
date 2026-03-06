@@ -241,21 +241,42 @@ export function PerplexityChatbot() {
       await addMessage.mutateAsync({ sessionId, role: 'assistant', content: assistantContent });
     }
 
-    // If delegation was detected, execute subagent call
+    // If delegation was detected, show notice and execute subagent
     if (delegationDetected) {
       const agent = activeSubagents.find(s => s.name.toLowerCase() === delegationDetected!.agent_name.toLowerCase());
       if (agent) {
+        // Insert delegation notice message
+        const noticeId = crypto.randomUUID();
+        setMessages(prev => [...prev, {
+          id: noticeId, role: 'assistant', 
+          content: `🔄 Delegando tarea a **${agent.name}** ${agent.avatar_emoji || '🤖'}`,
+          timestamp: new Date(),
+          isDelegationNotice: true,
+          subagent: agent.name,
+          subagentEmoji: agent.avatar_emoji,
+          subagentColor: agent.avatar_color,
+        }]);
         await executeSubagentCall(agent, delegationDetected.task, sessionId, userMessages);
       }
     }
 
     // Check if content mentions delegation pattern
-    if (assistantContent.includes('🔄 Delegando') || assistantContent.includes('delegation_requested')) {
+    if (!delegationDetected && (assistantContent.includes('🔄 Delegando') || assistantContent.includes('delegation_requested'))) {
       const match = assistantContent.match(/Delegando a \*\*(.+?)\*\*/);
       if (match) {
         const agentName = match[1];
         const agent = activeSubagents.find(s => s.name.toLowerCase() === agentName.toLowerCase());
         if (agent) {
+          const noticeId = crypto.randomUUID();
+          setMessages(prev => [...prev, {
+            id: noticeId, role: 'assistant',
+            content: `🔄 Delegando tarea a **${agent.name}** ${agent.avatar_emoji || '🤖'}`,
+            timestamp: new Date(),
+            isDelegationNotice: true,
+            subagent: agent.name,
+            subagentEmoji: agent.avatar_emoji,
+            subagentColor: agent.avatar_color,
+          }]);
           const lastUserMsg = userMessages[userMessages.length - 1];
           const task = typeof lastUserMsg.content === 'string' ? lastUserMsg.content : '';
           await executeSubagentCall(agent, task, sessionId, userMessages);
