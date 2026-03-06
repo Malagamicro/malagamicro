@@ -117,13 +117,16 @@ export function SubagentManager() {
 
   const handleSaveTeam = async () => {
     if (!teamName.trim()) return;
+    const orchModel = teamModel === 'custom' ? teamCustomModel : teamModel;
     if (editingTeam) {
-      await updateTeam.mutateAsync({ id: editingTeam.id, name: teamName, description: teamDescription || null });
+      await updateTeam.mutateAsync({ id: editingTeam.id, name: teamName, description: teamDescription || null, orchestrator_model: orchModel });
     } else {
-      await createTeam.mutateAsync({ name: teamName, description: teamDescription || undefined });
+      await createTeam.mutateAsync({ name: teamName, description: teamDescription || undefined, orchestrator_model: orchModel });
     }
     setTeamName('');
     setTeamDescription('');
+    setTeamModel('openai/gpt-5-nano');
+    setTeamCustomModel('');
     setEditingTeam(null);
     setIsTeamOpen(false);
   };
