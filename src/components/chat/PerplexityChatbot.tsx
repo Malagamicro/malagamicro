@@ -40,10 +40,9 @@ interface Message {
   subagent?: string; // which subagent responded
   subagentEmoji?: string;
   subagentColor?: string;
-  isImage?: boolean; // if this is an image response
+  isImage?: boolean;
   imageUrls?: string[];
-  isAudio?: boolean;
-  audioUrl?: string;
+  isDelegationNotice?: boolean;
   isDelegationNotice?: boolean; // delegation notice message
 }
 
