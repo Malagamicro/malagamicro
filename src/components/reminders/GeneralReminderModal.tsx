@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 interface GeneralReminderModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editReminder?: GeneralReminder | null;
 }
 
 const priorities = [

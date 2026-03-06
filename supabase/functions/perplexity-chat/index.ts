@@ -1760,23 +1760,38 @@ serve(async (req) => {
         : [];
 
       if (agentType === 'image') {
-        // Image generation via OpenRouter
-        const imageResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        // Image generation via Lovable AI Gateway (supports actual image generation)
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        const imageApiUrl = LOVABLE_API_KEY 
+          ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+          : "https://openrouter.ai/api/v1/chat/completions";
+        const imageApiKey = LOVABLE_API_KEY || OPENROUTER_API_KEY;
+        const imageModel = LOVABLE_API_KEY ? "google/gemini-2.5-flash-image" : agentModel;
+        
+        const imageRequestBody: any = {
+          model: imageModel,
+          messages: [
+            { role: "system", content: agentPrompt || "You are an AI image generation assistant. Generate images based on user descriptions. Always generate the image directly." },
+            { role: "user", content: userMessage },
+          ],
+          stream: false,
+        };
+        
+        // Lovable AI gateway requires modalities for image generation
+        if (LOVABLE_API_KEY) {
+          imageRequestBody.modalities = ["image", "text"];
+        }
+        
+        console.log(`[perplexity-chat] Image generation using ${imageModel} via ${LOVABLE_API_KEY ? 'Lovable Gateway' : 'OpenRouter'}`);
+        
+        const imageResponse = await fetch(imageApiUrl, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+            "Authorization": `Bearer ${imageApiKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": supabaseUrl,
-            "X-Title": "Malaga Micro CRM - Image Subagent",
+            ...(LOVABLE_API_KEY ? {} : { "HTTP-Referer": supabaseUrl, "X-Title": "Malaga Micro CRM - Image Subagent" }),
           },
-          body: JSON.stringify({
-            model: agentModel,
-            messages: [
-              { role: "system", content: agentPrompt || "You are an AI image generation assistant. Generate images based on user descriptions." },
-              { role: "user", content: userMessage },
-            ],
-            stream: false,
-          }),
+          body: JSON.stringify(imageRequestBody),
         });
 
         if (!imageResponse.ok) {
