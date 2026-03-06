@@ -571,12 +571,26 @@ export function PerplexityChatbot() {
             )}
           </ScrollArea>
 
-          {/* Subagent Manager at bottom of sidebar */}
-          <div className="border-t p-3">
-            <SubagentManager />
-          </div>
         </div>
       )}
+
+      {/* Subagent Panel - separate from conversations */}
+      {showSubagentPanel && (
+        <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
+          <div className="p-3 border-b flex items-center justify-between gap-2">
+            <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
+              <Settings2 className="h-4 w-4 shrink-0" />
+              <span className="truncate">Subagentes IA</span>
+            </h3>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSubagentPanel(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <ScrollArea className="flex-1 p-3">
+            <SubagentManager />
+          </ScrollArea>
+        </div>
+      )
 
       {showSidebar && (
         <div className="absolute inset-0 bg-background/40 backdrop-blur-sm z-10 md:hidden" onClick={() => setShowSidebar(false)} />
