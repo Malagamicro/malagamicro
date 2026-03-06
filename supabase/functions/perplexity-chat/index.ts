@@ -679,6 +679,24 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "send_notification",
+      description: "Enviar una notificación personalizada (popup o silenciosa) a un usuario del CRM. Útil para alertas, avisos o información importante.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título de la notificación" },
+          message: { type: "string", description: "Mensaje/cuerpo de la notificación" },
+          type: { type: "string", enum: ["info", "success", "warning", "error", "ai"], description: "Tipo (default: ai)" },
+          is_popup: { type: "boolean", description: "Si debe mostrarse como popup flotante (default: true)" },
+          target_user: { type: "string", description: "Nombre del usuario destinatario (si no se especifica, se envía al actual)" },
+        },
+        required: ["title", "message"],
+      },
+    },
+  },
 ];
 
 // Map endpoint paths to their required root JSON key for POST/PUT
