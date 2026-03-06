@@ -33,6 +33,53 @@ export function loadFluiditosConfig(): FluiditosConfig {
 
 export function saveFluiditosConfig(config: FluiditosConfig) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  // Also persist to database for cross-device sync
+  saveFluiditosConfigToDb(config);
+}
+
+async function saveFluiditosConfigToDb(config: FluiditosConfig) {
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    // Load current custom_theme and merge fluiditos config into it
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('custom_theme')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    const currentTheme = (profile?.custom_theme as Record<string, unknown>) || {};
+    await supabase
+      .from('profiles')
+      .update({ custom_theme: { ...currentTheme, fluiditos: config } as any })
+      .eq('user_id', user.id);
+  } catch (e) {
+    console.error('Error saving fluiditos config to DB:', e);
+  }
+}
+
+export async function loadFluiditosConfigFromDb(): Promise<FluiditosConfig | null> {
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    
+    const { data } = await supabase
+      .from('profiles')
+      .select('custom_theme')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    const theme = data?.custom_theme as any;
+    if (theme?.fluiditos) {
+      // Also update localStorage for fast local loading
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(theme.fluiditos));
+      return { ...DEFAULT_CONFIG, ...theme.fluiditos };
+    }
+    return null;
+  } catch { return null; }
 }
 
 export type FluiditosAnimState = 'idle' | 'thinking' | 'typing' | 'responding';

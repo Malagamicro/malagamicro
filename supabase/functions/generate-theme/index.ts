@@ -10,8 +10,14 @@ serve(async (req) => {
 
   try {
     const { prompt, currentTheme } = await req.json();
+    
+    // Try Lovable AI gateway first, fallback to OpenRouter
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-    if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured");
+    
+    if (!LOVABLE_API_KEY && !OPENROUTER_API_KEY) {
+      throw new Error("No AI API key configured");
+    }
 
     const systemPrompt = `Eres un diseñador de temas UI experto para un CRM. El usuario te describe cómo quiere que se vea su aplicación y tú generas un tema COMPLETO que incluye colores, sidebar, estados de leads, y configuración visual.
 
@@ -66,26 +72,33 @@ Reglas:
 - borderRadius opciones: none, sm, md, lg, xl, full
 - sidebarStyle opciones: solid, glass, transparent
 - animationSpeed opciones: none, reduced, normal, smooth
-- sidebarConfig.visibleModules: array con los módulos a mostrar. Opciones: dashboard, leads, calendar, whatsapp, email, tickets, budgets, files, reports, chat, reminders, seo, campaigns, settings, templates, admin
+- sidebarConfig.visibleModules: array con los módulos a mostrar
 - sidebarConfig.sidebarPosition: left, right, top, bottom
-- Si el usuario pide un tema minimalista, reduce los módulos visibles a los esenciales
-- Si el usuario pide un tema completo, incluye todos los módulos
-- Adapta la organización del sidebar según el tipo de uso que describe el usuario
 - NO incluyas texto explicativo, SOLO el JSON`;
 
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-    if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured");
+    let apiUrl: string;
+    let apiKey: string;
+    let model: string;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    if (LOVABLE_API_KEY) {
+      apiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
+      apiKey = LOVABLE_API_KEY;
+      model = "google/gemini-2.5-flash";
+    } else {
+      apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+      apiKey = OPENROUTER_API_KEY!;
+      model = "google/gemini-2.5-flash";
+      headers["HTTP-Referer"] = "https://malagamicro.lovable.app";
+      headers["X-Title"] = "MalagaMicro CRM";
+    }
+    headers["Authorization"] = `Bearer ${apiKey}`;
+
+    const response = await fetch(apiUrl, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://malagamicro.lovable.app",
-        "X-Title": "MalagaMicro CRM",
-      },
+      headers,
       body: JSON.stringify({
-        model: "anthropic/claude-4-6-sonnet",
+        model,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Tema actual: ${JSON.stringify(currentTheme || {})}. Petición del usuario: ${prompt}` },
@@ -97,11 +110,6 @@ Reglas:
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Demasiadas solicitudes. Inténtalo de nuevo en unos segundos." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos de IA agotados." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();

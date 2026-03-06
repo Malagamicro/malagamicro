@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CalendarIcon, Clock, Repeat, StickyNote, Users } from 'lucide-react';
-import { useGeneralReminders } from '@/hooks/useGeneralReminders';
+import { useGeneralReminders, GeneralReminder } from '@/hooks/useGeneralReminders';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 interface GeneralReminderModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editReminder?: GeneralReminder | null;
 }
 
 const priorities = [
@@ -53,7 +54,7 @@ interface UserProfile {
   full_name: string | null;
 }
 
-export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModalProps) {
+export function GeneralReminderModal({ open, onOpenChange, editReminder }: GeneralReminderModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState<Date>();
@@ -66,7 +67,26 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [showUserPicker, setShowUserPicker] = useState(false);
 
-  const { addReminder, isAddingReminder } = useGeneralReminders();
+  const { addReminder, isAddingReminder, updateReminder, isUpdatingReminder } = useGeneralReminders();
+
+  const isEditing = !!editReminder;
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editReminder && open) {
+      setTitle(editReminder.title);
+      setDescription(editReminder.description || '');
+      const rDate = new Date(editReminder.reminder_date);
+      setDate(rDate);
+      setTime(`${rDate.getHours().toString().padStart(2, '0')}:${rDate.getMinutes().toString().padStart(2, '0')}`);
+      setPriority(editReminder.priority);
+      setCategory(editReminder.category || 'general');
+      setRecurrence(editReminder.recurrence_type || 'once');
+      setNote(editReminder.note || '');
+    } else if (!editReminder && open) {
+      resetForm();
+    }
+  }, [editReminder, open]);
 
   // Fetch all users for the picker
   useEffect(() => {
@@ -86,19 +106,35 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
     const reminderDate = new Date(date);
     reminderDate.setHours(hours, minutes, 0, 0);
 
-    addReminder(
-      {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        reminderDate,
-        priority,
-        category,
-        recurrence_type: recurrence,
-        note: note.trim() || undefined,
-        target_user_ids: selectedUserIds.length > 0 ? selectedUserIds : undefined,
-      },
-      { onSuccess: () => { onOpenChange(false); resetForm(); } }
-    );
+    if (isEditing) {
+      updateReminder(
+        {
+          id: editReminder!.id,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          reminderDate,
+          priority,
+          category,
+          recurrence_type: recurrence,
+          note: note.trim() || undefined,
+        },
+        { onSuccess: () => { onOpenChange(false); resetForm(); } }
+      );
+    } else {
+      addReminder(
+        {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          reminderDate,
+          priority,
+          category,
+          recurrence_type: recurrence,
+          note: note.trim() || undefined,
+          target_user_ids: selectedUserIds.length > 0 ? selectedUserIds : undefined,
+        },
+        { onSuccess: () => { onOpenChange(false); resetForm(); } }
+      );
+    }
   };
 
   const resetForm = () => {
@@ -119,8 +155,8 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nuevo Recordatorio</DialogTitle>
-          <DialogDescription>Programa un recordatorio general para la empresa.</DialogDescription>
+          <DialogTitle>{isEditing ? 'Editar Recordatorio' : 'Nuevo Recordatorio'}</DialogTitle>
+          <DialogDescription>{isEditing ? 'Modifica los detalles del recordatorio.' : 'Programa un recordatorio general para la empresa.'}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
@@ -235,8 +271,8 @@ export function GeneralReminderModal({ open, onOpenChange }: GeneralReminderModa
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!date || !title.trim() || isAddingReminder}>
-            {isAddingReminder ? 'Guardando...' : 'Programar'}
+          <Button onClick={handleSubmit} disabled={!date || !title.trim() || isAddingReminder || isUpdatingReminder}>
+            {(isAddingReminder || isUpdatingReminder) ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Programar'}
           </Button>
         </DialogFooter>
       </DialogContent>

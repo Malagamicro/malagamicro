@@ -4,7 +4,7 @@ import { es } from 'date-fns/locale';
 import {
   Bell, Check, Clock, Trash2, Plus, Calendar, AlertTriangle,
   CheckCircle2, Eye, Repeat, AlarmClock, Phone, Users2,
-  CreditCard, Target, StickyNote, Timer, Pause
+  CreditCard, Target, StickyNote, Timer, Pause, Pencil
 } from 'lucide-react';
 import { useGeneralReminders, GeneralReminder } from '@/hooks/useGeneralReminders';
 import { GeneralReminderModal } from './GeneralReminderModal';
@@ -84,9 +84,9 @@ function SnoozeButton({ reminderId, onSnooze }: { reminderId: string; onSnooze: 
   );
 }
 
-function ReminderCard({ reminder, onToggle, onDelete, onView, onSnooze }: {
+function ReminderCard({ reminder, onToggle, onDelete, onView, onSnooze, onEdit }: {
   reminder: GeneralReminder; onToggle: () => void; onDelete: () => void; onView: () => void;
-  onSnooze: (id: string, min: number) => void;
+  onSnooze: (id: string, min: number) => void; onEdit: () => void;
 }) {
   const reminderDate = new Date(reminder.reminder_date);
   const isOverdue = isPast(reminderDate) && !reminder.is_completed;
@@ -165,6 +165,10 @@ function ReminderCard({ reminder, onToggle, onDelete, onView, onSnooze }: {
           {reminder.is_completed && <Check className="h-3 w-3" />}
         </button>
         {!reminder.is_completed && <SnoozeButton reminderId={reminder.id} onSnooze={onSnooze} />}
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}>
           <Trash2 className="h-3.5 w-3.5" />
@@ -174,9 +178,9 @@ function ReminderCard({ reminder, onToggle, onDelete, onView, onSnooze }: {
   );
 }
 
-function ReminderDetailModal({ reminder, open, onOpenChange, onToggle, onDelete, onSnooze }: {
+function ReminderDetailModal({ reminder, open, onOpenChange, onToggle, onDelete, onSnooze, onEdit }: {
   reminder: GeneralReminder | null; open: boolean; onOpenChange: (open: boolean) => void;
-  onToggle: () => void; onDelete: () => void; onSnooze: (id: string, min: number) => void;
+  onToggle: () => void; onDelete: () => void; onSnooze: (id: string, min: number) => void; onEdit?: () => void;
 }) {
   if (!reminder) return null;
   const reminderDate = new Date(reminder.reminder_date);
@@ -242,9 +246,16 @@ function ReminderDetailModal({ reminder, open, onOpenChange, onToggle, onDelete,
                 </DropdownMenu>
               )}
             </div>
-            <Button variant="destructive" size="sm" onClick={() => { onOpenChange(false); onDelete(); }}>
-              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
-            </Button>
+            <div className="flex gap-2">
+              {onEdit && (
+                <Button variant="outline" size="sm" onClick={() => { onOpenChange(false); onEdit(); }}>
+                  <Pencil className="h-4 w-4 mr-1" /> Editar
+                </Button>
+              )}
+              <Button variant="destructive" size="sm" onClick={() => { onOpenChange(false); onDelete(); }}>
+                <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -289,6 +300,7 @@ export function GeneralRemindersList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewReminder, setViewReminder] = useState<GeneralReminder | null>(null);
+  const [editReminder, setEditReminder] = useState<GeneralReminder | null>(null);
   const [activeTab, setActiveTab] = useState('pending');
 
   const {
@@ -350,6 +362,7 @@ export function GeneralRemindersList() {
                       onDelete={() => setDeleteId(reminder.id)}
                       onView={() => setViewReminder(reminder)}
                       onSnooze={snoozeReminder}
+                      onEdit={() => setEditReminder(reminder)}
                     />
                   ))
                 )}
@@ -368,6 +381,7 @@ export function GeneralRemindersList() {
                       onDelete={() => setDeleteId(reminder.id)}
                       onView={() => setViewReminder(reminder)}
                       onSnooze={snoozeReminder}
+                      onEdit={() => setEditReminder(reminder)}
                     />
                   ))
                 )}
@@ -398,13 +412,14 @@ export function GeneralRemindersList() {
         </div>
       </div>
 
-      <GeneralReminderModal open={modalOpen} onOpenChange={setModalOpen} />
+      <GeneralReminderModal open={modalOpen || !!editReminder} onOpenChange={(open) => { if (!open) { setModalOpen(false); setEditReminder(null); } }} editReminder={editReminder} />
 
       <ReminderDetailModal reminder={viewReminder} open={!!viewReminder}
         onOpenChange={(open) => !open && setViewReminder(null)}
         onToggle={() => { if (viewReminder) { toggleComplete(viewReminder.id, viewReminder.is_completed); setViewReminder(null); } }}
         onDelete={() => { if (viewReminder) { setDeleteId(viewReminder.id); setViewReminder(null); } }}
         onSnooze={(id, min) => { snoozeReminder(id, min); setViewReminder(null); }}
+        onEdit={() => { if (viewReminder) { setEditReminder(viewReminder); setViewReminder(null); } }}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
