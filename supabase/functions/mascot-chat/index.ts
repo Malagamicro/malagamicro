@@ -616,7 +616,7 @@ async function executeToolCall(
         });
         const result = await res.json();
         if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al enviar" });
-        return JSON.stringify({ success: true, message: `Correo enviado a ${to} desde ia@malagamicro.com (Micro)` });
+        return JSON.stringify({ success: true, message: `Correo enviado a ${to} desde ia@malagamicro.com (Fluiditos)` });
       }
 
       case "get_inbox": {
