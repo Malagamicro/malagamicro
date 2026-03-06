@@ -83,6 +83,7 @@ export default function FileManager() {
   const [moveDialogFile, setMoveDialogFile] = useState<SavedFile | null>(null);
   const [moveTargetFolder, setMoveTargetFolder] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "file" | "folder"; id: string; name: string; hasContent: boolean } | null>(null);
 
   // Filter files
   const filteredFiles = files.filter((file) => {
