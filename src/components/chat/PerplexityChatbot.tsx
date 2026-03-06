@@ -10,10 +10,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Send, Bot, User, Loader2, Sparkles, Brain, RotateCcw, BarChart3, Plus,
-  Search, Bell, MessageSquare, Trash2, MoreVertical, PanelLeftClose, Mic,
-  MicOff, PanelLeft, Pencil, FileIcon, X, Paperclip, Image, FileText,
-  Settings2, Zap, ImageIcon, AudioLines,
+  Send, Bot, User, Loader2, Sparkles, Brain, RotateCcw, Plus,
+  MessageSquare, Trash2, MoreVertical, PanelLeftClose, Mic,
+  MicOff, PanelLeft, Pencil, X, Paperclip, Image, FileText,
+  Settings2, Zap, ImageIcon, AudioLines, Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
@@ -57,15 +57,7 @@ const MODELS = [
   { id: 'google/gemini-2.5-pro', name: 'Gemini Pro', icon: Brain, color: 'text-indigo-500' },
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet', icon: Brain, color: 'text-orange-500' },
   { id: 'openai/gpt-5.2', name: 'GPT-5.2', icon: Sparkles, color: 'text-cyan-500' },
-];
-
-const QUICK_ACTIONS = [
-  { icon: BarChart3, label: 'Estadísticas', prompt: '¿Cuáles son mis estadísticas de leads?' },
-  { icon: Search, label: 'Buscar leads', prompt: 'Busca mis leads más recientes' },
-  { icon: Plus, label: 'Crear lead', prompt: 'Quiero crear un nuevo lead' },
-  { icon: Bell, label: 'Recordatorios', prompt: '¿Qué recordatorios tengo pendientes?' },
-  { icon: MessageSquare, label: 'WhatsApp', prompt: 'Muéstrame mis chats de WhatsApp recientes' },
-  { icon: FileIcon, label: 'Presupuestos STEL', prompt: 'Lista mis presupuestos de STEL Order' },
+  { id: 'custom', name: 'Personalizado', icon: Pencil, color: 'text-muted-foreground' },
 ];
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/perplexity-chat`;
@@ -75,8 +67,10 @@ export function PerplexityChatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('openai/gpt-5-nano');
+  const [customModelId, setCustomModelId] = useState('');
   const [activeSubagent, setActiveSubagent] = useState<string | null>(null);
   const [showSubagentPanel, setShowSubagentPanel] = useState(false);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 768);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -89,8 +83,27 @@ export function PerplexityChatbot() {
   const queryClient = useQueryClient();
   
   const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
-  const { subagents } = useAISubagents();
-  const activeSubagents = subagents.filter(s => s.is_active);
+  const { subagents, teams } = useAISubagents();
+  
+  // Filter active subagents by selected team
+  const activeSubagents = activeTeamId 
+    ? subagents.filter(s => s.is_active && s.team_id === activeTeamId)
+    : subagents.filter(s => s.is_active);
+
+  // When team changes, update orchestrator model
+  const activeTeam = teams.find(t => t.id === activeTeamId);
+  useEffect(() => {
+    if (activeTeam?.orchestrator_model) {
+      const isBuiltIn = MODELS.some(m => m.id === activeTeam.orchestrator_model);
+      if (isBuiltIn) {
+        setSelectedModel(activeTeam.orchestrator_model);
+        setCustomModelId('');
+      } else {
+        setSelectedModel('custom');
+        setCustomModelId(activeTeam.orchestrator_model);
+      }
+    }
+  }, [activeTeamId, activeTeam?.orchestrator_model]);
   
   const { isRecording, isTranscribing, startRecording, stopRecording } = useAudioRecorder({
     onTranscription: (text) => {
@@ -130,6 +143,7 @@ export function PerplexityChatbot() {
 
   const streamChat = async (userMessages: { role: string; content: string | any[] }[], sessionId: string) => {
     const token = await getAuthToken();
+    const effectiveModel = selectedModel === 'custom' ? customModelId : selectedModel;
     
     const resp = await fetch(CHAT_URL, {
       method: 'POST',
@@ -139,7 +153,7 @@ export function PerplexityChatbot() {
       },
       body: JSON.stringify({ 
         messages: userMessages,
-        model: selectedModel,
+        model: effectiveModel,
         subagents: activeSubagents.map(s => ({
           name: s.name,
           description: s.description,
@@ -604,14 +618,39 @@ export function PerplexityChatbot() {
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSidebar(!showSidebar)}>
               {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
             </Button>
-            <div className="relative hidden md:block">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
-                <Bot className="h-6 w-6 text-primary-foreground" />
-              </div>
+            {/* Fluiditos avatars - one per subagent in active team */}
+            <div className="relative hidden md:flex items-center">
+              {activeSubagents.length === 0 ? (
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
+                  <Bot className="h-6 w-6 text-primary-foreground" />
+                </div>
+              ) : (
+                <div className="flex items-center -space-x-2">
+                  {activeSubagents.slice(0, 5).map((agent, i) => (
+                    <div
+                      key={agent.id}
+                      className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-md border-2 border-background transition-all hover:scale-110 hover:z-10',
+                        activeSubagent === agent.name && 'ring-2 ring-primary animate-pulse'
+                      )}
+                      style={{ backgroundColor: agent.avatar_color + '30', zIndex: activeSubagents.length - i }}
+                      title={agent.name}
+                    >
+                      {agent.avatar_emoji}
+                    </div>
+                  ))}
+                  {activeSubagents.length > 5 && (
+                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xs font-bold border-2 border-background shadow-md">
+                      +{activeSubagents.length - 5}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-background" style={{ backgroundColor: 'hsl(142, 71%, 45%)' }} />
             </div>
             <div>
-              <h2 className="font-semibold text-base md:text-lg">Asistente CRM</h2>
+              <h2 className="font-semibold text-base md:text-lg">
+                {activeTeam ? activeTeam.name : 'Asistente CRM'}
+              </h2>
               <div className="flex items-center gap-2">
                 <p className="text-xs text-muted-foreground hidden md:block">
                   {activeSubagent ? `🔄 ${activeSubagent} trabajando...` : `${activeSubagents.length} subagente(s) activo(s)`}
@@ -621,32 +660,40 @@ export function PerplexityChatbot() {
           </div>
           
           <div className="flex items-center gap-2 md:gap-3">
-            {/* Active subagents indicators */}
-            {activeSubagents.length > 0 && (
-              <div className="hidden md:flex items-center gap-1">
-                {activeSubagents.slice(0, 4).map(agent => (
-                  <div
-                    key={agent.id}
-                    className={cn('w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all',
-                      activeSubagent === agent.name ? 'ring-2 ring-primary animate-pulse' : ''
-                    )}
-                    style={{ backgroundColor: agent.avatar_color + '22', border: `1px solid ${agent.avatar_color}40` }}
-                    title={`${agent.name} (${agent.model})`}
-                  >
-                    {agent.avatar_emoji}
+            {/* Team selector */}
+            {teams.length > 0 && (
+              <Select value={activeTeamId || 'all'} onValueChange={v => setActiveTeamId(v === 'all' ? null : v)}>
+                <SelectTrigger className="w-[100px] md:w-[130px] h-8 md:h-9 bg-muted/50 border-0">
+                  <div className="flex items-center gap-1">
+                    <Users className="h-3 w-3 shrink-0" />
+                    <span className="text-xs truncate">{activeTeam?.name || 'Todos'}</span>
                   </div>
-                ))}
-                {activeSubagents.length > 4 && (
-                  <span className="text-xs text-muted-foreground">+{activeSubagents.length - 4}</span>
-                )}
-              </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los agentes</SelectItem>
+                  {teams.map(t => {
+                    const count = subagents.filter(s => s.is_active && s.team_id === t.id).length;
+                    return (
+                      <SelectItem key={t.id} value={t.id}>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-3 w-3" />
+                          <span>{t.name}</span>
+                          <span className="text-muted-foreground text-xs">({count})</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             )}
 
             <Select value={selectedModel} onValueChange={setSelectedModel}>
               <SelectTrigger className="w-[110px] md:w-[150px] h-8 md:h-9 bg-muted/50 border-0">
                 <div className="flex items-center gap-1 md:gap-2">
                   <selectedModelInfo.icon className={`h-3 w-3 md:h-4 md:w-4 ${selectedModelInfo.color}`} />
-                  <span className="text-xs md:text-sm truncate">{selectedModelInfo.name}</span>
+                  <span className="text-xs md:text-sm truncate">
+                    {selectedModel === 'custom' ? (customModelId || 'Custom') : selectedModelInfo.name}
+                  </span>
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -660,6 +707,16 @@ export function PerplexityChatbot() {
                 ))}
               </SelectContent>
             </Select>
+
+            {/* Custom model input */}
+            {selectedModel === 'custom' && (
+              <Input
+                value={customModelId}
+                onChange={e => setCustomModelId(e.target.value)}
+                placeholder="provider/model"
+                className="w-[140px] h-8 text-xs bg-muted/50 border-0"
+              />
+            )}
             
             <Button variant="ghost" size="icon" onClick={() => setShowSubagentPanel(!showSubagentPanel)} className="h-9 w-9" title="Subagentes IA">
               <Settings2 className={cn("h-4 w-4", showSubagentPanel && "text-primary")} />
@@ -677,17 +734,40 @@ export function PerplexityChatbot() {
         <ScrollArea className="flex-1 px-3 md:px-6" ref={scrollRef}>
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center py-8 md:py-12">
-              <div className="w-14 h-14 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4 md:mb-6">
-                <Sparkles className="h-7 w-7 md:h-10 md:w-10 text-primary" />
+              {/* Fluiditos group display */}
+              <div className="flex items-center -space-x-3 mb-4 md:mb-6">
+                {activeSubagents.length === 0 ? (
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <Sparkles className="h-8 w-8 md:h-10 md:w-10 text-primary" />
+                  </div>
+                ) : (
+                  activeSubagents.slice(0, 6).map((agent, i) => (
+                    <div
+                      key={agent.id}
+                      className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center text-2xl md:text-3xl shadow-lg border-2 border-background transition-transform hover:scale-110 hover:z-10"
+                      style={{ backgroundColor: agent.avatar_color + '25', zIndex: activeSubagents.length - i }}
+                      title={agent.name}
+                    >
+                      {agent.avatar_emoji}
+                    </div>
+                  ))
+                )}
+                {activeSubagents.length > 6 && (
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-muted flex items-center justify-center text-sm font-bold border-2 border-background shadow-lg">
+                    +{activeSubagents.length - 6}
+                  </div>
+                )}
               </div>
               <h3 className="font-semibold text-lg md:text-xl mb-2 text-center">¿En qué puedo ayudarte?</h3>
               <p className="text-muted-foreground text-center text-sm md:text-base max-w-md mb-4 px-4">
-                Orquestador central con {activeSubagents.length} subagente(s) especializado(s)
+                {activeTeam 
+                  ? `Equipo "${activeTeam.name}" con ${activeSubagents.length} subagente(s)`
+                  : `Orquestador central con ${activeSubagents.length} subagente(s) especializado(s)`}
               </p>
 
               {/* Subagent chips */}
               {activeSubagents.length > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center mb-6 max-w-md">
+                <div className="flex flex-wrap gap-2 justify-center max-w-md">
                   {activeSubagents.map(agent => (
                     <div key={agent.id}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs"
@@ -700,18 +780,6 @@ export function PerplexityChatbot() {
                   ))}
                 </div>
               )}
-              
-              <div className="grid grid-cols-2 gap-2 md:gap-3 w-full max-w-md px-2">
-                {QUICK_ACTIONS.map((action) => (
-                  <button key={action.label} onClick={() => handleSend(action.prompt)}
-                    className="flex items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl border bg-card hover:bg-accent transition-colors text-left group">
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
-                      <action.icon className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-                    </div>
-                    <span className="text-xs md:text-sm font-medium">{action.label}</span>
-                  </button>
-                ))}
-              </div>
             </div>
           ) : (
             <div className="py-6 space-y-6">
@@ -844,7 +912,8 @@ export function PerplexityChatbot() {
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground text-center mt-2">
-            Orquestador: {selectedModelInfo.name} • {activeSubagents.length} subagente(s) • 📎 PDF, DOCX, CSV, imágenes
+            Orquestador: {selectedModel === 'custom' ? (customModelId || 'Custom') : selectedModelInfo.name}
+            {activeTeam ? ` • Equipo: ${activeTeam.name}` : ''} • {activeSubagents.length} subagente(s) • 📎 PDF, DOCX, CSV, imágenes
           </p>
         </div>
       </div>

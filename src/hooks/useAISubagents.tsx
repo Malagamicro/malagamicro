@@ -9,6 +9,7 @@ export interface AISubagentTeam {
   name: string;
   description: string | null;
   is_active: boolean;
+  orchestrator_model: string;
   created_at: string;
   updated_at: string;
 }
@@ -88,7 +89,7 @@ export function useAISubagents() {
   });
 
   const createTeam = useMutation({
-    mutationFn: async (team: { name: string; description?: string }) => {
+    mutationFn: async (team: { name: string; description?: string; orchestrator_model?: string }) => {
       if (!user?.id) throw new Error('No autenticado');
       const { data, error } = await supabase
         .from('ai_subagent_teams' as any)

@@ -68,6 +68,8 @@ export function SubagentManager() {
   const [customModel, setCustomModel] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamDescription, setTeamDescription] = useState('');
+  const [teamModel, setTeamModel] = useState('openai/gpt-5-nano');
+  const [teamCustomModel, setTeamCustomModel] = useState('');
   const [editingTeam, setEditingTeam] = useState<AISubagentTeam | null>(null);
   const [activeTab, setActiveTab] = useState('agents');
   const [expandedToolCategories, setExpandedToolCategories] = useState<string[]>([]);
@@ -115,13 +117,16 @@ export function SubagentManager() {
 
   const handleSaveTeam = async () => {
     if (!teamName.trim()) return;
+    const orchModel = teamModel === 'custom' ? teamCustomModel : teamModel;
     if (editingTeam) {
-      await updateTeam.mutateAsync({ id: editingTeam.id, name: teamName, description: teamDescription || null });
+      await updateTeam.mutateAsync({ id: editingTeam.id, name: teamName, description: teamDescription || null, orchestrator_model: orchModel });
     } else {
-      await createTeam.mutateAsync({ name: teamName, description: teamDescription || undefined });
+      await createTeam.mutateAsync({ name: teamName, description: teamDescription || undefined, orchestrator_model: orchModel });
     }
     setTeamName('');
     setTeamDescription('');
+    setTeamModel('openai/gpt-5-nano');
+    setTeamCustomModel('');
     setEditingTeam(null);
     setIsTeamOpen(false);
   };
@@ -464,7 +469,7 @@ export function SubagentManager() {
           <div className="flex justify-end">
             <Dialog open={isTeamOpen} onOpenChange={setIsTeamOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditingTeam(null); setTeamName(''); setTeamDescription(''); }}>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditingTeam(null); setTeamName(''); setTeamDescription(''); setTeamModel('openai/gpt-5-nano'); setTeamCustomModel(''); }}>
                   <FolderPlus className="h-3 w-3 mr-1" /> Nuevo equipo
                 </Button>
               </DialogTrigger>
@@ -480,6 +485,23 @@ export function SubagentManager() {
                   <div className="space-y-1.5">
                     <Label className="text-xs">Descripción (opcional)</Label>
                     <Input value={teamDescription} onChange={e => setTeamDescription(e.target.value)} placeholder="Descripción del equipo" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Modelo del orquestador</Label>
+                    <Select value={teamModel} onValueChange={setTeamModel}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Modelo para el orquestador" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {POPULAR_MODELS.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                        <SelectItem value="custom">✏️ Modelo personalizado...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {teamModel === 'custom' && (
+                      <Input value={teamCustomModel} onChange={e => setTeamCustomModel(e.target.value)} placeholder="provider/model-name" className="mt-1.5" />
+                    )}
                   </div>
                   <Button onClick={handleSaveTeam} className="w-full" disabled={!teamName.trim()}>
                     {editingTeam ? 'Guardar' : 'Crear equipo'}
@@ -508,12 +530,16 @@ export function SubagentManager() {
                         {team.description && (
                           <p className="text-[10px] text-muted-foreground">{team.description}</p>
                         )}
+                        <p className="text-[10px] text-muted-foreground">🤖 Orquestador: {team.orchestrator_model}</p>
                       </div>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
                           setEditingTeam(team);
                           setTeamName(team.name);
                           setTeamDescription(team.description || '');
+                          const isBuiltIn = POPULAR_MODELS.some(m => m.id === team.orchestrator_model);
+                          setTeamModel(isBuiltIn ? team.orchestrator_model : 'custom');
+                          setTeamCustomModel(isBuiltIn ? '' : team.orchestrator_model);
                           setIsTeamOpen(true);
                         }}>
                           <Pencil className="h-3 w-3" />
