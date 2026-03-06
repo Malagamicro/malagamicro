@@ -1760,11 +1760,12 @@ serve(async (req) => {
         : [];
 
       if (agentType === 'image') {
-        // Image generation via OpenRouter
-        const imageModel = agentModel || 'google/gemini-2.0-flash-exp:free';
+        // Image generation via OpenRouter with modalities parameter
+        const imageModel = agentModel || 'google/gemini-2.5-flash-image-preview';
         
         const imageRequestBody: any = {
           model: imageModel,
+          modalities: ["text", "image"],
           messages: [
             { role: "system", content: agentPrompt || "You are an AI image generation assistant. Generate images based on user descriptions. Always generate the image directly." },
             { role: "user", content: userMessage },
