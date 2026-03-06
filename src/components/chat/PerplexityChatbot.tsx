@@ -618,14 +618,39 @@ export function PerplexityChatbot() {
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSidebar(!showSidebar)}>
               {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
             </Button>
-            <div className="relative hidden md:block">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
-                <Bot className="h-6 w-6 text-primary-foreground" />
-              </div>
+            {/* Fluiditos avatars - one per subagent in active team */}
+            <div className="relative hidden md:flex items-center">
+              {activeSubagents.length === 0 ? (
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
+                  <Bot className="h-6 w-6 text-primary-foreground" />
+                </div>
+              ) : (
+                <div className="flex items-center -space-x-2">
+                  {activeSubagents.slice(0, 5).map((agent, i) => (
+                    <div
+                      key={agent.id}
+                      className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-md border-2 border-background transition-all hover:scale-110 hover:z-10',
+                        activeSubagent === agent.name && 'ring-2 ring-primary animate-pulse'
+                      )}
+                      style={{ backgroundColor: agent.avatar_color + '30', zIndex: activeSubagents.length - i }}
+                      title={agent.name}
+                    >
+                      {agent.avatar_emoji}
+                    </div>
+                  ))}
+                  {activeSubagents.length > 5 && (
+                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xs font-bold border-2 border-background shadow-md">
+                      +{activeSubagents.length - 5}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-background" style={{ backgroundColor: 'hsl(142, 71%, 45%)' }} />
             </div>
             <div>
-              <h2 className="font-semibold text-base md:text-lg">Asistente CRM</h2>
+              <h2 className="font-semibold text-base md:text-lg">
+                {activeTeam ? activeTeam.name : 'Asistente CRM'}
+              </h2>
               <div className="flex items-center gap-2">
                 <p className="text-xs text-muted-foreground hidden md:block">
                   {activeSubagent ? `🔄 ${activeSubagent} trabajando...` : `${activeSubagents.length} subagente(s) activo(s)`}
