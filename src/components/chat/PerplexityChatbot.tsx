@@ -707,7 +707,7 @@ export function PerplexityChatbot() {
         collapsedSize={0}
         onCollapse={() => setShowSubagentPanel(false)}
         onExpand={() => setShowSubagentPanel(true)}
-        className={cn('transition-all', !showSubagentPanel && 'hidden')}
+        className="transition-all"
       >
         <div className="h-full flex flex-col bg-muted/30">
           <div className="p-3 border-b flex items-center justify-between gap-2">
