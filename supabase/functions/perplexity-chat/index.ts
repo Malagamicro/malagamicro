@@ -1760,28 +1760,26 @@ serve(async (req) => {
         : [];
 
       if (agentType === 'image') {
-        // Image generation via OpenRouter with modalities parameter
-        const imageModel = agentModel || 'google/gemini-2.5-flash-image-preview';
+        // Image generation uses Lovable AI Gateway with google/gemini-2.5-flash-image
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        const imageModel = 'google/gemini-2.5-flash-image';
         
         const imageRequestBody: any = {
           model: imageModel,
-          modalities: ["text", "image"],
+          modalities: ["image", "text"],
           messages: [
-            { role: "system", content: agentPrompt || "You are an AI image generation assistant. Generate images based on user descriptions. Always generate the image directly." },
-            { role: "user", content: userMessage },
+            { role: "user", content: agentPrompt ? `${agentPrompt}\n\n${userMessage}` : userMessage },
           ],
           stream: false,
         };
         
-        console.log(`[perplexity-chat] Image generation using ${imageModel} via OpenRouter`);
+        console.log(`[perplexity-chat] Image generation using ${imageModel} via Lovable AI Gateway`);
         
-        const imageResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": supabaseUrl,
-            "X-Title": "Malaga Micro CRM - Image Subagent",
           },
           body: JSON.stringify(imageRequestBody),
         });
@@ -1789,8 +1787,14 @@ serve(async (req) => {
         if (!imageResponse.ok) {
           const errText = await imageResponse.text();
           console.error("Subagent image error:", imageResponse.status, errText);
-          return new Response(JSON.stringify({ error: `Error del subagente ${agentName}: ${imageResponse.status}` }), {
-            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          const errorMsg = imageResponse.status === 404 
+            ? `Modelo de imagen no encontrado. Verifica la configuración.`
+            : imageResponse.status === 429 
+            ? `Rate limit excedido. Intenta de nuevo en unos segundos.`
+            : `Error del subagente ${agentName}: ${imageResponse.status}`;
+          return new Response(JSON.stringify({ error: errorMsg }), {
+            status: imageResponse.status >= 400 && imageResponse.status < 500 ? imageResponse.status : 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
