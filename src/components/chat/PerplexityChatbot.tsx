@@ -322,7 +322,7 @@ export function PerplexityChatbot() {
     }
   };
 
-  const executeSubagentCall = async (agent: AISubagent, task: string, sessionId: string, contextMessages: any[]) => {
+  const executeSubagentCall = async (agent: AISubagent, task: string, sessionId: string, contextMessages: any[]): Promise<string> => {
     setActiveSubagent(agent.name);
     const subagentMsgId = crypto.randomUUID();
 
