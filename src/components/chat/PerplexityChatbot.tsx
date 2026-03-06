@@ -453,6 +453,7 @@ export function PerplexityChatbot() {
         if (subContent) {
           await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${subContent}` });
         }
+        return subContent;
       }
     } catch (error) {
       console.error('Subagent error:', error);
