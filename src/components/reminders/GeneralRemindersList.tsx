@@ -293,6 +293,7 @@ export function GeneralRemindersList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewReminder, setViewReminder] = useState<GeneralReminder | null>(null);
+  const [editReminder, setEditReminder] = useState<GeneralReminder | null>(null);
   const [activeTab, setActiveTab] = useState('pending');
 
   const {
