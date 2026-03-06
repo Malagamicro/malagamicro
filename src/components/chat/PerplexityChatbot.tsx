@@ -67,8 +67,10 @@ export function PerplexityChatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('openai/gpt-5-nano');
+  const [customModelId, setCustomModelId] = useState('');
   const [activeSubagent, setActiveSubagent] = useState<string | null>(null);
   const [showSubagentPanel, setShowSubagentPanel] = useState(false);
+  const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 768);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -81,8 +83,27 @@ export function PerplexityChatbot() {
   const queryClient = useQueryClient();
   
   const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
-  const { subagents } = useAISubagents();
-  const activeSubagents = subagents.filter(s => s.is_active);
+  const { subagents, teams } = useAISubagents();
+  
+  // Filter active subagents by selected team
+  const activeSubagents = activeTeamId 
+    ? subagents.filter(s => s.is_active && s.team_id === activeTeamId)
+    : subagents.filter(s => s.is_active);
+
+  // When team changes, update orchestrator model
+  const activeTeam = teams.find(t => t.id === activeTeamId);
+  useEffect(() => {
+    if (activeTeam?.orchestrator_model) {
+      const isBuiltIn = MODELS.some(m => m.id === activeTeam.orchestrator_model);
+      if (isBuiltIn) {
+        setSelectedModel(activeTeam.orchestrator_model);
+        setCustomModelId('');
+      } else {
+        setSelectedModel('custom');
+        setCustomModelId(activeTeam.orchestrator_model);
+      }
+    }
+  }, [activeTeamId, activeTeam?.orchestrator_model]);
   
   const { isRecording, isTranscribing, startRecording, stopRecording } = useAudioRecorder({
     onTranscription: (text) => {
