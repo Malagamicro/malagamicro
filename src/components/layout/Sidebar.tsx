@@ -211,6 +211,118 @@ function AddCategoryDialog({ onAdd }: { onAdd: (name: string, icon: string, colo
   );
 }
 
+// Available internal apps that can be added to the sidebar
+const AVAILABLE_APPS: SidebarItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', color: 'text-blue-500' },
+  { id: 'leads', label: 'Leads', icon: 'Users', color: 'text-indigo-500' },
+  { id: 'pipeline', label: 'Pipeline', icon: 'Kanban', color: 'text-purple-500' },
+  { id: 'prospeccion', label: 'Prospección', icon: 'Search', color: 'text-cyan-500' },
+  { id: 'mapa', label: 'Mapa', icon: 'MapPin', color: 'text-red-500' },
+  { id: 'notas', label: 'Notas', icon: 'StickyNote', color: 'text-amber-500' },
+  { id: 'apps', label: 'Aplicaciones', icon: 'LayoutGrid', color: 'text-violet-500' },
+  { id: 'calendario', label: 'Calendario', icon: 'Calendar', color: 'text-green-500' },
+  { id: 'correo', label: 'Correo', icon: 'Mail', color: 'text-sky-500' },
+  { id: 'inbox', label: 'Bandeja', icon: 'Inbox', color: 'text-blue-400' },
+  { id: 'mensajes', label: 'Chat Interno', icon: 'MessagesSquare', color: 'text-emerald-500' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: 'MessageCircle', color: 'text-green-500' },
+  { id: 'osticket', label: 'Tickets', icon: 'Ticket', color: 'text-orange-500' },
+  { id: 'campaigns', label: 'Campañas', icon: 'Megaphone', color: 'text-pink-500' },
+  { id: 'templates', label: 'Plantillas', icon: 'FileText', color: 'text-slate-400' },
+  { id: 'informes', label: 'Informes', icon: 'BarChart3', color: 'text-teal-500' },
+  { id: 'reminders', label: 'Recordatorios', icon: 'Bell', color: 'text-amber-500' },
+  { id: 'shared-files', label: 'Archivos', icon: 'FolderOpen', color: 'text-yellow-500' },
+  { id: 'chat-ai', label: 'Chat IA', icon: 'Bot', color: 'text-violet-500' },
+  { id: 'editor', label: 'Editor', icon: 'FileEdit', color: 'text-blue-500' },
+  { id: 'seo-generator', label: 'SEO', icon: 'Globe', color: 'text-green-500' },
+  { id: 'settings', label: 'Ajustes', icon: 'Settings', color: 'text-slate-400' },
+];
+
+// Add App Dialog - allows adding internal app modules to sidebar categories
+function AddAppDialog({ categories, onAdd }: {
+  categories: SidebarCategory[];
+  onAdd: (categoryId: string, app: SidebarItem) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [categoryId, setCategoryId] = useState('');
+  const [search, setSearch] = useState('');
+
+  // Get all item IDs already in the sidebar
+  const existingIds = new Set(categories.flatMap(c => c.items.map(i => i.id)));
+  const filteredApps = AVAILABLE_APPS.filter(app => {
+    if (existingIds.has(app.id)) return false;
+    if (search) return app.label.toLowerCase().includes(search.toLowerCase());
+    return true;
+  });
+
+  const handleAdd = (app: SidebarItem) => {
+    if (!categoryId) return;
+    onAdd(categoryId, app);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-sidebar-accent transition-colors">
+          <LayoutGrid className="w-4 h-4" />
+          <span>Añadir aplicación</span>
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[400px] bg-background">
+        <DialogHeader><DialogTitle>Añadir aplicación al sidebar</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Carpeta destino</label>
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona una carpeta..." />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map(cat => (
+                  <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar aplicación..."
+              className="mb-2"
+            />
+            <div className="max-h-[280px] overflow-y-auto space-y-1">
+              {filteredApps.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {search ? 'No se encontraron aplicaciones' : 'Todas las aplicaciones ya están en el sidebar'}
+                </p>
+              ) : (
+                filteredApps.map(app => {
+                  const AppIcon = getIcon(app.icon);
+                  return (
+                    <button
+                      key={app.id}
+                      onClick={() => { handleAdd(app); }}
+                      disabled={!categoryId}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                        categoryId ? "hover:bg-muted cursor-pointer" : "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <AppIcon className={cn("w-4 h-4 flex-shrink-0", app.color)} />
+                      <span className="flex-1 text-left">{app.label}</span>
+                      <Plus className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Add External Link Dialog
 function AddLinkDialog({ categories, onAdd }: {
   categories: SidebarCategory[];
@@ -327,7 +439,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   const badgeCounts = useBadgeCounts();
   const isMobile = useIsMobile();
   const {
-    categories, editMode, setEditMode, addCategory, addLinkItem, removeCategory,
+    categories, editMode, setEditMode, addCategory, addLinkItem, addAppItem, removeCategory,
     renameCategory, reorderCategories, moveItem, reorderItems, resetToDefault,
     sidebarPosition, setSidebarPosition, setCategoryBgColor, toggleItemVisibility,
   } = useSidebarConfig();
@@ -379,6 +491,10 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
 
   const handleAddLink = (categoryId: string, label: string, url: string, icon: string, color: string) => {
     addLinkItem(categoryId, label, url, icon, color);
+  };
+
+  const handleAddApp = (categoryId: string, app: SidebarItem) => {
+    addAppItem(categoryId, app);
   };
 
   const handleStartRename = (catId: string, currentName: string) => {
@@ -695,6 +811,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         )}
       </Droppable>
       <AddCategoryDialog onAdd={addCategory} />
+      <AddAppDialog categories={categories} onAdd={handleAddApp} />
       <AddLinkDialog categories={categories} onAdd={handleAddLink} />
       {/* Position selector */}
       <div className="px-3 py-2">

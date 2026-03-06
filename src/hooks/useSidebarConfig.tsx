@@ -178,6 +178,21 @@ export function useSidebarConfig() {
     saveConfig(updated);
   };
 
+  const addAppItem = (categoryId: string, app: SidebarItem) => {
+    // Check if app already exists in any category
+    const exists = categories.some(c => c.items.some(i => i.id === app.id));
+    if (exists) {
+      toast.info('Esta aplicación ya está en el sidebar');
+      return;
+    }
+    const updated = categories.map(c =>
+      c.id === categoryId ? { ...c, items: [...c.items, { ...app }] } : c
+    );
+    setCategories(updated);
+    saveConfig(updated);
+    toast.success(`"${app.label}" añadida al sidebar`);
+  };
+
   const removeCategory = (categoryId: string) => {
     const updated = categories.filter(c => c.id !== categoryId);
     setCategories(updated);
@@ -270,6 +285,7 @@ export function useSidebarConfig() {
     setEditMode,
     addCategory,
     addLinkItem,
+    addAppItem,
     removeCategory,
     renameCategory,
     reorderCategories,

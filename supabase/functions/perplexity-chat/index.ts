@@ -1760,13 +1760,8 @@ serve(async (req) => {
         : [];
 
       if (agentType === 'image') {
-        // Image generation via Lovable AI Gateway (supports actual image generation)
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        const imageApiUrl = LOVABLE_API_KEY 
-          ? "https://ai.gateway.lovable.dev/v1/chat/completions"
-          : "https://openrouter.ai/api/v1/chat/completions";
-        const imageApiKey = LOVABLE_API_KEY || OPENROUTER_API_KEY;
-        const imageModel = LOVABLE_API_KEY ? "google/gemini-2.5-flash-image" : agentModel;
+        // Image generation via OpenRouter
+        const imageModel = agentModel || 'google/gemini-2.0-flash-exp:free';
         
         const imageRequestBody: any = {
           model: imageModel,
@@ -1777,19 +1772,15 @@ serve(async (req) => {
           stream: false,
         };
         
-        // Lovable AI gateway requires modalities for image generation
-        if (LOVABLE_API_KEY) {
-          imageRequestBody.modalities = ["image", "text"];
-        }
+        console.log(`[perplexity-chat] Image generation using ${imageModel} via OpenRouter`);
         
-        console.log(`[perplexity-chat] Image generation using ${imageModel} via ${LOVABLE_API_KEY ? 'Lovable Gateway' : 'OpenRouter'}`);
-        
-        const imageResponse = await fetch(imageApiUrl, {
+        const imageResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${imageApiKey}`,
+            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
             "Content-Type": "application/json",
-            ...(LOVABLE_API_KEY ? {} : { "HTTP-Referer": supabaseUrl, "X-Title": "Malaga Micro CRM - Image Subagent" }),
+            "HTTP-Referer": supabaseUrl,
+            "X-Title": "Malaga Micro CRM - Image Subagent",
           },
           body: JSON.stringify(imageRequestBody),
         });

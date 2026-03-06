@@ -11,12 +11,9 @@ serve(async (req) => {
   try {
     const { prompt, currentTheme } = await req.json();
     
-    // Try Lovable AI gateway first, fallback to OpenRouter
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-    
-    if (!LOVABLE_API_KEY && !OPENROUTER_API_KEY) {
-      throw new Error("No AI API key configured");
+    if (!OPENROUTER_API_KEY) {
+      throw new Error("OPENROUTER_API_KEY not configured");
     }
 
     const systemPrompt = `Eres un diseñador de temas UI experto para un CRM. El usuario te describe cómo quiere que se vea su aplicación y tú generas un tema COMPLETO que incluye colores, sidebar, estados de leads, y configuración visual.
@@ -76,29 +73,19 @@ Reglas:
 - sidebarConfig.sidebarPosition: left, right, top, bottom
 - NO incluyas texto explicativo, SOLO el JSON`;
 
-    let apiUrl: string;
-    let apiKey: string;
-    let model: string;
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-
-    if (LOVABLE_API_KEY) {
-      apiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
-      apiKey = LOVABLE_API_KEY;
-      model = "google/gemini-2.5-flash";
-    } else {
-      apiUrl = "https://openrouter.ai/api/v1/chat/completions";
-      apiKey = OPENROUTER_API_KEY!;
-      model = "google/gemini-2.5-flash";
-      headers["HTTP-Referer"] = "https://malagamicro.lovable.app";
-      headers["X-Title"] = "MalagaMicro CRM";
-    }
-    headers["Authorization"] = `Bearer ${apiKey}`;
+    const apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+      "HTTP-Referer": "https://malagamicro.lovable.app",
+      "X-Title": "MalagaMicro CRM",
+    };
 
     const response = await fetch(apiUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        model,
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Tema actual: ${JSON.stringify(currentTheme || {})}. Petición del usuario: ${prompt}` },
