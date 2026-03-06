@@ -271,16 +271,7 @@ export function MascotChatWidget() {
           : 'overflow-auto min-w-[280px] min-h-[300px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)] w-[340px] h-[460px] rounded-2xl resize'
       )}
     >
-      {/* Customizer overlay */}
-      {showCustomizer && (
-        <FluiditosCustomizer
-          config={fluiditosConfig}
-          onChange={setFluiditosConfig}
-          onClose={() => setShowCustomizer(false)}
-        />
-      )}
-
-      {/* Header */}
+      {/* Header - always draggable */}
       <div
         onMouseDown={startDrag}
         onTouchStart={startDrag}
