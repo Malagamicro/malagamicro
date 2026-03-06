@@ -93,9 +93,9 @@ export function PerplexityChatbot() {
   const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
   const { subagents, teams } = useAISubagents();
   
-  // Filter active subagents by selected team
+  // Filter active subagents by selected team (include teamless subagents as "global")
   const activeSubagents = activeTeamId 
-    ? subagents.filter(s => s.is_active && s.team_id === activeTeamId)
+    ? subagents.filter(s => s.is_active && (s.team_id === activeTeamId || !s.team_id))
     : subagents.filter(s => s.is_active);
 
   // When team changes, update orchestrator model
@@ -271,7 +271,12 @@ export function PerplexityChatbot() {
       const agentResults: Record<string, string> = {};
 
       for (const delegation of ordered) {
-        const agent = activeSubagents.find(s => s.name.toLowerCase() === delegation.agent_name.toLowerCase());
+        // Fuzzy match: exact match first, then startsWith, then includes
+        const agentNameLower = delegation.agent_name.toLowerCase();
+        const agent = activeSubagents.find(s => s.name.toLowerCase() === agentNameLower)
+          || activeSubagents.find(s => s.name.toLowerCase().startsWith(agentNameLower) || agentNameLower.startsWith(s.name.toLowerCase()))
+          || activeSubagents.find(s => s.agent_type === 'image' && (agentNameLower.includes('image') || agentNameLower.includes('imagen')))
+          || activeSubagents.find(s => s.agent_type === 'audio' && (agentNameLower.includes('audio') || agentNameLower.includes('sonido') || agentNameLower.includes('voz')));
         if (!agent) continue;
 
         // If this delegation depends on another agent's output, append it to the task
@@ -291,8 +296,10 @@ export function PerplexityChatbot() {
     if (delegations.length === 0 && (assistantContent.includes('🔄 Delegando') || assistantContent.includes('delegation_requested'))) {
       const match = assistantContent.match(/Delegando a \*\*(.+?)\*\*/);
       if (match) {
-        const agentName = match[1];
-        const agent = activeSubagents.find(s => s.name.toLowerCase() === agentName.toLowerCase());
+        const agentNameLower2 = match[1].toLowerCase();
+        const agent = activeSubagents.find(s => s.name.toLowerCase() === agentNameLower2)
+          || activeSubagents.find(s => s.name.toLowerCase().startsWith(agentNameLower2) || agentNameLower2.startsWith(s.name.toLowerCase()))
+          || activeSubagents.find(s => s.agent_type === 'image' && (agentNameLower2.includes('image') || agentNameLower2.includes('imagen')));
         if (agent) {
           setMessages(prev => prev.map(m => 
             m.id === assistantId ? {
