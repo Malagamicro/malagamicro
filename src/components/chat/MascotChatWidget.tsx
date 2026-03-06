@@ -298,13 +298,23 @@ export function MascotChatWidget() {
         </Button>
       </div>
 
+      {/* Customizer overlay - rendered after header so header is still accessible for drag */}
+      {showCustomizer && (
+        <FluiditosCustomizer
+          config={fluiditosConfig}
+          onChange={setFluiditosConfig}
+          onClose={() => setShowCustomizer(false)}
+        />
+      )}
+
       {/* Messages */}
+      {!showCustomizer && (
       <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollViewportRef}>
         <div className="p-4 space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-8 space-y-4">
               <div className="w-24 h-24 mx-auto">
-                <FluiditosAvatar config={fluiditosConfig} size={96} />
+                <FluiditosAvatar config={fluiditosConfig} size={96} animState="idle" />
               </div>
               <div className="space-y-2">
                 <h4 className="font-semibold">¡Hola! Soy Fluiditos 💧</h4>
