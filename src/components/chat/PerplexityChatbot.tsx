@@ -811,7 +811,7 @@ export function PerplexityChatbot() {
                 )}
               </div>
             )}
-            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-background z-20" style={{ backgroundColor: 'hsl(142, 71%, 45%)' }} />
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background z-30 shadow-sm" style={{ backgroundColor: 'hsl(142, 71%, 45%)' }} />
           </div>
           <div>
             <h2 className="font-semibold text-base md:text-lg">
