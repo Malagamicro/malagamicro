@@ -627,6 +627,22 @@ const tools = [
       },
     },
   },
+  // Subagent delegation
+  {
+    type: "function",
+    function: {
+      name: "delegate_to_subagent",
+      description: "Delegar una tarea a un subagente especializado. Úsalo cuando la petición del usuario encaje mejor con un subagente disponible (ej: generar imágenes, análisis especializado, etc.).",
+      parameters: {
+        type: "object",
+        properties: {
+          agent_name: { type: "string", description: "Nombre exacto del subagente al que delegar" },
+          task_description: { type: "string", description: "Descripción clara de la tarea a realizar por el subagente" },
+        },
+        required: ["agent_name", "task_description"],
+      },
+    },
+  },
 ];
 
 // Map endpoint paths to their required root JSON key for POST/PUT
