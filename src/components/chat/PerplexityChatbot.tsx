@@ -93,9 +93,9 @@ export function PerplexityChatbot() {
   const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
   const { subagents, teams } = useAISubagents();
   
-  // Filter active subagents by selected team
+  // Filter active subagents by selected team (include teamless subagents as "global")
   const activeSubagents = activeTeamId 
-    ? subagents.filter(s => s.is_active && s.team_id === activeTeamId)
+    ? subagents.filter(s => s.is_active && (s.team_id === activeTeamId || !s.team_id))
     : subagents.filter(s => s.is_active);
 
   // When team changes, update orchestrator model
