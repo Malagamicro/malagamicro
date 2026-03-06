@@ -296,7 +296,7 @@ export function PerplexityChatbot() {
     if (delegations.length === 0 && (assistantContent.includes('🔄 Delegando') || assistantContent.includes('delegation_requested'))) {
       const match = assistantContent.match(/Delegando a \*\*(.+?)\*\*/);
       if (match) {
-        const agentNameLower2 = agentName.toLowerCase();
+        const agentNameLower2 = match[1].toLowerCase();
         const agent = activeSubagents.find(s => s.name.toLowerCase() === agentNameLower2)
           || activeSubagents.find(s => s.name.toLowerCase().startsWith(agentNameLower2) || agentNameLower2.startsWith(s.name.toLowerCase()))
           || activeSubagents.find(s => s.agent_type === 'image' && (agentNameLower2.includes('image') || agentNameLower2.includes('imagen')));
