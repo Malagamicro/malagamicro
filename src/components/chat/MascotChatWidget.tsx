@@ -234,7 +234,7 @@ export function MascotChatWidget() {
         role="button"
         aria-label="Abrir chat con Fluiditos"
       >
-        <FluiditosAvatar config={fluiditosConfig} size={56} animated />
+        <FluiditosAvatar config={fluiditosConfig} size={56} animated animState="idle" />
         <span className="absolute -top-2 -right-1 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full font-medium shadow pointer-events-none">
           {messages.length > 0 ? `${messages.length}` : '¡Hola!'}
         </span>
