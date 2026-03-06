@@ -13,7 +13,8 @@ import {
   Send, Bot, User, Loader2, Sparkles, Brain, RotateCcw, Plus,
   MessageSquare, Trash2, MoreVertical, PanelLeftClose, Mic,
   MicOff, PanelLeft, Pencil, X, Paperclip, Image, FileText,
-  Settings2, Zap, ImageIcon, AudioLines, Users,
+  Settings2, Zap, ImageIcon, AudioLines, Users, GripVertical,
+  ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
@@ -27,6 +28,8 @@ import { SubagentManager } from './SubagentManager';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { ImperativePanelHandle } from 'react-resizable-panels';
 
 interface Message {
   id: string;
