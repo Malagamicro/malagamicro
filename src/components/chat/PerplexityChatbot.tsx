@@ -13,7 +13,8 @@ import {
   Send, Bot, User, Loader2, Sparkles, Brain, RotateCcw, Plus,
   MessageSquare, Trash2, MoreVertical, PanelLeftClose, Mic,
   MicOff, PanelLeft, Pencil, X, Paperclip, Image, FileText,
-  Settings2, Zap, ImageIcon, AudioLines, Users,
+  Settings2, Zap, ImageIcon, AudioLines, Users, GripVertical,
+  ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
@@ -27,6 +28,8 @@ import { SubagentManager } from './SubagentManager';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { ImperativePanelHandle } from 'react-resizable-panels';
 
 interface Message {
   id: string;
@@ -83,6 +86,8 @@ export function PerplexityChatbot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
+  const subagentPanelRef = useRef<ImperativePanelHandle>(null);
   const queryClient = useQueryClient();
   
   const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
@@ -574,391 +579,534 @@ export function PerplexityChatbot() {
     return format(date, 'dd/MM/yyyy');
   };
 
+  const toggleSidebar = () => {
+    const panel = sidebarPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) {
+      panel.expand();
+      setShowSidebar(true);
+    } else {
+      panel.collapse();
+      setShowSidebar(false);
+    }
+  };
+
+  const toggleSubagentPanel = () => {
+    const panel = subagentPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) {
+      panel.resize(28);
+      setShowSubagentPanel(true);
+    } else {
+      panel.collapse();
+      setShowSubagentPanel(false);
+    }
+  };
+
+  // Mobile: keep old overlay layout
+  if (isMobile) {
+    return (
+      <div className="relative flex w-full h-full overflow-hidden">
+        {showSidebar && (
+          <div className="absolute inset-0 bg-background/40 backdrop-blur-sm z-10" onClick={() => setShowSidebar(false)} />
+        )}
+        {showSidebar && (
+          <div className="absolute z-20 w-[min(18rem,85vw)] h-full border-r bg-background flex flex-col shadow-xl">
+            <div className="p-3 border-b flex items-center justify-between gap-2">
+              <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
+                <MessageSquare className="h-4 w-4 shrink-0" />
+                <span className="truncate">Conversaciones</span>
+              </h3>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNewChat}><Plus className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSidebar(false)}><X className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <ScrollArea className="flex-1">
+              {renderSessionsList()}
+            </ScrollArea>
+          </div>
+        )}
+        {showSubagentPanel && (
+          <div className="absolute z-20 w-[min(24rem,90vw)] h-full border-r bg-background flex flex-col shadow-xl right-0">
+            <div className="p-3 border-b flex items-center justify-between gap-2">
+              <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
+                <Settings2 className="h-4 w-4 shrink-0" />
+                <span className="truncate">Subagentes IA</span>
+              </h3>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSubagentPanel(false)}><X className="h-4 w-4" /></Button>
+            </div>
+            <ScrollArea className="flex-1 p-3">
+              <SubagentManager />
+            </ScrollArea>
+          </div>
+        )}
+        <div className="flex-1 flex flex-col w-full">
+          {renderHeader()}
+          {renderMessages()}
+          {renderInput()}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop: resizable panels
   return (
-    <div className="relative flex w-full h-full overflow-hidden">
-      {/* Sessions Sidebar */}
-      {showSidebar && (
-        <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-56 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
+    <ResizablePanelGroup direction="horizontal" className="w-full h-full">
+      {/* Conversations Panel */}
+      <ResizablePanel
+        ref={sidebarPanelRef}
+        defaultSize={18}
+        minSize={12}
+        maxSize={30}
+        collapsible
+        collapsedSize={0}
+        onCollapse={() => setShowSidebar(false)}
+        onExpand={() => setShowSidebar(true)}
+        className="transition-all"
+      >
+        <div className="h-full flex flex-col bg-muted/30">
           <div className="p-3 border-b flex items-center justify-between gap-2">
             <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
               <MessageSquare className="h-4 w-4 shrink-0" />
               <span className="truncate">Conversaciones</span>
             </h3>
             <div className="flex items-center gap-1 shrink-0">
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNewChat}>
-                <Plus className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 md:hidden" onClick={() => setShowSidebar(false)}>
-                <X className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNewChat}><Plus className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleSidebar} title="Colapsar">
+                <ChevronsLeft className="h-4 w-4" />
               </Button>
             </div>
           </div>
-          
           <ScrollArea className="flex-1">
-            {isLoadingSessions ? (
-              <div className="p-4 text-center text-muted-foreground text-sm">Cargando...</div>
-            ) : sessions.length === 0 ? (
-              <div className="p-4 text-center text-muted-foreground text-sm">No hay conversaciones</div>
-            ) : (
-              <div className="p-2 space-y-1">
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className={cn('group relative rounded-lg p-2 cursor-pointer transition-colors',
-                      activeSessionId === session.id ? 'bg-accent' : 'hover:bg-accent/50'
-                    )}
-                    onClick={() => handleSelectSession(session)}
-                  >
-                    {editingTitle === session.id ? (
-                      <Input value={editTitleValue} onChange={(e) => setEditTitleValue(e.target.value)}
-                        onBlur={handleSaveTitle}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(); if (e.key === 'Escape') setEditingTitle(null); }}
-                        className="h-6 text-sm" autoFocus onClick={(e) => e.stopPropagation()} />
-                    ) : (
-                      <>
-                        <p className="text-sm font-medium truncate pr-8">{session.title}</p>
-                        <p className="text-xs text-muted-foreground">{formatSessionDate(session.updatedAt)}</p>
-                      </>
-                    )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"
-                          className="absolute right-1 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => e.stopPropagation()}>
-                          <MoreVertical className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleStartEditTitle(session)}>
-                          <Pencil className="h-3 w-3 mr-2" /> Renombrar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteSession(session.id)} className="text-destructive">
-                          <Trash2 className="h-3 w-3 mr-2" /> Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ))}
-              </div>
-            )}
+            {renderSessionsList()}
           </ScrollArea>
-
         </div>
-      )}
+      </ResizablePanel>
 
-      {/* Subagent Panel - separate from conversations */}
-      {showSubagentPanel && (
-        <div className="absolute md:relative z-20 w-[min(24rem,90vw)] md:w-96 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
+      <ResizableHandle withHandle />
+
+      {/* Main Chat */}
+      <ResizablePanel defaultSize={82} minSize={30}>
+        <div className="flex-1 flex flex-col w-full h-full">
+          {renderHeader()}
+          {renderMessages()}
+          {renderInput()}
+        </div>
+      </ResizablePanel>
+
+      <ResizableHandle withHandle />
+
+      {/* Subagent Panel */}
+      <ResizablePanel
+        ref={subagentPanelRef}
+        defaultSize={0}
+        minSize={15}
+        maxSize={45}
+        collapsible
+        collapsedSize={0}
+        onCollapse={() => setShowSubagentPanel(false)}
+        onExpand={() => setShowSubagentPanel(true)}
+        className="transition-all"
+      >
+        <div className="h-full flex flex-col bg-muted/30">
           <div className="p-3 border-b flex items-center justify-between gap-2">
             <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
               <Settings2 className="h-4 w-4 shrink-0" />
               <span className="truncate">Subagentes IA</span>
             </h3>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowSubagentPanel(false)}>
-              <X className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleSubagentPanel} title="Colapsar">
+              <ChevronsRight className="h-4 w-4" />
             </Button>
           </div>
           <ScrollArea className="flex-1 p-3">
             <SubagentManager />
           </ScrollArea>
         </div>
-      )}
+      </ResizablePanel>
+    </ResizablePanelGroup>
+  );
 
-      {showSidebar && (
-        <div className="absolute inset-0 bg-background/40 backdrop-blur-sm z-10 md:hidden" onClick={() => setShowSidebar(false)} />
-      )}
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col w-full">
-        {/* Header */}
-        <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 border-b bg-background/80 backdrop-blur-sm">
-          <div className="flex items-center gap-2 md:gap-4">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowSidebar(!showSidebar)}>
-              {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
-            </Button>
-            {/* Fluiditos avatars - one per subagent in active team */}
-            <div className="relative hidden md:flex items-center">
-              {activeSubagents.length === 0 ? (
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
-                  <Bot className="h-6 w-6 text-primary-foreground" />
-                </div>
-              ) : (
-                <div className="flex items-center -space-x-2">
-                  {activeSubagents.slice(0, 5).map((agent, i) => (
-                    <div
-                      key={agent.id}
-                      className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-md border-2 border-background transition-all hover:scale-110 hover:z-10',
-                        activeSubagent === agent.name && 'ring-2 ring-primary animate-pulse'
-                      )}
-                      style={{ backgroundColor: agent.avatar_color + '30', zIndex: activeSubagents.length - i }}
-                      title={agent.name}
-                    >
-                      {agent.avatar_emoji}
-                    </div>
-                  ))}
-                  {activeSubagents.length > 5 && (
-                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xs font-bold border-2 border-background shadow-md">
-                      +{activeSubagents.length - 5}
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-background z-20" style={{ backgroundColor: 'hsl(142, 71%, 45%)' }} />
-            </div>
-            <div>
-              <h2 className="font-semibold text-base md:text-lg">
-                {activeTeam ? activeTeam.name : 'Asistente CRM'}
-              </h2>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground hidden md:block">
-                  {activeSubagent ? `🔄 ${activeSubagent} trabajando...` : `${activeSubagents.length} subagente(s) activo(s)`}
-                </p>
-              </div>
-            </div>
+  // --- Extracted render functions ---
+  function renderSessionsList() {
+    return isLoadingSessions ? (
+      <div className="p-4 text-center text-muted-foreground text-sm">Cargando...</div>
+    ) : sessions.length === 0 ? (
+      <div className="p-4 text-center text-muted-foreground text-sm">No hay conversaciones</div>
+    ) : (
+      <div className="p-2 space-y-1">
+        {sessions.map((session) => (
+          <div
+            key={session.id}
+            className={cn('group relative rounded-lg p-2 cursor-pointer transition-colors',
+              activeSessionId === session.id ? 'bg-accent' : 'hover:bg-accent/50'
+            )}
+            onClick={() => handleSelectSession(session)}
+          >
+            {editingTitle === session.id ? (
+              <Input value={editTitleValue} onChange={(e) => setEditTitleValue(e.target.value)}
+                onBlur={handleSaveTitle}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(); if (e.key === 'Escape') setEditingTitle(null); }}
+                className="h-6 text-sm" autoFocus onClick={(e) => e.stopPropagation()} />
+            ) : (
+              <>
+                <p className="text-sm font-medium truncate pr-8">{session.title}</p>
+                <p className="text-xs text-muted-foreground">{formatSessionDate(session.updatedAt)}</p>
+              </>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon"
+                  className="absolute right-1 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}>
+                  <MoreVertical className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleStartEditTitle(session)}>
+                  <Pencil className="h-3 w-3 mr-2" /> Renombrar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDeleteSession(session.id)} className="text-destructive">
+                  <Trash2 className="h-3 w-3 mr-2" /> Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          
-          <div className="flex items-center gap-2 md:gap-3">
-            {/* Team selector */}
-            {teams.length > 0 && (
-              <Select value={activeTeamId || 'all'} onValueChange={v => setActiveTeamId(v === 'all' ? null : v)}>
-                <SelectTrigger className="w-[100px] md:w-[130px] h-8 md:h-9 bg-muted/50 border-0">
-                  <div className="flex items-center gap-1">
-                    <Users className="h-3 w-3 shrink-0" />
-                    <span className="text-xs truncate">{activeTeam?.name || 'Todos'}</span>
+        ))}
+      </div>
+    );
+  }
+
+  function renderHeader() {
+    return (
+      <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 border-b bg-background/80 backdrop-blur-sm">
+        <div className="flex items-center gap-2 md:gap-4">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={isMobile ? () => setShowSidebar(!showSidebar) : toggleSidebar}>
+            {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+          </Button>
+          {/* Fluiditos avatars - one per subagent in active team */}
+          <div className="relative hidden md:flex items-center">
+            {activeSubagents.length === 0 ? (
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
+                <Bot className="h-6 w-6 text-primary-foreground" />
+              </div>
+            ) : (
+              <div className="flex items-center -space-x-2">
+                {activeSubagents.slice(0, 5).map((agent, i) => (
+                  <div
+                    key={agent.id}
+                    className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-md border-2 border-background transition-all hover:scale-110 hover:z-10',
+                      activeSubagent === agent.name && 'ring-2 ring-primary animate-pulse'
+                    )}
+                    style={{ backgroundColor: agent.avatar_color + '30', zIndex: activeSubagents.length - i }}
+                    title={agent.name}
+                  >
+                    {agent.avatar_emoji}
                   </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los agentes</SelectItem>
-                  {teams.map(t => {
-                    const count = subagents.filter(s => s.is_active && s.team_id === t.id).length;
-                    return (
-                      <SelectItem key={t.id} value={t.id}>
-                        <div className="flex items-center gap-2">
-                          <Users className="h-3 w-3" />
-                          <span>{t.name}</span>
-                          <span className="text-muted-foreground text-xs">({count})</span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            )}
-
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[110px] md:w-[150px] h-8 md:h-9 bg-muted/50 border-0">
-                <div className="flex items-center gap-1 md:gap-2">
-                  <selectedModelInfo.icon className={`h-3 w-3 md:h-4 md:w-4 ${selectedModelInfo.color}`} />
-                  <span className="text-xs md:text-sm truncate">
-                    {selectedModel === 'custom' ? (customModelId || 'Custom') : selectedModelInfo.name}
-                  </span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                {MODELS.map(model => (
-                  <SelectItem key={model.id} value={model.id}>
-                    <div className="flex items-center gap-3">
-                      <model.icon className={`h-4 w-4 ${model.color}`} />
-                      <p className="font-medium">{model.name}</p>
-                    </div>
-                  </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-
-            {/* Custom model input */}
-            {selectedModel === 'custom' && (
-              <Input
-                value={customModelId}
-                onChange={e => setCustomModelId(e.target.value)}
-                placeholder="provider/model"
-                className="w-[140px] h-8 text-xs bg-muted/50 border-0"
-              />
+                {activeSubagents.length > 5 && (
+                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xs font-bold border-2 border-background shadow-md">
+                    +{activeSubagents.length - 5}
+                  </div>
+                )}
+              </div>
             )}
-            
-            <Button variant="ghost" size="icon" onClick={() => setShowSubagentPanel(!showSubagentPanel)} className="h-9 w-9" title="Subagentes IA">
-              <Settings2 className={cn("h-4 w-4", showSubagentPanel && "text-primary")} />
-            </Button>
-
-            {messages.length > 0 && (
-              <Button variant="ghost" size="icon" onClick={handleNewChat} className="h-9 w-9">
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            )}
+            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-background z-20" style={{ backgroundColor: 'hsl(142, 71%, 45%)' }} />
+          </div>
+          <div>
+            <h2 className="font-semibold text-base md:text-lg">
+              {activeTeam ? activeTeam.name : 'Asistente CRM'}
+            </h2>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground hidden md:block">
+                {activeSubagent ? `🔄 ${activeSubagent} trabajando...` : `${activeSubagents.length} subagente(s) activo(s)`}
+              </p>
+            </div>
           </div>
         </div>
         
-        {/* Messages */}
-        <ScrollArea className="flex-1 px-3 md:px-6" ref={scrollRef}>
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center py-8 md:py-12">
-              {/* Fluiditos group display */}
-              <div className="flex items-center -space-x-3 mb-4 md:mb-6">
-                {activeSubagents.length === 0 ? (
-                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                    <Sparkles className="h-8 w-8 md:h-10 md:w-10 text-primary" />
-                  </div>
-                ) : (
-                  activeSubagents.slice(0, 6).map((agent, i) => (
-                    <div
-                      key={agent.id}
-                      className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center text-2xl md:text-3xl shadow-lg border-2 border-background transition-transform hover:scale-110 hover:z-10"
-                      style={{ backgroundColor: agent.avatar_color + '25', zIndex: activeSubagents.length - i }}
-                      title={agent.name}
-                    >
-                      {agent.avatar_emoji}
-                    </div>
-                  ))
-                )}
-                {activeSubagents.length > 6 && (
-                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-muted flex items-center justify-center text-sm font-bold border-2 border-background shadow-lg">
-                    +{activeSubagents.length - 6}
-                  </div>
-                )}
-              </div>
-              <h3 className="font-semibold text-lg md:text-xl mb-2 text-center">¿En qué puedo ayudarte?</h3>
-              <p className="text-muted-foreground text-center text-sm md:text-base max-w-md mb-4 px-4">
-                {activeTeam 
-                  ? `Equipo "${activeTeam.name}" con ${activeSubagents.length} subagente(s)`
-                  : `Orquestador central con ${activeSubagents.length} subagente(s) especializado(s)`}
-              </p>
+        <div className="flex items-center gap-2 md:gap-3">
+          {/* Team selector */}
+          {teams.length > 0 && (
+            <Select value={activeTeamId || 'all'} onValueChange={v => setActiveTeamId(v === 'all' ? null : v)}>
+              <SelectTrigger className="w-[100px] md:w-[130px] h-8 md:h-9 bg-muted/50 border-0">
+                <div className="flex items-center gap-1">
+                  <Users className="h-3 w-3 shrink-0" />
+                  <span className="text-xs truncate">{activeTeam?.name || 'Todos'}</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los agentes</SelectItem>
+                {teams.map(t => {
+                  const count = subagents.filter(s => s.is_active && s.team_id === t.id).length;
+                  return (
+                    <SelectItem key={t.id} value={t.id}>
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3 w-3" />
+                        <span>{t.name}</span>
+                        <span className="text-muted-foreground text-xs">({count})</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          )}
 
-              {/* Subagent chips */}
-              {activeSubagents.length > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center max-w-md">
-                  {activeSubagents.map(agent => (
-                    <div key={agent.id}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs"
-                      style={{ borderColor: agent.avatar_color + '60', backgroundColor: agent.avatar_color + '10' }}
-                    >
-                      <span>{agent.avatar_emoji}</span>
-                      <span className="font-medium">{agent.name}</span>
-                      <span className="text-muted-foreground">· {agent.agent_type}</span>
-                    </div>
-                  ))}
+          <Select value={selectedModel} onValueChange={setSelectedModel}>
+            <SelectTrigger className="w-[110px] md:w-[150px] h-8 md:h-9 bg-muted/50 border-0">
+              <div className="flex items-center gap-1 md:gap-2">
+                <selectedModelInfo.icon className={`h-3 w-3 md:h-4 md:w-4 ${selectedModelInfo.color}`} />
+                <span className="text-xs md:text-sm truncate">
+                  {selectedModel === 'custom' ? (customModelId || 'Custom') : selectedModelInfo.name}
+                </span>
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {MODELS.map(model => (
+                <SelectItem key={model.id} value={model.id}>
+                  <div className="flex items-center gap-3">
+                    <model.icon className={`h-4 w-4 ${model.color}`} />
+                    <p className="font-medium">{model.name}</p>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Custom model input */}
+          {selectedModel === 'custom' && (
+            <Input
+              value={customModelId}
+              onChange={e => setCustomModelId(e.target.value)}
+              placeholder="provider/model"
+              className="w-[140px] h-8 text-xs bg-muted/50 border-0"
+            />
+          )}
+          
+          <Button variant="ghost" size="icon" onClick={isMobile ? () => setShowSubagentPanel(!showSubagentPanel) : toggleSubagentPanel} className="h-9 w-9" title="Subagentes IA">
+            <Settings2 className={cn("h-4 w-4", showSubagentPanel && "text-primary")} />
+          </Button>
+
+          {messages.length > 0 && (
+            <Button variant="ghost" size="icon" onClick={handleNewChat} className="h-9 w-9">
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderMessages() {
+    return (
+      <ScrollArea className="flex-1 px-3 md:px-6" ref={scrollRef}>
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center py-8 md:py-12">
+            {/* Fluiditos group display */}
+            <div className="flex items-center -space-x-3 mb-4 md:mb-6">
+              {activeSubagents.length === 0 ? (
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                  <Sparkles className="h-8 w-8 md:h-10 md:w-10 text-primary" />
+                </div>
+              ) : (
+                activeSubagents.slice(0, 6).map((agent, i) => (
+                  <div
+                    key={agent.id}
+                    className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center text-2xl md:text-3xl shadow-lg border-2 border-background transition-transform hover:scale-110 hover:z-10"
+                    style={{ backgroundColor: agent.avatar_color + '25', zIndex: activeSubagents.length - i }}
+                    title={agent.name}
+                  >
+                    {agent.avatar_emoji}
+                  </div>
+                ))
+              )}
+              {activeSubagents.length > 6 && (
+                <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-muted flex items-center justify-center text-sm font-bold border-2 border-background shadow-lg">
+                  +{activeSubagents.length - 6}
                 </div>
               )}
             </div>
-          ) : (
-            <div className="py-6 space-y-6">
-              {messages.map((message) => {
-                // Delegation notice - special rendering
-                if (message.isDelegationNotice) {
-                  return (
-                    <div key={message.id} className="flex justify-center animate-fade-in">
-                      <div 
-                        className="flex items-center gap-3 px-5 py-3 rounded-2xl border-2 shadow-lg animate-pulse"
-                        style={{ 
-                          borderColor: (message.subagentColor || '#6C63FF') + '60',
-                          backgroundColor: (message.subagentColor || '#6C63FF') + '08',
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg"
-                            style={{ backgroundColor: (message.subagentColor || '#6C63FF') + '25' }}>
-                            {message.subagentEmoji || '🤖'}
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold" style={{ color: message.subagentColor || 'hsl(var(--primary))' }}>
-                              Orquestador → {message.subagent}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground">Delegando tarea al subagente...</p>
-                          </div>
-                        </div>
-                        <Loader2 className="h-4 w-4 animate-spin" style={{ color: message.subagentColor || 'hsl(var(--primary))' }} />
-                      </div>
-                    </div>
-                  );
-                }
+            <h3 className="font-semibold text-lg md:text-xl mb-2 text-center">¿En qué puedo ayudarte?</h3>
+            <p className="text-muted-foreground text-center text-sm md:text-base max-w-md mb-4 px-4">
+              {activeTeam 
+                ? `Equipo "${activeTeam.name}" con ${activeSubagents.length} subagente(s)`
+                : `Orquestador central con ${activeSubagents.length} subagente(s) especializado(s)`}
+            </p>
 
-                return (
-                <div key={message.id} className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                  <Avatar className={cn('h-9 w-9', 
-                    message.role === 'user' ? 'bg-primary' :
-                    message.subagent ? '' : 'bg-gradient-to-br from-primary to-primary/60'
-                  )}
-                    style={message.subagentColor ? { backgroundColor: message.subagentColor + '30', border: `2px solid ${message.subagentColor}` } : undefined}
+            {/* Subagent chips */}
+            {activeSubagents.length > 0 && (
+              <div className="flex flex-wrap gap-2 justify-center max-w-md">
+                {activeSubagents.map(agent => (
+                  <div key={agent.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs"
+                    style={{ borderColor: agent.avatar_color + '60', backgroundColor: agent.avatar_color + '10' }}
                   >
-                    <AvatarFallback className="bg-transparent text-base">
-                      {message.role === 'user' ? (
-                        <User className="h-4 w-4 text-primary-foreground" />
-                      ) : message.subagentEmoji ? (
-                        message.subagentEmoji
-                      ) : (
-                        <Bot className="h-4 w-4 text-primary-foreground" />
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className={`flex-1 max-w-[80%] ${message.role === 'user' ? 'text-right' : ''}`}>
-                    {message.subagent && (
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                          style={{ backgroundColor: (message.subagentColor || '#6C63FF') + '20', color: message.subagentColor || '#6C63FF' }}>
-                          {message.subagentEmoji} {message.subagent}
-                        </span>
-                      </div>
-                    )}
-                    <div className={cn('inline-block rounded-2xl px-4 py-3',
-                      message.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-md' : 'bg-muted rounded-tl-md',
-                      message.subagent ? 'border-l-2' : ''
-                    )}
-                      style={message.subagentColor ? { borderLeftColor: message.subagentColor } : undefined}
+                    <span>{agent.avatar_emoji}</span>
+                    <span className="font-medium">{agent.name}</span>
+                    <span className="text-muted-foreground">· {agent.agent_type}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Test buttons for image/audio demo */}
+            <div className="flex flex-wrap gap-2 mt-6 justify-center">
+              <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
+                const demoId = crypto.randomUUID();
+                setMessages(prev => [...prev, {
+                  id: demoId, role: 'assistant', content: '🖼️ Aquí tienes una imagen de ejemplo generada por un subagente de imagen:',
+                  timestamp: new Date(),
+                  isImage: true,
+                  imageUrls: ['https://picsum.photos/seed/demo-ai/512/512'],
+                  subagent: 'Demo Imagen',
+                  subagentEmoji: '🎨',
+                  subagentColor: '#FF6B6B',
+                }]);
+              }}>
+                <ImageIcon className="h-3 w-3" /> Demo imagen
+              </Button>
+              <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
+                const demoId = crypto.randomUUID();
+                setMessages(prev => [...prev, {
+                  id: demoId, role: 'assistant', content: '🎵 Aquí tienes un audio de ejemplo generado por un subagente de audio:',
+                  timestamp: new Date(),
+                  isAudio: true,
+                  audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+                  subagent: 'Demo Audio',
+                  subagentEmoji: '🎵',
+                  subagentColor: '#48DBFB',
+                }]);
+              }}>
+                <AudioLines className="h-3 w-3" /> Demo audio
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="py-6 space-y-6">
+            {messages.map((message) => {
+              // Delegation notice - special rendering
+              if (message.isDelegationNotice) {
+                return (
+                  <div key={message.id} className="flex justify-center animate-fade-in">
+                    <div 
+                      className="flex items-center gap-3 px-5 py-3 rounded-2xl border-2 shadow-lg animate-pulse"
+                      style={{ 
+                        borderColor: (message.subagentColor || '#6C63FF') + '60',
+                        backgroundColor: (message.subagentColor || '#6C63FF') + '08',
+                      }}
                     >
-                      {message.role === 'assistant' ? (
-                        message.content ? (
-                          <>
-                            <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                              <ReactMarkdown>{message.content}</ReactMarkdown>
-                            </div>
-                            {message.imageUrls && message.imageUrls.length > 0 && (
-                              <div className="mt-3 space-y-2">
-                                {message.imageUrls.map((url, idx) => (
-                                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
-                                    <img src={url} alt="Imagen generada" className="max-w-full rounded-lg hover:opacity-90 transition-opacity cursor-pointer" />
-                                  </a>
-                                ))}
-                              </div>
-                            )}
-                            {message.isAudio && message.audioUrl && (
-                              <div className="mt-3">
-                                <audio controls src={message.audioUrl} className="max-w-full" preload="metadata" />
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm">{message.subagent ? `${message.subagent} pensando...` : 'Pensando...'}</span>
-                          </div>
-                        )
-                      ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg"
+                          style={{ backgroundColor: (message.subagentColor || '#6C63FF') + '25' }}>
+                          {message.subagentEmoji || '🤖'}
+                        </div>
                         <div>
-                          {message.attachments && message.attachments.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mb-2">
-                              {message.attachments.map((att, idx) => (
-                                <div key={idx} className="flex items-center gap-1 text-xs bg-primary-foreground/20 rounded px-2 py-1">
-                                  {isImageFile(att.name) ? <Image className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
-                                  <span className="truncate max-w-[120px]">{att.name}</span>
-                                </div>
+                          <p className="text-xs font-semibold" style={{ color: message.subagentColor || 'hsl(var(--primary))' }}>
+                            Orquestador → {message.subagent}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Delegando tarea al subagente...</p>
+                        </div>
+                      </div>
+                      <Loader2 className="h-4 w-4 animate-spin" style={{ color: message.subagentColor || 'hsl(var(--primary))' }} />
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+              <div key={message.id} className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                <Avatar className={cn('h-9 w-9', 
+                  message.role === 'user' ? 'bg-primary' :
+                  message.subagent ? '' : 'bg-gradient-to-br from-primary to-primary/60'
+                )}
+                  style={message.subagentColor ? { backgroundColor: message.subagentColor + '30', border: `2px solid ${message.subagentColor}` } : undefined}
+                >
+                  <AvatarFallback className="bg-transparent text-base">
+                    {message.role === 'user' ? (
+                      <User className="h-4 w-4 text-primary-foreground" />
+                    ) : message.subagentEmoji ? (
+                      message.subagentEmoji
+                    ) : (
+                      <Bot className="h-4 w-4 text-primary-foreground" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className={`flex-1 max-w-[80%] ${message.role === 'user' ? 'text-right' : ''}`}>
+                  {message.subagent && (
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: (message.subagentColor || '#6C63FF') + '20', color: message.subagentColor || '#6C63FF' }}>
+                        {message.subagentEmoji} {message.subagent}
+                      </span>
+                    </div>
+                  )}
+                  <div className={cn('inline-block rounded-2xl px-4 py-3',
+                    message.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-md' : 'bg-muted rounded-tl-md',
+                    message.subagent ? 'border-l-2' : ''
+                  )}
+                    style={message.subagentColor ? { borderLeftColor: message.subagentColor } : undefined}
+                  >
+                    {message.role === 'assistant' ? (
+                      message.content ? (
+                        <>
+                          <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                          </div>
+                          {message.imageUrls && message.imageUrls.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {message.imageUrls.map((url, idx) => (
+                                <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
+                                  <img src={url} alt="Imagen generada" className="max-w-full rounded-lg hover:opacity-90 transition-opacity cursor-pointer" />
+                                </a>
                               ))}
                             </div>
                           )}
-                          <p className="text-sm">{message.content}</p>
+                          {message.isAudio && message.audioUrl && (
+                            <div className="mt-3">
+                              <audio controls src={message.audioUrl} className="max-w-full" preload="metadata" />
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">{message.subagent ? `${message.subagent} pensando...` : 'Pensando...'}</span>
                         </div>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-1 px-1">
-                      {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                      )
+                    ) : (
+                      <div>
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {message.attachments.map((att, idx) => (
+                              <div key={idx} className="flex items-center gap-1 text-xs bg-primary-foreground/20 rounded px-2 py-1">
+                                {isImageFile(att.name) ? <Image className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                                <span className="truncate max-w-[120px]">{att.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-sm">{message.content}</p>
+                      </div>
+                    )}
                   </div>
+                  <p className="text-[10px] text-muted-foreground mt-1 px-1">
+                    {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 </div>
-                );
-              })}
-            </div>
-          )}
-        </ScrollArea>
+              </div>
+              );
+            })}
+          </div>
+        )}
+      </ScrollArea>
+    );
+  }
 
+  function renderInput() {
+    return (
+      <>
         {/* Active subagent indicator */}
         {activeSubagent && (
           <div className="px-4 py-2 bg-primary/5 border-t flex items-center gap-2 text-xs text-primary">
@@ -1012,7 +1160,7 @@ export function PerplexityChatbot() {
             {activeTeam ? ` • Equipo: ${activeTeam.name}` : ''} • {activeSubagents.length} subagente(s) • 📎 PDF, DOCX, CSV, imágenes
           </p>
         </div>
-      </div>
-    </div>
-  );
+      </>
+    );
+  }
 }
