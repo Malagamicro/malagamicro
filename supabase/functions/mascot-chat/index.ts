@@ -1504,6 +1504,7 @@ HERRAMIENTAS DISPONIBLES:
 - create_reminder (puede asignar a otros usuarios), complete_reminder
 - create_calendar_event (puede añadir participantes del equipo), delete_calendar_event
 - update_apps_config (personalizar el hub de aplicaciones: cambiar iconos, colores, categorías, tamaño)
+- create_file (crear archivos .md, .txt, .csv, .json, etc. CON CONTENIDO dentro en archivos compartidos)
 
 🧠 MEMORIA (ejecución directa, NO requieren confirmación):
 - save_ai_memory: Guarda automáticamente información relevante tras conversaciones (preferencias del cliente, acuerdos, datos clave). Categorías: general, preference, interaction, note.
