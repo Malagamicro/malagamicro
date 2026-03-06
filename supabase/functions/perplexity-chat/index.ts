@@ -2002,9 +2002,8 @@ serve(async (req) => {
         }).join('\n')
       : '';
 
-    // Detect image and audio subagents
+    // Detect image subagent
     const imageSubagent = Array.isArray(clientSubagents) ? clientSubagents.find((s: any) => s.agent_type === 'image') : null;
-    const audioSubagent = Array.isArray(clientSubagents) ? clientSubagents.find((s: any) => s.agent_type === 'audio') : null;
 
     const delegationInstructions = subagentList 
       ? `\n\n**SUBAGENTES DISPONIBLES:**
@@ -2013,7 +2012,6 @@ ${subagentList}
 
 **REGLAS DE DELEGACIÓN OBLIGATORIAS (NUNCA IGNORAR):**
 1. **OBLIGATORIO:** Si el usuario pide una IMAGEN (generar, crear, dibujar, hacer foto, ilustración, diseño visual), DEBES llamar a delegate_to_subagent con el agente de tipo imagen${imageSubagent ? ` ("${imageSubagent.name}")` : ''}. NUNCA respondas con texto diciendo que no puedes generar imágenes. SÍ PUEDES, a través del subagente.
-2. **OBLIGATORIO:** Si el usuario pide AUDIO (generar audio, texto a voz, narración, música), DEBES llamar a delegate_to_subagent con el agente de tipo audio${audioSubagent ? ` ("${audioSubagent.name}")` : ''}. NUNCA respondas con texto diciendo que no puedes generar audio.
 3. Cuando delegues, NO escribas un mensaje largo explicando qué vas a hacer. Simplemente llama a delegate_to_subagent INMEDIATAMENTE.
 4. NO envíes texto de confirmación antes de delegar (nada de "voy a generar...", "delegando a...", "no puedo generar...").
 5. El subagente se encarga de todo. Tu trabajo es SOLO llamar a delegate_to_subagent con los parámetros correctos.
