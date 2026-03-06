@@ -45,9 +45,28 @@ interface Props {
   className?: string;
 }
 
-export function FluiditosAvatar({ config = DEFAULT_CONFIG, size = 64, animated = true, className }: Props) {
+export function FluiditosAvatar({ config = DEFAULT_CONFIG, size = 64, animated = true, animState = 'idle', className }: Props) {
   const c = config;
   const id = useMemo(() => Math.random().toString(36).slice(2, 8), []);
+
+  // Animation CSS classes based on state
+  const getAnimStyle = (): React.CSSProperties => {
+    const base: React.CSSProperties = {
+      filter: animated ? `drop-shadow(0 0 8px ${c.glowColor}80)` : undefined,
+      transition: 'transform 0.3s ease',
+    };
+    if (!animated) return base;
+    switch (animState) {
+      case 'thinking':
+        return { ...base, animation: 'fluiditos-think 1.5s ease-in-out infinite' };
+      case 'typing':
+        return { ...base, animation: 'fluiditos-type 0.4s ease-in-out infinite alternate' };
+      case 'responding':
+        return { ...base, animation: 'fluiditos-respond 2s ease-in-out infinite' };
+      default:
+        return { ...base, animation: 'fluiditos-idle 6s ease-in-out infinite' };
+    }
+  };
 
   const renderEyes = () => {
     switch (c.eyeStyle) {
