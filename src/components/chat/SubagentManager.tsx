@@ -424,7 +424,6 @@ export function SubagentManager() {
                         <p className="text-sm font-medium truncate">{agent.name}</p>
                         <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full',
                           agent.agent_type === 'image' ? 'bg-pink-500/10 text-pink-500' :
-                          agent.agent_type === 'audio' ? 'bg-amber-500/10 text-amber-500' :
                           'bg-primary/10 text-primary'
                         )}>
                           {agent.agent_type}
