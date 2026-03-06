@@ -695,7 +695,7 @@ export function PerplexityChatbot() {
         </div>
       </ResizablePanel>
 
-      {showSubagentPanel && <ResizableHandle withHandle />}
+      <ResizableHandle withHandle />
 
       {/* Subagent Panel */}
       <ResizablePanel
