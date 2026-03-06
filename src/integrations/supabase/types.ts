@@ -556,6 +556,60 @@ export type Database = {
           },
         ]
       }
+      custom_notifications: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          color: string | null
+          created_at: string
+          expires_at: string | null
+          icon: string | null
+          id: string
+          is_popup: boolean
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          source: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          color?: string | null
+          created_at?: string
+          expires_at?: string | null
+          icon?: string | null
+          id?: string
+          is_popup?: boolean
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          source?: string
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          color?: string | null
+          created_at?: string
+          expires_at?: string | null
+          icon?: string | null
+          id?: string
+          is_popup?: boolean
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          source?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_attachments: {
         Row: {
           content_id: string | null

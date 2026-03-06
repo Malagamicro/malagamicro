@@ -126,8 +126,8 @@ serve(async (req) => {
       });
     }
 
-    // Validate idOrAction as UUID if present
-    if (idOrAction && !isValidUuid(idOrAction)) {
+    // Validate idOrAction as UUID if present, or allow action-like strings for some resources
+    if (idOrAction && !isValidUuid(idOrAction) && !/^[a-z0-9-]+$/.test(idOrAction)) {
       return new Response(JSON.stringify({ error: 'Invalid resource ID format' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -745,6 +745,66 @@ serve(async (req) => {
         break;
       }
 
+      // ===== NOTIFICATIONS =====
+      case 'notifications': {
+        if (req.method === 'GET') {
+          let query = supabase.from('custom_notifications').select('*').eq('user_id', userId);
+          if (params.unread_only === 'true') query = query.eq('is_read', false);
+          const { data, error } = await query.order('created_at', { ascending: false }).limit(parseInt(params.limit || '50'));
+          if (error) throw error;
+          result = data;
+        } else if (req.method === 'POST') {
+          const { title, message, type, is_popup, target_user_id, action_url, action_label, metadata } = body as any;
+          if (!title || !message) throw new Error('title and message are required');
+          const targetId = target_user_id || userId;
+          const { data, error } = await supabase.from('custom_notifications').insert({
+            user_id: targetId,
+            title,
+            message,
+            type: type || 'info',
+            source: 'api',
+            is_popup: is_popup || false,
+            action_url,
+            action_label,
+            metadata,
+          }).select().single();
+          if (error) throw error;
+          result = data;
+        } else if (req.method === 'PATCH' && idOrAction) {
+          const { data, error } = await supabase.from('custom_notifications').update(body).eq('id', idOrAction).eq('user_id', userId).select().single();
+          if (error) throw error;
+          result = data;
+        } else if (req.method === 'DELETE' && idOrAction) {
+          const { error } = await supabase.from('custom_notifications').delete().eq('id', idOrAction).eq('user_id', userId);
+          if (error) throw error;
+          result = { success: true };
+        }
+        break;
+      }
+
+      // ===== SEND NOTIFICATION (convenience for n8n) =====
+      case 'send-notification': {
+        if (req.method === 'POST') {
+          const { title, message, type, is_popup, target_user_id, action_url, action_label, metadata } = body as any;
+          if (!title || !message) throw new Error('title and message are required');
+          const targetId = target_user_id || userId;
+          const { data, error } = await supabase.from('custom_notifications').insert({
+            user_id: targetId,
+            title,
+            message,
+            type: type || 'n8n',
+            source: 'n8n',
+            is_popup: is_popup !== undefined ? is_popup : true,
+            action_url,
+            action_label,
+            metadata,
+          }).select().single();
+          if (error) throw error;
+          result = data;
+        }
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ 
           error: `Unknown resource: ${resource}`, 
@@ -762,6 +822,7 @@ serve(async (req) => {
             'audit-logs', 'login-logs', 'security-blocks', 'ip-whitelist',
             'user-presence', 'profiles', 'profile',
             'reports', 'seo-articles',
+            'notifications', 'send-notification',
           ] 
         }), {
           status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }

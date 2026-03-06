@@ -679,6 +679,24 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "send_notification",
+      description: "Enviar una notificación personalizada (popup o silenciosa) a un usuario del CRM. Útil para alertas, avisos o información importante.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título de la notificación" },
+          message: { type: "string", description: "Mensaje/cuerpo de la notificación" },
+          type: { type: "string", enum: ["info", "success", "warning", "error", "ai"], description: "Tipo (default: ai)" },
+          is_popup: { type: "boolean", description: "Si debe mostrarse como popup flotante (default: true)" },
+          target_user: { type: "string", description: "Nombre del usuario destinatario (si no se especifica, se envía al actual)" },
+        },
+        required: ["title", "message"],
+      },
+    },
+  },
 ];
 
 // Map endpoint paths to their required root JSON key for POST/PUT
@@ -1709,6 +1727,33 @@ async function executeToolCall(
           task: taskDescription,
           message: `🔄 Delegando tarea a **${agentName}**: ${taskDescription}` 
         });
+      }
+
+      case "send_notification": {
+        const title = String(args.title || "");
+        const message = String(args.message || "");
+        if (!title || !message) return JSON.stringify({ error: "Se requiere title y message" });
+        
+        let targetId = userId;
+        if (args.target_user) {
+          const { data: targetProfile } = await supabase
+            .from("profiles")
+            .select("user_id")
+            .ilike("full_name", `%${args.target_user}%`)
+            .maybeSingle();
+          if (targetProfile) targetId = targetProfile.user_id;
+        }
+        
+        const { error: notifErr } = await supabase.from("custom_notifications").insert({
+          user_id: targetId,
+          title,
+          message,
+          type: String(args.type || "ai"),
+          source: "Chat IA",
+          is_popup: args.is_popup !== false,
+        });
+        if (notifErr) return JSON.stringify({ error: notifErr.message });
+        return JSON.stringify({ success: true, message: `Notificación enviada: "${title}"` });
       }
 
       default:

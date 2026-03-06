@@ -462,12 +462,32 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "send_notification",
+      description: "Enviar una notificación personalizada (popup o silenciosa) a un usuario. Útil para alertas, avisos o información importante. REQUIERE CONFIRMACIÓN.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título de la notificación" },
+          message: { type: "string", description: "Mensaje/cuerpo de la notificación" },
+          type: { type: "string", enum: ["info", "success", "warning", "error", "ai"], description: "Tipo de notificación (default: ai)" },
+          is_popup: { type: "boolean", description: "Si debe mostrarse como popup flotante (default: true)" },
+          target_user: { type: "string", description: "Nombre del usuario destinatario (si no se especifica, se envía al usuario actual)" },
+          confirmed: { type: "boolean", description: "Si el usuario ya confirmó" },
+        },
+        required: ["title", "message"],
+      },
+    },
+  },
 ];
 // Confirmation check for write operations
 function needsConfirmation(toolName: string, args: Record<string, unknown>): string | null {
   const writeTools = [
     "send_internal_message", "send_email", "send_whatsapp",
     "create_lead", "update_lead", "create_reminder", "complete_reminder",
+    "send_notification",
     "create_calendar_event", "delete_calendar_event", "update_apps_config",
   ];
   if (!writeTools.includes(toolName)) return null;
@@ -1258,6 +1278,33 @@ async function executeToolCall(
           is_image: isImage,
           message: isImage ? "Usa la URL para ver/describir la imagen" : "Archivo disponible en la URL",
         });
+      }
+
+      case "send_notification": {
+        const title = String(args.title || "");
+        const message = String(args.message || "");
+        if (!title || !message) return JSON.stringify({ error: "Se requiere title y message" });
+        
+        let targetId = userId;
+        if (args.target_user) {
+          const { data: targetProfile } = await supabase
+            .from("profiles")
+            .select("user_id")
+            .ilike("full_name", `%${args.target_user}%`)
+            .maybeSingle();
+          if (targetProfile) targetId = targetProfile.user_id;
+        }
+        
+        const { error } = await supabase.from("custom_notifications").insert({
+          user_id: targetId,
+          title,
+          message,
+          type: String(args.type || "ai"),
+          source: "Fluiditos",
+          is_popup: args.is_popup !== false,
+        });
+        if (error) return JSON.stringify({ error: error.message });
+        return JSON.stringify({ success: true, message: `Notificación enviada: "${title}"` });
       }
 
       default:
