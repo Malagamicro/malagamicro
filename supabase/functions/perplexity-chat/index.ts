@@ -1729,6 +1729,33 @@ async function executeToolCall(
         });
       }
 
+      case "send_notification": {
+        const title = String(args.title || "");
+        const message = String(args.message || "");
+        if (!title || !message) return JSON.stringify({ error: "Se requiere title y message" });
+        
+        let targetId = userId;
+        if (args.target_user) {
+          const { data: targetProfile } = await supabase
+            .from("profiles")
+            .select("user_id")
+            .ilike("full_name", `%${args.target_user}%`)
+            .maybeSingle();
+          if (targetProfile) targetId = targetProfile.user_id;
+        }
+        
+        const { error: notifErr } = await supabase.from("custom_notifications").insert({
+          user_id: targetId,
+          title,
+          message,
+          type: String(args.type || "ai"),
+          source: "Chat IA",
+          is_popup: args.is_popup !== false,
+        });
+        if (notifErr) return JSON.stringify({ error: notifErr.message });
+        return JSON.stringify({ success: true, message: `Notificación enviada: "${title}"` });
+      }
+
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
