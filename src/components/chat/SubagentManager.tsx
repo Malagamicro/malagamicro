@@ -37,7 +37,7 @@ interface SubagentFormData {
   description: string;
   model: string;
   role_prompt: string;
-  agent_type: 'text' | 'image' | 'audio';
+  agent_type: 'text' | 'image';
   avatar_emoji: string;
   avatar_color: string;
   is_active: boolean;
