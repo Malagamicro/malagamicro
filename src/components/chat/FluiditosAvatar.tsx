@@ -35,10 +35,13 @@ export function saveFluiditosConfig(config: FluiditosConfig) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
 }
 
+export type FluiditosAnimState = 'idle' | 'thinking' | 'typing' | 'responding';
+
 interface Props {
   config?: FluiditosConfig;
   size?: number;
   animated?: boolean;
+  animState?: FluiditosAnimState;
   className?: string;
 }
 
