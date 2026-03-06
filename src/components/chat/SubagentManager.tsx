@@ -536,6 +536,9 @@ export function SubagentManager() {
                           setEditingTeam(team);
                           setTeamName(team.name);
                           setTeamDescription(team.description || '');
+                          const isBuiltIn = POPULAR_MODELS.some(m => m.id === team.orchestrator_model);
+                          setTeamModel(isBuiltIn ? team.orchestrator_model : 'custom');
+                          setTeamCustomModel(isBuiltIn ? '' : team.orchestrator_model);
                           setIsTeamOpen(true);
                         }}>
                           <Pencil className="h-3 w-3" />
