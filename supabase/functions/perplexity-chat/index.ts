@@ -1890,70 +1890,23 @@ serve(async (req) => {
         });
       }
 
-      // Check if this is an audio model that requires audio modality
-      const isAudioModel = agentModel.includes('audio') || agentModel.includes('tts');
+      // Audio subagents: use a text fallback model, client will handle TTS via Browser SpeechSynthesis
+      const isAudioAgent = agentType === 'audio';
+      const effectiveModel = isAudioAgent ? 'openai/gpt-5-mini' : agentModel;
       
-      if (isAudioModel) {
-        // Audio models require audio modality - use non-streaming and add modalities
-        const subRequestBody: any = {
-          model: agentModel,
-          messages: [
-            { role: "system", content: agentPrompt },
-            { role: "user", content: userMessage },
-          ],
-          modalities: ["text", "audio"],
-          audio: { voice: "alloy", format: "wav" },
-          stream: false,
-        };
-
-        console.log(`[perplexity-chat] Audio subagent call with modalities: ["text", "audio"]`);
-
-        const subResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": supabaseUrl,
-            "X-Title": "Malaga Micro CRM - Audio Subagent",
-          },
-          body: JSON.stringify(subRequestBody),
-        });
-
-        if (!subResponse.ok) {
-          const errText = await subResponse.text();
-          console.error(`[perplexity-chat] Audio subagent error: ${subResponse.status} - ${errText}`);
-          return new Response(JSON.stringify({ 
-            subagent: agentName, 
-            type: 'audio',
-            response: {
-              choices: [{
-                message: { role: 'assistant', content: `Error del subagente de audio: el modelo ${agentModel} no pudo procesar la solicitud. Intenta con un modelo de texto.` }
-              }]
-            }
-          }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        const audioData = await subResponse.json();
-        return new Response(JSON.stringify({ 
-          subagent: agentName, 
-          type: 'audio',
-          response: audioData
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (isAudioAgent) {
+        console.log(`[perplexity-chat] Audio subagent "${agentName}": using text model ${effectiveModel} + client-side TTS`);
       }
 
-      // Text subagent - if it has tools, do a non-streaming call first to check for tool calls
+      // Text/Audio subagent - if it has tools, do a non-streaming call first to check for tool calls
       const subRequestBody: any = {
-        model: agentModel,
+        model: effectiveModel,
         messages: [
           { role: "system", content: agentPrompt + (allowedTools.length > 0 ? '\n\nTienes acceso a herramientas del CRM. Úsalas cuando sea necesario para obtener datos reales.' : '') },
           ...messages.filter((m: any) => m.role !== 'system'),
           { role: "user", content: userMessage },
         ],
-        stream: allowedTools.length === 0,
+        stream: isAudioAgent ? false : (allowedTools.length === 0),
       };
 
       if (allowedTools.length > 0) {
@@ -1976,6 +1929,19 @@ serve(async (req) => {
         const errText = await subResponse.text();
         return new Response(JSON.stringify({ error: `Subagente ${agentName} error: ${subResponse.status} - ${errText}` }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Audio subagent: return JSON response (non-streaming)
+      if (isAudioAgent) {
+        const audioData = await subResponse.json();
+        const audioText = audioData.choices?.[0]?.message?.content || 'Respuesta de audio generada';
+        return new Response(JSON.stringify({ 
+          subagent: agentName, 
+          type: 'audio',
+          response: { choices: [{ message: { role: 'assistant', content: audioText } }] }
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 

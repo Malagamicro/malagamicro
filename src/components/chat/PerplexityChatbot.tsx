@@ -437,13 +437,30 @@ export function PerplexityChatbot() {
         await addMessage.mutateAsync({ sessionId, role: 'assistant', content: dbContent });
         return imageContent;
       } else if (agent.agent_type === 'audio') {
-        // Audio subagent - handle TTS or audio generation
+        // Audio subagent - text response + Browser TTS
         const data = await resp.json();
         const audioContent = data.response?.choices?.[0]?.message?.content || 'Audio generado';
-        const audioUrl = data.response?.choices?.[0]?.message?.audio?.url || null;
+        
+        // Use Browser SpeechSynthesis to read the response aloud
+        const speakText = (text: string) => {
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'es-ES';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            // Try to find a Spanish voice
+            const voices = window.speechSynthesis.getVoices();
+            const esVoice = voices.find(v => v.lang.startsWith('es'));
+            if (esVoice) utterance.voice = esVoice;
+            window.speechSynthesis.speak(utterance);
+          }
+        };
+        
+        speakText(audioContent);
         
         setMessages(prev => prev.map(m => 
-          m.id === subagentMsgId ? { ...m, content: audioContent, isAudio: !!audioUrl, audioUrl } : m
+          m.id === subagentMsgId ? { ...m, content: audioContent, isAudio: true, audioUrl: null } : m
         ));
         
         await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${audioContent}` });
