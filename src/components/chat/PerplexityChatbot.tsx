@@ -1126,11 +1126,6 @@ export function PerplexityChatbot() {
                               ))}
                             </div>
                           )}
-                          {message.isAudio && message.audioUrl && (
-                            <div className="mt-3">
-                              <audio controls src={message.audioUrl} className="max-w-full" preload="metadata" />
-                            </div>
-                          )}
                         </>
                       ) : (
                         <div className="flex items-center gap-2">
