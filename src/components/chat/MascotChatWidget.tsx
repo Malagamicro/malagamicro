@@ -278,7 +278,7 @@ export function MascotChatWidget() {
         className="flex items-center gap-3 p-4 border-b bg-gradient-to-r from-primary/10 to-primary/5 cursor-grab active:cursor-grabbing touch-none select-none"
       >
         <div className="w-10 h-10 rounded-full bg-card/60 flex items-center justify-center border shadow-sm pointer-events-none">
-          <FluiditosAvatar config={fluiditosConfig} size={36} animated={false} />
+          <FluiditosAvatar config={fluiditosConfig} size={36} animated animState={isLoading ? 'responding' : 'idle'} />
         </div>
         <div className="flex-1 pointer-events-none">
           <h3 className="font-semibold text-sm">Fluiditos</h3>
