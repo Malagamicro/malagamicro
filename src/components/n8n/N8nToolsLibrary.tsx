@@ -454,6 +454,42 @@ const TOOLS: N8nTool[] = [
     method: 'GET', path: '/seo-articles', icon: <Newspaper className="w-4 h-4" />, category: 'SEO',
   },
 
+  // ===== NOTIFICACIONES =====
+  {
+    id: 'send-notification', name: 'Enviar Notificación', description: 'Envía una notificación push a un usuario',
+    toolDescription: 'Envía una notificación en tiempo real a un usuario específico del CRM. Aparece como popup si is_popup=true. Ideal para alertas automatizadas desde n8n.',
+    method: 'POST', path: '/send-notification', icon: <Bell className="w-4 h-4" />, category: 'Notificaciones',
+    bodyFields: [
+      { name: 'title', type: 'string', required: true, description: 'Título de la notificación' },
+      { name: 'message', type: 'string', required: true, description: 'Mensaje de la notificación' },
+      { name: 'target_user_id', type: 'string', required: false, description: 'UUID del usuario destino (vacío = usuario actual)' },
+      { name: 'type', type: 'string', required: false, description: 'Tipo: info, success, warning, error, n8n' },
+      { name: 'is_popup', type: 'boolean', required: false, description: 'true = mostrar como popup emergente (default: true)' },
+      { name: 'action_url', type: 'string', required: false, description: 'URL de acción al hacer clic' },
+      { name: 'action_label', type: 'string', required: false, description: 'Texto del botón de acción' },
+    ],
+  },
+  {
+    id: 'list-notifications', name: 'Listar Notificaciones', description: 'Obtiene las notificaciones del usuario',
+    toolDescription: 'Lista las notificaciones del usuario autenticado. Puede filtrar solo las no leídas.',
+    method: 'GET', path: '/notifications', icon: <Bell className="w-4 h-4" />, category: 'Notificaciones',
+    queryParams: [
+      { name: 'unread_only', type: 'string', description: 'true = solo no leídas' },
+      { name: 'limit', type: 'number', description: 'Límite de resultados (default: 50)' },
+    ],
+  },
+  {
+    id: 'mark-notification-read', name: 'Marcar Notificación Leída', description: 'Marca una notificación como leída',
+    toolDescription: 'Marca una notificación específica como leída.',
+    method: 'PATCH', path: '/notifications/{id}', icon: <Bell className="w-4 h-4" />, category: 'Notificaciones',
+    bodyFields: [{ name: 'is_read', type: 'boolean', required: true, description: 'true para marcar como leída' }],
+  },
+  {
+    id: 'delete-notification', name: 'Eliminar Notificación', description: 'Elimina una notificación',
+    toolDescription: 'Elimina una notificación específica del usuario.',
+    method: 'DELETE', path: '/notifications/{id}', icon: <Bell className="w-4 h-4" />, category: 'Notificaciones',
+  },
+
   // ===== NOTAS TICKETS =====
   {
     id: 'list-ticket-notes', name: 'Notas de Ticket', description: 'Obtiene las notas de un ticket',
