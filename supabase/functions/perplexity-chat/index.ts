@@ -21,6 +21,41 @@ interface ToolCall {
   };
 }
 
+// Helper: upload base64 image to Supabase storage and return public URL
+async function uploadBase64ToStorage(supabase: any, dataUrl: string, supabaseUrl: string): Promise<string | null> {
+  try {
+    // Parse data URL: data:image/png;base64,iVBOR...
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return null;
+    
+    const mimeType = match[1];
+    const base64Data = match[2];
+    const ext = mimeType.split('/')[1] || 'png';
+    const fileName = `ai-gen/${crypto.randomUUID()}.${ext}`;
+    
+    // Decode base64 to Uint8Array
+    const binaryStr = atob(base64Data);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    
+    const { error } = await supabase.storage
+      .from('chat-files')
+      .upload(fileName, bytes, { contentType: mimeType, upsert: false });
+    
+    if (error) {
+      console.error('Storage upload error:', error);
+      return null;
+    }
+    
+    return `${supabaseUrl}/storage/v1/object/public/chat-files/${fileName}`;
+  } catch (e) {
+    console.error('Base64 upload error:', e);
+    return null;
+  }
+}
+
 const STEL_API_BASE = 'https://app.stelorder.com/app';
 
 const tools = [
