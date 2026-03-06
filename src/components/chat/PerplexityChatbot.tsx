@@ -595,7 +595,7 @@ export function PerplexityChatbot() {
     const panel = subagentPanelRef.current;
     if (!panel) return;
     if (panel.isCollapsed()) {
-      panel.expand();
+      panel.resize(28);
       setShowSubagentPanel(true);
     } else {
       panel.collapse();
