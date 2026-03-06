@@ -316,7 +316,7 @@ export default function FileManager() {
           Descargar
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem onClick={() => handleDelete(file.id)} className="text-destructive">
+        <ContextMenuItem onClick={() => requestDeleteFile(file.id)} className="text-destructive">
           <Trash2 className="h-4 w-4 mr-2" />
           Eliminar
         </ContextMenuItem>
