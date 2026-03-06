@@ -464,7 +464,7 @@ export function SubagentManager() {
           <div className="flex justify-end">
             <Dialog open={isTeamOpen} onOpenChange={setIsTeamOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditingTeam(null); setTeamName(''); setTeamDescription(''); }}>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditingTeam(null); setTeamName(''); setTeamDescription(''); setTeamModel('openai/gpt-5-nano'); setTeamCustomModel(''); }}>
                   <FolderPlus className="h-3 w-3 mr-1" /> Nuevo equipo
                 </Button>
               </DialogTrigger>
@@ -480,6 +480,23 @@ export function SubagentManager() {
                   <div className="space-y-1.5">
                     <Label className="text-xs">Descripción (opcional)</Label>
                     <Input value={teamDescription} onChange={e => setTeamDescription(e.target.value)} placeholder="Descripción del equipo" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Modelo del orquestador</Label>
+                    <Select value={teamModel} onValueChange={setTeamModel}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Modelo para el orquestador" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {POPULAR_MODELS.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                        <SelectItem value="custom">✏️ Modelo personalizado...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {teamModel === 'custom' && (
+                      <Input value={teamCustomModel} onChange={e => setTeamCustomModel(e.target.value)} placeholder="provider/model-name" className="mt-1.5" />
+                    )}
                   </div>
                   <Button onClick={handleSaveTeam} className="w-full" disabled={!teamName.trim()}>
                     {editingTeam ? 'Guardar' : 'Crear equipo'}
