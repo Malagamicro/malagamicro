@@ -10,10 +10,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Send, Bot, User, Loader2, Sparkles, Brain, RotateCcw, BarChart3, Plus,
-  Search, Bell, MessageSquare, Trash2, MoreVertical, PanelLeftClose, Mic,
-  MicOff, PanelLeft, Pencil, FileIcon, X, Paperclip, Image, FileText,
-  Settings2, Zap, ImageIcon, AudioLines,
+  Send, Bot, User, Loader2, Sparkles, Brain, RotateCcw, Plus,
+  MessageSquare, Trash2, MoreVertical, PanelLeftClose, Mic,
+  MicOff, PanelLeft, Pencil, X, Paperclip, Image, FileText,
+  Settings2, Zap, ImageIcon, AudioLines, Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
