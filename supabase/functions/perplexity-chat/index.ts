@@ -662,17 +662,18 @@ const tools = [
       },
     },
   },
-  // Subagent delegation
+  // Subagent delegation (single or chained)
   {
     type: "function",
     function: {
       name: "delegate_to_subagent",
-      description: "Delegar una tarea a un subagente especializado. Úsalo cuando la petición del usuario encaje mejor con un subagente disponible (ej: generar imágenes, análisis especializado, etc.).",
+      description: "Delegar una tarea a un subagente especializado. Puedes llamar esta herramienta VARIAS VECES en paralelo para usar múltiples subagentes. Si necesitas encadenar (output de uno como input de otro), usa el campo 'depends_on' con el nombre del agente cuyo resultado necesitas.",
       parameters: {
         type: "object",
         properties: {
           agent_name: { type: "string", description: "Nombre exacto del subagente al que delegar" },
           task_description: { type: "string", description: "Descripción clara de la tarea a realizar por el subagente" },
+          depends_on: { type: "string", description: "Nombre del subagente cuyo resultado se necesita antes de ejecutar este. Si se indica, el output del agente previo se añade al task_description automáticamente." },
         },
         required: ["agent_name", "task_description"],
       },
@@ -1975,7 +1976,12 @@ ${subagentList}
 2. NO envíes texto de confirmación antes de delegar (nada de "voy a generar...", "delegando a...", "te la mostraré...").
 3. El subagente se encarga de todo. Tu trabajo es SOLO llamar a delegate_to_subagent con los parámetros correctos.
 4. Después de delegar, NO añadas texto adicional. El resultado del subagente se mostrará directamente.
-5. Para imágenes: pasa la descripción detallada en task_description. El subagente generará la imagen directamente.`
+5. Para imágenes: pasa la descripción detallada en task_description. El subagente generará la imagen directamente.
+6. **MULTI-AGENTE**: Puedes llamar delegate_to_subagent VARIAS VECES en la misma respuesta para usar múltiples subagentes simultáneamente (ej: generar imagen + crear audio a la vez).
+7. **ENCADENAMIENTO**: Si un agente necesita el resultado de otro, usa depends_on. Ejemplo: si necesitas que un agente cree un prompt y otro genere la imagen con ese prompt, el segundo lleva depends_on con el nombre del primero.
+8. Ejemplos de multi-agente:
+   - "Quiero una foto con audio" → delegate_to_subagent(imagen, "...") + delegate_to_subagent(audio, "...")
+   - "Crea un prompt profesional y genera la imagen" → delegate_to_subagent(prompt_creator, "crear prompt...") + delegate_to_subagent(imagen, "generar imagen", depends_on="prompt_creator")`
       : '';
 
     const systemPrompt = `Eres un asistente de CRM inteligente con acceso COMPLETO a toda la aplicación. 
@@ -2122,19 +2128,24 @@ Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`
 
     // Execute tool calls if any
     if (toolCalls.length > 0 && userId) {
-      // Check if any tool call is a delegation — handle it specially
-      const delegationCall = toolCalls.find(tc => tc.function.name === 'delegate_to_subagent');
-      if (delegationCall) {
-        // Return a special SSE stream that tells the client to delegate
-        let args: any = {};
-        try { args = JSON.parse(delegationCall.function.arguments); } catch {}
+      // Check if ANY tool calls are delegations
+      const delegationCalls = toolCalls.filter(tc => tc.function.name === 'delegate_to_subagent');
+      if (delegationCalls.length > 0) {
+        // Parse all delegation arguments
+        const delegations = delegationCalls.map(dc => {
+          let args: any = {};
+          try { args = JSON.parse(dc.function.arguments); } catch {}
+          return args;
+        });
         
-        // Send a minimal stream with just the delegation info
+        // Send ALL delegations to client as a single SSE response
         const sseData = `data: ${JSON.stringify({
           choices: [{
             delta: {
               content: null,
-              tool_calls: [{ function: { name: 'delegate_to_subagent', arguments: JSON.stringify(args) } }]
+              tool_calls: delegations.map((args: any) => ({ 
+                function: { name: 'delegate_to_subagent', arguments: JSON.stringify(args) } 
+              }))
             }
           }]
         })}\n\ndata: [DONE]\n\n`;

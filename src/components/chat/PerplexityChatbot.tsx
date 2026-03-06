@@ -190,7 +190,7 @@ export function PerplexityChatbot() {
       id: assistantId, role: 'assistant', content: '', timestamp: new Date(),
     }]);
 
-    let delegationDetected: { agent_name: string; task: string } | null = null;
+    let delegations: { agent_name: string; task: string; depends_on?: string }[] = [];
 
     while (true) {
       const { done, value } = await reader.read();
@@ -220,7 +220,7 @@ export function PerplexityChatbot() {
             ));
           }
 
-          // Check for tool calls that indicate delegation
+          // Check for tool calls that indicate delegation(s)
           const toolCalls = parsed.choices?.[0]?.delta?.tool_calls;
           if (toolCalls) {
             for (const tc of toolCalls) {
@@ -228,7 +228,11 @@ export function PerplexityChatbot() {
                 try {
                   const args = JSON.parse(tc.function.arguments || '{}');
                   if (args.agent_name) {
-                    delegationDetected = { agent_name: args.agent_name, task: args.task_description || '' };
+                    delegations.push({ 
+                      agent_name: args.agent_name, 
+                      task: args.task_description || args.task || '', 
+                      depends_on: args.depends_on || undefined,
+                    });
                   }
                 } catch {}
               }
@@ -241,38 +245,55 @@ export function PerplexityChatbot() {
       }
     }
 
-    // If delegation was detected, replace orchestrator text with delegation notice and execute subagent
-    if (delegationDetected) {
-      const agent = activeSubagents.find(s => s.name.toLowerCase() === delegationDetected!.agent_name.toLowerCase());
-      if (agent) {
-        // Remove the orchestrator's text message and replace with a clean delegation notice
-        setMessages(prev => prev.map(m => 
-          m.id === assistantId ? {
-            ...m,
-            content: `🔄 Delegando tarea a **${agent.name}**...`,
-            isDelegationNotice: true,
-            subagent: agent.name,
-            subagentEmoji: agent.avatar_emoji,
-            subagentColor: agent.avatar_color,
-          } : m
-        ));
-        // Save minimal delegation message to DB
-        if (assistantContent) {
-          await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[Delegado a ${agent.name}]` });
-        }
-        await executeSubagentCall(agent, delegationDetected.task, sessionId, userMessages);
-        return; // Don't continue — subagent handles the rest
+    // If delegations were detected, execute them (with chaining support)
+    if (delegations.length > 0) {
+      // Remove orchestrator text
+      setMessages(prev => prev.map(m => 
+        m.id === assistantId ? {
+          ...m,
+          content: delegations.length === 1 
+            ? `🔄 Delegando tarea a **${delegations[0].agent_name}**...`
+            : `🔄 Ejecutando ${delegations.length} subagentes: ${delegations.map(d => `**${d.agent_name}**`).join(', ')}...`,
+          isDelegationNotice: true,
+        } : m
+      ));
+
+      if (assistantContent) {
+        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[Delegado a ${delegations.map(d => d.agent_name).join(', ')}]` });
       }
+
+      // Sort delegations: those without depends_on first, then chained ones
+      const independent = delegations.filter(d => !d.depends_on);
+      const chained = delegations.filter(d => d.depends_on);
+      const ordered = [...independent, ...chained];
+      
+      // Store results for chaining
+      const agentResults: Record<string, string> = {};
+
+      for (const delegation of ordered) {
+        const agent = activeSubagents.find(s => s.name.toLowerCase() === delegation.agent_name.toLowerCase());
+        if (!agent) continue;
+
+        // If this delegation depends on another agent's output, append it to the task
+        let finalTask = delegation.task;
+        if (delegation.depends_on && agentResults[delegation.depends_on.toLowerCase()]) {
+          finalTask += `\n\nResultado del agente "${delegation.depends_on}":\n${agentResults[delegation.depends_on.toLowerCase()]}`;
+        }
+
+        const result = await executeSubagentCall(agent, finalTask, sessionId, userMessages);
+        agentResults[agent.name.toLowerCase()] = result || '';
+      }
+
+      return;
     }
 
     // Check if content mentions delegation pattern (fallback)
-    if (!delegationDetected && (assistantContent.includes('🔄 Delegando') || assistantContent.includes('delegation_requested'))) {
+    if (delegations.length === 0 && (assistantContent.includes('🔄 Delegando') || assistantContent.includes('delegation_requested'))) {
       const match = assistantContent.match(/Delegando a \*\*(.+?)\*\*/);
       if (match) {
         const agentName = match[1];
         const agent = activeSubagents.find(s => s.name.toLowerCase() === agentName.toLowerCase());
         if (agent) {
-          // Replace orchestrator text with delegation notice
           setMessages(prev => prev.map(m => 
             m.id === assistantId ? {
               ...m,
@@ -301,7 +322,7 @@ export function PerplexityChatbot() {
     }
   };
 
-  const executeSubagentCall = async (agent: AISubagent, task: string, sessionId: string, contextMessages: any[]) => {
+  const executeSubagentCall = async (agent: AISubagent, task: string, sessionId: string, contextMessages: any[]): Promise<string> => {
     setActiveSubagent(agent.name);
     const subagentMsgId = crypto.randomUUID();
 
@@ -380,6 +401,7 @@ export function PerplexityChatbot() {
         ));
         
         await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${imageContent}` });
+        return imageContent;
       } else if (agent.agent_type === 'audio') {
         // Audio subagent - handle TTS or audio generation
         const data = await resp.json();
@@ -391,6 +413,7 @@ export function PerplexityChatbot() {
         ));
         
         await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${audioContent}` });
+        return audioContent;
       } else {
         // Stream text response
         const reader = resp.body!.getReader();
@@ -430,12 +453,15 @@ export function PerplexityChatbot() {
         if (subContent) {
           await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${subContent}` });
         }
+        return subContent;
       }
     } catch (error) {
       console.error('Subagent error:', error);
+      const errMsg = `❌ Error del subagente ${agent.name}: ${error instanceof Error ? error.message : 'Error desconocido'}`;
       setMessages(prev => prev.map(m =>
-        m.id === subagentMsgId ? { ...m, content: `❌ Error del subagente ${agent.name}: ${error instanceof Error ? error.message : 'Error desconocido'}` } : m
+        m.id === subagentMsgId ? { ...m, content: errMsg } : m
       ));
+      return errMsg;
     } finally {
       setActiveSubagent(null);
     }
