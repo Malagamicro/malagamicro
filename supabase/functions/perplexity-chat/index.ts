@@ -1976,7 +1976,12 @@ ${subagentList}
 2. NO envíes texto de confirmación antes de delegar (nada de "voy a generar...", "delegando a...", "te la mostraré...").
 3. El subagente se encarga de todo. Tu trabajo es SOLO llamar a delegate_to_subagent con los parámetros correctos.
 4. Después de delegar, NO añadas texto adicional. El resultado del subagente se mostrará directamente.
-5. Para imágenes: pasa la descripción detallada en task_description. El subagente generará la imagen directamente.`
+5. Para imágenes: pasa la descripción detallada en task_description. El subagente generará la imagen directamente.
+6. **MULTI-AGENTE**: Puedes llamar delegate_to_subagent VARIAS VECES en la misma respuesta para usar múltiples subagentes simultáneamente (ej: generar imagen + crear audio a la vez).
+7. **ENCADENAMIENTO**: Si un agente necesita el resultado de otro, usa depends_on. Ejemplo: si necesitas que un agente cree un prompt y otro genere la imagen con ese prompt, el segundo lleva depends_on con el nombre del primero.
+8. Ejemplos de multi-agente:
+   - "Quiero una foto con audio" → delegate_to_subagent(imagen, "...") + delegate_to_subagent(audio, "...")
+   - "Crea un prompt profesional y genera la imagen" → delegate_to_subagent(prompt_creator, "crear prompt...") + delegate_to_subagent(imagen, "generar imagen", depends_on="prompt_creator")`
       : '';
 
     const systemPrompt = `Eres un asistente de CRM inteligente con acceso COMPLETO a toda la aplicación. 
