@@ -401,6 +401,7 @@ export function PerplexityChatbot() {
         ));
         
         await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${imageContent}` });
+        return imageContent;
       } else if (agent.agent_type === 'audio') {
         // Audio subagent - handle TTS or audio generation
         const data = await resp.json();
@@ -412,6 +413,7 @@ export function PerplexityChatbot() {
         ));
         
         await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${audioContent}` });
+        return audioContent;
       } else {
         // Stream text response
         const reader = resp.body!.getReader();
