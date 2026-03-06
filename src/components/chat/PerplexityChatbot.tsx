@@ -660,32 +660,40 @@ export function PerplexityChatbot() {
           </div>
           
           <div className="flex items-center gap-2 md:gap-3">
-            {/* Active subagents indicators */}
-            {activeSubagents.length > 0 && (
-              <div className="hidden md:flex items-center gap-1">
-                {activeSubagents.slice(0, 4).map(agent => (
-                  <div
-                    key={agent.id}
-                    className={cn('w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all',
-                      activeSubagent === agent.name ? 'ring-2 ring-primary animate-pulse' : ''
-                    )}
-                    style={{ backgroundColor: agent.avatar_color + '22', border: `1px solid ${agent.avatar_color}40` }}
-                    title={`${agent.name} (${agent.model})`}
-                  >
-                    {agent.avatar_emoji}
+            {/* Team selector */}
+            {teams.length > 0 && (
+              <Select value={activeTeamId || 'all'} onValueChange={v => setActiveTeamId(v === 'all' ? null : v)}>
+                <SelectTrigger className="w-[100px] md:w-[130px] h-8 md:h-9 bg-muted/50 border-0">
+                  <div className="flex items-center gap-1">
+                    <Users className="h-3 w-3 shrink-0" />
+                    <span className="text-xs truncate">{activeTeam?.name || 'Todos'}</span>
                   </div>
-                ))}
-                {activeSubagents.length > 4 && (
-                  <span className="text-xs text-muted-foreground">+{activeSubagents.length - 4}</span>
-                )}
-              </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los agentes</SelectItem>
+                  {teams.map(t => {
+                    const count = subagents.filter(s => s.is_active && s.team_id === t.id).length;
+                    return (
+                      <SelectItem key={t.id} value={t.id}>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-3 w-3" />
+                          <span>{t.name}</span>
+                          <span className="text-muted-foreground text-xs">({count})</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             )}
 
             <Select value={selectedModel} onValueChange={setSelectedModel}>
               <SelectTrigger className="w-[110px] md:w-[150px] h-8 md:h-9 bg-muted/50 border-0">
                 <div className="flex items-center gap-1 md:gap-2">
                   <selectedModelInfo.icon className={`h-3 w-3 md:h-4 md:w-4 ${selectedModelInfo.color}`} />
-                  <span className="text-xs md:text-sm truncate">{selectedModelInfo.name}</span>
+                  <span className="text-xs md:text-sm truncate">
+                    {selectedModel === 'custom' ? (customModelId || 'Custom') : selectedModelInfo.name}
+                  </span>
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -699,6 +707,16 @@ export function PerplexityChatbot() {
                 ))}
               </SelectContent>
             </Select>
+
+            {/* Custom model input */}
+            {selectedModel === 'custom' && (
+              <Input
+                value={customModelId}
+                onChange={e => setCustomModelId(e.target.value)}
+                placeholder="provider/model"
+                className="w-[140px] h-8 text-xs bg-muted/50 border-0"
+              />
+            )}
             
             <Button variant="ghost" size="icon" onClick={() => setShowSubagentPanel(!showSubagentPanel)} className="h-9 w-9" title="Subagentes IA">
               <Settings2 className={cn("h-4 w-4", showSubagentPanel && "text-primary")} />
