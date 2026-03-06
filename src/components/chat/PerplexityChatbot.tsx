@@ -13,7 +13,7 @@ import {
   Send, Bot, User, Loader2, Sparkles, Brain, RotateCcw, Plus,
   MessageSquare, Trash2, MoreVertical, PanelLeftClose, Mic,
   MicOff, PanelLeft, Pencil, X, Paperclip, Image, FileText,
-  Settings2, Zap, ImageIcon, AudioLines, Users, GripVertical,
+  Settings2, Zap, ImageIcon, Users, GripVertical,
   ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
