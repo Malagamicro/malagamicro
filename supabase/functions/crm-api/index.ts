@@ -156,7 +156,12 @@ serve(async (req) => {
         if (req.method === 'GET' && !idOrAction) {
           let query = supabase.from('leads').select('*').eq('user_id', userId);
           if (params.status) query = query.eq('status', params.status);
-          if (params.search) query = query.or(`company_name.ilike.%${params.search}%,contact_name.ilike.%${params.search}%,email.ilike.%${params.search}%`);
+          if (params.search) {
+            const safeSearch = sanitizeSearchParam(params.search);
+            if (safeSearch) {
+              query = query.or(`company_name.ilike.%${safeSearch}%,contact_name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
+            }
+          }
           if (params.limit) query = query.limit(parseInt(params.limit));
           if (params.offset) query = query.range(parseInt(params.offset), parseInt(params.offset) + parseInt(params.limit || '50') - 1);
           const { data, error } = await query.order('created_at', { ascending: false });
