@@ -530,6 +530,7 @@ export function SubagentManager() {
                         {team.description && (
                           <p className="text-[10px] text-muted-foreground">{team.description}</p>
                         )}
+                        <p className="text-[10px] text-muted-foreground">🤖 Orquestador: {team.orchestrator_model}</p>
                       </div>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
