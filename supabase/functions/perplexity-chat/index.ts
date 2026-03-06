@@ -2122,6 +2122,28 @@ Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`
 
     // Execute tool calls if any
     if (toolCalls.length > 0 && userId) {
+      // Check if any tool call is a delegation — handle it specially
+      const delegationCall = toolCalls.find(tc => tc.function.name === 'delegate_to_subagent');
+      if (delegationCall) {
+        // Return a special SSE stream that tells the client to delegate
+        let args: any = {};
+        try { args = JSON.parse(delegationCall.function.arguments); } catch {}
+        
+        // Send a minimal stream with just the delegation info
+        const sseData = `data: ${JSON.stringify({
+          choices: [{
+            delta: {
+              content: null,
+              tool_calls: [{ function: { name: 'delegate_to_subagent', arguments: JSON.stringify(args) } }]
+            }
+          }]
+        })}\n\ndata: [DONE]\n\n`;
+        
+        return new Response(sseData, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+        });
+      }
+
       const toolResults: ChatMessage[] = [];
 
       for (const tc of toolCalls) {
