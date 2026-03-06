@@ -493,6 +493,10 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
     addLinkItem(categoryId, label, url, icon, color);
   };
 
+  const handleAddApp = (categoryId: string, app: SidebarItem) => {
+    addAppItem(categoryId, app);
+  };
+
   const handleStartRename = (catId: string, currentName: string) => {
     setRenamingCategory(catId);
     setRenameValue(currentName);
