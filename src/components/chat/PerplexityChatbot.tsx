@@ -912,7 +912,8 @@ export function PerplexityChatbot() {
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground text-center mt-2">
-            Orquestador: {selectedModelInfo.name} • {activeSubagents.length} subagente(s) • 📎 PDF, DOCX, CSV, imágenes
+            Orquestador: {selectedModel === 'custom' ? (customModelId || 'Custom') : selectedModelInfo.name}
+            {activeTeam ? ` • Equipo: ${activeTeam.name}` : ''} • {activeSubagents.length} subagente(s) • 📎 PDF, DOCX, CSV, imágenes
           </p>
         </div>
       </div>
