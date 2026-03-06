@@ -178,9 +178,9 @@ function ReminderCard({ reminder, onToggle, onDelete, onView, onSnooze, onEdit }
   );
 }
 
-function ReminderDetailModal({ reminder, open, onOpenChange, onToggle, onDelete, onSnooze }: {
+function ReminderDetailModal({ reminder, open, onOpenChange, onToggle, onDelete, onSnooze, onEdit }: {
   reminder: GeneralReminder | null; open: boolean; onOpenChange: (open: boolean) => void;
-  onToggle: () => void; onDelete: () => void; onSnooze: (id: string, min: number) => void;
+  onToggle: () => void; onDelete: () => void; onSnooze: (id: string, min: number) => void; onEdit?: () => void;
 }) {
   if (!reminder) return null;
   const reminderDate = new Date(reminder.reminder_date);
