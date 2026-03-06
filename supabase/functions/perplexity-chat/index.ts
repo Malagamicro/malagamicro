@@ -1890,23 +1890,15 @@ serve(async (req) => {
         });
       }
 
-      // Audio subagents: use a text fallback model, client will handle TTS via Browser SpeechSynthesis
-      const isAudioAgent = agentType === 'audio';
-      const effectiveModel = isAudioAgent ? 'openai/gpt-5-mini' : agentModel;
-      
-      if (isAudioAgent) {
-        console.log(`[perplexity-chat] Audio subagent "${agentName}": using text model ${effectiveModel} + client-side TTS`);
-      }
-
-      // Text/Audio subagent - if it has tools, do a non-streaming call first to check for tool calls
+      // Text subagent - if it has tools, do a non-streaming call first to check for tool calls
       const subRequestBody: any = {
-        model: effectiveModel,
+        model: agentModel,
         messages: [
           { role: "system", content: agentPrompt + (allowedTools.length > 0 ? '\n\nTienes acceso a herramientas del CRM. Úsalas cuando sea necesario para obtener datos reales.' : '') },
           ...messages.filter((m: any) => m.role !== 'system'),
           { role: "user", content: userMessage },
         ],
-        stream: isAudioAgent ? false : (allowedTools.length === 0),
+        stream: allowedTools.length === 0,
       };
 
       if (allowedTools.length > 0) {
@@ -1932,18 +1924,6 @@ serve(async (req) => {
         });
       }
 
-      // Audio subagent: return JSON response (non-streaming)
-      if (isAudioAgent) {
-        const audioData = await subResponse.json();
-        const audioText = audioData.choices?.[0]?.message?.content || 'Respuesta de audio generada';
-        return new Response(JSON.stringify({ 
-          subagent: agentName, 
-          type: 'audio',
-          response: { choices: [{ message: { role: 'assistant', content: audioText } }] }
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
 
       // If subagent has tools, handle tool calls non-streaming then re-stream
       if (allowedTools.length > 0) {
@@ -2022,9 +2002,8 @@ serve(async (req) => {
         }).join('\n')
       : '';
 
-    // Detect image and audio subagents
+    // Detect image subagent
     const imageSubagent = Array.isArray(clientSubagents) ? clientSubagents.find((s: any) => s.agent_type === 'image') : null;
-    const audioSubagent = Array.isArray(clientSubagents) ? clientSubagents.find((s: any) => s.agent_type === 'audio') : null;
 
     const delegationInstructions = subagentList 
       ? `\n\n**SUBAGENTES DISPONIBLES:**
@@ -2033,14 +2012,13 @@ ${subagentList}
 
 **REGLAS DE DELEGACIÓN OBLIGATORIAS (NUNCA IGNORAR):**
 1. **OBLIGATORIO:** Si el usuario pide una IMAGEN (generar, crear, dibujar, hacer foto, ilustración, diseño visual), DEBES llamar a delegate_to_subagent con el agente de tipo imagen${imageSubagent ? ` ("${imageSubagent.name}")` : ''}. NUNCA respondas con texto diciendo que no puedes generar imágenes. SÍ PUEDES, a través del subagente.
-2. **OBLIGATORIO:** Si el usuario pide AUDIO (generar audio, texto a voz, narración, música), DEBES llamar a delegate_to_subagent con el agente de tipo audio${audioSubagent ? ` ("${audioSubagent.name}")` : ''}. NUNCA respondas con texto diciendo que no puedes generar audio.
-3. Cuando delegues, NO escribas un mensaje largo explicando qué vas a hacer. Simplemente llama a delegate_to_subagent INMEDIATAMENTE.
-4. NO envíes texto de confirmación antes de delegar (nada de "voy a generar...", "delegando a...", "no puedo generar...").
-5. El subagente se encarga de todo. Tu trabajo es SOLO llamar a delegate_to_subagent con los parámetros correctos.
-6. Para imágenes: pasa la descripción detallada del usuario en task_description. El subagente generará la imagen directamente.
-7. **MULTI-AGENTE**: Puedes llamar delegate_to_subagent VARIAS VECES en la misma respuesta.
-8. **ENCADENAMIENTO**: Si un agente necesita el resultado de otro, usa depends_on.
-9. **PROHIBIDO:** Responder "no puedo generar imágenes" o "no tengo herramienta de imágenes" cuando tienes subagentes de imagen disponibles. Esto está TERMINANTEMENTE PROHIBIDO.`
+2. Cuando delegues, NO escribas un mensaje largo explicando qué vas a hacer. Simplemente llama a delegate_to_subagent INMEDIATAMENTE.
+3. NO envíes texto de confirmación antes de delegar (nada de "voy a generar...", "delegando a...", "no puedo generar...").
+4. El subagente se encarga de todo. Tu trabajo es SOLO llamar a delegate_to_subagent con los parámetros correctos.
+5. Para imágenes: pasa la descripción detallada del usuario en task_description. El subagente generará la imagen directamente.
+6. **MULTI-AGENTE**: Puedes llamar delegate_to_subagent VARIAS VECES en la misma respuesta.
+7. **ENCADENAMIENTO**: Si un agente necesita el resultado de otro, usa depends_on.
+8. **PROHIBIDO:** Responder "no puedo generar imágenes" o "no tengo herramienta de imágenes" cuando tienes subagentes de imagen disponibles. Esto está TERMINANTEMENTE PROHIBIDO.`
       : '';
 
     const systemPrompt = `Eres un asistente de CRM inteligente con acceso COMPLETO a toda la aplicación. 

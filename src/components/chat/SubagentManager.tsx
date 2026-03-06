@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 const AGENT_TYPE_OPTIONS = [
   { value: 'text', label: 'Texto', icon: Bot, description: 'Responde con texto' },
   { value: 'image', label: 'Imagen', icon: ImageIcon, description: 'Genera imágenes' },
-  { value: 'audio', label: 'Audio', icon: AudioLines, description: 'Genera audio' },
 ];
 
 const EMOJI_OPTIONS = ['🤖', '🎨', '🎵', '📊', '🧠', '✍️', '🔍', '💡', '🌐', '⚡', '🎭', '📝'];
@@ -38,7 +37,7 @@ interface SubagentFormData {
   description: string;
   model: string;
   role_prompt: string;
-  agent_type: 'text' | 'image' | 'audio';
+  agent_type: 'text' | 'image';
   avatar_emoji: string;
   avatar_color: string;
   is_active: boolean;
@@ -90,7 +89,7 @@ export function SubagentManager() {
       description: agent.description || '',
       model: isPopular ? agent.model : 'custom',
       role_prompt: agent.role_prompt,
-      agent_type: agent.agent_type,
+      agent_type: agent.agent_type === 'audio' ? 'text' : agent.agent_type as 'text' | 'image',
       avatar_emoji: agent.avatar_emoji,
       avatar_color: agent.avatar_color,
       is_active: agent.is_active,
@@ -425,7 +424,6 @@ export function SubagentManager() {
                         <p className="text-sm font-medium truncate">{agent.name}</p>
                         <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full',
                           agent.agent_type === 'image' ? 'bg-pink-500/10 text-pink-500' :
-                          agent.agent_type === 'audio' ? 'bg-amber-500/10 text-amber-500' :
                           'bg-primary/10 text-primary'
                         )}>
                           {agent.agent_type}

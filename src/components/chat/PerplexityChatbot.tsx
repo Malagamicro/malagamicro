@@ -13,7 +13,7 @@ import {
   Send, Bot, User, Loader2, Sparkles, Brain, RotateCcw, Plus,
   MessageSquare, Trash2, MoreVertical, PanelLeftClose, Mic,
   MicOff, PanelLeft, Pencil, X, Paperclip, Image, FileText,
-  Settings2, Zap, ImageIcon, AudioLines, Users, GripVertical,
+  Settings2, Zap, ImageIcon, Users, GripVertical,
   ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -40,11 +40,9 @@ interface Message {
   subagent?: string; // which subagent responded
   subagentEmoji?: string;
   subagentColor?: string;
-  isImage?: boolean; // if this is an image response
+  isImage?: boolean;
   imageUrls?: string[];
-  isAudio?: boolean;
-  audioUrl?: string;
-  isDelegationNotice?: boolean; // delegation notice message
+  isDelegationNotice?: boolean;
 }
 
 interface FileAttachment {
@@ -130,11 +128,11 @@ export function PerplexityChatbot() {
   useEffect(() => {
     if (sessionMessages) {
       setMessages(prev => {
-        // Preserve local-only properties (imageUrls, isImage, audioUrl, isAudio) that aren't in DB
+        // Preserve local-only properties (imageUrls, isImage) that aren't in DB
         const localExtras = new Map<string, Partial<Message>>();
         for (const m of prev) {
-          if (m.imageUrls?.length || m.isImage || m.audioUrl || m.isAudio) {
-            localExtras.set(m.id, { imageUrls: m.imageUrls, isImage: m.isImage, audioUrl: m.audioUrl, isAudio: m.isAudio });
+          if (m.imageUrls?.length || m.isImage) {
+            localExtras.set(m.id, { imageUrls: m.imageUrls, isImage: m.isImage });
           }
         }
         return sessionMessages.map(m => {
@@ -300,7 +298,7 @@ export function PerplexityChatbot() {
         const agent = activeSubagents.find(s => s.name.toLowerCase() === agentNameLower)
           || activeSubagents.find(s => s.name.toLowerCase().startsWith(agentNameLower) || agentNameLower.startsWith(s.name.toLowerCase()))
           || activeSubagents.find(s => s.agent_type === 'image' && (agentNameLower.includes('image') || agentNameLower.includes('imagen')))
-          || activeSubagents.find(s => s.agent_type === 'audio' && (agentNameLower.includes('audio') || agentNameLower.includes('sonido') || agentNameLower.includes('voz')));
+          ;
         if (!agent) continue;
 
         // If this delegation depends on another agent's output, append it to the task
@@ -436,35 +434,6 @@ export function PerplexityChatbot() {
         const dbContent = `[${agent.name}] ${imageContent}${imageMarkdown ? '\n' + imageMarkdown : ''}`;
         await addMessage.mutateAsync({ sessionId, role: 'assistant', content: dbContent });
         return imageContent;
-      } else if (agent.agent_type === 'audio') {
-        // Audio subagent - text response + Browser TTS
-        const data = await resp.json();
-        const audioContent = data.response?.choices?.[0]?.message?.content || 'Audio generado';
-        
-        // Use Browser SpeechSynthesis to read the response aloud
-        const speakText = (text: string) => {
-          if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'es-ES';
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
-            // Try to find a Spanish voice
-            const voices = window.speechSynthesis.getVoices();
-            const esVoice = voices.find(v => v.lang.startsWith('es'));
-            if (esVoice) utterance.voice = esVoice;
-            window.speechSynthesis.speak(utterance);
-          }
-        };
-        
-        speakText(audioContent);
-        
-        setMessages(prev => prev.map(m => 
-          m.id === subagentMsgId ? { ...m, content: audioContent, isAudio: true, audioUrl: null } : m
-        ));
-        
-        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${audioContent}` });
-        return audioContent;
       } else {
         // Stream text response
         const reader = resp.body!.getReader();
@@ -1060,20 +1029,6 @@ export function PerplexityChatbot() {
               }}>
                 <ImageIcon className="h-3 w-3" /> Demo imagen
               </Button>
-              <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
-                const demoId = crypto.randomUUID();
-                setMessages(prev => [...prev, {
-                  id: demoId, role: 'assistant', content: '🎵 Aquí tienes un audio de ejemplo generado por un subagente de audio:',
-                  timestamp: new Date(),
-                  isAudio: true,
-                  audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-                  subagent: 'Demo Audio',
-                  subagentEmoji: '🎵',
-                  subagentColor: '#48DBFB',
-                }]);
-              }}>
-                <AudioLines className="h-3 w-3" /> Demo audio
-              </Button>
             </div>
           </div>
         ) : (
@@ -1155,11 +1110,6 @@ export function PerplexityChatbot() {
                                   <img src={url} alt="Imagen generada" className="max-w-full rounded-lg hover:opacity-90 transition-opacity cursor-pointer" />
                                 </a>
                               ))}
-                            </div>
-                          )}
-                          {message.isAudio && message.audioUrl && (
-                            <div className="mt-3">
-                              <audio controls src={message.audioUrl} className="max-w-full" preload="metadata" />
                             </div>
                           )}
                         </>
