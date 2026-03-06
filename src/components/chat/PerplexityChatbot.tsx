@@ -276,6 +276,7 @@ export function PerplexityChatbot() {
             agentModel: agent.model,
             agentPrompt: agent.role_prompt,
             agentType: agent.agent_type,
+            agentTools: (agent as any).tools || [],
             userMessage: task,
           },
         }),
