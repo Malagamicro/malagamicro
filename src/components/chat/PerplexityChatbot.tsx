@@ -143,6 +143,7 @@ export function PerplexityChatbot() {
 
   const streamChat = async (userMessages: { role: string; content: string | any[] }[], sessionId: string) => {
     const token = await getAuthToken();
+    const effectiveModel = selectedModel === 'custom' ? customModelId : selectedModel;
     
     const resp = await fetch(CHAT_URL, {
       method: 'POST',
@@ -152,7 +153,7 @@ export function PerplexityChatbot() {
       },
       body: JSON.stringify({ 
         messages: userMessages,
-        model: selectedModel,
+        model: effectiveModel,
         subagents: activeSubagents.map(s => ({
           name: s.name,
           description: s.description,
