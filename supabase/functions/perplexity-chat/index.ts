@@ -2001,22 +2001,25 @@ serve(async (req) => {
         }).join('\n')
       : '';
 
+    // Detect image and audio subagents
+    const imageSubagent = Array.isArray(clientSubagents) ? clientSubagents.find((s: any) => s.agent_type === 'image') : null;
+    const audioSubagent = Array.isArray(clientSubagents) ? clientSubagents.find((s: any) => s.agent_type === 'audio') : null;
+
     const delegationInstructions = subagentList 
       ? `\n\n**SUBAGENTES DISPONIBLES:**
 Tienes acceso a subagentes especializados. Cuando una tarea se beneficie de un agente especializado, usa la herramienta delegate_to_subagent.
 ${subagentList}
 
-**REGLAS DE DELEGACIÓN CRÍTICAS:**
-1. Cuando delegues, NO escribas un mensaje largo explicando qué vas a hacer. Simplemente llama a delegate_to_subagent INMEDIATAMENTE.
-2. NO envíes texto de confirmación antes de delegar (nada de "voy a generar...", "delegando a...", "te la mostraré...").
-3. El subagente se encarga de todo. Tu trabajo es SOLO llamar a delegate_to_subagent con los parámetros correctos.
-4. Después de delegar, NO añadas texto adicional. El resultado del subagente se mostrará directamente.
-5. Para imágenes: pasa la descripción detallada en task_description. El subagente generará la imagen directamente.
-6. **MULTI-AGENTE**: Puedes llamar delegate_to_subagent VARIAS VECES en la misma respuesta para usar múltiples subagentes simultáneamente (ej: generar imagen + crear audio a la vez).
-7. **ENCADENAMIENTO**: Si un agente necesita el resultado de otro, usa depends_on. Ejemplo: si necesitas que un agente cree un prompt y otro genere la imagen con ese prompt, el segundo lleva depends_on con el nombre del primero.
-8. Ejemplos de multi-agente:
-   - "Quiero una foto con audio" → delegate_to_subagent(imagen, "...") + delegate_to_subagent(audio, "...")
-   - "Crea un prompt profesional y genera la imagen" → delegate_to_subagent(prompt_creator, "crear prompt...") + delegate_to_subagent(imagen, "generar imagen", depends_on="prompt_creator")`
+**REGLAS DE DELEGACIÓN OBLIGATORIAS (NUNCA IGNORAR):**
+1. **OBLIGATORIO:** Si el usuario pide una IMAGEN (generar, crear, dibujar, hacer foto, ilustración, diseño visual), DEBES llamar a delegate_to_subagent con el agente de tipo imagen${imageSubagent ? ` ("${imageSubagent.name}")` : ''}. NUNCA respondas con texto diciendo que no puedes generar imágenes. SÍ PUEDES, a través del subagente.
+2. **OBLIGATORIO:** Si el usuario pide AUDIO (generar audio, texto a voz, narración, música), DEBES llamar a delegate_to_subagent con el agente de tipo audio${audioSubagent ? ` ("${audioSubagent.name}")` : ''}. NUNCA respondas con texto diciendo que no puedes generar audio.
+3. Cuando delegues, NO escribas un mensaje largo explicando qué vas a hacer. Simplemente llama a delegate_to_subagent INMEDIATAMENTE.
+4. NO envíes texto de confirmación antes de delegar (nada de "voy a generar...", "delegando a...", "no puedo generar...").
+5. El subagente se encarga de todo. Tu trabajo es SOLO llamar a delegate_to_subagent con los parámetros correctos.
+6. Para imágenes: pasa la descripción detallada del usuario en task_description. El subagente generará la imagen directamente.
+7. **MULTI-AGENTE**: Puedes llamar delegate_to_subagent VARIAS VECES en la misma respuesta.
+8. **ENCADENAMIENTO**: Si un agente necesita el resultado de otro, usa depends_on.
+9. **PROHIBIDO:** Responder "no puedo generar imágenes" o "no tengo herramienta de imágenes" cuando tienes subagentes de imagen disponibles. Esto está TERMINANTEMENTE PROHIBIDO.`
       : '';
 
     const systemPrompt = `Eres un asistente de CRM inteligente con acceso COMPLETO a toda la aplicación. 
