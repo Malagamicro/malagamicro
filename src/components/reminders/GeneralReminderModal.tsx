@@ -271,8 +271,8 @@ export function GeneralReminderModal({ open, onOpenChange, editReminder }: Gener
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!date || !title.trim() || isAddingReminder}>
-            {isAddingReminder ? 'Guardando...' : 'Programar'}
+          <Button onClick={handleSubmit} disabled={!date || !title.trim() || isAddingReminder || isUpdatingReminder}>
+            {(isAddingReminder || isUpdatingReminder) ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Programar'}
           </Button>
         </DialogFooter>
       </DialogContent>
