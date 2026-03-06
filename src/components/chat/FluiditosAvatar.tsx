@@ -35,16 +35,38 @@ export function saveFluiditosConfig(config: FluiditosConfig) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
 }
 
+export type FluiditosAnimState = 'idle' | 'thinking' | 'typing' | 'responding';
+
 interface Props {
   config?: FluiditosConfig;
   size?: number;
   animated?: boolean;
+  animState?: FluiditosAnimState;
   className?: string;
 }
 
-export function FluiditosAvatar({ config = DEFAULT_CONFIG, size = 64, animated = true, className }: Props) {
+export function FluiditosAvatar({ config = DEFAULT_CONFIG, size = 64, animated = true, animState = 'idle', className }: Props) {
   const c = config;
   const id = useMemo(() => Math.random().toString(36).slice(2, 8), []);
+
+  // Animation CSS classes based on state
+  const getAnimStyle = (): React.CSSProperties => {
+    const base: React.CSSProperties = {
+      filter: animated ? `drop-shadow(0 0 8px ${c.glowColor}80)` : undefined,
+      transition: 'transform 0.3s ease',
+    };
+    if (!animated) return base;
+    switch (animState) {
+      case 'thinking':
+        return { ...base, animation: 'fluiditos-think 1.5s ease-in-out infinite' };
+      case 'typing':
+        return { ...base, animation: 'fluiditos-type 0.4s ease-in-out infinite alternate' };
+      case 'responding':
+        return { ...base, animation: 'fluiditos-respond 2s ease-in-out infinite' };
+      default:
+        return { ...base, animation: 'fluiditos-idle 6s ease-in-out infinite' };
+    }
+  };
 
   const renderEyes = () => {
     switch (c.eyeStyle) {
@@ -317,13 +339,39 @@ export function FluiditosAvatar({ config = DEFAULT_CONFIG, size = 64, animated =
   );
 
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      className={className}
-      style={{ filter: animated ? `drop-shadow(0 0 8px ${c.glowColor}80)` : undefined }}
-    >
+    <>
+      <style>{`
+        @keyframes fluiditos-idle {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          25% { transform: translateY(-2px) rotate(1deg); }
+          50% { transform: translateY(1px) rotate(-0.5deg); }
+          75% { transform: translateY(-1px) rotate(0.5deg); }
+        }
+        @keyframes fluiditos-think {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          25% { transform: scale(1.03) rotate(-3deg); }
+          50% { transform: scale(0.97) rotate(3deg); }
+          75% { transform: scale(1.02) rotate(-1deg); }
+        }
+        @keyframes fluiditos-type {
+          0% { transform: scale(1) translateY(0); }
+          100% { transform: scale(1.02) translateY(-1px); }
+        }
+        @keyframes fluiditos-respond {
+          0%, 100% { transform: scale(1) translateY(0); }
+          15% { transform: scale(1.06) translateY(-3px); }
+          30% { transform: scale(0.98) translateY(1px); }
+          50% { transform: scale(1.03) translateY(-2px) rotate(2deg); }
+          70% { transform: scale(0.99) rotate(-1deg); }
+        }
+      `}</style>
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 100 100"
+        className={className}
+        style={getAnimStyle()}
+      >
       <defs>
         <radialGradient id={`grad-${id}`} cx="35%" cy="30%" r="65%">
           <stop offset="0%" stopColor="white" stopOpacity="0.35" />
@@ -380,6 +428,7 @@ export function FluiditosAvatar({ config = DEFAULT_CONFIG, size = 64, animated =
 
       {/* Accessory */}
       {renderAccessory()}
-    </svg>
+      </svg>
+    </>
   );
 }

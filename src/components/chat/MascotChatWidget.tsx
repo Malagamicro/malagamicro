@@ -7,7 +7,7 @@ import { X, Send, Loader2, Minimize2, Mic, MicOff, Plus, Paperclip, Image as Ima
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { FluiditosAvatar, FluiditosConfig, loadFluiditosConfig } from './FluiditosAvatar';
+import { FluiditosAvatar, FluiditosConfig, FluiditosAnimState, loadFluiditosConfig } from './FluiditosAvatar';
 import { FluiditosCustomizer } from './FluiditosCustomizer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -234,7 +234,7 @@ export function MascotChatWidget() {
         role="button"
         aria-label="Abrir chat con Fluiditos"
       >
-        <FluiditosAvatar config={fluiditosConfig} size={56} animated />
+        <FluiditosAvatar config={fluiditosConfig} size={56} animated animState="idle" />
         <span className="absolute -top-2 -right-1 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full font-medium shadow pointer-events-none">
           {messages.length > 0 ? `${messages.length}` : '¡Hola!'}
         </span>
@@ -254,7 +254,7 @@ export function MascotChatWidget() {
         className="z-50 touch-none w-14 h-14 rounded-full shadow-xl bg-card/80 backdrop-blur-sm border border-primary/20 flex items-center justify-center cursor-grab active:cursor-grabbing"
         role="button"
       >
-        <FluiditosAvatar config={fluiditosConfig} size={48} animated />
+        <FluiditosAvatar config={fluiditosConfig} size={48} animated animState="idle" />
       </div>
     );
   }
@@ -271,23 +271,14 @@ export function MascotChatWidget() {
           : 'overflow-auto min-w-[280px] min-h-[300px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)] w-[340px] h-[460px] rounded-2xl resize'
       )}
     >
-      {/* Customizer overlay */}
-      {showCustomizer && (
-        <FluiditosCustomizer
-          config={fluiditosConfig}
-          onChange={setFluiditosConfig}
-          onClose={() => setShowCustomizer(false)}
-        />
-      )}
-
-      {/* Header */}
+      {/* Header - always draggable */}
       <div
         onMouseDown={startDrag}
         onTouchStart={startDrag}
         className="flex items-center gap-3 p-4 border-b bg-gradient-to-r from-primary/10 to-primary/5 cursor-grab active:cursor-grabbing touch-none select-none"
       >
         <div className="w-10 h-10 rounded-full bg-card/60 flex items-center justify-center border shadow-sm pointer-events-none">
-          <FluiditosAvatar config={fluiditosConfig} size={36} animated={false} />
+          <FluiditosAvatar config={fluiditosConfig} size={36} animated animState={isLoading ? 'responding' : 'idle'} />
         </div>
         <div className="flex-1 pointer-events-none">
           <h3 className="font-semibold text-sm">Fluiditos</h3>
@@ -307,13 +298,23 @@ export function MascotChatWidget() {
         </Button>
       </div>
 
+      {/* Customizer overlay - rendered after header so header is still accessible for drag */}
+      {showCustomizer && (
+        <FluiditosCustomizer
+          config={fluiditosConfig}
+          onChange={setFluiditosConfig}
+          onClose={() => setShowCustomizer(false)}
+        />
+      )}
+
       {/* Messages */}
+      {!showCustomizer && (
       <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollViewportRef}>
         <div className="p-4 space-y-4">
           {messages.length === 0 ? (
             <div className="text-center py-8 space-y-4">
               <div className="w-24 h-24 mx-auto">
-                <FluiditosAvatar config={fluiditosConfig} size={96} />
+                <FluiditosAvatar config={fluiditosConfig} size={96} animState="idle" />
               </div>
               <div className="space-y-2">
                 <h4 className="font-semibold">¡Hola! Soy Fluiditos 💧</h4>
@@ -348,7 +349,7 @@ export function MascotChatWidget() {
                 <div key={i} className={cn('flex gap-2', message.role === 'user' ? 'justify-end' : 'justify-start')}>
                   {message.role === 'assistant' && (
                     <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
-                      <FluiditosAvatar config={fluiditosConfig} size={28} animated={false} />
+                      <FluiditosAvatar config={fluiditosConfig} size={28} animated={false} animState="idle" />
                     </div>
                   )}
                   <div className={cn('max-w-[80%] rounded-2xl px-4 py-2 text-sm', message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-muted rounded-bl-md')}>
@@ -370,7 +371,7 @@ export function MascotChatWidget() {
               {isLoading && (
                 <div className="flex gap-2 justify-start">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
-                    <FluiditosAvatar config={fluiditosConfig} size={28} animated={false} />
+                    <FluiditosAvatar config={fluiditosConfig} size={28} animated animState="responding" />
                   </div>
                   <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3 text-xs text-muted-foreground">
                     Escribiendo...
@@ -381,8 +382,10 @@ export function MascotChatWidget() {
           )}
         </div>
       </div>
+      )}
 
       {/* Input */}
+      {!showCustomizer && (
       <div className="p-3 border-t bg-muted/30">
         {pendingImages.length > 0 && (
           <div className="flex gap-2 mb-2 flex-wrap">
@@ -433,6 +436,7 @@ export function MascotChatWidget() {
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }

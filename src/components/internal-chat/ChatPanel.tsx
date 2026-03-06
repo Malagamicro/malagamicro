@@ -351,8 +351,33 @@ export function ChatPanel({
               const showAvatar = !isMe && (idx === 0 || messages[idx - 1]?.sender_id !== message.sender_id);
               const isEditing = editingMessageId === message.id;
 
+              // Date separator logic
+              const msgDate = new Date(message.created_at);
+              const prevDate = idx > 0 ? new Date(messages[idx - 1].created_at) : null;
+              const showDateSeparator = !prevDate || 
+                msgDate.toDateString() !== prevDate.toDateString();
+              
+              const getDateLabel = (d: Date) => {
+                const today = new Date();
+                const yesterday = new Date();
+                yesterday.setDate(today.getDate() - 1);
+                if (d.toDateString() === today.toDateString()) return 'Hoy';
+                if (d.toDateString() === yesterday.toDateString()) return 'Ayer';
+                return format(d, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
+              };
+
               return (
-                <div key={message.id} className={cn('flex gap-2 group', isMe && 'flex-row-reverse')}>
+                <div key={message.id}>
+                  {showDateSeparator && (
+                    <div className="flex items-center gap-3 my-4">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-[11px] text-muted-foreground bg-muted px-3 py-1 rounded-full font-medium capitalize">
+                        {getDateLabel(msgDate)}
+                      </span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                  )}
+                  <div className={cn('flex gap-2 group', isMe && 'flex-row-reverse')}>
                   {!isMe && (
                     <div className="w-6 sm:w-8 shrink-0">
                       {showAvatar && (
@@ -440,6 +465,7 @@ export function ChatPanel({
                       {format(new Date(message.created_at), 'HH:mm', { locale: es })}
                       {message.is_edited && ' (editado)'}
                     </p>
+                  </div>
                   </div>
                 </div>
               );
