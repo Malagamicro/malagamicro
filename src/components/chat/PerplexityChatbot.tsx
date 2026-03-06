@@ -1129,7 +1129,7 @@ export function PerplexityChatbot() {
                       message.content ? (
                         <>
                           <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                            <ReactMarkdown>{message.imageUrls?.length ? message.content.replace(/!\[.*?\]\([^\)]+\)/g, '').trim() : message.content}</ReactMarkdown>
                           </div>
                           {message.imageUrls && message.imageUrls.length > 0 && (
                             <div className="mt-3 space-y-2">
