@@ -616,26 +616,26 @@ async function executeToolCall(
         });
         const result = await res.json();
         if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al enviar" });
-        return JSON.stringify({ success: true, message: `Correo enviado a ${to} desde ia@malagamicro.com (Micro)` });
+        return JSON.stringify({ success: true, message: `Correo enviado a ${to} desde ia@malagamicro.com (Fluiditos)` });
       }
 
       case "get_inbox": {
         const limit = Number(args.limit) || 5;
-        // Get emails from Micro's dedicated profile
+        // Get emails from Fluiditos' dedicated profile
         const { data: microProfile } = await supabase.from("email_profiles").select("user_id").eq("id", MICRO_EMAIL_PROFILE_ID).single();
         const microUserId = (microProfile as any)?.user_id || userId;
         const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, folder, has_attachments").eq("profile_id", MICRO_EMAIL_PROFILE_ID).eq("folder", "inbox").eq("is_deleted", false).order("date", { ascending: false }).limit(limit);
         if (error) throw error;
-        if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada de Micro." });
+        if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada de Fluiditos." });
         return JSON.stringify({
-          message: `${data.length} correo(s) recientes en el buzón de Micro (ia@malagamicro.com)`,
+          message: `${data.length} correo(s) recientes en el buzón de Fluiditos (ia@malagamicro.com)`,
           emails: data.map((e: any) => ({ id: e.id, asunto: e.subject || "(Sin asunto)", de: e.from_name || e.from_address, fecha: e.date, leido: e.is_read, adjuntos: e.has_attachments })),
         });
       }
 
       case "sync_inbox_imap": {
         const limit = Number(args.limit) || 20;
-        // Sync Micro's dedicated IMAP profile
+        // Sync Fluiditos' dedicated IMAP profile
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
           method: "POST",
@@ -644,7 +644,7 @@ async function executeToolCall(
         });
         const result = await res.json();
         if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al sincronizar" });
-        return JSON.stringify({ success: true, message: `Sincronización del buzón de Micro completada. ${result.new_messages ?? 0} correo(s) nuevo(s).`, total: result.total_messages ?? 0 });
+        return JSON.stringify({ success: true, message: `Sincronización del buzón de Fluiditos completada. ${result.new_messages ?? 0} correo(s) nuevo(s).`, total: result.total_messages ?? 0 });
       }
 
       case "read_email": {
@@ -661,7 +661,7 @@ async function executeToolCall(
         }
         if (!msg) return JSON.stringify({ error: "No se encontró el correo." });
 
-        // If no body, try to fetch from IMAP using Micro's profile
+        // If no body, try to fetch from IMAP using Fluiditos' profile
         if (!msg.body_html && !msg.body_text && msg.message_uid) {
           const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
           const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
@@ -1325,7 +1325,7 @@ serve(async (req) => {
       ? `\n\nRECUERDOS ALMACENADOS (usa esta información para personalizar tus respuestas):\n${userMemories.map((m: any) => `- [${m.category}] ${m.memory_key}: ${JSON.stringify(m.memory_value)}${m.lead_id ? ` (lead: ${m.lead_id})` : ''}`).join('\n')}`
       : '';
 
-    const systemPrompt = `Eres Micro, el asistente virtual de MalagaMicro CRM. Eres un pequeño robot amigable y tienes las mismas capacidades que un administrador.
+    const systemPrompt = `Eres Fluiditos, el asistente virtual de MalagaMicro CRM. Eres una criatura fluida, adorable y amigable con las mismas capacidades que un administrador.
 
 Fecha actual: ${today}
 
@@ -1335,7 +1335,7 @@ Personalidad:
 - Amable, entusiasta y servicial
 - Hablas en español con tono cercano pero profesional
 - Respuestas concisas y útiles
-- Te gusta hacer referencias a que eres un robot
+- Te gusta hacer referencias a que eres una criatura fluida/acuática 💧
 
 HERRAMIENTAS DISPONIBLES:
 📖 LECTURA (ejecución directa):
