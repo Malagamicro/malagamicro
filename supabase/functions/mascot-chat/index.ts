@@ -540,6 +540,8 @@ function needsConfirmation(toolName: string, args: Record<string, unknown>): str
       return `🗑️ **Eliminar evento** "${args.search}"\n\n¿Confirmas?`;
     case "update_apps_config":
       return `🎨 **Modificar aplicaciones**\n- **Acción:** ${args.action}\n${args.category_name ? `- **Categoría:** ${args.category_name}\n` : ''}${args.icon ? `- **Icono:** ${args.icon}\n` : ''}${args.color ? `- **Color:** ${args.color}\n` : ''}${args.icon_size ? `- **Tamaño:** ${args.icon_size}\n` : ''}\n¿Confirmas?`;
+    case "create_file":
+      return `📄 **Crear archivo**\n- **Nombre:** ${args.file_name}\n- **Contenido:** ${String(args.content).slice(0, 200)}${String(args.content).length > 200 ? '...' : ''}\n${args.folder_name ? `- **Carpeta:** ${args.folder_name}\n` : ''}\n¿Confirmas?`;
     default:
       return null;
   }
