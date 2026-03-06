@@ -156,6 +156,36 @@ export type Database = {
           },
         ]
       }
+      ai_subagent_teams: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_subagents: {
         Row: {
           agent_type: string
@@ -168,6 +198,8 @@ export type Database = {
           model: string
           name: string
           role_prompt: string
+          team_id: string | null
+          tools: string[]
           updated_at: string
           user_id: string
         }
@@ -182,6 +214,8 @@ export type Database = {
           model: string
           name: string
           role_prompt?: string
+          team_id?: string | null
+          tools?: string[]
           updated_at?: string
           user_id: string
         }
@@ -196,10 +230,20 @@ export type Database = {
           model?: string
           name?: string
           role_prompt?: string
+          team_id?: string | null
+          tools?: string[]
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_subagents_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "ai_subagent_teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_logs: {
         Row: {
