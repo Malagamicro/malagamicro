@@ -679,6 +679,25 @@ export default function FileManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={() => setDeleteConfirm(null)}
+        title={deleteConfirm?.type === "folder" ? "Eliminar carpeta" : "Eliminar archivo"}
+        description={
+          deleteConfirm?.type === "folder"
+            ? `La carpeta "${deleteConfirm?.name}" contiene archivos. ¿Estás seguro de que quieres eliminarla junto con todo su contenido?`
+            : `El archivo "${deleteConfirm?.name}" tiene contenido. ¿Estás seguro de que quieres eliminarlo?`
+        }
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => {
+          if (!deleteConfirm) return;
+          if (deleteConfirm.type === "file") confirmDeleteFile(deleteConfirm.id);
+          else confirmDeleteFolder(deleteConfirm.id);
+        }}
+      />
     </div>
   );
 }
