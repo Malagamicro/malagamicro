@@ -1664,6 +1664,17 @@ async function executeToolCall(
         return JSON.stringify({ message: `${results2.length} archivo(s) de memoria IA`, files: results2 });
       }
 
+      case "delegate_to_subagent": {
+        const agentName = args.agent_name;
+        const taskDescription = args.task_description;
+        return JSON.stringify({ 
+          delegation_requested: true, 
+          agent_name: agentName, 
+          task: taskDescription,
+          message: `🔄 Delegando tarea a **${agentName}**: ${taskDescription}` 
+        });
+      }
+
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
