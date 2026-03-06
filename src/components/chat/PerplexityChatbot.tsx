@@ -129,9 +129,33 @@ export function PerplexityChatbot() {
 
   useEffect(() => {
     if (sessionMessages) {
-      setMessages(sessionMessages.map(m => ({
-        id: m.id, role: m.role, content: m.content, timestamp: m.createdAt,
-      })));
+      setMessages(prev => {
+        // Preserve local-only properties (imageUrls, isImage, audioUrl, isAudio) that aren't in DB
+        const localExtras = new Map<string, Partial<ChatMessage>>();
+        for (const m of prev) {
+          if (m.imageUrls?.length || m.isImage || m.audioUrl || m.isAudio) {
+            localExtras.set(m.id, { imageUrls: m.imageUrls, isImage: m.isImage, audioUrl: m.audioUrl, isAudio: m.isAudio });
+          }
+        }
+        return sessionMessages.map(m => {
+          const extras = localExtras.get(m.id) || {};
+          // Also parse markdown images from content for messages loaded fresh from DB
+          const mdImageMatches = m.content.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g);
+          const parsedImageUrls: string[] = [];
+          if (mdImageMatches) {
+            for (const mdImg of mdImageMatches) {
+              const urlMatch = mdImg.match(/\(([^\)]+)\)/);
+              if (urlMatch?.[1]) parsedImageUrls.push(urlMatch[1]);
+            }
+          }
+          const hasImages = (extras.imageUrls?.length || 0) > 0 || parsedImageUrls.length > 0;
+          return {
+            id: m.id, role: m.role, content: m.content, timestamp: m.createdAt,
+            ...extras,
+            ...(parsedImageUrls.length > 0 && !extras.imageUrls?.length ? { imageUrls: parsedImageUrls, isImage: true } : {}),
+          };
+        });
+      });
     } else if (!activeSessionId) {
       setMessages([]);
     }
