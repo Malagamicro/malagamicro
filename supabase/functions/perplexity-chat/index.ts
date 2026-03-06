@@ -1760,57 +1760,75 @@ serve(async (req) => {
         : [];
 
       if (agentType === 'image') {
-        // Image generation uses Lovable AI Gateway with google/gemini-2.5-flash-image
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        const imageModel = 'google/gemini-2.5-flash-image';
+        // Image generation via OpenRouter
+        const imageModel = agentModel || 'google/gemini-2.5-flash-image-preview';
         
-        const imageRequestBody: any = {
-          model: imageModel,
-          modalities: ["image", "text"],
-          messages: [
-            { role: "user", content: agentPrompt ? `${agentPrompt}\n\n${userMessage}` : userMessage },
-          ],
-          stream: false,
+        // Gemini image models need modalities param; FLUX and others don't
+        const isGeminiImageModel = imageModel.includes('gemini') && imageModel.includes('image');
+        
+        const buildImageRequest = (model: string, useModalities: boolean) => {
+          const body: any = {
+            model,
+            messages: [
+              { role: "user", content: agentPrompt ? `${agentPrompt}\n\nGenera una imagen de: ${userMessage}` : `Generate an image of: ${userMessage}` },
+            ],
+            stream: false,
+          };
+          if (useModalities) body.modalities = ["image", "text"];
+          return body;
         };
         
-        console.log(`[perplexity-chat] Image generation using ${imageModel} via Lovable AI Gateway`);
+        const callImageApi = async (body: any) => {
+          return await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": supabaseUrl,
+              "X-Title": "Malaga Micro CRM - Image Subagent",
+            },
+            body: JSON.stringify(body),
+          });
+        };
         
-        const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(imageRequestBody),
-        });
-
+        console.log(`[perplexity-chat] Image gen: model=${imageModel}, gemini=${isGeminiImageModel}`);
+        
+        let imageResponse = await callImageApi(buildImageRequest(imageModel, isGeminiImageModel));
+        
+        // If the configured model fails (404 or modalities error), fallback to gemini image model
         if (!imageResponse.ok) {
           const errText = await imageResponse.text();
-          console.error("Subagent image error:", imageResponse.status, errText);
-          const errorMsg = imageResponse.status === 404 
-            ? `Modelo de imagen no encontrado. Verifica la configuración.`
-            : imageResponse.status === 429 
-            ? `Rate limit excedido. Intenta de nuevo en unos segundos.`
-            : `Error del subagente ${agentName}: ${imageResponse.status}`;
-          return new Response(JSON.stringify({ error: errorMsg }), {
-            status: imageResponse.status >= 400 && imageResponse.status < 500 ? imageResponse.status : 500, 
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          console.warn(`[perplexity-chat] Image model ${imageModel} failed (${imageResponse.status}): ${errText}`);
+          
+          if (imageModel !== 'google/gemini-2.5-flash-image-preview') {
+            console.log(`[perplexity-chat] Trying fallback: google/gemini-2.5-flash-image-preview`);
+            imageResponse = await callImageApi(buildImageRequest('google/gemini-2.5-flash-image-preview', true));
+            
+            if (!imageResponse.ok) {
+              const fbErr = await imageResponse.text();
+              console.error(`[perplexity-chat] Fallback also failed: ${fbErr}`);
+              return new Response(JSON.stringify({ error: `Error generando imagen. Modelo ${imageModel} y fallback fallaron.` }), {
+                status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          } else {
+            return new Response(JSON.stringify({ error: `Error del subagente ${agentName}: ${imageResponse.status} - ${errText}` }), {
+              status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
         }
 
         const imageData = await imageResponse.json();
         console.log('[perplexity-chat] Image response keys:', JSON.stringify(Object.keys(imageData)));
         const messageData = imageData.choices?.[0]?.message;
-        console.log('[perplexity-chat] Message keys:', messageData ? JSON.stringify(Object.keys(messageData)) : 'null');
-        if (messageData?.images) {
-          console.log('[perplexity-chat] Images array length:', messageData.images.length);
-        }
+        console.log('[perplexity-chat] Message data:', messageData ? JSON.stringify(Object.keys(messageData)) : 'null');
         
-        // Extract base64 images and upload to storage
+        // Extract images from response
         const uploadedUrls: string[] = [];
         
-        // Check for images in message.images array (OpenRouter standard for image gen models)
+        // OpenRouter returns images in message.images array
         if (Array.isArray(messageData?.images)) {
+          console.log('[perplexity-chat] Found images array:', messageData.images.length);
           for (const img of messageData.images) {
             const imgUrl = img.image_url?.url || img.url || (typeof img === 'string' ? img : null);
             if (imgUrl?.startsWith('data:')) {
@@ -1822,7 +1840,7 @@ serve(async (req) => {
           }
         }
         
-        // Check for images in content array (multimodal response)
+        // Also check content array for multimodal responses
         if (Array.isArray(messageData?.content)) {
           for (const part of messageData.content) {
             if (part.type === 'image_url' && part.image_url?.url?.startsWith('data:')) {
@@ -1832,7 +1850,7 @@ serve(async (req) => {
           }
         }
         
-        // Check for base64 in text content (markdown images)
+        // Extract text content
         let textContent = '';
         if (typeof messageData?.content === 'string') {
           textContent = messageData.content;
@@ -1840,7 +1858,7 @@ serve(async (req) => {
           textContent = messageData.content.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('\n');
         }
 
-        // Extract markdown image URLs
+        // Extract markdown image URLs from text
         if (textContent) {
           const mdImages = textContent.match(/!\[.*?\]\(([^\)]+)\)/g);
           if (mdImages) {
@@ -1853,7 +1871,8 @@ serve(async (req) => {
           }
         }
 
-        // Build clean response with public URLs instead of base64
+        console.log(`[perplexity-chat] Total images extracted: ${uploadedUrls.length}`);
+
         return new Response(JSON.stringify({ 
           subagent: agentName, 
           type: 'image',
@@ -1861,7 +1880,7 @@ serve(async (req) => {
             choices: [{
               message: {
                 role: 'assistant',
-                content: textContent || 'Imagen generada',
+                content: textContent || (uploadedUrls.length > 0 ? 'Imagen generada exitosamente' : 'No se pudo generar la imagen'),
                 images: uploadedUrls.map(u => ({ image_url: { url: u } })),
               }
             }]
