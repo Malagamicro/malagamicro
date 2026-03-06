@@ -1680,23 +1680,108 @@ serve(async (req) => {
       userId = user?.id || null;
     }
 
-    const { messages, model: requestedModel } = await req.json();
+    const { messages, model: requestedModel, subagents: clientSubagents, delegateToSubagent } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       throw new Error("Messages array is required");
     }
 
-    const allowedModels = ['openai/gpt-5-nano', 'openai/gpt-oss-120b'];
-    const selectedModel = allowedModels.includes(requestedModel) ? requestedModel : 'openai/gpt-5-nano';
+    // --- Subagent delegation mode ---
+    if (delegateToSubagent) {
+      const { agentName, agentModel, agentPrompt, agentType, userMessage } = delegateToSubagent;
+      console.log(`[perplexity-chat] Delegating to subagent: ${agentName} (${agentModel})`);
 
-    const modelDescriptions: Record<string, string> = {
-      'openai/gpt-5-nano': 'GPT-5 Nano: modelo rápido y eficiente, ideal para tareas sencillas, respuestas rápidas y alto volumen de consultas. Menor coste.',
-      'openai/gpt-oss-120b': 'GPT-OSS 120B: modelo open source de 120 mil millones de parámetros, excelente razonamiento y precisión. Más potente pero más lento.',
-    };
+      if (agentType === 'image') {
+        // Image generation via OpenRouter (models that support image generation)
+        const imageResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": supabaseUrl,
+            "X-Title": "Malaga Micro CRM - Subagent",
+          },
+          body: JSON.stringify({
+            model: agentModel,
+            messages: [
+              { role: "system", content: agentPrompt || "You are an AI image generation assistant. Generate images based on user descriptions." },
+              { role: "user", content: userMessage },
+            ],
+            stream: false,
+          }),
+        });
+
+        if (!imageResponse.ok) {
+          const errText = await imageResponse.text();
+          console.error("Subagent image error:", imageResponse.status, errText);
+          return new Response(JSON.stringify({ error: `Error del subagente ${agentName}: ${imageResponse.status}` }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const imageData = await imageResponse.json();
+        return new Response(JSON.stringify({ 
+          subagent: agentName, 
+          type: 'image',
+          response: imageData 
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Text/Audio subagent - stream
+      const subResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": supabaseUrl,
+          "X-Title": "Malaga Micro CRM - Subagent",
+        },
+        body: JSON.stringify({
+          model: agentModel,
+          messages: [
+            { role: "system", content: agentPrompt },
+            ...messages.filter((m: any) => m.role !== 'system'),
+            { role: "user", content: userMessage },
+          ],
+          stream: true,
+        }),
+      });
+
+      if (!subResponse.ok) {
+        const errText = await subResponse.text();
+        return new Response(JSON.stringify({ error: `Subagente ${agentName} error: ${subResponse.status} - ${errText}` }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(subResponse.body, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Subagent": agentName },
+      });
+    }
+
+    // --- Normal orchestrator mode ---
+    const selectedModel = requestedModel || 'openai/gpt-5-nano';
+
+    // Build subagent info for system prompt
+    const subagentList = Array.isArray(clientSubagents) && clientSubagents.length > 0
+      ? clientSubagents.map((s: any) => `- **${s.name}** (${s.agent_type}): ${s.description || s.role_prompt?.substring(0, 80) || 'Sin descripción'}. Modelo: ${s.model}`).join('\n')
+      : '';
+
+    const delegationInstructions = subagentList 
+      ? `\n\n**SUBAGENTES DISPONIBLES:**
+Tienes acceso a subagentes especializados. Cuando una tarea se beneficie de un agente especializado, usa la herramienta delegate_to_subagent.
+${subagentList}
+
+IMPORTANTE: Cuando delegues a un subagente, indica claramente al usuario que estás delegando la tarea. Ejemplo: "🔄 Delegando a **Artista** para generar la imagen..."
+Solo delega cuando la tarea encaje claramente con la especialidad del subagente.`
+      : '';
 
     const systemPrompt = `Eres un asistente de CRM inteligente con acceso COMPLETO a toda la aplicación. 
 
-**MODELO ACTUAL:** ${modelDescriptions[selectedModel]}
+**MODELO ACTUAL:** ${selectedModel}
+${delegationInstructions}
 
 Puedes:
 
@@ -1749,10 +1834,6 @@ Puedes:
 
 **AUDITORÍA:**
 - Ver registro de acciones del sistema
-
-Si el usuario pregunta qué modelo estás usando o qué hace cada modelo, explícale las diferencias:
-- **GPT-5 Nano**: Rápido, eficiente, bueno para tareas sencillas y alto volumen. Menor coste por consulta.
-- **GPT-OSS 120B**: Modelo open source grande (120B parámetros), mejor razonamiento y precisión en tareas complejas. Más lento pero más capaz.
 
 Responde siempre en español de forma concisa y útil. Cuando el usuario pregunte algo, usa las herramientas apropiadas para obtener la información real del sistema.
 Si necesitas buscar un lead o información específica, siempre usa las herramientas disponibles en lugar de inventar datos.
