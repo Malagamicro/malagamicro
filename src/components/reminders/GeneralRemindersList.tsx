@@ -4,7 +4,7 @@ import { es } from 'date-fns/locale';
 import {
   Bell, Check, Clock, Trash2, Plus, Calendar, AlertTriangle,
   CheckCircle2, Eye, Repeat, AlarmClock, Phone, Users2,
-  CreditCard, Target, StickyNote, Timer, Pause
+  CreditCard, Target, StickyNote, Timer, Pause, Pencil
 } from 'lucide-react';
 import { useGeneralReminders, GeneralReminder } from '@/hooks/useGeneralReminders';
 import { GeneralReminderModal } from './GeneralReminderModal';
