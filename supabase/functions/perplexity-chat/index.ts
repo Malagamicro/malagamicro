@@ -1932,6 +1932,19 @@ serve(async (req) => {
         });
       }
 
+      // Audio subagent: return JSON response (non-streaming)
+      if (isAudioAgent) {
+        const audioData = await subResponse.json();
+        const audioText = audioData.choices?.[0]?.message?.content || 'Respuesta de audio generada';
+        return new Response(JSON.stringify({ 
+          subagent: agentName, 
+          type: 'audio',
+          response: { choices: [{ message: { role: 'assistant', content: audioText } }] }
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       // If subagent has tools, handle tool calls non-streaming then re-stream
       if (allowedTools.length > 0) {
         const subData = await subResponse.json();
