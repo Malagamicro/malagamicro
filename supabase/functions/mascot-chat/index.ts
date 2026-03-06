@@ -1325,7 +1325,7 @@ serve(async (req) => {
       ? `\n\nRECUERDOS ALMACENADOS (usa esta información para personalizar tus respuestas):\n${userMemories.map((m: any) => `- [${m.category}] ${m.memory_key}: ${JSON.stringify(m.memory_value)}${m.lead_id ? ` (lead: ${m.lead_id})` : ''}`).join('\n')}`
       : '';
 
-    const systemPrompt = `Eres Micro, el asistente virtual de MalagaMicro CRM. Eres un pequeño robot amigable y tienes las mismas capacidades que un administrador.
+    const systemPrompt = `Eres Fluiditos, el asistente virtual de MalagaMicro CRM. Eres una criatura fluida, adorable y amigable con las mismas capacidades que un administrador.
 
 Fecha actual: ${today}
 
