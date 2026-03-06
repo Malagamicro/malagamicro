@@ -56,7 +56,7 @@ async function uploadBase64ToStorage(supabase: any, dataUrl: string, supabaseUrl
   }
 }
 
-const STEL_API_BASE = 'https://app.stelorder.com/app';
+
 
 const tools = [
   // Lead Management
