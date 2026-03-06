@@ -1300,6 +1300,78 @@ async function executeToolCall(
         });
       }
 
+      case "create_file": {
+        const fileName = String(args.file_name || "");
+        const content = String(args.content || "");
+        const folderName = args.folder_name ? String(args.folder_name) : null;
+        const description = args.description ? String(args.description) : null;
+        if (!fileName) return JSON.stringify({ error: "file_name es obligatorio" });
+        if (!content) return JSON.stringify({ error: "content es obligatorio" });
+
+        // Sanitize file name
+        const sanitizedName = fileName.replace(/[^a-zA-Z0-9._\-áéíóúñÁÉÍÓÚÑ ]/g, "_");
+        const filePath = folderName 
+          ? `${folderName.replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ ]/g, "_")}/${sanitizedName}`
+          : sanitizedName;
+
+        // Upload file content to storage
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const encoder = new TextEncoder();
+        const fileBytes = encoder.encode(content);
+        
+        // Determine content type
+        const ext = sanitizedName.split('.').pop()?.toLowerCase() || 'txt';
+        const mimeTypes: Record<string, string> = {
+          md: "text/markdown", txt: "text/plain", csv: "text/csv", json: "application/json",
+          html: "text/html", css: "text/css", js: "application/javascript", ts: "application/typescript",
+          xml: "application/xml", yaml: "text/yaml", yml: "text/yaml", sql: "text/sql", log: "text/plain",
+        };
+        const contentType = mimeTypes[ext] || "text/plain";
+
+        const { error: uploadErr } = await supabase.storage
+          .from("shared-files")
+          .upload(filePath, fileBytes, { contentType, upsert: true });
+        if (uploadErr) return JSON.stringify({ error: `Error al subir archivo: ${uploadErr.message}` });
+
+        // If folder specified, ensure folder exists
+        let folderId: string | null = null;
+        if (folderName) {
+          const { data: existingFolder } = await supabase
+            .from("shared_folders")
+            .select("id")
+            .eq("name", folderName)
+            .maybeSingle();
+          if (existingFolder) {
+            folderId = existingFolder.id;
+          } else {
+            const { data: newFolder, error: folderErr } = await supabase
+              .from("shared_folders")
+              .insert({ name: folderName, user_id: userId })
+              .select("id")
+              .single();
+            if (!folderErr && newFolder) folderId = (newFolder as any).id;
+          }
+        }
+
+        // Insert metadata record
+        const { error: dbErr } = await supabase.from("shared_files").insert({
+          file_name: sanitizedName,
+          file_path: filePath,
+          file_size: fileBytes.length,
+          file_type: contentType,
+          description: description,
+          folder_id: folderId,
+          user_id: userId,
+        });
+        if (dbErr) return JSON.stringify({ error: `Error al registrar archivo: ${dbErr.message}` });
+
+        return JSON.stringify({ 
+          success: true, 
+          message: `Archivo "${sanitizedName}" creado correctamente${folderName ? ` en carpeta "${folderName}"` : ''}`,
+          file_name: sanitizedName,
+        });
+      }
+
       case "send_notification": {
         const title = String(args.title || "");
         const message = String(args.message || "");
