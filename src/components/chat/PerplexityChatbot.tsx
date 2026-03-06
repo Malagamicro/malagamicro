@@ -300,7 +300,7 @@ export function PerplexityChatbot() {
         const agent = activeSubagents.find(s => s.name.toLowerCase() === agentNameLower)
           || activeSubagents.find(s => s.name.toLowerCase().startsWith(agentNameLower) || agentNameLower.startsWith(s.name.toLowerCase()))
           || activeSubagents.find(s => s.agent_type === 'image' && (agentNameLower.includes('image') || agentNameLower.includes('imagen')))
-          || activeSubagents.find(s => s.agent_type === 'audio' && (agentNameLower.includes('audio') || agentNameLower.includes('sonido') || agentNameLower.includes('voz')));
+          ;
         if (!agent) continue;
 
         // If this delegation depends on another agent's output, append it to the task
