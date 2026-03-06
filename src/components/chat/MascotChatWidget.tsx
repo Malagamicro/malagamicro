@@ -371,7 +371,7 @@ export function MascotChatWidget() {
               {isLoading && (
                 <div className="flex gap-2 justify-start">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
-                    <FluiditosAvatar config={fluiditosConfig} size={28} animated={false} />
+                    <FluiditosAvatar config={fluiditosConfig} size={28} animated animState="responding" />
                   </div>
                   <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3 text-xs text-muted-foreground">
                     Escribiendo...
@@ -382,6 +382,7 @@ export function MascotChatWidget() {
           )}
         </div>
       </div>
+      )}
 
       {/* Input */}
       <div className="p-3 border-t bg-muted/30">
