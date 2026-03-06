@@ -86,6 +86,8 @@ export function PerplexityChatbot() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sidebarPanelRef = useRef<ImperativePanelHandle>(null);
+  const subagentPanelRef = useRef<ImperativePanelHandle>(null);
   const queryClient = useQueryClient();
   
   const [pendingFiles, setPendingFiles] = useState<FileAttachment[]>([]);
