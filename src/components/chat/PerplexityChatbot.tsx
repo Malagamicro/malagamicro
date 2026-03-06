@@ -39,6 +39,9 @@ interface Message {
   subagentColor?: string;
   isImage?: boolean; // if this is an image response
   imageUrls?: string[];
+  isAudio?: boolean;
+  audioUrl?: string;
+  isDelegationNotice?: boolean; // delegation notice message
 }
 
 interface FileAttachment {
