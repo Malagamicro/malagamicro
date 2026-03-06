@@ -621,7 +621,7 @@ async function executeToolCall(
 
       case "get_inbox": {
         const limit = Number(args.limit) || 5;
-        // Get emails from Micro's dedicated profile
+        // Get emails from Fluiditos' dedicated profile
         const { data: microProfile } = await supabase.from("email_profiles").select("user_id").eq("id", MICRO_EMAIL_PROFILE_ID).single();
         const microUserId = (microProfile as any)?.user_id || userId;
         const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, folder, has_attachments").eq("profile_id", MICRO_EMAIL_PROFILE_ID).eq("folder", "inbox").eq("is_deleted", false).order("date", { ascending: false }).limit(limit);
