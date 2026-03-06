@@ -89,7 +89,7 @@ export function SubagentManager() {
       description: agent.description || '',
       model: isPopular ? agent.model : 'custom',
       role_prompt: agent.role_prompt,
-      agent_type: agent.agent_type,
+      agent_type: agent.agent_type === 'audio' ? 'text' : agent.agent_type as 'text' | 'image',
       avatar_emoji: agent.avatar_emoji,
       avatar_color: agent.avatar_color,
       is_active: agent.is_active,
