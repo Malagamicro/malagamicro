@@ -734,17 +734,40 @@ export function PerplexityChatbot() {
         <ScrollArea className="flex-1 px-3 md:px-6" ref={scrollRef}>
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center py-8 md:py-12">
-              <div className="w-14 h-14 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4 md:mb-6">
-                <Sparkles className="h-7 w-7 md:h-10 md:w-10 text-primary" />
+              {/* Fluiditos group display */}
+              <div className="flex items-center -space-x-3 mb-4 md:mb-6">
+                {activeSubagents.length === 0 ? (
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <Sparkles className="h-8 w-8 md:h-10 md:w-10 text-primary" />
+                  </div>
+                ) : (
+                  activeSubagents.slice(0, 6).map((agent, i) => (
+                    <div
+                      key={agent.id}
+                      className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center text-2xl md:text-3xl shadow-lg border-2 border-background transition-transform hover:scale-110 hover:z-10"
+                      style={{ backgroundColor: agent.avatar_color + '25', zIndex: activeSubagents.length - i }}
+                      title={agent.name}
+                    >
+                      {agent.avatar_emoji}
+                    </div>
+                  ))
+                )}
+                {activeSubagents.length > 6 && (
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-muted flex items-center justify-center text-sm font-bold border-2 border-background shadow-lg">
+                    +{activeSubagents.length - 6}
+                  </div>
+                )}
               </div>
               <h3 className="font-semibold text-lg md:text-xl mb-2 text-center">¿En qué puedo ayudarte?</h3>
               <p className="text-muted-foreground text-center text-sm md:text-base max-w-md mb-4 px-4">
-                Orquestador central con {activeSubagents.length} subagente(s) especializado(s)
+                {activeTeam 
+                  ? `Equipo "${activeTeam.name}" con ${activeSubagents.length} subagente(s)`
+                  : `Orquestador central con ${activeSubagents.length} subagente(s) especializado(s)`}
               </p>
 
               {/* Subagent chips */}
               {activeSubagents.length > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center mb-6 max-w-md">
+                <div className="flex flex-wrap gap-2 justify-center max-w-md">
                   {activeSubagents.map(agent => (
                     <div key={agent.id}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs"
@@ -757,18 +780,6 @@ export function PerplexityChatbot() {
                   ))}
                 </div>
               )}
-              
-              <div className="grid grid-cols-2 gap-2 md:gap-3 w-full max-w-md px-2">
-                {QUICK_ACTIONS.map((action) => (
-                  <button key={action.label} onClick={() => handleSend(action.prompt)}
-                    className="flex items-center gap-2 md:gap-3 p-3 md:p-4 rounded-xl border bg-card hover:bg-accent transition-colors text-left group">
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
-                      <action.icon className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-                    </div>
-                    <span className="text-xs md:text-sm font-medium">{action.label}</span>
-                  </button>
-                ))}
-              </div>
             </div>
           ) : (
             <div className="py-6 space-y-6">
