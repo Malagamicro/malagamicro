@@ -1791,6 +1791,113 @@ async function executeToolCall(
         return JSON.stringify({ success: true, message: `Notificación enviada: "${title}"` });
       }
 
+      case "create_file": {
+        const fileName = String(args.file_name || "").trim();
+        const content = String(args.content || "");
+        if (!fileName) return JSON.stringify({ error: "Se requiere file_name" });
+        if (!content) return JSON.stringify({ error: "Se requiere content" });
+
+        // Upload file to Supabase Storage (shared-files bucket)
+        const filePath = `${userId}/${Date.now()}-${fileName}`;
+        const blob = new Blob([content], { type: "text/plain" });
+        const { error: uploadErr } = await supabase.storage
+          .from("shared-files")
+          .upload(filePath, blob, { contentType: getMimeType(fileName), upsert: false });
+        if (uploadErr) return JSON.stringify({ error: `Error al subir: ${uploadErr.message}` });
+
+        const { data: urlData } = supabase.storage.from("shared-files").getPublicUrl(filePath);
+
+        // Find or create folder
+        let folderId: string | null = null;
+        if (args.folder_name) {
+          const { data: existingFolder } = await supabase
+            .from("shared_folders")
+            .select("id")
+            .eq("user_id", userId)
+            .ilike("name", args.folder_name)
+            .maybeSingle();
+          if (existingFolder) {
+            folderId = existingFolder.id;
+          } else {
+            const { data: newFolder } = await supabase
+              .from("shared_folders")
+              .insert({ user_id: userId, name: args.folder_name })
+              .select("id")
+              .single();
+            if (newFolder) folderId = newFolder.id;
+          }
+        }
+
+        // Create record in shared_files table
+        const { data: fileRecord, error: dbErr } = await supabase
+          .from("shared_files")
+          .insert({
+            user_id: userId,
+            file_name: fileName,
+            file_path: filePath,
+            file_size: content.length,
+            file_type: getMimeType(fileName),
+            folder_id: folderId,
+            description: args.description || null,
+          })
+          .select()
+          .single();
+        if (dbErr) return JSON.stringify({ error: `Error al registrar: ${dbErr.message}` });
+
+        return JSON.stringify({
+          success: true,
+          message: `✅ Archivo "${fileName}" creado y subido a Archivos Compartidos${args.folder_name ? ` en carpeta "${args.folder_name}"` : ""}`,
+          file: { id: fileRecord.id, name: fileName, url: urlData.publicUrl, size: content.length },
+        });
+      }
+
+      case "delete_shared_file": {
+        if (!args.confirmed) {
+          // Find the file first to confirm
+          let query = supabase.from("shared_files").select("id, file_name, file_path").eq("user_id", userId);
+          if (args.file_id) {
+            query = query.eq("id", args.file_id);
+          } else if (args.file_name) {
+            query = query.ilike("file_name", `%${args.file_name}%`);
+          } else {
+            return JSON.stringify({ error: "Se requiere file_name o file_id" });
+          }
+          const { data: files } = await query.limit(5);
+          if (!files?.length) return JSON.stringify({ error: "No se encontró ningún archivo con ese nombre" });
+          if (files.length === 1) {
+            return JSON.stringify({
+              needs_confirmation: true,
+              message: `¿Seguro que quieres eliminar "${files[0].file_name}"?`,
+              file_id: files[0].id,
+              file_name: files[0].file_name,
+            });
+          }
+          return JSON.stringify({
+            needs_confirmation: true,
+            message: `Se encontraron ${files.length} archivos. ¿Cuál quieres eliminar?`,
+            files: files.map((f: any) => ({ id: f.id, name: f.file_name })),
+          });
+        }
+
+        // Confirmed deletion
+        let fileToDelete: any = null;
+        if (args.file_id) {
+          const { data } = await supabase.from("shared_files").select("id, file_name, file_path").eq("id", args.file_id).eq("user_id", userId).single();
+          fileToDelete = data;
+        } else if (args.file_name) {
+          const { data } = await supabase.from("shared_files").select("id, file_name, file_path").eq("user_id", userId).ilike("file_name", `%${args.file_name}%`).limit(1).single();
+          fileToDelete = data;
+        }
+        if (!fileToDelete) return JSON.stringify({ error: "Archivo no encontrado" });
+
+        // Delete from storage
+        await supabase.storage.from("shared-files").remove([fileToDelete.file_path]);
+        // Delete from database
+        await supabase.from("shared_files").delete().eq("id", fileToDelete.id);
+
+        return JSON.stringify({ success: true, message: `🗑️ Archivo "${fileToDelete.file_name}" eliminado correctamente` });
+      }
+
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
