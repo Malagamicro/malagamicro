@@ -146,6 +146,7 @@ export function PerplexityChatbot() {
           model: s.model,
           role_prompt: s.role_prompt,
           agent_type: s.agent_type,
+          tools: (s as any).tools || [],
         })),
       }),
     });
