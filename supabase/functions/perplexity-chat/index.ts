@@ -1890,17 +1890,9 @@ serve(async (req) => {
         });
       }
 
-      // Audio subagents: use a text fallback model, client will handle TTS via Browser SpeechSynthesis
-      const isAudioAgent = agentType === 'audio';
-      const effectiveModel = isAudioAgent ? 'openai/gpt-5-mini' : agentModel;
-      
-      if (isAudioAgent) {
-        console.log(`[perplexity-chat] Audio subagent "${agentName}": using text model ${effectiveModel} + client-side TTS`);
-      }
-
-      // Text/Audio subagent - if it has tools, do a non-streaming call first to check for tool calls
+      // Text subagent - if it has tools, do a non-streaming call first to check for tool calls
       const subRequestBody: any = {
-        model: effectiveModel,
+        model: agentModel,
         messages: [
           { role: "system", content: agentPrompt + (allowedTools.length > 0 ? '\n\nTienes acceso a herramientas del CRM. Úsalas cuando sea necesario para obtener datos reales.' : '') },
           ...messages.filter((m: any) => m.role !== 'system'),
