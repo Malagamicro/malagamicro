@@ -774,7 +774,11 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('CRM API Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    // Don't expose internal error details to clients
+    const safeMessage = error.message?.includes('not found') ? 'Resource not found' 
+      : error.message?.includes('required') ? error.message 
+      : 'An error occurred processing your request';
+    return new Response(JSON.stringify({ error: safeMessage }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
