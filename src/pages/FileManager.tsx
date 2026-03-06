@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useFileManager, SavedFile } from "@/hooks/useFileManager";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { cn } from "@/lib/utils";
 
 interface ClipboardItem {
