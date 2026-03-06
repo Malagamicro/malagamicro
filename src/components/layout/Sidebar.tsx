@@ -811,6 +811,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         )}
       </Droppable>
       <AddCategoryDialog onAdd={addCategory} />
+      <AddAppDialog categories={categories} onAdd={handleAddApp} />
       <AddLinkDialog categories={categories} onAdd={handleAddLink} />
       {/* Position selector */}
       <div className="px-3 py-2">
