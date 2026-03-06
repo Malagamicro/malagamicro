@@ -132,21 +132,21 @@ function MicroChatDashboardWidget() {
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <img src={mascotImage} alt="Micro" className="w-5 h-5" /> Chat Micro
+          <img src={mascotImage} alt="Fluiditos" className="w-5 h-5" /> Chat Fluiditos
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 gap-2">
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-2 pr-2">
             {messages.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-4">Pregúntale algo a Micro...</p>
+              <p className="text-xs text-muted-foreground text-center py-4">Pregúntale algo a Fluiditos...</p>
             )}
             {messages.map((m, i) => (
               <div key={i} className={cn('text-xs p-2 rounded-lg max-w-[90%]', m.role === 'user' ? 'bg-primary text-primary-foreground ml-auto' : 'bg-muted')}>
                 {m.content}
               </div>
             ))}
-            {loading && <div className="text-xs text-muted-foreground animate-pulse">Micro está pensando...</div>}
+            {loading && <div className="text-xs text-muted-foreground animate-pulse">Fluiditos está pensando...</div>}
           </div>
         </ScrollArea>
         <div className="flex gap-1.5">
