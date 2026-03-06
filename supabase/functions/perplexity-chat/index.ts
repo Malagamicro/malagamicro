@@ -1724,22 +1724,28 @@ serve(async (req) => {
         : [];
 
       if (agentType === 'image') {
-        // Image generation via OpenRouter (models that support image generation)
-        const imageResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        // Image generation via Lovable AI Gateway (gemini-2.5-flash-image)
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        if (!LOVABLE_API_KEY) {
+          return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured for image generation" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const imageModel = "google/gemini-2.5-flash-image";
+        const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+            "Authorization": `Bearer ${LOVABLE_API_KEY}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": supabaseUrl,
-            "X-Title": "Malaga Micro CRM - Subagent",
           },
           body: JSON.stringify({
-            model: agentModel,
+            model: imageModel,
             messages: [
               { role: "system", content: agentPrompt || "You are an AI image generation assistant. Generate images based on user descriptions." },
               { role: "user", content: userMessage },
             ],
-            stream: false,
+            modalities: ["image", "text"],
           }),
         });
 

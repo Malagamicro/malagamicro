@@ -332,37 +332,47 @@ export function PerplexityChatbot() {
 
       if (agent.agent_type === 'image') {
         const data = await resp.json();
-        const imageContent = data.response?.choices?.[0]?.message?.content || 'Imagen generada';
-        // Extract image URLs from various model response formats
-        let imageUrls: string[] = [];
-        // OpenRouter image models may return images in different formats
         const messageData = data.response?.choices?.[0]?.message;
-        if (messageData?.images) {
-          imageUrls = messageData.images.map((img: any) => img.image_url?.url || img.url || img).filter(Boolean);
-        }
-        // Some models return base64 inline in content parts
-        if (Array.isArray(messageData?.content)) {
+        let imageContent = 'Imagen generada';
+        let imageUrls: string[] = [];
+
+        // Extract text content
+        if (typeof messageData?.content === 'string' && messageData.content.trim()) {
+          imageContent = messageData.content;
+        } else if (Array.isArray(messageData?.content)) {
+          const textParts = messageData.content.filter((p: any) => p.type === 'text').map((p: any) => p.text);
+          if (textParts.length > 0) imageContent = textParts.join('\n');
+          // Extract inline images from content parts
           for (const part of messageData.content) {
             if (part.type === 'image_url') imageUrls.push(part.image_url?.url);
             if (part.type === 'image' && part.source?.data) imageUrls.push(`data:${part.source.media_type || 'image/png'};base64,${part.source.data}`);
           }
         }
+
+        // Lovable AI gateway returns images in a separate `images` array
+        if (messageData?.images && Array.isArray(messageData.images)) {
+          for (const img of messageData.images) {
+            const url = img.image_url?.url || img.url || (typeof img === 'string' ? img : null);
+            if (url) imageUrls.push(url);
+          }
+        }
+
         // Check for markdown image URLs in text content
         if (typeof imageContent === 'string') {
-          const mdImages = imageContent.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g);
+          const mdImages = imageContent.match(/!\[.*?\]\((https?:\/\/[^\)]+|data:[^\)]+)\)/g);
           if (mdImages) {
             for (const mdImg of mdImages) {
-              const urlMatch = mdImg.match(/\((https?:\/\/[^\)]+)\)/);
+              const urlMatch = mdImg.match(/\(([^\)]+)\)/);
               if (urlMatch) imageUrls.push(urlMatch[1]);
             }
           }
         }
         
         setMessages(prev => prev.map(m => 
-          m.id === subagentMsgId ? { ...m, content: typeof imageContent === 'string' ? imageContent : 'Imagen generada', isImage: true, imageUrls } : m
+          m.id === subagentMsgId ? { ...m, content: imageContent, isImage: true, imageUrls } : m
         ));
         
-        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${typeof imageContent === 'string' ? imageContent : 'Imagen generada'}` });
+        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${imageContent}` });
       } else if (agent.agent_type === 'audio') {
         // Audio subagent - handle TTS or audio generation
         const data = await resp.json();
@@ -811,7 +821,7 @@ export function PerplexityChatbot() {
                 )}
               </div>
             )}
-            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-background z-20" style={{ backgroundColor: 'hsl(142, 71%, 45%)' }} />
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background z-30 shadow-sm" style={{ backgroundColor: 'hsl(142, 71%, 45%)' }} />
           </div>
           <div>
             <h2 className="font-semibold text-base md:text-lg">
