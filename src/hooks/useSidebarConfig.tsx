@@ -299,5 +299,6 @@ export function useSidebarConfig() {
     resetToDefault,
     setCategoryBgColor,
     toggleItemVisibility,
+    removeItem,
   };
 }
