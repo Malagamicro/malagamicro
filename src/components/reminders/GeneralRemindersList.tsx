@@ -84,9 +84,9 @@ function SnoozeButton({ reminderId, onSnooze }: { reminderId: string; onSnooze: 
   );
 }
 
-function ReminderCard({ reminder, onToggle, onDelete, onView, onSnooze }: {
+function ReminderCard({ reminder, onToggle, onDelete, onView, onSnooze, onEdit }: {
   reminder: GeneralReminder; onToggle: () => void; onDelete: () => void; onView: () => void;
-  onSnooze: (id: string, min: number) => void;
+  onSnooze: (id: string, min: number) => void; onEdit: () => void;
 }) {
   const reminderDate = new Date(reminder.reminder_date);
   const isOverdue = isPast(reminderDate) && !reminder.is_completed;
