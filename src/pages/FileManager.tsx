@@ -564,7 +564,7 @@ export default function FileManager() {
                           Descargar
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(file.id)} className="text-destructive">
+                        <DropdownMenuItem onClick={() => requestDeleteFile(file.id)} className="text-destructive">
                           <Trash2 className="h-4 w-4 mr-2" />
                           Eliminar
                         </DropdownMenuItem>
