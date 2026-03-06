@@ -43,7 +43,6 @@ interface Message {
   isImage?: boolean;
   imageUrls?: string[];
   isDelegationNotice?: boolean;
-  isDelegationNotice?: boolean; // delegation notice message
 }
 
 interface FileAttachment {
