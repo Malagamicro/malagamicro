@@ -444,7 +444,7 @@ export default function FileManager() {
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem onClick={() => handleDeleteFolder(folder.id)} className="text-destructive">
+                <ContextMenuItem onClick={() => requestDeleteFolder(folder.id)} className="text-destructive">
                   <Trash2 className="h-4 w-4 mr-2" />
                   Eliminar carpeta
                 </ContextMenuItem>
