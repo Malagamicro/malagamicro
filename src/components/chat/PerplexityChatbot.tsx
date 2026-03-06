@@ -1029,20 +1029,6 @@ export function PerplexityChatbot() {
               }}>
                 <ImageIcon className="h-3 w-3" /> Demo imagen
               </Button>
-              <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
-                const demoId = crypto.randomUUID();
-                setMessages(prev => [...prev, {
-                  id: demoId, role: 'assistant', content: '🎵 Aquí tienes un audio de ejemplo generado por un subagente de audio:',
-                  timestamp: new Date(),
-                  isAudio: true,
-                  audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-                  subagent: 'Demo Audio',
-                  subagentEmoji: '🎵',
-                  subagentColor: '#48DBFB',
-                }]);
-              }}>
-                <AudioLines className="h-3 w-3" /> Demo audio
-              </Button>
             </div>
           </div>
         ) : (
