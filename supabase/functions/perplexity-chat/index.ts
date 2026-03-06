@@ -1890,7 +1890,62 @@ serve(async (req) => {
         });
       }
 
-      // Text/Audio subagent - if it has tools, do a non-streaming call first to check for tool calls
+      // Check if this is an audio model that requires audio modality
+      const isAudioModel = agentModel.includes('audio') || agentModel.includes('tts');
+      
+      if (isAudioModel) {
+        // Audio models require audio modality - use non-streaming and add modalities
+        const subRequestBody: any = {
+          model: agentModel,
+          messages: [
+            { role: "system", content: agentPrompt },
+            { role: "user", content: userMessage },
+          ],
+          modalities: ["text", "audio"],
+          audio: { voice: "alloy", format: "wav" },
+          stream: false,
+        };
+
+        console.log(`[perplexity-chat] Audio subagent call with modalities: ["text", "audio"]`);
+
+        const subResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": supabaseUrl,
+            "X-Title": "Malaga Micro CRM - Audio Subagent",
+          },
+          body: JSON.stringify(subRequestBody),
+        });
+
+        if (!subResponse.ok) {
+          const errText = await subResponse.text();
+          console.error(`[perplexity-chat] Audio subagent error: ${subResponse.status} - ${errText}`);
+          return new Response(JSON.stringify({ 
+            subagent: agentName, 
+            type: 'audio',
+            response: {
+              choices: [{
+                message: { role: 'assistant', content: `Error del subagente de audio: el modelo ${agentModel} no pudo procesar la solicitud. Intenta con un modelo de texto.` }
+              }]
+            }
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const audioData = await subResponse.json();
+        return new Response(JSON.stringify({ 
+          subagent: agentName, 
+          type: 'audio',
+          response: audioData
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Text subagent - if it has tools, do a non-streaming call first to check for tool calls
       const subRequestBody: any = {
         model: agentModel,
         messages: [
