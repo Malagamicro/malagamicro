@@ -349,7 +349,7 @@ export function MascotChatWidget() {
                 <div key={i} className={cn('flex gap-2', message.role === 'user' ? 'justify-end' : 'justify-start')}>
                   {message.role === 'assistant' && (
                     <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
-                      <FluiditosAvatar config={fluiditosConfig} size={28} animated={false} />
+                      <FluiditosAvatar config={fluiditosConfig} size={28} animated={false} animState="idle" />
                     </div>
                   )}
                   <div className={cn('max-w-[80%] rounded-2xl px-4 py-2 text-sm', message.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-muted rounded-bl-md')}>
