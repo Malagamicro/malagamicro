@@ -428,6 +428,7 @@ export function FluiditosAvatar({ config = DEFAULT_CONFIG, size = 64, animated =
 
       {/* Accessory */}
       {renderAccessory()}
-    </svg>
+      </svg>
+    </>
   );
 }

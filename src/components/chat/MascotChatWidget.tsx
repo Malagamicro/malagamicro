@@ -436,6 +436,7 @@ export function MascotChatWidget() {
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }

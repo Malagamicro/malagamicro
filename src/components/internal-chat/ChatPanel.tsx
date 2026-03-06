@@ -466,6 +466,7 @@ export function ChatPanel({
                       {message.is_edited && ' (editado)'}
                     </p>
                   </div>
+                  </div>
                 </div>
               );
             })}
