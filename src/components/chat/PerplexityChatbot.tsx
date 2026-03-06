@@ -39,6 +39,9 @@ interface Message {
   subagentColor?: string;
   isImage?: boolean; // if this is an image response
   imageUrls?: string[];
+  isAudio?: boolean;
+  audioUrl?: string;
+  isDelegationNotice?: boolean; // delegation notice message
 }
 
 interface FileAttachment {
@@ -238,21 +241,42 @@ export function PerplexityChatbot() {
       await addMessage.mutateAsync({ sessionId, role: 'assistant', content: assistantContent });
     }
 
-    // If delegation was detected, execute subagent call
+    // If delegation was detected, show notice and execute subagent
     if (delegationDetected) {
       const agent = activeSubagents.find(s => s.name.toLowerCase() === delegationDetected!.agent_name.toLowerCase());
       if (agent) {
+        // Insert delegation notice message
+        const noticeId = crypto.randomUUID();
+        setMessages(prev => [...prev, {
+          id: noticeId, role: 'assistant', 
+          content: `🔄 Delegando tarea a **${agent.name}** ${agent.avatar_emoji || '🤖'}`,
+          timestamp: new Date(),
+          isDelegationNotice: true,
+          subagent: agent.name,
+          subagentEmoji: agent.avatar_emoji,
+          subagentColor: agent.avatar_color,
+        }]);
         await executeSubagentCall(agent, delegationDetected.task, sessionId, userMessages);
       }
     }
 
     // Check if content mentions delegation pattern
-    if (assistantContent.includes('🔄 Delegando') || assistantContent.includes('delegation_requested')) {
+    if (!delegationDetected && (assistantContent.includes('🔄 Delegando') || assistantContent.includes('delegation_requested'))) {
       const match = assistantContent.match(/Delegando a \*\*(.+?)\*\*/);
       if (match) {
         const agentName = match[1];
         const agent = activeSubagents.find(s => s.name.toLowerCase() === agentName.toLowerCase());
         if (agent) {
+          const noticeId = crypto.randomUUID();
+          setMessages(prev => [...prev, {
+            id: noticeId, role: 'assistant',
+            content: `🔄 Delegando tarea a **${agent.name}** ${agent.avatar_emoji || '🤖'}`,
+            timestamp: new Date(),
+            isDelegationNotice: true,
+            subagent: agent.name,
+            subagentEmoji: agent.avatar_emoji,
+            subagentColor: agent.avatar_color,
+          }]);
           const lastUserMsg = userMessages[userMessages.length - 1];
           const task = typeof lastUserMsg.content === 'string' ? lastUserMsg.content : '';
           await executeSubagentCall(agent, task, sessionId, userMessages);
@@ -304,13 +328,47 @@ export function PerplexityChatbot() {
       if (agent.agent_type === 'image') {
         const data = await resp.json();
         const imageContent = data.response?.choices?.[0]?.message?.content || 'Imagen generada';
-        const imageUrls = data.response?.choices?.[0]?.message?.images?.map((img: any) => img.image_url?.url) || [];
+        // Extract image URLs from various model response formats
+        let imageUrls: string[] = [];
+        // OpenRouter image models may return images in different formats
+        const messageData = data.response?.choices?.[0]?.message;
+        if (messageData?.images) {
+          imageUrls = messageData.images.map((img: any) => img.image_url?.url || img.url || img).filter(Boolean);
+        }
+        // Some models return base64 inline in content parts
+        if (Array.isArray(messageData?.content)) {
+          for (const part of messageData.content) {
+            if (part.type === 'image_url') imageUrls.push(part.image_url?.url);
+            if (part.type === 'image' && part.source?.data) imageUrls.push(`data:${part.source.media_type || 'image/png'};base64,${part.source.data}`);
+          }
+        }
+        // Check for markdown image URLs in text content
+        if (typeof imageContent === 'string') {
+          const mdImages = imageContent.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/g);
+          if (mdImages) {
+            for (const mdImg of mdImages) {
+              const urlMatch = mdImg.match(/\((https?:\/\/[^\)]+)\)/);
+              if (urlMatch) imageUrls.push(urlMatch[1]);
+            }
+          }
+        }
         
         setMessages(prev => prev.map(m => 
-          m.id === subagentMsgId ? { ...m, content: imageContent, isImage: true, imageUrls } : m
+          m.id === subagentMsgId ? { ...m, content: typeof imageContent === 'string' ? imageContent : 'Imagen generada', isImage: true, imageUrls } : m
         ));
         
-        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${imageContent}` });
+        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${typeof imageContent === 'string' ? imageContent : 'Imagen generada'}` });
+      } else if (agent.agent_type === 'audio') {
+        // Audio subagent - handle TTS or audio generation
+        const data = await resp.json();
+        const audioContent = data.response?.choices?.[0]?.message?.content || 'Audio generado';
+        const audioUrl = data.response?.choices?.[0]?.message?.audio?.url || null;
+        
+        setMessages(prev => prev.map(m => 
+          m.id === subagentMsgId ? { ...m, content: audioContent, isAudio: !!audioUrl, audioUrl } : m
+        ));
+        
+        await addMessage.mutateAsync({ sessionId, role: 'assistant', content: `[${agent.name}] ${audioContent}` });
       } else {
         // Stream text response
         const reader = resp.body!.getReader();
@@ -783,7 +841,37 @@ export function PerplexityChatbot() {
             </div>
           ) : (
             <div className="py-6 space-y-6">
-              {messages.map((message) => (
+              {messages.map((message) => {
+                // Delegation notice - special rendering
+                if (message.isDelegationNotice) {
+                  return (
+                    <div key={message.id} className="flex justify-center animate-fade-in">
+                      <div 
+                        className="flex items-center gap-3 px-5 py-3 rounded-2xl border-2 shadow-lg animate-pulse"
+                        style={{ 
+                          borderColor: (message.subagentColor || '#6C63FF') + '60',
+                          backgroundColor: (message.subagentColor || '#6C63FF') + '08',
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg"
+                            style={{ backgroundColor: (message.subagentColor || '#6C63FF') + '25' }}>
+                            {message.subagentEmoji || '🤖'}
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold" style={{ color: message.subagentColor || 'hsl(var(--primary))' }}>
+                              Orquestador → {message.subagent}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">Delegando tarea al subagente...</p>
+                          </div>
+                        </div>
+                        <Loader2 className="h-4 w-4 animate-spin" style={{ color: message.subagentColor || 'hsl(var(--primary))' }} />
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
                 <div key={message.id} className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <Avatar className={cn('h-9 w-9', 
                     message.role === 'user' ? 'bg-primary' :
@@ -826,8 +914,15 @@ export function PerplexityChatbot() {
                             {message.imageUrls && message.imageUrls.length > 0 && (
                               <div className="mt-3 space-y-2">
                                 {message.imageUrls.map((url, idx) => (
-                                  <img key={idx} src={url} alt="Imagen generada" className="max-w-full rounded-lg" />
+                                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
+                                    <img src={url} alt="Imagen generada" className="max-w-full rounded-lg hover:opacity-90 transition-opacity cursor-pointer" />
+                                  </a>
                                 ))}
+                              </div>
+                            )}
+                            {message.isAudio && message.audioUrl && (
+                              <div className="mt-3">
+                                <audio controls src={message.audioUrl} className="max-w-full" preload="metadata" />
                               </div>
                             )}
                           </>
@@ -858,7 +953,8 @@ export function PerplexityChatbot() {
                     </p>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>
