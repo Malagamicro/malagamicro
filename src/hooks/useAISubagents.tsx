@@ -59,15 +59,14 @@ export const AVAILABLE_TOOLS = [
   { id: 'get_calendar_events', name: 'Ver Calendario', category: 'Calendario', icon: '📅' },
   { id: 'create_calendar_event', name: 'Crear Evento', category: 'Calendario', icon: '🗓️' },
   { id: 'share_calendar_event', name: 'Compartir Evento', category: 'Calendario', icon: '🔗' },
-  { id: 'stel_list_budgets', name: 'Listar Presupuestos STEL', category: 'STEL Order', icon: '💰' },
-  { id: 'stel_get_budget', name: 'Ver Presupuesto STEL', category: 'STEL Order', icon: '📑' },
-  { id: 'stel_create_budget', name: 'Crear Presupuesto STEL', category: 'STEL Order', icon: '🆕' },
-  { id: 'stel_list_clients', name: 'Clientes STEL', category: 'STEL Order', icon: '🏢' },
   { id: 'get_ai_memories', name: 'Memoria IA', category: 'IA', icon: '🧠' },
   { id: 'view_ai_memory_file', name: 'Archivos Memoria IA', category: 'IA', icon: '🗃️' },
   { id: 'get_osticket_tickets', name: 'Tickets Soporte', category: 'Soporte', icon: '🎫' },
   { id: 'get_audit_logs', name: 'Logs Auditoría', category: 'Auditoría', icon: '📜' },
   { id: 'get_lead_folders', name: 'Carpetas Leads', category: 'Leads', icon: '🗂️' },
+  { id: 'send_notification', name: 'Enviar Notificación', category: 'Notificaciones', icon: '🔔' },
+  { id: 'create_file', name: 'Crear Archivo', category: 'Archivos', icon: '📄' },
+  { id: 'delete_shared_file', name: 'Eliminar Archivo', category: 'Archivos', icon: '🗑️' },
 ];
 
 export function useAISubagents() {
