@@ -648,7 +648,7 @@ export function PerplexityChatbot() {
 
       {/* Subagent Panel - separate from conversations */}
       {showSubagentPanel && (
-        <div className="absolute md:relative z-20 w-[min(18rem,85vw)] md:w-64 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
+        <div className="absolute md:relative z-20 w-[min(24rem,90vw)] md:w-96 h-full border-r bg-background md:bg-muted/30 flex flex-col shadow-xl md:shadow-none">
           <div className="p-3 border-b flex items-center justify-between gap-2">
             <h3 className="font-medium text-sm flex items-center gap-2 min-w-0">
               <Settings2 className="h-4 w-4 shrink-0" />
