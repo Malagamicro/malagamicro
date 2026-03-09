@@ -51,7 +51,7 @@ const WIDGET_PREVIEWS: Record<string, { description: string; emoji: string }> = 
   'tickets': { description: 'Últimos tickets de soporte recibidos', emoji: '🎫' },
   'online-users': { description: 'Miembros del equipo conectados', emoji: '🟢' },
   'calendar-mini': { description: 'Eventos de hoy y próximos días', emoji: '📅' },
-  'micro-chat': { description: 'Chat rápido con Micro', emoji: '🤖' },
+  'micro-chat': { description: 'Chat rápido con Micromoji: '🤖' },
   'inbox-preview': { description: 'Acceso rápido a tu bandeja de email', emoji: '📬' },
   'whatsapp-preview': { description: 'Vista rápida de conversaciones WA', emoji: '💬' },
   'ai-chat-quick': { description: 'Consultas rápidas al asistente IA', emoji: '🧠' },
@@ -132,8 +132,7 @@ function MicroChatDashboardWidget() {
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <img src={mascotImage} alt="Fluiditos" className="w-5 h-5" /> Chat Fluiditos
-        </CardTitle>
+          <img src={mascotImage} alt="FluiMicro" className="w-5 h-5" /> Chat Micro     </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 gap-2">
         <ScrollArea className="flex-1 min-h-0">
