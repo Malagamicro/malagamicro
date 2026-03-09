@@ -24,7 +24,7 @@ interface Message {
   images?: string[];
 }
 
-const STORAGE_KEY = 'micro_chat_messages';
+const STORAGE_KEY = 'microt_messages';
 
 export function MascotChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -207,7 +207,7 @@ export function MascotChatWidget() {
       if (error) throw error;
       setMessages(prev => [...prev, { role: 'assistant', content: data?.response || data?.error || 'Sin respuesta' }]);
     } catch (error) {
-      console.error('Fluiditos chat error:', error);
+      console.error('FluiMicrot error:', error);
       setMessages(prev => [...prev, { role: 'assistant', content: '¡Ups! Parece que tuve un pequeño cortocircuito 💧⚡ Intenta de nuevo.' }]);
     } finally {
       setIsLoading(false);
