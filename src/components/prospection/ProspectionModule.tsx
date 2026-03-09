@@ -7,15 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Search, Loader2, AlertCircle, Phone, Globe, Star,
   Building2, Plus, ChevronRight, Download, X, CheckCircle2,
-  Smartphone, PhoneCall, Zap,
+  Smartphone, PhoneCall, Zap, Map, UserPlus, Bot,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLeads } from '@/hooks/useLeads';
 import { Badge } from '@/components/ui/badge';
 import ExcelJS from 'exceljs';
+import { LeadFinderAgent } from './LeadFinderAgent';
+import { ManualLeadEntry } from './ManualLeadEntry';
 
 interface PlaceResult {
   id: string;
