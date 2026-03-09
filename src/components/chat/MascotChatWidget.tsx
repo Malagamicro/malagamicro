@@ -317,7 +317,7 @@ export function MascotChatWidget() {
                 <FluiditosAvatar config={fluiditosConfig} size={96} animState="idle" />
               </div>
               <div className="space-y-2">
-                <h4 className="font-semibold">¡Hola! Soy Fluiditos 💧</h4>
+                <h4 className="font-semibold">¡Hola! Soy Micro 🤖</h4>
                 <p className="text-sm text-muted-foreground max-w-[250px] mx-auto">
                   Tu asistente de MalagaMicro. Puedo enviar mensajes, emails, WhatsApp, buscar leads y más.
                 </p>
