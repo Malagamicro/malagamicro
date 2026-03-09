@@ -675,7 +675,7 @@ async function executeToolCall(
 
       case "sync_inbox_imap": {
         const limit = Number(args.limit) || 20;
-        // Sync Fluiditos' dedicated IMAP profile
+        // Sync Micro's dedicated IMAP profile
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
           method: "POST",
