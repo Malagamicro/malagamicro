@@ -280,7 +280,7 @@ export function MascotChatWidget() {
           <FluiditosAvatar config={fluiditosConfig} size={36} animated animState={isLoading ? 'responding' : 'idle'} />
         </div>
         <div className="flex-1 pointer-events-none">
-          <h3 className="font-semibold text-sm">Fluiditos</h3>
+          <h3 className="font-semibold text-sm">Micro</h3>
           <p className="text-xs text-muted-foreground">Asistente virtual 💧</p>
         </div>
         <Button variant="ghost" size="icon" className="h-8 w-8" onMouseDown={e => e.stopPropagation()} onClick={() => setShowCustomizer(true)} title="Personalizar">

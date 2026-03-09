@@ -119,7 +119,7 @@ export function FluiditosCustomizer({ config, onChange, onClose }: Props) {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-background">
       <div className="flex items-center justify-between p-3 border-b">
-        <h3 className="font-semibold text-sm">Personalizar Fluiditos</h3>
+        <h3 className="font-semibold text-sm">Personalizar Micro</h3>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleReset} title="Restablecer">
             <RotateCcw className="h-3.5 w-3.5" />
