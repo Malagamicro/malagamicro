@@ -847,7 +847,7 @@ export function PerplexityChatbot() {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={isMobile ? () => setShowSidebar(!showSidebar) : toggleSidebar}>
             {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
           </Button>
-          {/* Micro avatars - one per subagent in active team */}
+          {/* Microtars - one per subagent in active team */}
           <div className="relative hidden md:flex items-center">
             {activeSubagents.length === 0 ? (
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
@@ -966,7 +966,7 @@ export function PerplexityChatbot() {
       <ScrollArea className="flex-1 px-3 md:px-6" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center py-8 md:py-12">
-            {/* Fluiditos group display */}
+            {/* FluiMicroup display */}
             <div className="flex items-center -space-x-3 mb-4 md:mb-6">
               {activeSubagents.length === 0 ? (
                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">

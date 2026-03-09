@@ -208,7 +208,7 @@ export function MascotChatWidget() {
       setMessages(prev => [...prev, { role: 'assistant', content: data?.response || data?.error || 'Sin respuesta' }]);
     } catch (error) {
       console.error('FluiMicrMicro', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: '¡Ups! Parece que tuve un pequeño cortocircuito 💧⚡ Intenta de nuevo.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: '¡Ups! Parece que tuve un pequeño cortocircuito ⚡ Intenta de nuevo.' }]);
     } finally {
       setIsLoading(false);
     }

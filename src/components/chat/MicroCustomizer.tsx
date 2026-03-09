@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FluiditosAvatar, FluiditosConfig, saveFluiditosConfig } from './FluiditosAvatar';
+import { FluiditosAvatar, FluiditosConfig, saveFluiditosConfig } from './MicroAvatar';
 import { X, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
