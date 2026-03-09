@@ -684,7 +684,7 @@ async function executeToolCall(
         });
         const result = await res.json();
         if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al sincronizar" });
-        return JSON.stringify({ success: true, message: `Sincronización del buzón de Fluiditos completada. ${result.new_messages ?? 0} correo(s) nuevo(s).`, total: result.total_messages ?? 0 });
+        return JSON.stringify({ success: true, message: `Sincronización del buzón de Micro completada. ${result.new_messages ?? 0} correo(s) nuevo(s).`, total: result.total_messages ?? 0 });
       }
 
       case "read_email": {
