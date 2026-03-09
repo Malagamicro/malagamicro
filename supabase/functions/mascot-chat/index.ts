@@ -1392,7 +1392,7 @@ async function executeToolCall(
           title,
           message,
           type: String(args.type || "ai"),
-          source: "Fluiditos",
+          source: "Micro",
           is_popup: args.is_popup !== false,
         });
         if (error) return JSON.stringify({ error: error.message });
