@@ -24,7 +24,7 @@ interface Message {
   images?: string[];
 }
 
-const STORAGE_KEY = 'fluiditos_chat_messages';
+const STORAGE_KEY = 'micro_chat_messages';
 
 export function MascotChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
