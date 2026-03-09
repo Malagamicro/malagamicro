@@ -51,7 +51,7 @@ const WIDGET_PREVIEWS: Record<string, { description: string; emoji: string }> = 
   'tickets': { description: 'Últimos tickets de soporte recibidos', emoji: '🎫' },
   'online-users': { description: 'Miembros del equipo conectados', emoji: '🟢' },
   'calendar-mini': { description: 'Eventos de hoy y próximos días', emoji: '📅' },
-  'micro-chat': { description: 'Chat rápido con Micromoji: '🤖' },
+  'micro-chat': { description: 'Chat rápido con Micro: '🤖' },
   'inbox-preview': { description: 'Acceso rápido a tu bandeja de email', emoji: '📬' },
   'whatsapp-preview': { description: 'Vista rápida de conversaciones WA', emoji: '💬' },
   'ai-chat-quick': { description: 'Consultas rápidas al asistente IA', emoji: '🧠' },
@@ -132,14 +132,13 @@ function MicroChatDashboardWidget() {
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <img src={mascotImage} alt="FluiMicro" className="w-5 h-5" /> Chat Micro     </CardTitle>
+          <img src={mascotImage} alt="FluiMicrMicro" className="w-5 h-5" /> Chat Microitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 gap-2">
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-2 pr-2">
             {messages.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-4">Pregúntale algo a Fluiditos...</p>
-            )}
+              <p className="text-xs text-muted-foreground text-center py-4">Pregúntale algo a Fluiditos...Micro        )}
             {messages.map((m, i) => (
               <div key={i} className={cn('text-xs p-2 rounded-lg max-w-[90%]', m.role === 'user' ? 'bg-primary text-primary-foreground ml-auto' : 'bg-muted')}>
                 {m.content}
