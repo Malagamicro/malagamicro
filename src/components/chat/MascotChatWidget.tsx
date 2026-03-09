@@ -282,7 +282,7 @@ export function MascotChatWidget() {
         </div>
         <div className="flex-1 pointer-events-none">
           <h3 className="font-semibold text-sm">Micro</h3>
-          <p className="text-xs text-muted-foreground">Asistente virtual 💧</p>
+          <p className="text-xs text-muted-foreground">Asistente virtual</p>
         </div>
         <Button variant="ghost" size="icon" className="h-8 w-8" onMouseDown={e => e.stopPropagation()} onClick={() => setShowCustomizer(true)} title="Personalizar">
           <Palette className="h-4 w-4" />
