@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationContext } from '@/contexts/NotificationContext';
@@ -433,6 +434,8 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   const [renamingCategory, setRenamingCategory] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const { signOut, user } = useAuth();
+  const { profile } = useProfile();
+  const profileDisplayName = profile?.full_name || user?.email || 'Usuario';
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const { unreadCount } = useNotificationContext();
@@ -922,7 +925,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         {editToggle}
         
         {user && (
-          <div className="px-3 py-2 text-xs text-sidebar-foreground/70 truncate">{user.email}</div>
+          <div className="px-3 py-2 text-xs text-sidebar-foreground/70 truncate" title={user.email || ''}>{profileDisplayName}</div>
         )}
         <button
           onClick={() => handleTabChange('settings')}
@@ -970,7 +973,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         {editToggle}
         
         {user && (
-          <div className="px-2 py-1 text-[10px] text-sidebar-foreground/70 truncate">{user.email}</div>
+          <div className="px-2 py-1 text-[10px] text-sidebar-foreground/70 truncate" title={user.email || ''}>{profileDisplayName}</div>
         )}
         <button
           onClick={() => handleTabChange('settings')}
