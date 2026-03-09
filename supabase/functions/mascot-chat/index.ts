@@ -701,7 +701,7 @@ async function executeToolCall(
         }
         if (!msg) return JSON.stringify({ error: "No se encontró el correo." });
 
-        // If no body, try to fetch from IMAP using Fluiditos' profile
+        // If no body, try to fetch from IMAP using Micro's profile
         if (!msg.body_html && !msg.body_text && msg.message_uid) {
           const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
           const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
