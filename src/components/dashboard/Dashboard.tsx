@@ -51,7 +51,7 @@ const WIDGET_PREVIEWS: Record<string, { description: string; emoji: string }> = 
   'tickets': { description: 'Últimos tickets de soporte recibidos', emoji: '🎫' },
   'online-users': { description: 'Miembros del equipo conectados', emoji: '🟢' },
   'calendar-mini': { description: 'Eventos de hoy y próximos días', emoji: '📅' },
-  'micro-chat': { description: 'Chat rápido con Fluiditos', emoji: '🤖' },
+  'micro-chat': { description: 'Chat rápido con Micro', emoji: '🤖' },
   'inbox-preview': { description: 'Acceso rápido a tu bandeja de email', emoji: '📬' },
   'whatsapp-preview': { description: 'Vista rápida de conversaciones WA', emoji: '💬' },
   'ai-chat-quick': { description: 'Consultas rápidas al asistente IA', emoji: '🧠' },
@@ -132,21 +132,21 @@ function MicroChatDashboardWidget() {
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <img src={mascotImage} alt="Fluiditos" className="w-5 h-5" /> Chat Fluiditos
+          <img src={mascotImage} alt="Micro" className="w-5 h-5" /> Chat Micro
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 gap-2">
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-2 pr-2">
             {messages.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-4">Pregúntale algo a Fluiditos...</p>
+              <p className="text-xs text-muted-foreground text-center py-4">Pregúntale algo a Micro...</p>
             )}
             {messages.map((m, i) => (
               <div key={i} className={cn('text-xs p-2 rounded-lg max-w-[90%]', m.role === 'user' ? 'bg-primary text-primary-foreground ml-auto' : 'bg-muted')}>
                 {m.content}
               </div>
             ))}
-            {loading && <div className="text-xs text-muted-foreground animate-pulse">Fluiditos está pensando...</div>}
+            {loading && <div className="text-xs text-muted-foreground animate-pulse">Micro está pensando...</div>}
           </div>
         </ScrollArea>
         <div className="flex gap-1.5">
@@ -369,23 +369,19 @@ export function Dashboard({ onViewLead, onTabChange }: DashboardProps) {
         isDraggable={editMode}
         isResizable={editMode}
         onLayoutChange={(layout) => { if (editMode) onLayoutChange(layout); }}
-        draggableHandle=".widget-drag-handle"
-        compactType="vertical"
+        draggableHandle=".drag-handle"
         margin={[16, 16]}
       >
         {visibleWidgets.map(widget => (
-          <div key={widget.id} className={cn(
-            "rounded-xl overflow-hidden bg-card shadow-sm border",
-            editMode && "ring-2 ring-dashed ring-primary/30 bg-card/50"
-          )}>
+          <div key={widget.id} className="relative group">
             {editMode && (
-              <div className="widget-drag-handle absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-background/80 to-transparent z-10 flex items-center justify-center cursor-grab active:cursor-grabbing">
-                <div className="w-8 h-1 rounded-full bg-muted-foreground/40" />
+              <div className="drag-handle absolute top-0 left-0 right-0 h-6 flex items-center justify-center cursor-grab active:cursor-grabbing z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="bg-muted/80 backdrop-blur-sm rounded-b-md px-4 py-0.5 text-[10px] text-muted-foreground font-medium flex items-center gap-1.5">
+                  <span>⠿</span> {widget.title}
+                </div>
               </div>
             )}
-            <div className={cn("h-full overflow-auto", editMode && "pt-4")}>
-              <WidgetContent widget={widget} stats={dashboardStats} leads={leads} onViewLead={onViewLead} onTabChange={onTabChange} />
-            </div>
+            <WidgetContent widget={widget} stats={dashboardStats} leads={leads || []} onViewLead={onViewLead} onTabChange={onTabChange} />
           </div>
         ))}
       </ResponsiveGridLayout>

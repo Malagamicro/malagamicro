@@ -7,8 +7,8 @@ import { X, Send, Loader2, Minimize2, Mic, MicOff, Plus, Paperclip, Image as Ima
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { FluiditosAvatar, FluiditosConfig, FluiditosAnimState, loadFluiditosConfig } from './FluiditosAvatar';
-import { FluiditosCustomizer } from './FluiditosCustomizer';
+import { FluiditosAvatar, FluiditosConfig, FluiditosAnimState, loadFluiditosConfig } from './MicroAvatar';
+import { FluiditosCustomizer } from './MicroCustomizer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
@@ -208,7 +208,7 @@ export function MascotChatWidget() {
       setMessages(prev => [...prev, { role: 'assistant', content: data?.response || data?.error || 'Sin respuesta' }]);
     } catch (error) {
       console.error('FluiMicrMicro', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: '¡Ups! Parece que tuve un pequeño cortocircuito 💧⚡ Intenta de nuevo.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: '¡Ups! Parece que tuve un pequeño cortocircuito ⚡ Intenta de nuevo.' }]);
     } finally {
       setIsLoading(false);
     }
@@ -282,7 +282,7 @@ export function MascotChatWidget() {
         </div>
         <div className="flex-1 pointer-events-none">
           <h3 className="font-semibold text-sm">Micro</h3>
-          <p className="text-xs text-muted-foreground">Asistente virtual 💧</p>
+          <p className="text-xs text-muted-foreground">Asistente virtual</p>
         </div>
         <Button variant="ghost" size="icon" className="h-8 w-8" onMouseDown={e => e.stopPropagation()} onClick={() => setShowCustomizer(true)} title="Personalizar">
           <Palette className="h-4 w-4" />
@@ -317,7 +317,7 @@ export function MascotChatWidget() {
                 <FluiditosAvatar config={fluiditosConfig} size={96} animState="idle" />
               </div>
               <div className="space-y-2">
-                <h4 className="font-semibold">¡Hola! Soy Fluiditos 💧</h4>
+                <h4 className="font-semibold">¡Hola! Soy Micro 🤖</h4>
                 <p className="text-sm text-muted-foreground max-w-[250px] mx-auto">
                   Tu asistente de MalagaMicro. Puedo enviar mensajes, emails, WhatsApp, buscar leads y más.
                 </p>
