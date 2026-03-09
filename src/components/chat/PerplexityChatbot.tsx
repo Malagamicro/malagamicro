@@ -847,7 +847,7 @@ export function PerplexityChatbot() {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={isMobile ? () => setShowSidebar(!showSidebar) : toggleSidebar}>
             {showSidebar ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
           </Button>
-          {/* Fluiditos avatars - one per subagent in active team */}
+          {/* Micro avatars - one per subagent in active team */}
           <div className="relative hidden md:flex items-center">
             {activeSubagents.length === 0 ? (
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
