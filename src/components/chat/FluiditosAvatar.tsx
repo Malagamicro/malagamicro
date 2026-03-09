@@ -43,7 +43,7 @@ async function saveFluiditosConfigToDb(config: FluiditosConfig) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     
-    // Load current custom_theme and merge fluiditos config into it
+    // Load current custom_theme and merge micro config into it
     const { data: profile } = await supabase
       .from('profiles')
       .select('custom_theme')
