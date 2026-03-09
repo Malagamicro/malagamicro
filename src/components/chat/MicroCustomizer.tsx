@@ -81,7 +81,7 @@ export function FluiditosCustomizer({ config, onChange, onClose }: Props) {
   };
 
   const handleReset = () => {
-    const { DEFAULT_CONFIG } = require('./FluiditosAvatar');
+    const { DEFAULT_CONFIG } = require('./MicroAvatar');
     setDraft(DEFAULT_CONFIG);
   };
 
