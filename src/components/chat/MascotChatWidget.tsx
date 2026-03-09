@@ -7,8 +7,8 @@ import { X, Send, Loader2, Minimize2, Mic, MicOff, Plus, Paperclip, Image as Ima
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { FluiditosAvatar, FluiditosConfig, FluiditosAnimState, loadFluiditosConfig } from './FluiditosAvatar';
-import { FluiditosCustomizer } from './FluiditosCustomizer';
+import { FluiditosAvatar, FluiditosConfig, FluiditosAnimState, loadFluiditosConfig } from './MicroAvatar';
+import { FluiditosCustomizer } from './MicroCustomizer';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
