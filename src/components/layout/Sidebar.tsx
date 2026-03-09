@@ -923,7 +923,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         {editToggle}
         
         {user && (
-          <div className="px-3 py-2 text-xs text-sidebar-foreground/70 truncate">{user.email}</div>
+          <div className="px-3 py-2 text-xs text-sidebar-foreground/70 truncate" title={user.email || ''}>{profileDisplayName}</div>
         )}
         <button
           onClick={() => handleTabChange('settings')}
