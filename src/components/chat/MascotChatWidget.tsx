@@ -232,7 +232,8 @@ export function MascotChatWidget() {
         style={{ position: 'fixed', left: 0, top: 0, willChange: 'transform' }}
         className="z-50 touch-none w-16 h-16 rounded-full shadow-2xl bg-card/80 backdrop-blur-sm border border-primary/20 flex items-center justify-center cursor-grab active:cursor-grabbing"
         role="button"
-        aria-label="Abrir chat con FluiditoMicro>
+        aria-label="Abrir chat con Micro"
+      >
         <FluiditosAvatar config={fluiditosConfig} size={56} animated animState="idle" />
         <span className="absolute -top-2 -right-1 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full font-medium shadow pointer-events-none">
           {messages.length > 0 ? `${messages.length}` : '¡Hola!'}
