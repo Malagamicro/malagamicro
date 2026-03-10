@@ -281,7 +281,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Header */}
       {!hideHeader && (
         <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
@@ -334,7 +334,7 @@ export function ChatPanel({
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-2 sm:px-4">
+      <ScrollArea className="flex-1 min-h-0 px-2 sm:px-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -391,7 +391,7 @@ export function ChatPanel({
                     </div>
                   )}
 
-                  <div className={cn('max-w-[88%] sm:max-w-[70%] relative', isMe && 'text-right')}>
+                  <div className={cn('max-w-[85%] sm:max-w-[70%] relative overflow-hidden', isMe && 'text-right')}>
                     {showAvatar && !isMe && (
                       <p className="text-xs text-muted-foreground mb-1 ml-1">{message.sender?.full_name}</p>
                     )}
@@ -477,7 +477,7 @@ export function ChatPanel({
 
       {/* Pending files preview */}
       {pendingPreviews.length > 0 && (
-        <div className="px-3 sm:px-4 pt-2 pb-1 border-t bg-card flex flex-wrap gap-2">
+        <div className="px-2 sm:px-4 pt-2 pb-1 border-t bg-card flex flex-wrap gap-2 shrink-0">
           {pendingPreviews.map((preview, idx) => (
             <div key={idx} className="relative group">
               {preview.isImage ? (
@@ -500,7 +500,7 @@ export function ChatPanel({
       )}
 
       {/* Input */}
-      <div className="p-3 sm:p-4 border-t bg-card">
+      <div className="p-2 sm:p-4 border-t bg-card shrink-0">
         <div className="flex items-center gap-1.5 sm:gap-2">
           <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
           <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
