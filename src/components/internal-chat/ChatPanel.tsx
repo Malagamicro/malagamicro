@@ -281,7 +281,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Header */}
       {!hideHeader && (
         <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
