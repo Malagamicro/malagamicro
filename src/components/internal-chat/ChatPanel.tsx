@@ -334,7 +334,8 @@ export function ChatPanel({
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0 px-2 sm:px-4">
+      <ScrollArea className="flex-1 min-h-0 w-full overflow-hidden">
+        <div className="px-2 sm:px-4 w-full overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -345,7 +346,7 @@ export function ChatPanel({
             <p className="text-xs">Envía el primero 👋</p>
           </div>
         ) : (
-          <div className="py-3 sm:py-4 space-y-3 sm:space-y-4">
+          <div className="py-3 sm:py-4 space-y-3 sm:space-y-4 w-full overflow-hidden">
             {messages.map((message, idx) => {
               const isMe = message.sender_id === user?.id;
               const showAvatar = !isMe && (idx === 0 || messages[idx - 1]?.sender_id !== message.sender_id);
@@ -367,17 +368,17 @@ export function ChatPanel({
               };
 
               return (
-                <div key={message.id}>
+                <div key={message.id} className="w-full overflow-hidden">
                   {showDateSeparator && (
-                    <div className="flex items-center gap-3 my-4">
-                      <div className="flex-1 h-px bg-border" />
-                      <span className="text-[11px] text-muted-foreground bg-muted px-3 py-1 rounded-full font-medium capitalize">
+                    <div className="flex items-center gap-2 my-4 w-full overflow-hidden">
+                      <div className="flex-1 min-w-0 h-px bg-border" />
+                      <span className="text-[10px] sm:text-[11px] text-muted-foreground bg-muted px-2 sm:px-3 py-1 rounded-full font-medium capitalize whitespace-nowrap shrink-0">
                         {getDateLabel(msgDate)}
                       </span>
-                      <div className="flex-1 h-px bg-border" />
+                      <div className="flex-1 min-w-0 h-px bg-border" />
                     </div>
                   )}
-                  <div className={cn('flex gap-2 group', isMe && 'flex-row-reverse')}>
+                  <div className={cn('flex gap-2 group w-full overflow-hidden', isMe && 'flex-row-reverse')}>
                   {!isMe && (
                     <div className="w-6 sm:w-8 shrink-0">
                       {showAvatar && (
@@ -391,7 +392,7 @@ export function ChatPanel({
                     </div>
                   )}
 
-                  <div className={cn('max-w-[85%] sm:max-w-[70%] relative overflow-hidden', isMe && 'text-right')}>
+                  <div className={cn('max-w-[80%] sm:max-w-[70%] relative overflow-hidden', isMe && 'text-right')}>
                     {showAvatar && !isMe && (
                       <p className="text-xs text-muted-foreground mb-1 ml-1">{message.sender?.full_name}</p>
                     )}
@@ -473,6 +474,7 @@ export function ChatPanel({
             <div ref={messagesEndRef} />
           </div>
         )}
+        </div>
       </ScrollArea>
 
       {/* Pending files preview */}
