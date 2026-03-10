@@ -346,7 +346,7 @@ export function ChatPanel({
             <p className="text-xs">Envía el primero 👋</p>
           </div>
         ) : (
-          <div className="py-3 sm:py-4 space-y-3 sm:space-y-4">
+          <div className="py-3 sm:py-4 space-y-3 sm:space-y-4 w-full overflow-hidden">
             {messages.map((message, idx) => {
               const isMe = message.sender_id === user?.id;
               const showAvatar = !isMe && (idx === 0 || messages[idx - 1]?.sender_id !== message.sender_id);
