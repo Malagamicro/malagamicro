@@ -368,14 +368,14 @@ export function ChatPanel({
               };
 
               return (
-                <div key={message.id}>
+                <div key={message.id} className="w-full overflow-hidden">
                   {showDateSeparator && (
-                    <div className="flex items-center gap-3 my-4">
-                      <div className="flex-1 h-px bg-border" />
-                      <span className="text-[11px] text-muted-foreground bg-muted px-3 py-1 rounded-full font-medium capitalize">
+                    <div className="flex items-center gap-2 my-4 w-full overflow-hidden">
+                      <div className="flex-1 min-w-0 h-px bg-border" />
+                      <span className="text-[10px] sm:text-[11px] text-muted-foreground bg-muted px-2 sm:px-3 py-1 rounded-full font-medium capitalize whitespace-nowrap shrink-0">
                         {getDateLabel(msgDate)}
                       </span>
-                      <div className="flex-1 h-px bg-border" />
+                      <div className="flex-1 min-w-0 h-px bg-border" />
                     </div>
                   )}
                   <div className={cn('flex gap-2 group', isMe && 'flex-row-reverse')}>
