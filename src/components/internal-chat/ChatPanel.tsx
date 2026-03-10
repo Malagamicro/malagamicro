@@ -346,7 +346,7 @@ export function ChatPanel({
             <p className="text-xs">Envía el primero 👋</p>
           </div>
         ) : (
-          <div className="py-3 sm:py-4 space-y-3 sm:space-y-4 w-full overflow-hidden">
+          <div className="py-2 sm:py-4 space-y-1 sm:space-y-2 w-full overflow-hidden">
             {messages.map((message, idx) => {
               const isMe = message.sender_id === user?.id;
               const showAvatar = !isMe && (idx === 0 || messages[idx - 1]?.sender_id !== message.sender_id);
@@ -370,15 +370,15 @@ export function ChatPanel({
               return (
                 <div key={message.id} className="w-full overflow-hidden">
                   {showDateSeparator && (
-                    <div className="flex items-center gap-2 my-4 w-full overflow-hidden">
+                    <div className="flex items-center gap-2 my-3 w-full min-w-0">
                       <div className="flex-1 min-w-0 h-px bg-border" />
-                      <span className="text-[10px] sm:text-[11px] text-muted-foreground bg-muted px-2 sm:px-3 py-1 rounded-full font-medium capitalize whitespace-nowrap shrink-0">
+                      <span className="text-[11px] text-muted-foreground bg-muted/80 px-3 py-0.5 rounded-full font-medium capitalize whitespace-nowrap shrink-0">
                         {getDateLabel(msgDate)}
                       </span>
                       <div className="flex-1 min-w-0 h-px bg-border" />
                     </div>
                   )}
-                  <div className={cn('flex gap-2 group w-full overflow-hidden', isMe && 'flex-row-reverse')}>
+                  <div className={cn('flex gap-1.5 group w-full min-w-0', isMe && 'flex-row-reverse')}>
                   {!isMe && (
                     <div className="w-6 sm:w-8 shrink-0">
                       {showAvatar && (
@@ -392,7 +392,7 @@ export function ChatPanel({
                     </div>
                   )}
 
-                  <div className={cn('max-w-[80%] sm:max-w-[70%] relative overflow-hidden', isMe && 'text-right')}>
+                  <div className={cn('max-w-[75%] sm:max-w-[70%] relative min-w-0', isMe && 'text-right')}>
                     {showAvatar && !isMe && (
                       <p className="text-xs text-muted-foreground mb-1 ml-1">{message.sender?.full_name}</p>
                     )}
@@ -423,7 +423,7 @@ export function ChatPanel({
                       })()
                     ) : (
                       <div className={cn(
-                        'inline-block rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2',
+                        'inline-block rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2 max-w-full',
                         isMe ? 'bg-primary text-primary-foreground rounded-tr-md' : 'bg-muted rounded-tl-md'
                       )}>
                         {message.is_deleted ? (
@@ -458,7 +458,7 @@ export function ChatPanel({
                             <Download className="h-4 w-4" />
                           </button>
                         ) : (
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          <p className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{message.content}</p>
                         )}
                       </div>
                     )}
