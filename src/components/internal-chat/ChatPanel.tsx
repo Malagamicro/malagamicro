@@ -477,7 +477,7 @@ export function ChatPanel({
 
       {/* Pending files preview */}
       {pendingPreviews.length > 0 && (
-        <div className="px-3 sm:px-4 pt-2 pb-1 border-t bg-card flex flex-wrap gap-2">
+        <div className="px-2 sm:px-4 pt-2 pb-1 border-t bg-card flex flex-wrap gap-2 shrink-0">
           {pendingPreviews.map((preview, idx) => (
             <div key={idx} className="relative group">
               {preview.isImage ? (
