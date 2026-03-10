@@ -474,6 +474,7 @@ export function ChatPanel({
             <div ref={messagesEndRef} />
           </div>
         )}
+        </div>
       </ScrollArea>
 
       {/* Pending files preview */}
