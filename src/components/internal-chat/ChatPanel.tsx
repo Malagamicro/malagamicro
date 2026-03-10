@@ -458,7 +458,7 @@ export function ChatPanel({
                             <Download className="h-4 w-4" />
                           </button>
                         ) : (
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          <p className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{message.content}</p>
                         )}
                       </div>
                     )}
