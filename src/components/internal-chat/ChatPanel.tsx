@@ -392,7 +392,7 @@ export function ChatPanel({
                     </div>
                   )}
 
-                  <div className={cn('max-w-[85%] sm:max-w-[70%] relative overflow-hidden', isMe && 'text-right')}>
+                  <div className={cn('max-w-[80%] sm:max-w-[70%] relative overflow-hidden', isMe && 'text-right')}>
                     {showAvatar && !isMe && (
                       <p className="text-xs text-muted-foreground mb-1 ml-1">{message.sender?.full_name}</p>
                     )}
