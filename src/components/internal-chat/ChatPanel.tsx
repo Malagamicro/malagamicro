@@ -500,7 +500,7 @@ export function ChatPanel({
       )}
 
       {/* Input */}
-      <div className="p-3 sm:p-4 border-t bg-card">
+      <div className="p-2 sm:p-4 border-t bg-card shrink-0">
         <div className="flex items-center gap-1.5 sm:gap-2">
           <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
           <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>

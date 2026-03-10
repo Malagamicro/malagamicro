@@ -69,28 +69,28 @@ export function InternalChatPage() {
 
   if (isMobile) {
     return (
-      <div className="h-full flex flex-col border rounded-xl overflow-hidden bg-card shadow-lg">
+      <div className="h-full flex flex-col overflow-hidden bg-card">
         {activeConversationId ? (
-          <div className="flex-1 flex flex-col">
-            <div className="flex items-center gap-2 p-2 border-b bg-muted/30">
-              <Button variant="ghost" size="icon" onClick={handleBack} className="h-10 w-10 shrink-0">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex items-center gap-2 p-2 border-b bg-muted/30 shrink-0">
+              <Button variant="ghost" size="icon" onClick={handleBack} className="h-9 w-9 shrink-0">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <span className="font-medium truncate flex-1">
+              <span className="font-medium truncate flex-1 text-sm">
                 {activeConversation?.name ||
                   activeConversation?.participants?.find(p => p.user_id !== activeConversation.created_by)?.profile?.full_name ||
                   'Conversación'}
               </span>
-              <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0"
+              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0"
                 onClick={() => { setMobileIsVideo(false); setMobileCallOpen(true); }}>
                 <Phone className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0"
+              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0"
                 onClick={() => { setMobileIsVideo(true); setMobileCallOpen(true); }}>
                 <Video className="h-4 w-4" />
               </Button>
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-h-0 overflow-hidden">
               <ChatPanel {...chatPanelProps} hideHeader />
             </div>
           </div>
