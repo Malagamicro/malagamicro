@@ -334,7 +334,8 @@ export function ChatPanel({
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0 px-2 sm:px-4">
+      <ScrollArea className="flex-1 min-h-0 w-full overflow-hidden">
+        <div className="px-2 sm:px-4 w-full overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
