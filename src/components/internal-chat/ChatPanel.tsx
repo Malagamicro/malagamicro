@@ -423,7 +423,7 @@ export function ChatPanel({
                       })()
                     ) : (
                       <div className={cn(
-                        'inline-block rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2',
+                        'inline-block rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2 max-w-full',
                         isMe ? 'bg-primary text-primary-foreground rounded-tr-md' : 'bg-muted rounded-tl-md'
                       )}>
                         {message.is_deleted ? (
