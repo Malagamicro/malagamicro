@@ -378,7 +378,7 @@ export function ChatPanel({
                       <div className="flex-1 min-w-0 h-px bg-border" />
                     </div>
                   )}
-                  <div className={cn('flex gap-2 group w-full overflow-hidden', isMe && 'flex-row-reverse')}>
+                  <div className={cn('flex gap-1.5 group w-full min-w-0', isMe && 'flex-row-reverse')}>
                   {!isMe && (
                     <div className="w-6 sm:w-8 shrink-0">
                       {showAvatar && (
