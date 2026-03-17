@@ -267,12 +267,13 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {isOwner && m.role !== 'owner' && (
+                      {isOwner && m.user_id !== user?.id && (
                         <Select value={m.role} onValueChange={val => updateMemberRole(m.id, val)}>
-                          <SelectTrigger className="h-7 w-24 text-[11px]">
+                          <SelectTrigger className="h-7 w-28 text-[11px]">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="owner">Propietario</SelectItem>
                             <SelectItem value="editor">Editor</SelectItem>
                             <SelectItem value="reader">Lector</SelectItem>
                           </SelectContent>
