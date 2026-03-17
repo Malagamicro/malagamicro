@@ -469,16 +469,9 @@ function TaskList({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, onDe
 }
 
 function CanvasView({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: string, u: any) => Promise<void> }) {
-  const [content, setContent] = useState(page.content);
-  const debouncedContent = useDebounce(content, 1000);
-
-  useEffect(() => { setContent(page.content); }, [page.id]);
-
-  useEffect(() => {
-    if (debouncedContent !== page.content) {
-      onUpdate(page.id, { content: debouncedContent });
-    }
-  }, [debouncedContent]);
+  const handleSave = useCallback((dataUrl: string) => {
+    onUpdate(page.id, { content: dataUrl });
+  }, [page.id, onUpdate]);
 
   return (
     <div className="flex flex-col h-full">
@@ -487,26 +480,8 @@ function CanvasView({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
         <h3 className="font-semibold text-foreground">{page.title}</h3>
         <Badge variant="secondary" className="text-[10px]">Pizarra</Badge>
       </div>
-      <div className="flex-1 min-h-0 p-6">
-        <div className="w-full h-full rounded-xl border-2 border-dashed border-border bg-muted/20 p-4">
-          <textarea
-            className="w-full h-full resize-none bg-transparent border-none outline-none text-sm leading-relaxed text-foreground placeholder:text-muted-foreground"
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            placeholder="🎨 Espacio libre para lluvia de ideas...
-
-Escribe notas, esquemas, ideas, diagramas en texto...
-
-┌──────────────┐     ┌──────────────┐
-│   Idea 1     │────▶│   Idea 2     │
-└──────────────┘     └──────────────┘
-        │
-        ▼
-┌──────────────┐
-│   Idea 3     │
-└──────────────┘"
-          />
-        </div>
+      <div className="flex-1 min-h-0">
+        <DrawingCanvas pageTitle={page.title} content={page.content} onSave={handleSave} />
       </div>
     </div>
   );
