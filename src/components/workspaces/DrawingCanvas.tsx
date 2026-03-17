@@ -32,6 +32,25 @@ interface BroadcastStroke {
   canvasH: number;
 }
 
+interface BroadcastDrawPoint {
+  tool: Tool;
+  color: string;
+  size: number;
+  from: StrokePoint;
+  to: StrokePoint;
+  canvasW: number;
+  canvasH: number;
+}
+
+interface BroadcastStrokeStart {
+  tool: Tool;
+  color: string;
+  size: number;
+  point: StrokePoint;
+  canvasW: number;
+  canvasH: number;
+}
+
 const COLORS = [
   '#000000', '#ffffff', '#ef4444', '#f97316', '#eab308', '#22c55e',
   '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280',
