@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useWorkspaceDetail, WorkspacePage, WorkspaceTask } from '@/hooks/useWorkspaces';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -281,29 +282,24 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
   const debouncedContent = useDebounce(content, 1000);
   const debouncedTitle = useDebounce(title, 1000);
   const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { setContent(page.content); setTitle(page.title); }, [page.id]);
+  useEffect(() => {
+    setContent(page.content);
+    setTitle(page.title);
+  }, [page.id, page.content, page.title]);
 
   useEffect(() => {
     if (debouncedContent !== page.content) {
       setSaving(true);
-      onUpdate(page.id, { content: debouncedContent }).then(() => setSaving(false));
+      onUpdate(page.id, { content: debouncedContent }).finally(() => setSaving(false));
     }
-  }, [debouncedContent]);
+  }, [debouncedContent, page.content, page.id, onUpdate]);
 
   useEffect(() => {
     if (debouncedTitle !== page.title && debouncedTitle.trim()) {
       onUpdate(page.id, { title: debouncedTitle });
     }
-  }, [debouncedTitle]);
-
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [isEditing]);
+  }, [debouncedTitle, page.title, page.id, onUpdate]);
 
   return (
     <div className="flex flex-col h-full">
@@ -316,20 +312,13 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
           placeholder="Título..."
         />
         {saving && <span className="text-xs text-muted-foreground animate-pulse">Guardando...</span>}
-        <Button
-          variant={isEditing ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setIsEditing(!isEditing)}
-          className="text-xs"
-        >
-          {isEditing ? 'Vista previa' : 'Editar'}
-        </Button>
       </div>
-      <div className="flex-1 min-h-0 px-6 pb-6 overflow-auto">
-        {isEditing ? (
-          <textarea
-            ref={textareaRef}
-            className="w-full h-full resize-none bg-transparent border-none outline-none text-sm leading-relaxed text-foreground placeholder:text-muted-foreground font-mono"
+
+      <div className="flex-1 min-h-0 px-6 pb-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="min-h-0 flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">Editor Markdown (.md)</p>
+          <Textarea
+            className="flex-1 min-h-[280px] h-full resize-none bg-transparent text-sm leading-relaxed text-foreground placeholder:text-muted-foreground font-mono"
             value={content}
             onChange={e => setContent(e.target.value)}
             placeholder="Escribe en Markdown...
@@ -342,20 +331,20 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
 
 **Negrita** | *Cursiva* | `código`"
           />
-        ) : (
-          <div
-            className="prose prose-sm dark:prose-invert max-w-none min-h-full cursor-text"
-            onClick={() => { if (!content?.trim()) setIsEditing(true); }}
-          >
+        </div>
+
+        <div className="min-h-0 flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">Vista en vivo</p>
+          <div className="flex-1 min-h-[280px] overflow-auto rounded-lg border border-border/50 bg-card/30 p-4">
             {content?.trim() ? (
-              <ReactMarkdown>{content}</ReactMarkdown>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              </div>
             ) : (
-              <p className="text-muted-foreground italic cursor-pointer" onClick={() => setIsEditing(true)}>
-                Haz clic aquí o en "Editar" para empezar a escribir...
-              </p>
+              <p className="text-muted-foreground italic">Empieza a escribir y verás el formato Markdown aquí al instante.</p>
             )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
