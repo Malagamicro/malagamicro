@@ -209,6 +209,8 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
             <WorkspaceFiles workspaceId={workspaceId} userRole={userRole} />
           ) : currentPage?.page_type === 'ai_chat' ? (
             <AIChatPage page={currentPage} onUpdate={updatePage} canEdit={canEdit} />
+          ) : currentPage?.page_type === 'team_chat' ? (
+            <TeamChatPage workspaceId={workspaceId} page={currentPage} profiles={profiles} members={members} />
           ) : null}
         </div>
 
