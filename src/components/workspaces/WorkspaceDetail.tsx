@@ -17,6 +17,7 @@ import {
   ArrowLeft, Plus, FileText, Layout, ListChecks, Palette, Trash2,
   Users, Save, CheckCircle2, Circle, Clock, AlertTriangle, ChevronRight,
   UserPlus, X, Bot, FolderOpen, Shield, Eye, Pencil, Loader2, Send,
+  MessageCircle, Paperclip, Image as ImageIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from '@/hooks/useDebounce';
