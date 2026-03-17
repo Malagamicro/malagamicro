@@ -14,10 +14,12 @@ import { cn } from '@/lib/utils';
 import {
   ArrowLeft, Plus, FileText, Layout, ListChecks, Palette, Trash2,
   Users, Save, CheckCircle2, Circle, Clock, AlertTriangle, ChevronRight,
-  UserPlus, X,
+  UserPlus, X, Bot,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from '@/hooks/useDebounce';
+import { DrawingCanvas } from './DrawingCanvas';
+import { WorkspaceAIChat } from './WorkspaceAIChat';
 
 interface WorkspaceDetailProps {
   workspaceId: string;
