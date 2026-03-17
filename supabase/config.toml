@@ -128,3 +128,6 @@ verify_jwt = false
 
 [functions.workspace-ai-chat]
 verify_jwt = false
+
+[functions.track-login]
+verify_jwt = false
