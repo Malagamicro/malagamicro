@@ -279,7 +279,7 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
                           </SelectContent>
                         </Select>
                       )}
-                      {m.role !== 'owner' && isOwner && (
+                      {m.user_id !== user?.id && isOwner && (
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeMember(m.id)}>
                           <X className="h-3.5 w-3.5" />
                         </Button>
