@@ -195,6 +195,14 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
             <CanvasView page={currentPage} onUpdate={updatePage} />
           ) : null}
         </div>
+
+        {/* AI Chat Panel */}
+        <WorkspaceAIChat
+          workspaceId={workspaceId}
+          pages={pages}
+          open={showAIChat}
+          onClose={() => setShowAIChat(false)}
+        />
       </div>
 
       {/* New page dialog */}
