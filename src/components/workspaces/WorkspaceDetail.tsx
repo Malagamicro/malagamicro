@@ -377,7 +377,7 @@ function KanbanBoard({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, o
                   </div>
                 )}
                 {colTasks.map((task: WorkspaceTask) => (
-                  <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} />
+                  <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} members={members} />
                 ))}
               </div>
             </ScrollArea>
