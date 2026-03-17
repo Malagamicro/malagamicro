@@ -291,10 +291,11 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
   );
 
   const canvasEl = (
-    <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white">
+    <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white" style={{ isolation: 'isolate', contain: 'strict' }}>
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
+        style={{ zIndex: 10, position: 'absolute' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
