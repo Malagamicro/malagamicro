@@ -547,7 +547,7 @@ function CanvasView({ page, onUpdate, canEdit }: { page: WorkspacePage; onUpdate
   );
 }
 
-function AIChatPage({ page, workspaceId, onUpdate, canEdit }: { page: WorkspacePage; onUpdate: (id: string, u: any) => Promise<void>; canEdit: boolean }) {
+function AIChatPage({ page, onUpdate, canEdit }: { page: WorkspacePage; onUpdate: (id: string, u: any) => Promise<void>; canEdit: boolean }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [input, setInput] = useState('');
