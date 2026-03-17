@@ -37,6 +37,7 @@ const PAGE_TYPES = [
   { value: 'canvas', label: 'Pizarra', icon: '🎨', lucide: Palette },
   { value: 'files', label: 'Archivos', icon: '📁', lucide: FolderOpen },
   { value: 'ai_chat', label: 'Chat IA', icon: '🤖', lucide: Bot },
+  { value: 'team_chat', label: 'Chat equipo', icon: '💬', lucide: MessageCircle },
 ];
 
 const TASK_STATUSES = [
