@@ -81,6 +81,8 @@ serve(async (req) => {
       });
     }
 
+    const user = { id: claimsData.claims.sub as string, email: claimsData.claims.email as string };
+
     const { user_agent, device_type } = await req.json();
 
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
