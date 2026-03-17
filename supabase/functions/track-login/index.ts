@@ -58,13 +58,14 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    const token = authHeader.replace('Bearer ', '').trim();
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -72,16 +73,31 @@ serve(async (req) => {
     const supabaseUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const token = authHeader.replace('Bearer ', '');
+
+    let user: { id: string; email?: string | null } | null = null;
+
     const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) {
+    if (!claimsError && claimsData?.claims?.sub) {
+      user = {
+        id: claimsData.claims.sub as string,
+        email: (claimsData.claims.email as string | undefined) ?? null,
+      };
+    } else {
+      const { data: userData, error: userError } = await supabaseUser.auth.getUser(token);
+      if (!userError && userData?.user?.id) {
+        user = {
+          id: userData.user.id,
+          email: userData.user.email,
+        };
+      }
+    }
+
+    if (!user?.id) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const user = { id: claimsData.claims.sub as string, email: claimsData.claims.email as string };
 
     const { user_agent, device_type } = await req.json();
 
