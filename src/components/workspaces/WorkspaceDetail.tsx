@@ -491,7 +491,7 @@ function TaskList({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, onDe
       </div>
       <div className="space-y-1">
         {tasks.map((task: WorkspaceTask) => (
-          <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} />
+          <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} members={members} />
         ))}
         {tasks.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">Sin tareas aún</p>
