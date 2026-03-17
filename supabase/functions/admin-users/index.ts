@@ -24,19 +24,23 @@ serve(async (req) => {
       );
     }
 
+    const token = authHeader.replace('Bearer ', '');
+
     const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { persistSession: false },
       global: { headers: { Authorization: authHeader } }
     });
 
-    const { data: { user }, error: userError } = await anonClient.auth.getUser();
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
     
-    if (userError || !user) {
+    if (claimsError || !claimsData?.claims?.sub) {
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const user = { id: claimsData.claims.sub as string, email: claimsData.claims.email as string };
 
     // Use the database role system instead of hardcoded email
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey, {
