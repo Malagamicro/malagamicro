@@ -108,30 +108,36 @@ export function useWorkspaceDetail(workspaceId: string | null) {
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const hasLoadedRef = useRef(false);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (options?: { showLoader?: boolean }) => {
     if (!workspaceId || !user) return;
-    setLoading(true);
+
+    const showLoader = options?.showLoader ?? !hasLoadedRef.current;
+    if (showLoader) setLoading(true);
+
     const [pagesRes, tasksRes, membersRes] = await Promise.all([
       supabase.from('workspace_pages').select('*').eq('workspace_id', workspaceId).order('sort_order'),
       supabase.from('workspace_tasks').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false }),
       supabase.from('workspace_members').select('*').eq('workspace_id', workspaceId),
     ]);
+
     setPages((pagesRes.data as any[]) || []);
     setTasks((tasksRes.data as any[]) || []);
     setMembers((membersRes.data as any[]) || []);
+    hasLoadedRef.current = true;
     setLoading(false);
   }, [workspaceId, user]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { fetchAll({ showLoader: true }); }, [fetchAll]);
 
   // Realtime subscriptions
   useEffect(() => {
     if (!workspaceId) return;
     const channel = supabase
       .channel(`workspace-${workspaceId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspace_pages', filter: `workspace_id=eq.${workspaceId}` }, () => fetchAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspace_tasks', filter: `workspace_id=eq.${workspaceId}` }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspace_pages', filter: `workspace_id=eq.${workspaceId}` }, () => fetchAll({ showLoader: false }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workspace_tasks', filter: `workspace_id=eq.${workspaceId}` }, () => fetchAll({ showLoader: false }))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [workspaceId, fetchAll]);
