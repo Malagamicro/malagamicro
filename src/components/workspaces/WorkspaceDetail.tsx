@@ -536,7 +536,7 @@ function CanvasView({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
         <Badge variant="secondary" className="text-[10px]">Pizarra</Badge>
       </div>
       <div className="flex-1 min-h-0">
-        <DrawingCanvas pageTitle={page.title} initialContent={page.content} onSave={handleSave} />
+        <DrawingCanvas pageTitle={page.title} pageId={page.id} initialContent={page.content} onSave={handleSave} />
       </div>
     </div>
   );
