@@ -16,12 +16,13 @@ import { cn } from '@/lib/utils';
 import {
   ArrowLeft, Plus, FileText, Layout, ListChecks, Palette, Trash2,
   Users, Save, CheckCircle2, Circle, Clock, AlertTriangle, ChevronRight,
-  UserPlus, X, Bot,
+  UserPlus, X, Bot, FolderOpen, Shield, Eye, Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from '@/hooks/useDebounce';
 import { DrawingCanvas } from './DrawingCanvas';
 import { WorkspaceAIChat } from './WorkspaceAIChat';
+import { WorkspaceFiles } from './WorkspaceFiles';
 
 interface WorkspaceDetailProps {
   workspaceId: string;
@@ -33,6 +34,7 @@ const PAGE_TYPES = [
   { value: 'kanban', label: 'Kanban', icon: '📊', lucide: Layout },
   { value: 'tasks', label: 'Tareas', icon: '✅', lucide: ListChecks },
   { value: 'canvas', label: 'Pizarra', icon: '🎨', lucide: Palette },
+  { value: 'files', label: 'Archivos', icon: '📁', lucide: FolderOpen },
 ];
 
 const TASK_STATUSES = [
@@ -48,15 +50,20 @@ const PRIORITIES = [
   { value: 'urgent', label: 'Urgente', color: 'bg-destructive/10 text-destructive' },
 ];
 
+const ROLE_LABELS: Record<string, { label: string; icon: any; color: string }> = {
+  owner: { label: 'Propietario', icon: Shield, color: 'text-amber-500' },
+  editor: { label: 'Editor', icon: Pencil, color: 'text-blue-500' },
+  reader: { label: 'Lector', icon: Eye, color: 'text-muted-foreground' },
+};
+
 export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
   const { user } = useAuth();
-  const { pages, tasks, members, loading, createPage, updatePage, deletePage, createTask, updateTask, deleteTask, addMember, removeMember } = useWorkspaceDetail(workspaceId);
+  const { pages, tasks, members, loading, createPage, updatePage, deletePage, createTask, updateTask, deleteTask, addMember, removeMember, updateMemberRole } = useWorkspaceDetail(workspaceId);
   const [activePage, setActivePage] = useState<string | null>(null);
   const [showNewPage, setShowNewPage] = useState(false);
   const [newPageTitle, setNewPageTitle] = useState('');
   const [newPageType, setNewPageType] = useState('note');
   const [showMembers, setShowMembers] = useState(false);
-  const [newMemberEmail, setNewMemberEmail] = useState('');
   const [workspace, setWorkspace] = useState<any>(null);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [showAIChat, setShowAIChat] = useState(false);
@@ -82,6 +89,10 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
   }, [members]);
 
   const currentPage = pages.find(p => p.id === activePage);
+  const currentMember = members.find(m => m.user_id === user?.id);
+  const userRole: 'owner' | 'editor' | 'reader' = (currentMember?.role as any) || (workspace?.created_by === user?.id ? 'owner' : 'reader');
+  const isOwner = userRole === 'owner';
+  const canEdit = userRole === 'owner' || userRole === 'editor';
 
   const handleCreatePage = async () => {
     if (!newPageTitle.trim()) return;
@@ -92,17 +103,6 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
       setShowNewPage(false);
       setNewPageTitle('');
     }
-  };
-
-  const handleInviteMember = async () => {
-    if (!newMemberEmail.trim()) return;
-    // Find user by email via profiles + auth
-    const { data } = await supabase.rpc('get_user_email', { _user_id: user!.id }); // dummy; we need to find by email
-    // Search profiles
-    const { data: profileData } = await supabase.from('profiles').select('user_id, full_name').limit(100);
-    // We cannot search by email in profiles, so we show all users for selection
-    toast.info('Usa la lista de miembros para agregar usuarios');
-    setNewMemberEmail('');
   };
 
   if (loading) {
@@ -125,6 +125,9 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
         </Button>
         <span className="text-xl">{workspace?.icon || '📋'}</span>
         <h2 className="font-semibold text-foreground truncate">{workspace?.name || 'Espacio'}</h2>
+        <Badge variant="secondary" className="text-[10px] gap-1">
+          {ROLE_LABELS[userRole]?.label || userRole}
+        </Badge>
         <div className="ml-auto flex items-center gap-2">
           <Button
             variant={showAIChat ? 'default' : 'outline'}
@@ -145,9 +148,11 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
         <div className="w-56 shrink-0 border-r border-border/50 flex flex-col bg-muted/30">
           <div className="p-3 flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Páginas</span>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowNewPage(true)}>
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
+            {canEdit && (
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowNewPage(true)}>
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
           <ScrollArea className="flex-1">
             <div className="px-2 pb-2 space-y-0.5">
@@ -164,14 +169,16 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
                 >
                   <span className="text-sm">{page.icon}</span>
                   <span className="truncate flex-1">{page.title}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0"
-                    onClick={e => { e.stopPropagation(); deletePage(page.id); if (activePage === page.id) setActivePage(null); }}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  {isOwner && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0"
+                      onClick={e => { e.stopPropagation(); deletePage(page.id); if (activePage === page.id) setActivePage(null); }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </button>
               ))}
               {pages.length === 0 && (
@@ -186,15 +193,17 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
         {/* Main content */}
         <div className={cn("flex-1 min-w-0", currentPage?.page_type === 'canvas' ? 'overflow-hidden' : 'overflow-auto')}>
           {!activePage ? (
-            <EmptyState onCreatePage={() => setShowNewPage(true)} />
+            <EmptyState onCreatePage={() => setShowNewPage(true)} canEdit={canEdit} />
           ) : currentPage?.page_type === 'note' ? (
-            <NoteEditor page={currentPage} onUpdate={updatePage} />
+            <NoteEditor page={currentPage} onUpdate={updatePage} canEdit={canEdit} />
           ) : currentPage?.page_type === 'kanban' ? (
-            <KanbanBoard tasks={tasks.filter(t => t.page_id === currentPage.id || !t.page_id)} workspaceId={workspaceId} pageId={currentPage.id} onCreateTask={createTask} onUpdateTask={updateTask} onDeleteTask={deleteTask} profiles={profiles} members={members} />
+            <KanbanBoard tasks={tasks.filter(t => t.page_id === currentPage.id || !t.page_id)} workspaceId={workspaceId} pageId={currentPage.id} onCreateTask={createTask} onUpdateTask={updateTask} onDeleteTask={deleteTask} profiles={profiles} members={members} canEdit={canEdit} />
           ) : currentPage?.page_type === 'tasks' ? (
-            <TaskList tasks={tasks.filter(t => t.page_id === currentPage.id || !t.page_id)} workspaceId={workspaceId} pageId={currentPage.id} onCreateTask={createTask} onUpdateTask={updateTask} onDeleteTask={deleteTask} profiles={profiles} members={members} />
+            <TaskList tasks={tasks.filter(t => t.page_id === currentPage.id || !t.page_id)} workspaceId={workspaceId} pageId={currentPage.id} onCreateTask={createTask} onUpdateTask={updateTask} onDeleteTask={deleteTask} profiles={profiles} members={members} canEdit={canEdit} />
           ) : currentPage?.page_type === 'canvas' ? (
-            <CanvasView page={currentPage} onUpdate={updatePage} />
+            <CanvasView page={currentPage} onUpdate={updatePage} canEdit={canEdit} />
+          ) : currentPage?.page_type === 'files' ? (
+            <WorkspaceFiles workspaceId={workspaceId} userRole={userRole} />
           ) : null}
         </div>
 
@@ -235,24 +244,46 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
 
       {/* Members dialog */}
       <Dialog open={showMembers} onOpenChange={setShowMembers}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Miembros</DialogTitle></DialogHeader>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Miembros del espacio</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            <MemberInvite workspaceId={workspaceId} existingMembers={members} onAdd={addMember} />
+            {isOwner && (
+              <MemberInvite workspaceId={workspaceId} existingMembers={members} onAdd={addMember} />
+            )}
             <div className="space-y-1.5 max-h-60 overflow-auto">
-              {members.map(m => (
-                <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50">
-                  <div>
-                    <p className="text-sm font-medium">{profiles[m.user_id] || 'Usuario'}</p>
-                    <p className="text-[10px] text-muted-foreground capitalize">{m.role}</p>
+              {members.map(m => {
+                const roleInfo = ROLE_LABELS[m.role] || ROLE_LABELS.reader;
+                const RoleIcon = roleInfo.icon;
+                return (
+                  <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2.5">
+                      <RoleIcon className={cn('h-4 w-4', roleInfo.color)} />
+                      <div>
+                        <p className="text-sm font-medium">{profiles[m.user_id] || 'Usuario'}</p>
+                        <p className="text-[10px] text-muted-foreground">{roleInfo.label}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {isOwner && m.role !== 'owner' && (
+                        <Select value={m.role} onValueChange={val => updateMemberRole(m.id, val)}>
+                          <SelectTrigger className="h-7 w-24 text-[11px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="editor">Editor</SelectItem>
+                            <SelectItem value="reader">Lector</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {m.role !== 'owner' && isOwner && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeMember(m.id)}>
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  {m.role !== 'owner' && workspace?.created_by === user?.id && (
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeMember(m.id)}>
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </DialogContent>
@@ -263,20 +294,20 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
 
 // -------- Sub-components --------
 
-function EmptyState({ onCreatePage }: { onCreatePage: () => void }) {
+function EmptyState({ onCreatePage, canEdit }: { onCreatePage: () => void; canEdit: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-6">
       <span className="text-5xl">✨</span>
       <h3 className="text-lg font-semibold">Empieza a crear</h3>
       <p className="text-sm text-muted-foreground max-w-xs">
-        Crea notas, tableros kanban, listas de tareas o pizarras para tu equipo
+        Crea notas, tableros kanban, listas de tareas, pizarras o sube archivos
       </p>
-      <Button onClick={onCreatePage}><Plus className="h-4 w-4 mr-1" /> Nueva página</Button>
+      {canEdit && <Button onClick={onCreatePage}><Plus className="h-4 w-4 mr-1" /> Nueva página</Button>}
     </div>
   );
 }
 
-function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: string, u: any) => Promise<void> }) {
+function NoteEditor({ page, onUpdate, canEdit }: { page: WorkspacePage; onUpdate: (id: string, u: any) => Promise<void>; canEdit: boolean }) {
   const [content, setContent] = useState(page.content);
   const [title, setTitle] = useState(page.title);
   const debouncedContent = useDebounce(content, 1000);
@@ -289,17 +320,17 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
   }, [page.id, page.content, page.title]);
 
   useEffect(() => {
-    if (debouncedContent !== page.content) {
+    if (debouncedContent !== page.content && canEdit) {
       setSaving(true);
       onUpdate(page.id, { content: debouncedContent }).finally(() => setSaving(false));
     }
-  }, [debouncedContent, page.content, page.id, onUpdate]);
+  }, [debouncedContent, page.content, page.id, onUpdate, canEdit]);
 
   useEffect(() => {
-    if (debouncedTitle !== page.title && debouncedTitle.trim()) {
+    if (debouncedTitle !== page.title && debouncedTitle.trim() && canEdit) {
       onUpdate(page.id, { title: debouncedTitle });
     }
-  }, [debouncedTitle, page.title, page.id, onUpdate]);
+  }, [debouncedTitle, page.title, page.id, onUpdate, canEdit]);
 
   return (
     <div className="flex flex-col h-full">
@@ -310,8 +341,10 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder="Título..."
+          readOnly={!canEdit}
         />
         {saving && <span className="text-xs text-muted-foreground animate-pulse">Guardando...</span>}
+        {!canEdit && <Badge variant="secondary" className="text-[10px]">Solo lectura</Badge>}
       </div>
 
       <div className="flex-1 min-h-0 px-6 pb-6 grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -321,18 +354,10 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
             className="flex-1 min-h-[280px] h-full resize-none bg-transparent text-sm leading-relaxed text-foreground placeholder:text-muted-foreground font-mono"
             value={content}
             onChange={e => setContent(e.target.value)}
-            placeholder="Escribe en Markdown...
-
-# Encabezado
-## Subencabezado
-- Lista de items
-- [ ] Tarea pendiente
-- [x] Tarea completada
-
-**Negrita** | *Cursiva* | `código`"
+            placeholder="Escribe en Markdown..."
+            readOnly={!canEdit}
           />
         </div>
-
         <div className="min-h-0 flex flex-col gap-2">
           <p className="text-xs text-muted-foreground">Vista en vivo</p>
           <div className="flex-1 min-h-[280px] overflow-auto rounded-lg border border-border/50 bg-card/30 p-4">
@@ -350,7 +375,7 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
   );
 }
 
-function KanbanBoard({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, onDeleteTask, profiles, members }: any) {
+function KanbanBoard({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, onDeleteTask, profiles, members, canEdit }: any) {
   const [newTitle, setNewTitle] = useState('');
   const [addingCol, setAddingCol] = useState<string | null>(null);
   const columns = TASK_STATUSES;
@@ -358,9 +383,6 @@ function KanbanBoard({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, o
   const handleAdd = async (status: string) => {
     if (!newTitle.trim()) return;
     await onCreateTask(newTitle.trim(), pageId);
-    if (status !== 'todo') {
-      // We created as todo, but let's find and update — simplification: create all as the target status
-    }
     setNewTitle('');
     setAddingCol(null);
   };
@@ -376,13 +398,15 @@ function KanbanBoard({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, o
               <Icon className={cn('h-4 w-4', col.color)} />
               <span className="text-sm font-semibold text-foreground">{col.label}</span>
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{colTasks.length}</Badge>
-              <Button variant="ghost" size="icon" className="ml-auto h-6 w-6" onClick={() => setAddingCol(col.value)}>
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
+              {canEdit && (
+                <Button variant="ghost" size="icon" className="ml-auto h-6 w-6" onClick={() => setAddingCol(col.value)}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
             <ScrollArea className="flex-1">
               <div className="space-y-2 pr-1">
-                {addingCol === col.value && (
+                {addingCol === col.value && canEdit && (
                   <div className="p-2 rounded-lg border border-primary/30 bg-card">
                     <Input
                       autoFocus
@@ -399,7 +423,7 @@ function KanbanBoard({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, o
                   </div>
                 )}
                 {colTasks.map((task: WorkspaceTask) => (
-                  <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} members={members} />
+                  <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} members={members} canEdit={canEdit} />
                 ))}
               </div>
             </ScrollArea>
@@ -410,7 +434,7 @@ function KanbanBoard({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, o
   );
 }
 
-function TaskCard({ task, onUpdate, onDelete, profiles, members }: { task: WorkspaceTask; onUpdate: any; onDelete: any; profiles: Record<string, string>; members?: any[] }) {
+function TaskCard({ task, onUpdate, onDelete, profiles, members, canEdit }: { task: WorkspaceTask; onUpdate: any; onDelete: any; profiles: Record<string, string>; members?: any[]; canEdit?: boolean }) {
   const priority = PRIORITIES.find(p => p.value === task.priority);
   const nextStatus = task.status === 'todo' ? 'in_progress' : task.status === 'in_progress' ? 'done' : 'todo';
   const [showAssign, setShowAssign] = useState(false);
@@ -418,7 +442,7 @@ function TaskCard({ task, onUpdate, onDelete, profiles, members }: { task: Works
   return (
     <div className="group p-3 rounded-lg border border-border/50 bg-card hover:shadow-sm transition-shadow">
       <div className="flex items-start gap-2">
-        <button onClick={() => onUpdate(task.id, { status: nextStatus })} className="mt-0.5 shrink-0">
+        <button onClick={() => canEdit && onUpdate(task.id, { status: nextStatus })} className="mt-0.5 shrink-0" disabled={!canEdit}>
           {task.status === 'done' ? (
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           ) : task.status === 'in_progress' ? (
@@ -433,62 +457,46 @@ function TaskCard({ task, onUpdate, onDelete, profiles, members }: { task: Works
             {priority && priority.value !== 'normal' && (
               <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full', priority.color)}>{priority.label}</span>
             )}
-            {task.assigned_to ? (
-              <button
-                onClick={() => setShowAssign(!showAssign)}
-                className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-              >
-                {profiles[task.assigned_to] || 'Asignado'}
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowAssign(!showAssign)}
-                className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground hover:bg-accent transition-colors"
-              >
-                + Asignar
-              </button>
-            )}
+            {canEdit ? (
+              task.assigned_to ? (
+                <button onClick={() => setShowAssign(!showAssign)} className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                  {profiles[task.assigned_to] || 'Asignado'}
+                </button>
+              ) : (
+                <button onClick={() => setShowAssign(!showAssign)} className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground hover:bg-accent transition-colors">
+                  + Asignar
+                </button>
+              )
+            ) : task.assigned_to ? (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{profiles[task.assigned_to] || 'Asignado'}</span>
+            ) : null}
             {task.due_date && (
               <span className="text-[10px] text-muted-foreground">{new Date(task.due_date).toLocaleDateString()}</span>
             )}
           </div>
-          {showAssign && members && members.length > 0 && (
+          {showAssign && canEdit && members && members.length > 0 && (
             <div className="mt-2 p-1.5 rounded-lg border border-border/50 bg-popover shadow-sm space-y-0.5 max-h-32 overflow-auto">
-              <button
-                onClick={() => { onUpdate(task.id, { assigned_to: null }); setShowAssign(false); }}
-                className="w-full text-left text-[11px] px-2 py-1 rounded hover:bg-muted text-muted-foreground"
-              >
-                Sin asignar
-              </button>
+              <button onClick={() => { onUpdate(task.id, { assigned_to: null }); setShowAssign(false); }} className="w-full text-left text-[11px] px-2 py-1 rounded hover:bg-muted text-muted-foreground">Sin asignar</button>
               {members.map((m: any) => (
-                <button
-                  key={m.user_id}
-                  onClick={() => { onUpdate(task.id, { assigned_to: m.user_id }); setShowAssign(false); }}
-                  className={cn(
-                    'w-full text-left text-[11px] px-2 py-1 rounded hover:bg-muted',
-                    task.assigned_to === m.user_id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground'
-                  )}
-                >
+                <button key={m.user_id} onClick={() => { onUpdate(task.id, { assigned_to: m.user_id }); setShowAssign(false); }}
+                  className={cn('w-full text-left text-[11px] px-2 py-1 rounded hover:bg-muted', task.assigned_to === m.user_id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground')}>
                   {profiles[m.user_id] || 'Usuario'}
                 </button>
               ))}
             </div>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
-          onClick={() => onDelete(task.id)}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+        {canEdit && (
+          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0" onClick={() => onDelete(task.id)}>
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
       </div>
     </div>
   );
 }
 
-function TaskList({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, onDeleteTask, profiles, members }: any) {
+function TaskList({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, onDeleteTask, profiles, members, canEdit }: any) {
   const [newTitle, setNewTitle] = useState('');
 
   const handleAdd = async () => {
@@ -499,34 +507,26 @@ function TaskList({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, onDe
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-4">
-      <div className="flex items-center gap-2">
-        <Input
-          placeholder="Añadir tarea..."
-          value={newTitle}
-          onChange={e => setNewTitle(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          className="flex-1"
-        />
-        <Button size="sm" onClick={handleAdd} disabled={!newTitle.trim()}>
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex items-center gap-2">
+          <Input placeholder="Añadir tarea..." value={newTitle} onChange={e => setNewTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdd()} className="flex-1" />
+          <Button size="sm" onClick={handleAdd} disabled={!newTitle.trim()}><Plus className="h-4 w-4" /></Button>
+        </div>
+      )}
       <div className="space-y-1">
         {tasks.map((task: WorkspaceTask) => (
-          <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} members={members} />
+          <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} members={members} canEdit={canEdit} />
         ))}
-        {tasks.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-8">Sin tareas aún</p>
-        )}
+        {tasks.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Sin tareas aún</p>}
       </div>
     </div>
   );
 }
 
-function CanvasView({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: string, u: any) => Promise<void> }) {
+function CanvasView({ page, onUpdate, canEdit }: { page: WorkspacePage; onUpdate: (id: string, u: any) => Promise<void>; canEdit: boolean }) {
   const handleSave = useCallback((dataUrl: string) => {
-    onUpdate(page.id, { content: dataUrl });
-  }, [page.id, onUpdate]);
+    if (canEdit) onUpdate(page.id, { content: dataUrl });
+  }, [page.id, onUpdate, canEdit]);
 
   return (
     <div className="flex flex-col h-full">
@@ -534,6 +534,7 @@ function CanvasView({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
         <span className="text-xl">🎨</span>
         <h3 className="font-semibold text-foreground">{page.title}</h3>
         <Badge variant="secondary" className="text-[10px]">Pizarra</Badge>
+        {!canEdit && <Badge variant="secondary" className="text-[10px]">Solo lectura</Badge>}
       </div>
       <div className="flex-1 min-h-0">
         <DrawingCanvas pageTitle={page.title} pageId={page.id} initialContent={page.content} onSave={handleSave} />
@@ -545,6 +546,7 @@ function CanvasView({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
 function MemberInvite({ workspaceId, existingMembers, onAdd }: { workspaceId: string; existingMembers: any[]; onAdd: (userId: string, role?: string) => void }) {
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [inviteRole, setInviteRole] = useState('editor');
 
   useEffect(() => {
     supabase.from('profiles').select('user_id, full_name, avatar_url').limit(50)
@@ -558,17 +560,30 @@ function MemberInvite({ workspaceId, existingMembers, onAdd }: { workspaceId: st
 
   return (
     <div className="space-y-2">
-      <Input placeholder="Buscar usuario..." value={search} onChange={e => setSearch(e.target.value)} className="h-8 text-xs" />
-      {filtered.length > 0 && (
+      <div className="flex items-center gap-2">
+        <Input placeholder="Buscar usuario..." value={search} onChange={e => setSearch(e.target.value)} className="h-8 text-xs flex-1" />
+        <Select value={inviteRole} onValueChange={setInviteRole}>
+          <SelectTrigger className="h-8 w-28 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="owner">Propietario</SelectItem>
+            <SelectItem value="editor">Editor</SelectItem>
+            <SelectItem value="reader">Lector</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {filtered.length > 0 && search && (
         <div className="max-h-32 overflow-auto space-y-1">
           {filtered.map(p => (
             <button
               key={p.user_id}
-              onClick={() => onAdd(p.user_id)}
+              onClick={() => onAdd(p.user_id, inviteRole)}
               className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-muted text-left text-sm"
             >
               <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>{p.full_name || 'Sin nombre'}</span>
+              <span className="flex-1">{p.full_name || 'Sin nombre'}</span>
+              <span className="text-[10px] text-muted-foreground capitalize">{inviteRole}</span>
             </button>
           ))}
         </div>
