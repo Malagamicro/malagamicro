@@ -57,6 +57,7 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [workspace, setWorkspace] = useState<any>(null);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [showAIChat, setShowAIChat] = useState(false);
 
   // Fetch workspace info
   useEffect(() => {
