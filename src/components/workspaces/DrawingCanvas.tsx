@@ -7,14 +7,30 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DrawingCanvasProps {
   pageTitle: string;
+  pageId?: string;
   initialContent: string;
   onSave: (dataUrl: string) => void;
 }
 
 type Tool = 'pen' | 'highlighter' | 'eraser' | 'line' | 'rect' | 'circle';
+
+interface StrokePoint {
+  x: number;
+  y: number;
+}
+
+interface BroadcastStroke {
+  tool: Tool;
+  color: string;
+  size: number;
+  points: StrokePoint[];
+  canvasW: number;
+  canvasH: number;
+}
 
 const COLORS = [
   '#000000', '#ffffff', '#ef4444', '#f97316', '#eab308', '#22c55e',
@@ -30,7 +46,7 @@ interface HistoryEntry {
   data: ImageData;
 }
 
-export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanvasProps) {
+export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<Tool>('pen');
@@ -46,6 +62,13 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
+
+  // Track current stroke points for broadcasting
+  const currentStrokeRef = useRef<StrokePoint[]>([]);
+
+  // Logical canvas dimensions (fixed, independent of display size)
+  const LOGICAL_W = 1920;
+  const LOGICAL_H = 1080;
 
   const getCtx = useCallback(() => canvasRef.current?.getContext('2d'), []);
 
@@ -68,17 +91,13 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
     }, 1500);
   }, []);
 
-  // Init canvas only once per mount
+  // Init canvas with fixed logical size
   useEffect(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas) return;
 
-    const rect = container.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    canvas.width = LOGICAL_W;
+    canvas.height = LOGICAL_H;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -88,7 +107,7 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
     if (initialContent && initialContent.startsWith('data:image')) {
       const img = new Image();
       img.onload = () => {
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, LOGICAL_W, LOGICAL_H);
         saveHistory();
         initializedRef.current = true;
       };
@@ -101,7 +120,115 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, []); // Only on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Realtime broadcast for collaborative drawing
+  useEffect(() => {
+    if (!pageId) return;
+
+    const channelName = `canvas-${pageId}`;
+    const channel = supabase.channel(channelName);
+
+    channel
+      .on('broadcast', { event: 'stroke' }, ({ payload }: { payload: BroadcastStroke }) => {
+        const ctx = getCtx();
+        const canvas = canvasRef.current;
+        if (!ctx || !canvas || !payload || payload.points.length < 2) return;
+
+        // Scale from sender's logical coords to ours (should be same LOGICAL_W/H)
+        const scaleX = canvas.width / payload.canvasW;
+        const scaleY = canvas.height / payload.canvasH;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        if (payload.tool === 'highlighter') {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = payload.color.startsWith('rgba') ? payload.color : `${payload.color}66`;
+          ctx.lineWidth = payload.size * 6;
+        } else if (payload.tool === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.strokeStyle = 'rgba(0,0,0,1)';
+          ctx.lineWidth = payload.size * 4;
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = payload.color;
+          ctx.lineWidth = payload.size;
+        }
+
+        if (['line', 'rect', 'circle'].includes(payload.tool) && payload.points.length >= 2) {
+          const s = payload.points[0];
+          const e = payload.points[payload.points.length - 1];
+          ctx.beginPath();
+          if (payload.tool === 'line') {
+            ctx.moveTo(s.x * scaleX, s.y * scaleY);
+            ctx.lineTo(e.x * scaleX, e.y * scaleY);
+          } else if (payload.tool === 'rect') {
+            ctx.rect(s.x * scaleX, s.y * scaleY, (e.x - s.x) * scaleX, (e.y - s.y) * scaleY);
+          } else if (payload.tool === 'circle') {
+            const rx = Math.abs(e.x - s.x) / 2 * scaleX;
+            const ry = Math.abs(e.y - s.y) / 2 * scaleY;
+            const cx = (s.x + (e.x - s.x) / 2) * scaleX;
+            const cy = (s.y + (e.y - s.y) / 2) * scaleY;
+            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+          }
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(payload.points[0].x * scaleX, payload.points[0].y * scaleY);
+          for (let i = 1; i < payload.points.length; i++) {
+            ctx.lineTo(payload.points[i].x * scaleX, payload.points[i].y * scaleY);
+          }
+          ctx.stroke();
+        }
+
+        ctx.restore();
+        saveHistory();
+        debouncedSave();
+      })
+      .on('broadcast', { event: 'clear' }, () => {
+        const ctx = getCtx();
+        const canvas = canvasRef.current;
+        if (!ctx || !canvas) return;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        saveHistory();
+        debouncedSave();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [pageId, getCtx, saveHistory, debouncedSave]);
+
+  const broadcastStroke = useCallback((points: StrokePoint[]) => {
+    if (!pageId || points.length < 2) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    supabase.channel(`canvas-${pageId}`).send({
+      type: 'broadcast',
+      event: 'stroke',
+      payload: {
+        tool,
+        color,
+        size,
+        points,
+        canvasW: canvas.width,
+        canvasH: canvas.height,
+      } as BroadcastStroke,
+    });
+  }, [pageId, tool, color, size]);
+
+  const broadcastClear = useCallback(() => {
+    if (!pageId) return;
+    supabase.channel(`canvas-${pageId}`).send({
+      type: 'broadcast',
+      event: 'clear',
+      payload: {},
+    });
+  }, [pageId]);
 
   const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -138,6 +265,7 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
     setIsDrawing(true);
     const pos = getPos(e);
     startPosRef.current = pos;
+    currentStrokeRef.current = [pos];
 
     if (['line', 'rect', 'circle'].includes(tool)) {
       snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -154,6 +282,7 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
     const canvas = canvasRef.current;
     if (!ctx || !canvas) return;
     const pos = getPos(e);
+    currentStrokeRef.current.push(pos);
 
     if (['line', 'rect', 'circle'].includes(tool) && snapshotRef.current && startPosRef.current) {
       ctx.putImageData(snapshotRef.current, 0, 0);
@@ -187,6 +316,11 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
     const ctx = getCtx();
     if (ctx) ctx.globalCompositeOperation = 'source-over';
     snapshotRef.current = null;
+
+    // Broadcast the completed stroke
+    broadcastStroke(currentStrokeRef.current);
+    currentStrokeRef.current = [];
+
     saveHistory();
     debouncedSave();
   };
@@ -215,6 +349,7 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     saveHistory();
     debouncedSave();
+    broadcastClear();
   };
 
   const downloadCanvas = () => {
@@ -290,12 +425,13 @@ export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanv
     </div>
   );
 
+  // Canvas uses object-fit contain so it always shows correctly regardless of container size
   const canvasEl = (
-    <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white" style={{ isolation: 'isolate', contain: 'strict' }}>
+    <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white flex items-center justify-center" style={{ isolation: 'isolate' }}>
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        style={{ zIndex: 10, position: 'absolute' }}
+        className="max-w-full max-h-full"
+        style={{ objectFit: 'contain' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
