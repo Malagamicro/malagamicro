@@ -125,3 +125,6 @@ verify_jwt = false
 
 [functions.lead-finder-agent]
 verify_jwt = false
+
+[functions.workspace-ai-chat]
+verify_jwt = false
