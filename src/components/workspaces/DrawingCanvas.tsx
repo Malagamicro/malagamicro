@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -6,7 +7,6 @@ import {
   Download, Circle, Square, Minus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 
 interface DrawingCanvasProps {
@@ -425,38 +425,34 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     </div>
   );
 
-  // Canvas uses object-fit contain so it always shows correctly regardless of container size
-  const canvasEl = (
-    <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white flex items-center justify-center" style={{ isolation: 'isolate' }}>
-      <canvas
-        ref={canvasRef}
-        className="max-w-full max-h-full"
-        style={{ objectFit: 'contain' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      />
+  const content = (
+    <div className={cn(
+      "flex flex-col",
+      maximized ? "fixed inset-0 z-[9999] bg-background" : "h-full"
+    )}>
+      {toolbar}
+      <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white flex items-center justify-center" style={{ isolation: 'isolate' }}>
+        <canvas
+          ref={canvasRef}
+          className="max-w-full max-h-full"
+          style={{ objectFit: 'contain' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        />
+      </div>
     </div>
   );
 
   if (maximized) {
     return (
-      <Dialog open={maximized} onOpenChange={setMaximized}>
-        <DialogContent className="max-w-[98vw] w-[98vw] h-[95vh] p-0 overflow-hidden">
-          <div className="flex flex-col h-full">
-            {toolbar}
-            {canvasEl}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <>
+        <div className="flex flex-col h-full" />
+        {createPortal(content, document.body)}
+      </>
     );
   }
 
-  return (
-    <div className="flex flex-col h-full">
-      {toolbar}
-      {canvasEl}
-    </div>
-  );
+  return content;
 }
