@@ -377,7 +377,7 @@ function KanbanBoard({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, o
                   </div>
                 )}
                 {colTasks.map((task: WorkspaceTask) => (
-                  <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} />
+                  <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} members={members} />
                 ))}
               </div>
             </ScrollArea>
@@ -388,9 +388,10 @@ function KanbanBoard({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, o
   );
 }
 
-function TaskCard({ task, onUpdate, onDelete, profiles }: { task: WorkspaceTask; onUpdate: any; onDelete: any; profiles: Record<string, string> }) {
+function TaskCard({ task, onUpdate, onDelete, profiles, members }: { task: WorkspaceTask; onUpdate: any; onDelete: any; profiles: Record<string, string>; members?: any[] }) {
   const priority = PRIORITIES.find(p => p.value === task.priority);
   const nextStatus = task.status === 'todo' ? 'in_progress' : task.status === 'in_progress' ? 'done' : 'todo';
+  const [showAssign, setShowAssign] = useState(false);
 
   return (
     <div className="group p-3 rounded-lg border border-border/50 bg-card hover:shadow-sm transition-shadow">
@@ -410,15 +411,47 @@ function TaskCard({ task, onUpdate, onDelete, profiles }: { task: WorkspaceTask;
             {priority && priority.value !== 'normal' && (
               <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full', priority.color)}>{priority.label}</span>
             )}
-            {task.assigned_to && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+            {task.assigned_to ? (
+              <button
+                onClick={() => setShowAssign(!showAssign)}
+                className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              >
                 {profiles[task.assigned_to] || 'Asignado'}
-              </span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowAssign(!showAssign)}
+                className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground hover:bg-accent transition-colors"
+              >
+                + Asignar
+              </button>
             )}
             {task.due_date && (
               <span className="text-[10px] text-muted-foreground">{new Date(task.due_date).toLocaleDateString()}</span>
             )}
           </div>
+          {showAssign && members && members.length > 0 && (
+            <div className="mt-2 p-1.5 rounded-lg border border-border/50 bg-popover shadow-sm space-y-0.5 max-h-32 overflow-auto">
+              <button
+                onClick={() => { onUpdate(task.id, { assigned_to: null }); setShowAssign(false); }}
+                className="w-full text-left text-[11px] px-2 py-1 rounded hover:bg-muted text-muted-foreground"
+              >
+                Sin asignar
+              </button>
+              {members.map((m: any) => (
+                <button
+                  key={m.user_id}
+                  onClick={() => { onUpdate(task.id, { assigned_to: m.user_id }); setShowAssign(false); }}
+                  className={cn(
+                    'w-full text-left text-[11px] px-2 py-1 rounded hover:bg-muted',
+                    task.assigned_to === m.user_id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground'
+                  )}
+                >
+                  {profiles[m.user_id] || 'Usuario'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -458,7 +491,7 @@ function TaskList({ tasks, workspaceId, pageId, onCreateTask, onUpdateTask, onDe
       </div>
       <div className="space-y-1">
         {tasks.map((task: WorkspaceTask) => (
-          <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} />
+          <TaskCard key={task.id} task={task} onUpdate={onUpdateTask} onDelete={onDeleteTask} profiles={profiles} members={members} />
         ))}
         {tasks.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">Sin tareas aún</p>
@@ -481,7 +514,7 @@ function CanvasView({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
         <Badge variant="secondary" className="text-[10px]">Pizarra</Badge>
       </div>
       <div className="flex-1 min-h-0">
-        <DrawingCanvas pageTitle={page.title} content={page.content} onSave={handleSave} />
+        <DrawingCanvas pageTitle={page.title} initialContent={page.content} onSave={handleSave} />
       </div>
     </div>
   );

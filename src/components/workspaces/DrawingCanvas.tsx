@@ -3,18 +3,18 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
   Pen, Highlighter, Eraser, Undo2, Redo2, Trash2, Maximize2, Minimize2,
-  Download, Circle, Square, Minus, Type, Pipette,
+  Download, Circle, Square, Minus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 interface DrawingCanvasProps {
   pageTitle: string;
-  content: string;
+  initialContent: string;
   onSave: (dataUrl: string) => void;
 }
 
-type Tool = 'pen' | 'highlighter' | 'eraser' | 'line' | 'rect' | 'circle' | 'text';
+type Tool = 'pen' | 'highlighter' | 'eraser' | 'line' | 'rect' | 'circle';
 
 const COLORS = [
   '#000000', '#ffffff', '#ef4444', '#f97316', '#eab308', '#22c55e',
@@ -30,7 +30,7 @@ interface HistoryEntry {
   data: ImageData;
 }
 
-export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps) {
+export function DrawingCanvas({ pageTitle, initialContent, onSave }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<Tool>('pen');
@@ -42,6 +42,10 @@ export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps
   const historyIndexRef = useRef(-1);
   const startPosRef = useRef<{ x: number; y: number } | null>(null);
   const snapshotRef = useRef<ImageData | null>(null);
+  const initializedRef = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
 
   const getCtx = useCallback(() => canvasRef.current?.getContext('2d'), []);
 
@@ -55,13 +59,24 @@ export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps
     historyIndexRef.current = historyRef.current.length - 1;
   }, [getCtx]);
 
-  // Init canvas
+  const debouncedSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      if (canvasRef.current) {
+        onSaveRef.current(canvasRef.current.toDataURL('image/png'));
+      }
+    }, 1500);
+  }, []);
+
+  // Init canvas only once per mount
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
     const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
     canvas.width = rect.width;
     canvas.height = rect.height;
 
@@ -70,18 +85,23 @@ export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Load existing content
-    if (content && content.startsWith('data:image')) {
+    if (initialContent && initialContent.startsWith('data:image')) {
       const img = new Image();
       img.onload = () => {
         ctx.drawImage(img, 0, 0);
         saveHistory();
+        initializedRef.current = true;
       };
-      img.src = content;
+      img.src = initialContent;
     } else {
       saveHistory();
+      initializedRef.current = true;
     }
-  }, [maximized]);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, []); // Only on mount
 
   const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -168,10 +188,7 @@ export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps
     if (ctx) ctx.globalCompositeOperation = 'source-over';
     snapshotRef.current = null;
     saveHistory();
-    // Autosave
-    if (canvasRef.current) {
-      onSave(canvasRef.current.toDataURL('image/png'));
-    }
+    debouncedSave();
   };
 
   const undo = () => {
@@ -179,7 +196,7 @@ export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps
     historyIndexRef.current--;
     const ctx = getCtx();
     if (ctx) ctx.putImageData(historyRef.current[historyIndexRef.current].data, 0, 0);
-    if (canvasRef.current) onSave(canvasRef.current.toDataURL('image/png'));
+    debouncedSave();
   };
 
   const redo = () => {
@@ -187,7 +204,7 @@ export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps
     historyIndexRef.current++;
     const ctx = getCtx();
     if (ctx) ctx.putImageData(historyRef.current[historyIndexRef.current].data, 0, 0);
-    if (canvasRef.current) onSave(canvasRef.current.toDataURL('image/png'));
+    debouncedSave();
   };
 
   const clearCanvas = () => {
@@ -197,7 +214,7 @@ export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     saveHistory();
-    onSave(canvas.toDataURL('image/png'));
+    debouncedSave();
   };
 
   const downloadCanvas = () => {
@@ -220,93 +237,69 @@ export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps
 
   const activeColors = tool === 'highlighter' ? HIGHLIGHTER_COLORS : COLORS;
 
-  const canvasContent = (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-border/50 bg-card flex-wrap">
-        {/* Tools */}
-        <div className="flex items-center gap-0.5 border-r border-border/30 pr-2 mr-1">
-          {tools.map(t => {
-            const Icon = t.icon;
-            return (
-              <Button
-                key={t.id}
-                variant={tool === t.id ? 'default' : 'ghost'}
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => {
-                  setTool(t.id);
-                  if (t.id === 'highlighter') setColor(HIGHLIGHTER_COLORS[0]);
-                  else if (t.id !== 'eraser' && color.startsWith('rgba')) setColor('#000000');
-                }}
-                title={t.label}
-              >
-                <Icon className="h-4 w-4" />
-              </Button>
-            );
-          })}
-        </div>
-
-        {/* Colors */}
-        <div className="flex items-center gap-0.5 border-r border-border/30 pr-2 mr-1">
-          {activeColors.map(c => (
-            <button
-              key={c}
-              onClick={() => setColor(c)}
-              className={cn(
-                'h-6 w-6 rounded-full border-2 transition-transform hover:scale-110',
-                color === c ? 'border-primary scale-110' : 'border-border/50'
-              )}
-              style={{ backgroundColor: c }}
-            />
-          ))}
-        </div>
-
-        {/* Size */}
-        <div className="flex items-center gap-2 border-r border-border/30 pr-2 mr-1 min-w-[120px]">
-          <span className="text-[10px] text-muted-foreground">Grosor</span>
-          <Slider
-            value={[size]}
-            onValueChange={v => setSize(v[0])}
-            min={1}
-            max={20}
-            step={1}
-            className="w-20"
+  const toolbar = (
+    <div className="flex items-center gap-1 px-3 py-2 border-b border-border/50 bg-card flex-wrap">
+      <div className="flex items-center gap-0.5 border-r border-border/30 pr-2 mr-1">
+        {tools.map(t => {
+          const Icon = t.icon;
+          return (
+            <Button
+              key={t.id}
+              variant={tool === t.id ? 'default' : 'ghost'}
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                setTool(t.id);
+                if (t.id === 'highlighter') setColor(HIGHLIGHTER_COLORS[0]);
+                else if (t.id !== 'eraser' && color.startsWith('rgba')) setColor('#000000');
+              }}
+              title={t.label}
+            >
+              <Icon className="h-4 w-4" />
+            </Button>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-0.5 border-r border-border/30 pr-2 mr-1">
+        {activeColors.map(c => (
+          <button
+            key={c}
+            onClick={() => setColor(c)}
+            className={cn(
+              'h-6 w-6 rounded-full border-2 transition-transform hover:scale-110',
+              color === c ? 'border-primary scale-110' : 'border-border/50'
+            )}
+            style={{ backgroundColor: c }}
           />
-          <span className="text-[10px] text-muted-foreground w-4 text-center">{size}</span>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-0.5 ml-auto">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={undo} title="Deshacer">
-            <Undo2 className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={redo} title="Rehacer">
-            <Redo2 className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearCanvas} title="Limpiar">
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={downloadCanvas} title="Descargar">
-            <Download className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMaximized(!maximized)} title={maximized ? 'Minimizar' : 'Maximizar'}>
-            {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </Button>
-        </div>
+        ))}
       </div>
-
-      {/* Canvas */}
-      <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white">
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        />
+      <div className="flex items-center gap-2 border-r border-border/30 pr-2 mr-1 min-w-[120px]">
+        <span className="text-[10px] text-muted-foreground">Grosor</span>
+        <Slider value={[size]} onValueChange={v => setSize(v[0])} min={1} max={20} step={1} className="w-20" />
+        <span className="text-[10px] text-muted-foreground w-4 text-center">{size}</span>
       </div>
+      <div className="flex items-center gap-0.5 ml-auto">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={undo} title="Deshacer"><Undo2 className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={redo} title="Rehacer"><Redo2 className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearCanvas} title="Limpiar"><Trash2 className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={downloadCanvas} title="Descargar"><Download className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMaximized(!maximized)} title={maximized ? 'Minimizar' : 'Maximizar'}>
+          {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
+      </div>
+    </div>
+  );
+
+  const canvasEl = (
+    <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white">
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      />
     </div>
   );
 
@@ -314,11 +307,19 @@ export function DrawingCanvas({ pageTitle, content, onSave }: DrawingCanvasProps
     return (
       <Dialog open={maximized} onOpenChange={setMaximized}>
         <DialogContent className="max-w-[98vw] w-[98vw] h-[95vh] p-0 overflow-hidden">
-          {canvasContent}
+          <div className="flex flex-col h-full">
+            {toolbar}
+            {canvasEl}
+          </div>
         </DialogContent>
       </Dialog>
     );
   }
 
-  return canvasContent;
+  return (
+    <div className="flex flex-col h-full">
+      {toolbar}
+      {canvasEl}
+    </div>
+  );
 }
