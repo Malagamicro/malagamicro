@@ -203,5 +203,12 @@ export function useWorkspaceDetail(workspaceId: string | null) {
     await fetchAll();
   };
 
-  return { pages, tasks, members, loading, createPage, updatePage, deletePage, createTask, updateTask, deleteTask, addMember, removeMember, refetch: fetchAll };
+  const updateMemberRole = async (memberId: string, role: string) => {
+    const { error } = await supabase.from('workspace_members').update({ role } as any).eq('id', memberId);
+    if (error) { toast.error('Error actualizando rol'); return; }
+    toast.success('Rol actualizado');
+    await fetchAll();
+  };
+
+  return { pages, tasks, members, loading, createPage, updatePage, deletePage, createTask, updateTask, deleteTask, addMember, removeMember, updateMemberRole, refetch: fetchAll };
 }
