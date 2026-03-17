@@ -280,6 +280,8 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
   const debouncedContent = useDebounce(content, 1000);
   const debouncedTitle = useDebounce(title, 1000);
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { setContent(page.content); setTitle(page.title); }, [page.id]);
 
@@ -296,6 +298,12 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
     }
   }, [debouncedTitle]);
 
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isEditing]);
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-6 pt-6 pb-2">
@@ -307,13 +315,23 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
           placeholder="Título..."
         />
         {saving && <span className="text-xs text-muted-foreground animate-pulse">Guardando...</span>}
+        <Button
+          variant={isEditing ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setIsEditing(!isEditing)}
+          className="text-xs"
+        >
+          {isEditing ? 'Vista previa' : 'Editar'}
+        </Button>
       </div>
-      <div className="flex-1 min-h-0 px-6 pb-6">
-        <textarea
-          className="w-full h-full resize-none bg-transparent border-none outline-none text-sm leading-relaxed text-foreground placeholder:text-muted-foreground font-mono"
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          placeholder="Escribe en Markdown... 
+      <div className="flex-1 min-h-0 px-6 pb-6 overflow-auto">
+        {isEditing ? (
+          <textarea
+            ref={textareaRef}
+            className="w-full h-full resize-none bg-transparent border-none outline-none text-sm leading-relaxed text-foreground placeholder:text-muted-foreground font-mono"
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="Escribe en Markdown...
 
 # Encabezado
 ## Subencabezado
@@ -322,7 +340,21 @@ function NoteEditor({ page, onUpdate }: { page: WorkspacePage; onUpdate: (id: st
 - [x] Tarea completada
 
 **Negrita** | *Cursiva* | `código`"
-        />
+          />
+        ) : (
+          <div
+            className="prose prose-sm dark:prose-invert max-w-none min-h-full cursor-text"
+            onClick={() => { if (!content?.trim()) setIsEditing(true); }}
+          >
+            {content?.trim() ? (
+              <ReactMarkdown>{content}</ReactMarkdown>
+            ) : (
+              <p className="text-muted-foreground italic cursor-pointer" onClick={() => setIsEditing(true)}>
+                Haz clic aquí o en "Editar" para empezar a escribir...
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
