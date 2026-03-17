@@ -691,6 +691,220 @@ function AIChatPage({ page, onUpdate, canEdit }: { page: WorkspacePage; onUpdate
   );
 }
 
+function TeamChatPage({ workspaceId, page, profiles, members }: { workspaceId: string; page: WorkspacePage; profiles: Record<string, string>; members: any[] }) {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 100);
+  }, []);
+
+  // Load messages
+  useEffect(() => {
+    setLoading(true);
+    supabase.from('workspace_chat_messages')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: true })
+      .limit(200)
+      .then(({ data }) => {
+        if (data) setMessages(data);
+        setLoading(false);
+        scrollToBottom();
+      });
+  }, [workspaceId, scrollToBottom]);
+
+  // Realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel(`ws-chat-${workspaceId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'workspace_chat_messages',
+        filter: `workspace_id=eq.${workspaceId}`,
+      }, (payload) => {
+        setMessages(prev => {
+          if (prev.some(m => m.id === payload.new.id)) return prev;
+          return [...prev, payload.new];
+        });
+        scrollToBottom();
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'workspace_chat_messages',
+        filter: `workspace_id=eq.${workspaceId}`,
+      }, (payload) => {
+        setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [workspaceId, scrollToBottom]);
+
+  const handleSend = async () => {
+    if (!input.trim() || !user) return;
+    const text = input.trim();
+    setInput('');
+    await supabase.from('workspace_chat_messages').insert({
+      workspace_id: workspaceId,
+      sender_id: user.id,
+      content: text,
+      message_type: 'text',
+    });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    const path = `${workspaceId}/chat/${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage.from('workspace-files').upload(path, file);
+    if (error) { toast.error('Error subiendo archivo'); return; }
+    const { data: urlData } = supabase.storage.from('workspace-files').getPublicUrl(path);
+    const isImage = file.type.startsWith('image/');
+    await supabase.from('workspace_chat_messages').insert({
+      workspace_id: workspaceId,
+      sender_id: user.id,
+      content: isImage ? '' : file.name,
+      message_type: isImage ? 'image' : 'file',
+      file_url: urlData.publicUrl,
+      file_name: file.name,
+      file_size: file.size,
+    });
+    e.target.value = '';
+  };
+
+  const formatTime = (date: string) => {
+    return new Date(date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDateSeparator = (date: string) => {
+    const d = new Date(date);
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) return 'Hoy';
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return 'Ayer';
+    return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+
+  // Group messages by date
+  const groupedMessages: { date: string; msgs: any[] }[] = [];
+  messages.forEach(msg => {
+    const dateKey = new Date(msg.created_at).toDateString();
+    const last = groupedMessages[groupedMessages.length - 1];
+    if (last && last.date === dateKey) {
+      last.msgs.push(msg);
+    } else {
+      groupedMessages.push({ date: dateKey, msgs: [msg] });
+    }
+  });
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-6 pt-4 pb-2 border-b border-border/50">
+        <span className="text-xl">💬</span>
+        <h3 className="font-semibold text-foreground flex-1">{page.title}</h3>
+        <Badge variant="secondary" className="text-[10px]">{members.length} miembros</Badge>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto">
+        <div className="p-4 space-y-1">
+          {loading && (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!loading && messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+              <MessageCircle className="h-12 w-12 text-primary/30" />
+              <p className="text-sm text-muted-foreground">No hay mensajes aún. ¡Empieza la conversación!</p>
+            </div>
+          )}
+          {groupedMessages.map(group => (
+            <div key={group.date}>
+              <div className="flex items-center gap-3 my-3">
+                <div className="flex-1 h-px bg-border/50" />
+                <span className="text-[10px] text-muted-foreground font-medium">{formatDateSeparator(group.msgs[0].created_at)}</span>
+                <div className="flex-1 h-px bg-border/50" />
+              </div>
+              {group.msgs.map(msg => {
+                const isMe = msg.sender_id === user?.id;
+                return (
+                  <div key={msg.id} className={cn('flex gap-2 mb-2', isMe ? 'flex-row-reverse' : '')}>
+                    {!isMe && (
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
+                        {(profiles[msg.sender_id] || '?')[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div className={cn('max-w-[70%] group', isMe ? 'items-end' : 'items-start')}>
+                      {!isMe && (
+                        <p className="text-[10px] text-muted-foreground mb-0.5 ml-1">{profiles[msg.sender_id] || 'Usuario'}</p>
+                      )}
+                      <div className={cn(
+                        'rounded-2xl px-3.5 py-2 text-sm relative',
+                        isMe ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-muted text-foreground rounded-bl-md'
+                      )}>
+                        {msg.message_type === 'image' && msg.file_url && (
+                          <img src={msg.file_url} alt={msg.file_name || 'imagen'} className="max-w-full max-h-60 rounded-lg mb-1" />
+                        )}
+                        {msg.message_type === 'file' && msg.file_url && (
+                          <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 underline">
+                            <Paperclip className="h-3.5 w-3.5" />
+                            <span className="truncate">{msg.file_name || 'Archivo'}</span>
+                          </a>
+                        )}
+                        {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+                        <span className={cn('text-[9px] mt-1 block', isMe ? 'text-primary-foreground/60' : 'text-muted-foreground')}>
+                          {formatTime(msg.created_at)}
+                        </span>
+                      </div>
+                      {isMe && (
+                        <button
+                          onClick={async () => {
+                            await supabase.from('workspace_chat_messages').delete().eq('id', msg.id);
+                          }}
+                          className="text-[10px] text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 mr-1 text-right block ml-auto"
+                        >
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-3 border-t border-border/50">
+        <div className="flex gap-2 items-end">
+          <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar" />
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileInputRef.current?.click()}>
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          <Input
+            placeholder="Escribe un mensaje..."
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            className="flex-1"
+          />
+          <Button onClick={handleSend} disabled={!input.trim()} className="shrink-0">
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MemberInvite({ workspaceId, existingMembers, onAdd }: { workspaceId: string; existingMembers: any[]; onAdd: (userId: string, role?: string) => void }) {
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
   const [search, setSearch] = useState('');
