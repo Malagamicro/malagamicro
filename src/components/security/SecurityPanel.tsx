@@ -114,7 +114,7 @@ export function SecurityPanel() {
     }
   };
 
-  useEffect(() => { fetchBlocks(); }, []);
+  useEffect(() => { if (user) fetchBlocks(); }, [user]);
 
   const handleUnblock = async (blockId: string) => {
     setUnlocking(blockId);
