@@ -91,6 +91,7 @@ const DEFAULT_APP_CATEGORIES: AppCategory[] = [
     items: [
       { id: 'chat-ai', label: 'Chat IA', description: 'Asistente inteligente', icon: 'Bot', color: '#8b5cf6', bgGradient: 'from-violet-500/20 to-violet-600/10', size: 1 },
       { id: 'editor', label: 'Editor IA', description: 'Documentos con IA', icon: 'FileEdit', color: '#10b981', bgGradient: 'from-emerald-500/20 to-emerald-600/10', size: 1 },
+      { id: 'workspaces', label: 'Espacios', description: 'Planificación colaborativa', icon: 'Layout', color: '#6366f1', bgGradient: 'from-indigo-500/20 to-indigo-600/10', size: 1 },
     ],
   },
   {
