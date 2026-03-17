@@ -182,7 +182,7 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 min-w-0 overflow-auto">
+        <div className={cn("flex-1 min-w-0", currentPage?.page_type === 'canvas' ? 'overflow-hidden' : 'overflow-auto')}>
           {!activePage ? (
             <EmptyState onCreatePage={() => setShowNewPage(true)} />
           ) : currentPage?.page_type === 'note' ? (
