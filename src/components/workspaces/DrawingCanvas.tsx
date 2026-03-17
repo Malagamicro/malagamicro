@@ -244,32 +244,50 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     };
   }, [pageId, getCtx, saveHistory, debouncedSave]);
 
-  const broadcastStroke = useCallback((points: StrokePoint[]) => {
-    if (!pageId || points.length < 2) return;
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Get or reuse the channel reference for sending
+  const getChannel = useCallback(() => {
+    if (!pageId) return null;
+    if (!channelRef.current) {
+      channelRef.current = supabase.channel(`canvas-${pageId}`);
+    }
+    return channelRef.current;
+  }, [pageId]);
+
+  const broadcastDrawPoint = useCallback((from: StrokePoint, to: StrokePoint) => {
+    const ch = getChannel();
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    supabase.channel(`canvas-${pageId}`).send({
+    if (!ch || !canvas) return;
+    ch.send({
+      type: 'broadcast',
+      event: 'draw_point',
+      payload: { tool, color, size, from, to, canvasW: canvas.width, canvasH: canvas.height } as BroadcastDrawPoint,
+    });
+  }, [getChannel, tool, color, size]);
+
+  const broadcastStrokeEnd = useCallback(() => {
+    const ch = getChannel();
+    if (!ch) return;
+    ch.send({ type: 'broadcast', event: 'stroke_end', payload: {} });
+  }, [getChannel]);
+
+  const broadcastShapeStroke = useCallback((points: StrokePoint[]) => {
+    const ch = getChannel();
+    const canvas = canvasRef.current;
+    if (!ch || !canvas || points.length < 2) return;
+    ch.send({
       type: 'broadcast',
       event: 'stroke',
-      payload: {
-        tool,
-        color,
-        size,
-        points,
-        canvasW: canvas.width,
-        canvasH: canvas.height,
-      } as BroadcastStroke,
+      payload: { tool, color, size, points, canvasW: canvas.width, canvasH: canvas.height } as BroadcastStroke,
     });
-  }, [pageId, tool, color, size]);
+  }, [getChannel, tool, color, size]);
 
   const broadcastClear = useCallback(() => {
-    if (!pageId) return;
-    supabase.channel(`canvas-${pageId}`).send({
-      type: 'broadcast',
-      event: 'clear',
-      payload: {},
-    });
-  }, [pageId]);
+    const ch = getChannel();
+    if (!ch) return;
+    ch.send({ type: 'broadcast', event: 'clear', payload: {} });
+  }, [getChannel]);
 
   const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -289,64 +307,6 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
       x: (touch.clientX - rect.left) * (canvas.width / rect.width),
       y: (touch.clientY - rect.top) * (canvas.height / rect.height),
     };
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    if (!touch) return;
-    const ctx = getCtx();
-    const canvas = canvasRef.current;
-    if (!ctx || !canvas) return;
-    setIsDrawing(true);
-    const pos = getTouchPos(touch);
-    startPosRef.current = pos;
-    currentStrokeRef.current = [pos];
-    if (['line', 'rect', 'circle'].includes(tool)) {
-      snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    } else {
-      configureCtx(ctx);
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    const touch = e.touches[0];
-    if (!touch) return;
-    const ctx = getCtx();
-    const canvas = canvasRef.current;
-    if (!ctx || !canvas) return;
-    const pos = getTouchPos(touch);
-    currentStrokeRef.current.push(pos);
-    if (['line', 'rect', 'circle'].includes(tool) && snapshotRef.current && startPosRef.current) {
-      ctx.putImageData(snapshotRef.current, 0, 0);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = color;
-      ctx.lineWidth = size;
-      ctx.beginPath();
-      const s = startPosRef.current;
-      if (tool === 'line') {
-        ctx.moveTo(s.x, s.y); ctx.lineTo(pos.x, pos.y);
-      } else if (tool === 'rect') {
-        ctx.rect(s.x, s.y, pos.x - s.x, pos.y - s.y);
-      } else if (tool === 'circle') {
-        const rx = Math.abs(pos.x - s.x) / 2;
-        const ry = Math.abs(pos.y - s.y) / 2;
-        ctx.ellipse(s.x + (pos.x - s.x) / 2, s.y + (pos.y - s.y) / 2, rx, ry, 0, 0, Math.PI * 2);
-      }
-      ctx.stroke();
-    } else {
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    handleMouseUp();
   };
 
   const configureCtx = (ctx: CanvasRenderingContext2D) => {
@@ -391,6 +351,7 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     const canvas = canvasRef.current;
     if (!ctx || !canvas) return;
     const pos = getPos(e);
+    const prevPos = currentStrokeRef.current[currentStrokeRef.current.length - 1];
     currentStrokeRef.current.push(pos);
 
     if (['line', 'rect', 'circle'].includes(tool) && snapshotRef.current && startPosRef.current) {
@@ -416,7 +377,69 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     } else {
       ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
+      // Broadcast each point in real-time for freehand tools
+      if (prevPos) broadcastDrawPoint(prevPos, pos);
     }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    const ctx = getCtx();
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+    setIsDrawing(true);
+    const pos = getTouchPos(touch);
+    startPosRef.current = pos;
+    currentStrokeRef.current = [pos];
+    if (['line', 'rect', 'circle'].includes(tool)) {
+      snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    } else {
+      configureCtx(ctx);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const ctx = getCtx();
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+    const pos = getTouchPos(touch);
+    const prevPos = currentStrokeRef.current[currentStrokeRef.current.length - 1];
+    currentStrokeRef.current.push(pos);
+    if (['line', 'rect', 'circle'].includes(tool) && snapshotRef.current && startPosRef.current) {
+      ctx.putImageData(snapshotRef.current, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size;
+      ctx.beginPath();
+      const s = startPosRef.current;
+      if (tool === 'line') {
+        ctx.moveTo(s.x, s.y); ctx.lineTo(pos.x, pos.y);
+      } else if (tool === 'rect') {
+        ctx.rect(s.x, s.y, pos.x - s.x, pos.y - s.y);
+      } else if (tool === 'circle') {
+        const rx = Math.abs(pos.x - s.x) / 2;
+        const ry = Math.abs(pos.y - s.y) / 2;
+        ctx.ellipse(s.x + (pos.x - s.x) / 2, s.y + (pos.y - s.y) / 2, rx, ry, 0, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    } else {
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      if (prevPos) broadcastDrawPoint(prevPos, pos);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    handleMouseUp();
   };
 
   const handleMouseUp = () => {
@@ -426,8 +449,12 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     if (ctx) ctx.globalCompositeOperation = 'source-over';
     snapshotRef.current = null;
 
-    // Broadcast the completed stroke
-    broadcastStroke(currentStrokeRef.current);
+    // For shapes, broadcast the complete shape; for freehand, just signal end
+    if (['line', 'rect', 'circle'].includes(tool)) {
+      broadcastShapeStroke(currentStrokeRef.current);
+    } else {
+      broadcastStrokeEnd();
+    }
     currentStrokeRef.current = [];
 
     saveHistory();
