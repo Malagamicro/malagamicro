@@ -44,6 +44,7 @@ import { AppsHub } from '@/components/apps/AppsHub';
 import { GeneralRemindersList } from '@/components/reminders/GeneralRemindersList';
 import { SeoArticleGenerator } from '@/components/seo/SeoArticleGenerator';
 import { N8nIntegrationPage } from '@/components/n8n/N8nIntegrationPage';
+import { WorkspacesModule } from '@/components/workspaces/WorkspacesModule';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { SeoArticleCard } from '@/components/seo/SeoArticleCard';
 import { SeoArticleViewer } from '@/components/seo/SeoArticleViewer';
@@ -551,6 +552,8 @@ const IndexContent = () => {
             </div>
           </div>
         );
+      case 'workspaces':
+        return <WorkspacesModule onBack={goApps} />;
       case 'correo':
         return (
           <div className="flex flex-col animate-fade-in h-full">
