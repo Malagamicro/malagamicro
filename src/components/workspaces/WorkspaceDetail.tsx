@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import {
   ArrowLeft, Plus, FileText, Layout, ListChecks, Palette, Trash2,
   Users, Save, CheckCircle2, Circle, Clock, AlertTriangle, ChevronRight,
-  UserPlus, X, Bot, FolderOpen, Shield, Eye, Pencil,
+  UserPlus, X, Bot, FolderOpen, Shield, Eye, Pencil, Loader2, Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from '@/hooks/useDebounce';
