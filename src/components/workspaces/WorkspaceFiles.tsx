@@ -386,44 +386,102 @@ function ImagePreview({ url, alt }: { url: string; alt: string }) {
 function PdfPreview({ url }: { url: string }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [useIframe, setUseIframe] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pdfDocRef = useRef<any>(null);
 
-  // Use iframe with page parameter for simplicity and reliability
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-center gap-3 py-2 border-b border-border/50">
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8"
-          disabled={currentPage <= 1}
-          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          Página {currentPage}
-        </span>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => setCurrentPage(p => p + 1)}
-        >
-          <ChevronRightIcon className="h-4 w-4" />
-        </Button>
+  // Load PDF document
+  useEffect(() => {
+    let cancelled = false;
+    const loadPdf = async () => {
+      try {
+        setLoading(true);
+        setError(false);
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+        const loadingTask = pdfjsLib.getDocument(url);
+        const pdf = await loadingTask.promise;
+        if (cancelled) return;
+        pdfDocRef.current = pdf;
+        setTotalPages(pdf.numPages);
+        setCurrentPage(1);
+      } catch (err) {
+        console.error('PDF load error:', err);
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    loadPdf();
+    return () => { cancelled = true; };
+  }, [url]);
+
+  // Render current page
+  useEffect(() => {
+    const pdf = pdfDocRef.current;
+    const canvas = canvasRef.current;
+    if (!pdf || !canvas) return;
+    let cancelled = false;
+    const renderPage = async () => {
+      try {
+        const page = await pdf.getPage(currentPage);
+        if (cancelled) return;
+        const scale = 1.5;
+        const viewport = page.getViewport({ scale });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+      } catch (err) {
+        console.error('PDF render error:', err);
+      }
+    };
+    renderPage();
+    return () => { cancelled = true; };
+  }, [currentPage, loading]);
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-4">
+        <FileText className="h-12 w-12 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">No se pudo cargar el PDF</p>
         <a href={url} download target="_blank" rel="noopener noreferrer">
           <Button variant="outline" size="sm" className="gap-1.5 text-xs">
             <Download className="h-3.5 w-3.5" /> Descargar PDF
           </Button>
         </a>
       </div>
-      <div className="flex-1 min-h-[500px]">
-        <iframe
-          src={`${url}#page=${currentPage}`}
-          className="w-full h-full min-h-[500px] border-0 rounded-lg"
-          title="PDF Preview"
-        />
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-center gap-3 py-2 border-b border-border/50">
+        <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          Página {currentPage} de {totalPages}
+        </span>
+        <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>
+          <ChevronRightIcon className="h-4 w-4" />
+        </Button>
+        <a href={url} download target="_blank" rel="noopener noreferrer">
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+            <Download className="h-3.5 w-3.5" /> Descargar
+          </Button>
+        </a>
+      </div>
+      <div className="flex-1 min-h-[500px] overflow-auto flex items-start justify-center p-4 bg-muted/30">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+          </div>
+        ) : (
+          <canvas ref={canvasRef} className="max-w-full shadow-lg rounded" style={{ objectFit: 'contain' }} />
+        )}
       </div>
     </div>
   );
