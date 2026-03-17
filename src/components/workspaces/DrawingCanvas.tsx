@@ -149,12 +149,17 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     const channel = supabase.channel(channelName);
 
     channel
-      .on('broadcast', { event: 'stroke' }, ({ payload }: { payload: BroadcastStroke }) => {
+      .on('broadcast', { event: 'stroke_start' }, ({ payload }: { payload: BroadcastStrokeStart }) => {
         const ctx = getCtx();
         const canvas = canvasRef.current;
-        if (!ctx || !canvas || !payload || payload.points.length < 2) return;
+        if (!ctx || !canvas || !payload) return;
+        // Just mark the start — actual drawing happens on draw_point
+      })
+      .on('broadcast', { event: 'draw_point' }, ({ payload }: { payload: BroadcastDrawPoint }) => {
+        const ctx = getCtx();
+        const canvas = canvasRef.current;
+        if (!ctx || !canvas || !payload) return;
 
-        // Scale from sender's logical coords to ours (should be same LOGICAL_W/H)
         const scaleX = canvas.width / payload.canvasW;
         const scaleY = canvas.height / payload.canvasH;
 
@@ -176,32 +181,49 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
           ctx.lineWidth = payload.size;
         }
 
-        if (['line', 'rect', 'circle'].includes(payload.tool) && payload.points.length >= 2) {
-          const s = payload.points[0];
-          const e = payload.points[payload.points.length - 1];
-          ctx.beginPath();
-          if (payload.tool === 'line') {
-            ctx.moveTo(s.x * scaleX, s.y * scaleY);
-            ctx.lineTo(e.x * scaleX, e.y * scaleY);
-          } else if (payload.tool === 'rect') {
-            ctx.rect(s.x * scaleX, s.y * scaleY, (e.x - s.x) * scaleX, (e.y - s.y) * scaleY);
-          } else if (payload.tool === 'circle') {
-            const rx = Math.abs(e.x - s.x) / 2 * scaleX;
-            const ry = Math.abs(e.y - s.y) / 2 * scaleY;
-            const cx = (s.x + (e.x - s.x) / 2) * scaleX;
-            const cy = (s.y + (e.y - s.y) / 2) * scaleY;
-            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-          }
-          ctx.stroke();
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(payload.points[0].x * scaleX, payload.points[0].y * scaleY);
-          for (let i = 1; i < payload.points.length; i++) {
-            ctx.lineTo(payload.points[i].x * scaleX, payload.points[i].y * scaleY);
-          }
-          ctx.stroke();
-        }
+        ctx.beginPath();
+        ctx.moveTo(payload.from.x * scaleX, payload.from.y * scaleY);
+        ctx.lineTo(payload.to.x * scaleX, payload.to.y * scaleY);
+        ctx.stroke();
+        ctx.restore();
+      })
+      .on('broadcast', { event: 'stroke_end' }, () => {
+        // Remote stroke finished — save history snapshot
+        saveHistory();
+        debouncedSave();
+      })
+      .on('broadcast', { event: 'stroke' }, ({ payload }: { payload: BroadcastStroke }) => {
+        // Shape strokes (line/rect/circle) still sent as complete strokes
+        const ctx = getCtx();
+        const canvas = canvasRef.current;
+        if (!ctx || !canvas || !payload || payload.points.length < 2) return;
 
+        const scaleX = canvas.width / payload.canvasW;
+        const scaleY = canvas.height / payload.canvasH;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = payload.color;
+        ctx.lineWidth = payload.size;
+
+        const s = payload.points[0];
+        const e = payload.points[payload.points.length - 1];
+        ctx.beginPath();
+        if (payload.tool === 'line') {
+          ctx.moveTo(s.x * scaleX, s.y * scaleY);
+          ctx.lineTo(e.x * scaleX, e.y * scaleY);
+        } else if (payload.tool === 'rect') {
+          ctx.rect(s.x * scaleX, s.y * scaleY, (e.x - s.x) * scaleX, (e.y - s.y) * scaleY);
+        } else if (payload.tool === 'circle') {
+          const rx = Math.abs(e.x - s.x) / 2 * scaleX;
+          const ry = Math.abs(e.y - s.y) / 2 * scaleY;
+          const cx = (s.x + (e.x - s.x) / 2) * scaleX;
+          const cy = (s.y + (e.y - s.y) / 2) * scaleY;
+          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        }
+        ctx.stroke();
         ctx.restore();
         saveHistory();
         debouncedSave();
