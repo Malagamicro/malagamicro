@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -240,6 +240,74 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     };
   };
 
+  const getTouchPos = (touch: React.Touch) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+      y: (touch.clientY - rect.top) * (canvas.height / rect.height),
+    };
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    const ctx = getCtx();
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+    setIsDrawing(true);
+    const pos = getTouchPos(touch);
+    startPosRef.current = pos;
+    currentStrokeRef.current = [pos];
+    if (['line', 'rect', 'circle'].includes(tool)) {
+      snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    } else {
+      configureCtx(ctx);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const ctx = getCtx();
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+    const pos = getTouchPos(touch);
+    currentStrokeRef.current.push(pos);
+    if (['line', 'rect', 'circle'].includes(tool) && snapshotRef.current && startPosRef.current) {
+      ctx.putImageData(snapshotRef.current, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size;
+      ctx.beginPath();
+      const s = startPosRef.current;
+      if (tool === 'line') {
+        ctx.moveTo(s.x, s.y); ctx.lineTo(pos.x, pos.y);
+      } else if (tool === 'rect') {
+        ctx.rect(s.x, s.y, pos.x - s.x, pos.y - s.y);
+      } else if (tool === 'circle') {
+        const rx = Math.abs(pos.x - s.x) / 2;
+        const ry = Math.abs(pos.y - s.y) / 2;
+        ctx.ellipse(s.x + (pos.x - s.x) / 2, s.y + (pos.y - s.y) / 2, rx, ry, 0, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    } else {
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    handleMouseUp();
+  };
+
   const configureCtx = (ctx: CanvasRenderingContext2D) => {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -431,28 +499,21 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
       maximized ? "fixed inset-0 z-[9999] bg-background" : "h-full"
     )}>
       {toolbar}
-      <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white flex items-center justify-center" style={{ isolation: 'isolate' }}>
+      <div ref={containerRef} className="flex-1 min-h-0 relative cursor-crosshair bg-white overflow-hidden" style={{ isolation: 'isolate' }}>
         <canvas
           ref={canvasRef}
-          className="max-w-full max-h-full"
-          style={{ objectFit: 'contain' }}
+          style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         />
       </div>
     </div>
   );
-
-  if (maximized) {
-    return (
-      <>
-        <div className="flex flex-col h-full" />
-        {createPortal(content, document.body)}
-      </>
-    );
-  }
 
   return content;
 }
