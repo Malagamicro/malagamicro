@@ -205,6 +205,8 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
             <CanvasView page={currentPage} onUpdate={updatePage} canEdit={canEdit} />
           ) : currentPage?.page_type === 'files' ? (
             <WorkspaceFiles workspaceId={workspaceId} userRole={userRole} />
+          ) : currentPage?.page_type === 'ai_chat' ? (
+            <AIChatPage page={currentPage} workspaceId={workspaceId} onUpdate={updatePage} canEdit={canEdit} />
           ) : null}
         </div>
 
