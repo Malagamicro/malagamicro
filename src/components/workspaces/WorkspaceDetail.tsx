@@ -124,6 +124,14 @@ export function WorkspaceDetail({ workspaceId, onBack }: WorkspaceDetailProps) {
         <span className="text-xl">{workspace?.icon || '📋'}</span>
         <h2 className="font-semibold text-foreground truncate">{workspace?.name || 'Espacio'}</h2>
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant={showAIChat ? 'default' : 'outline'}
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => setShowAIChat(!showAIChat)}
+          >
+            <Bot className="h-3.5 w-3.5" /> Chat IA
+          </Button>
           <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setShowMembers(true)}>
             <Users className="h-3.5 w-3.5" /> {members.length} miembros
           </Button>
