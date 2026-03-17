@@ -551,6 +551,8 @@ const IndexContent = () => {
             </div>
           </div>
         );
+      case 'workspaces':
+        return <WorkspacesModule onBack={goApps} />;
       case 'correo':
         return (
           <div className="flex flex-col animate-fade-in h-full">
