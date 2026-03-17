@@ -547,6 +547,146 @@ function CanvasView({ page, onUpdate, canEdit }: { page: WorkspacePage; onUpdate
   );
 }
 
+function AIChatPage({ page, workspaceId, onUpdate, canEdit }: { page: WorkspacePage; onUpdate: (id: string, u: any) => Promise<void>; canEdit: boolean }) {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState(page.content || 'Eres un asistente IA útil.');
+  const [editingPrompt, setEditingPrompt] = useState(false);
+  const [model, setModel] = useState('openrouter/hunter-alpha');
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const debouncedPrompt = useDebounce(systemPrompt, 1500);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
+  useEffect(() => {
+    setSystemPrompt(page.content || 'Eres un asistente IA útil.');
+    setMessages([]);
+  }, [page.id]);
+
+  useEffect(() => {
+    if (debouncedPrompt !== page.content && canEdit) {
+      onUpdate(page.id, { content: debouncedPrompt });
+    }
+  }, [debouncedPrompt]);
+
+  const handleSend = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = { role: 'user' as const, content: input.trim() };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
+    setInput('');
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('workspace-ai-chat', {
+        body: { messages: newMessages, model, systemPrompt },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setMessages(prev => [...prev, { role: 'assistant', content: data.content || 'Sin respuesta' }]);
+    } catch {
+      toast.error('Error al consultar la IA');
+      setMessages(prev => [...prev, { role: 'assistant', content: '❌ Error al procesar tu mensaje.' }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const AI_MODELS = [
+    { value: 'openrouter/hunter-alpha', label: 'Hunter Alpha' },
+    { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { value: 'openai/gpt-5-mini', label: 'GPT-5 Mini' },
+    { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  ];
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-6 pt-4 pb-2 border-b border-border/50">
+        <span className="text-xl">🤖</span>
+        <h3 className="font-semibold text-foreground flex-1">{page.title}</h3>
+        <Select value={model} onValueChange={setModel}>
+          <SelectTrigger className="h-7 w-40 text-[11px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {AI_MODELS.map(m => (
+              <SelectItem key={m.value} value={m.value} className="text-xs">{m.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {canEdit && (
+          <Button variant="outline" size="sm" className="text-[11px] h-7" onClick={() => setEditingPrompt(!editingPrompt)}>
+            {editingPrompt ? 'Ocultar prompt' : 'System prompt'}
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" className="text-[11px] h-7" onClick={() => setMessages([])}>
+          Limpiar
+        </Button>
+      </div>
+
+      {editingPrompt && canEdit && (
+        <div className="px-6 py-3 border-b border-border/30 bg-muted/30">
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">System Prompt (instrucciones para la IA)</p>
+          <Textarea
+            value={systemPrompt}
+            onChange={e => setSystemPrompt(e.target.value)}
+            className="text-xs min-h-[80px] resize-none"
+            placeholder="Eres un asistente especializado en..."
+          />
+        </div>
+      )}
+
+      <ScrollArea className="flex-1 min-h-0">
+        <div ref={scrollRef} className="p-4 space-y-3">
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+              <Bot className="h-12 w-12 text-primary/30" />
+              <p className="text-sm text-muted-foreground max-w-xs">
+                Chat IA con prompt personalizado. {canEdit ? 'Configura el system prompt para especializar la IA.' : ''}
+              </p>
+            </div>
+          )}
+          {messages.map((msg, i) => (
+            <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+              <div className={cn(
+                'max-w-[75%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed',
+                msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
+              )}>
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-muted rounded-xl px-3 py-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      <div className="p-4 border-t border-border/50">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Escribe tu mensaje..."
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            disabled={loading}
+          />
+          <Button onClick={handleSend} disabled={loading || !input.trim()}>
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MemberInvite({ workspaceId, existingMembers, onAdd }: { workspaceId: string; existingMembers: any[]; onAdd: (userId: string, role?: string) => void }) {
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
   const [search, setSearch] = useState('');
