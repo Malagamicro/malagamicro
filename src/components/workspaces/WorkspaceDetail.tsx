@@ -35,6 +35,7 @@ const PAGE_TYPES = [
   { value: 'tasks', label: 'Tareas', icon: '✅', lucide: ListChecks },
   { value: 'canvas', label: 'Pizarra', icon: '🎨', lucide: Palette },
   { value: 'files', label: 'Archivos', icon: '📁', lucide: FolderOpen },
+  { value: 'ai_chat', label: 'Chat IA', icon: '🤖', lucide: Bot },
 ];
 
 const TASK_STATUSES = [
