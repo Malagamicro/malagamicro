@@ -1,73 +1,93 @@
-# Welcome to your Lovable project
+# MalagaMicro CRM 🚀
 
-## Project info
+MalagaMicro CRM es un sistema integral avanzado de gestión de clientes y prospectos. Está diseñado para unificar la atención al cliente, campañas de marketing, gestión de embudos de ventas, presupuestos y comunicaciones a través de múltiples canales.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Adicionalmente, el sistema integra módulos de inteligencia artificial (generación SEO, agentes asistentes), automatizaciones con n8n, y conexiones con ERPs y sistemas de tickets externos (osTicket, StelOrder).
 
-## How can I edit this code?
+## 📚 Documentación Completa
+> [!IMPORTANT]
+> Si eres un desarrollador nuevo en la empresa o un arquitecto, por favor revisa la **[Documentación Técnica Maestra](./documentacion_proyecto/DOCUMENTACION_MAESTRA.md)**.
+>
+> Dicho documento contiene:
+> * Arquitectura detallada.
+> * Diccionario de funciones y módulos Core (Auth, Leads, UI).
+> * Flujos de datos completos.
+> * Puntos de mejora a nivel de código y seguridad identificados.
 
-There are several ways of editing your application.
+---
 
-**Use Lovable**
+## 🛠️ Stack Tecnológico Principal
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Frontend
+- **React 18** (Vite + SWC)
+- **TypeScript** (Tipado estricto)
+- **Tailwind CSS** + **shadcn/ui** (Estilado y Componentes UI Base)
+- **React Router v6** (Enrutamiento del lado del cliente)
+- **TanStack Query (React Query)** (Gestión de estado asíncrono y fetching)
 
-Changes made via Lovable will be committed automatically to this repo.
+### Backend (BaaS)
+- **Supabase** (Autenticación, Base de datos PostgreSQL, Realtime)
+- **Supabase Edge Functions** (Funciones serverless en Deno para IA, envíos de WhatsApp, Webhooks y llamadas a APIs de terceros)
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 💻 Instalación y Desarrollo Local
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerrequisitos
+Asegúrate de contar con:
+- [Node.js](https://nodejs.org/) (v18 o superior)
+- `npm` (o bien `yarn`, `pnpm`, `bun`).
+- Un proyecto configurado en [Supabase](https://supabase.com/).
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### Paso 1: Clonar e Instalar
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd vite_react_shadcn_ts
+npm install
 ```
 
-**Edit a file directly in GitHub**
+### Paso 2: Variables de Entorno
+Crea un archivo `.env` en el directorio raíz usando como referencia el archivo `.env.example` (si existe), o configura manualmente las variables:
+```env
+VITE_SUPABASE_URL=https://TU_PROYECTO.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=ey...
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Paso 3: Arrancar el Servidor
+Inicia el entorno de desarrollo con Hot Module Replacement (HMR):
+```bash
+npm run dev &
+```
+La aplicación se servirá por defecto en `http://localhost:8080`.
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🏗️ Estructura del Proyecto
 
-## What technologies are used for this project?
+* `/src`: Código principal de React.
+  * `/components`: Componentes reutilizables, agrupados por dominio de negocio (leads, chat, auth, ui).
+  * `/pages`: Vistas o pantallas principales (rutas de React Router).
+  * `/hooks`: Lógica de React hooks custom (ej. `useAuth`, fetching de consultas).
+  * `/integrations`: Configuración del cliente y tipos para Supabase.
+* `/supabase/functions`: Funciones serverless escritas en Deno.
+* `/documentacion_proyecto`: Documentación extensa e informes de arquitectura técnica.
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🧪 Comandos Útiles
 
-## How can I deploy this project?
+* `npm run dev &`: Levantar entorno local en background.
+* `npm run build`: Generar el build de producción en la carpeta `dist`.
+* `npm run lint`: Analizar el código con ESLint y reportar problemas.
+* `npm run test`: Ejecutar la batería de tests mediante Vitest.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
+## 🤝 Contribuciones y Estándares
+Para mantener una alta calidad de código:
+1. Asegúrate de tipar estrictamente con TypeScript y evitar el uso generalizado de `any`.
+2. Las llamadas de base de datos directas o lógica de negocio que comprometa seguridad debe aislarse en **Supabase Edge Functions** o mediante **RLS (Row Level Security)** de Supabase.
+3. Actualiza siempre la *Documentación Maestra* en `documentacion_proyecto` ante la creación de módulos significativos.
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+---
+_Creado para escalar las operaciones y ventas del equipo MalagaMicro._
