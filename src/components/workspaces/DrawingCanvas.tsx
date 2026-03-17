@@ -32,6 +32,25 @@ interface BroadcastStroke {
   canvasH: number;
 }
 
+interface BroadcastDrawPoint {
+  tool: Tool;
+  color: string;
+  size: number;
+  from: StrokePoint;
+  to: StrokePoint;
+  canvasW: number;
+  canvasH: number;
+}
+
+interface BroadcastStrokeStart {
+  tool: Tool;
+  color: string;
+  size: number;
+  point: StrokePoint;
+  canvasW: number;
+  canvasH: number;
+}
+
 const COLORS = [
   '#000000', '#ffffff', '#ef4444', '#f97316', '#eab308', '#22c55e',
   '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280',
@@ -130,12 +149,17 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     const channel = supabase.channel(channelName);
 
     channel
-      .on('broadcast', { event: 'stroke' }, ({ payload }: { payload: BroadcastStroke }) => {
+      .on('broadcast', { event: 'stroke_start' }, ({ payload }: { payload: BroadcastStrokeStart }) => {
         const ctx = getCtx();
         const canvas = canvasRef.current;
-        if (!ctx || !canvas || !payload || payload.points.length < 2) return;
+        if (!ctx || !canvas || !payload) return;
+        // Just mark the start — actual drawing happens on draw_point
+      })
+      .on('broadcast', { event: 'draw_point' }, ({ payload }: { payload: BroadcastDrawPoint }) => {
+        const ctx = getCtx();
+        const canvas = canvasRef.current;
+        if (!ctx || !canvas || !payload) return;
 
-        // Scale from sender's logical coords to ours (should be same LOGICAL_W/H)
         const scaleX = canvas.width / payload.canvasW;
         const scaleY = canvas.height / payload.canvasH;
 
@@ -157,32 +181,49 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
           ctx.lineWidth = payload.size;
         }
 
-        if (['line', 'rect', 'circle'].includes(payload.tool) && payload.points.length >= 2) {
-          const s = payload.points[0];
-          const e = payload.points[payload.points.length - 1];
-          ctx.beginPath();
-          if (payload.tool === 'line') {
-            ctx.moveTo(s.x * scaleX, s.y * scaleY);
-            ctx.lineTo(e.x * scaleX, e.y * scaleY);
-          } else if (payload.tool === 'rect') {
-            ctx.rect(s.x * scaleX, s.y * scaleY, (e.x - s.x) * scaleX, (e.y - s.y) * scaleY);
-          } else if (payload.tool === 'circle') {
-            const rx = Math.abs(e.x - s.x) / 2 * scaleX;
-            const ry = Math.abs(e.y - s.y) / 2 * scaleY;
-            const cx = (s.x + (e.x - s.x) / 2) * scaleX;
-            const cy = (s.y + (e.y - s.y) / 2) * scaleY;
-            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-          }
-          ctx.stroke();
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(payload.points[0].x * scaleX, payload.points[0].y * scaleY);
-          for (let i = 1; i < payload.points.length; i++) {
-            ctx.lineTo(payload.points[i].x * scaleX, payload.points[i].y * scaleY);
-          }
-          ctx.stroke();
-        }
+        ctx.beginPath();
+        ctx.moveTo(payload.from.x * scaleX, payload.from.y * scaleY);
+        ctx.lineTo(payload.to.x * scaleX, payload.to.y * scaleY);
+        ctx.stroke();
+        ctx.restore();
+      })
+      .on('broadcast', { event: 'stroke_end' }, () => {
+        // Remote stroke finished — save history snapshot
+        saveHistory();
+        debouncedSave();
+      })
+      .on('broadcast', { event: 'stroke' }, ({ payload }: { payload: BroadcastStroke }) => {
+        // Shape strokes (line/rect/circle) still sent as complete strokes
+        const ctx = getCtx();
+        const canvas = canvasRef.current;
+        if (!ctx || !canvas || !payload || payload.points.length < 2) return;
 
+        const scaleX = canvas.width / payload.canvasW;
+        const scaleY = canvas.height / payload.canvasH;
+
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = payload.color;
+        ctx.lineWidth = payload.size;
+
+        const s = payload.points[0];
+        const e = payload.points[payload.points.length - 1];
+        ctx.beginPath();
+        if (payload.tool === 'line') {
+          ctx.moveTo(s.x * scaleX, s.y * scaleY);
+          ctx.lineTo(e.x * scaleX, e.y * scaleY);
+        } else if (payload.tool === 'rect') {
+          ctx.rect(s.x * scaleX, s.y * scaleY, (e.x - s.x) * scaleX, (e.y - s.y) * scaleY);
+        } else if (payload.tool === 'circle') {
+          const rx = Math.abs(e.x - s.x) / 2 * scaleX;
+          const ry = Math.abs(e.y - s.y) / 2 * scaleY;
+          const cx = (s.x + (e.x - s.x) / 2) * scaleX;
+          const cy = (s.y + (e.y - s.y) / 2) * scaleY;
+          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        }
+        ctx.stroke();
         ctx.restore();
         saveHistory();
         debouncedSave();
@@ -203,32 +244,50 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     };
   }, [pageId, getCtx, saveHistory, debouncedSave]);
 
-  const broadcastStroke = useCallback((points: StrokePoint[]) => {
-    if (!pageId || points.length < 2) return;
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Get or reuse the channel reference for sending
+  const getChannel = useCallback(() => {
+    if (!pageId) return null;
+    if (!channelRef.current) {
+      channelRef.current = supabase.channel(`canvas-${pageId}`);
+    }
+    return channelRef.current;
+  }, [pageId]);
+
+  const broadcastDrawPoint = useCallback((from: StrokePoint, to: StrokePoint) => {
+    const ch = getChannel();
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    supabase.channel(`canvas-${pageId}`).send({
+    if (!ch || !canvas) return;
+    ch.send({
+      type: 'broadcast',
+      event: 'draw_point',
+      payload: { tool, color, size, from, to, canvasW: canvas.width, canvasH: canvas.height } as BroadcastDrawPoint,
+    });
+  }, [getChannel, tool, color, size]);
+
+  const broadcastStrokeEnd = useCallback(() => {
+    const ch = getChannel();
+    if (!ch) return;
+    ch.send({ type: 'broadcast', event: 'stroke_end', payload: {} });
+  }, [getChannel]);
+
+  const broadcastShapeStroke = useCallback((points: StrokePoint[]) => {
+    const ch = getChannel();
+    const canvas = canvasRef.current;
+    if (!ch || !canvas || points.length < 2) return;
+    ch.send({
       type: 'broadcast',
       event: 'stroke',
-      payload: {
-        tool,
-        color,
-        size,
-        points,
-        canvasW: canvas.width,
-        canvasH: canvas.height,
-      } as BroadcastStroke,
+      payload: { tool, color, size, points, canvasW: canvas.width, canvasH: canvas.height } as BroadcastStroke,
     });
-  }, [pageId, tool, color, size]);
+  }, [getChannel, tool, color, size]);
 
   const broadcastClear = useCallback(() => {
-    if (!pageId) return;
-    supabase.channel(`canvas-${pageId}`).send({
-      type: 'broadcast',
-      event: 'clear',
-      payload: {},
-    });
-  }, [pageId]);
+    const ch = getChannel();
+    if (!ch) return;
+    ch.send({ type: 'broadcast', event: 'clear', payload: {} });
+  }, [getChannel]);
 
   const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -248,64 +307,6 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
       x: (touch.clientX - rect.left) * (canvas.width / rect.width),
       y: (touch.clientY - rect.top) * (canvas.height / rect.height),
     };
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    if (!touch) return;
-    const ctx = getCtx();
-    const canvas = canvasRef.current;
-    if (!ctx || !canvas) return;
-    setIsDrawing(true);
-    const pos = getTouchPos(touch);
-    startPosRef.current = pos;
-    currentStrokeRef.current = [pos];
-    if (['line', 'rect', 'circle'].includes(tool)) {
-      snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    } else {
-      configureCtx(ctx);
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    const touch = e.touches[0];
-    if (!touch) return;
-    const ctx = getCtx();
-    const canvas = canvasRef.current;
-    if (!ctx || !canvas) return;
-    const pos = getTouchPos(touch);
-    currentStrokeRef.current.push(pos);
-    if (['line', 'rect', 'circle'].includes(tool) && snapshotRef.current && startPosRef.current) {
-      ctx.putImageData(snapshotRef.current, 0, 0);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = color;
-      ctx.lineWidth = size;
-      ctx.beginPath();
-      const s = startPosRef.current;
-      if (tool === 'line') {
-        ctx.moveTo(s.x, s.y); ctx.lineTo(pos.x, pos.y);
-      } else if (tool === 'rect') {
-        ctx.rect(s.x, s.y, pos.x - s.x, pos.y - s.y);
-      } else if (tool === 'circle') {
-        const rx = Math.abs(pos.x - s.x) / 2;
-        const ry = Math.abs(pos.y - s.y) / 2;
-        ctx.ellipse(s.x + (pos.x - s.x) / 2, s.y + (pos.y - s.y) / 2, rx, ry, 0, 0, Math.PI * 2);
-      }
-      ctx.stroke();
-    } else {
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    handleMouseUp();
   };
 
   const configureCtx = (ctx: CanvasRenderingContext2D) => {
@@ -350,6 +351,7 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     const canvas = canvasRef.current;
     if (!ctx || !canvas) return;
     const pos = getPos(e);
+    const prevPos = currentStrokeRef.current[currentStrokeRef.current.length - 1];
     currentStrokeRef.current.push(pos);
 
     if (['line', 'rect', 'circle'].includes(tool) && snapshotRef.current && startPosRef.current) {
@@ -375,7 +377,69 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     } else {
       ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
+      // Broadcast each point in real-time for freehand tools
+      if (prevPos) broadcastDrawPoint(prevPos, pos);
     }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    const ctx = getCtx();
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+    setIsDrawing(true);
+    const pos = getTouchPos(touch);
+    startPosRef.current = pos;
+    currentStrokeRef.current = [pos];
+    if (['line', 'rect', 'circle'].includes(tool)) {
+      snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    } else {
+      configureCtx(ctx);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const ctx = getCtx();
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+    const pos = getTouchPos(touch);
+    const prevPos = currentStrokeRef.current[currentStrokeRef.current.length - 1];
+    currentStrokeRef.current.push(pos);
+    if (['line', 'rect', 'circle'].includes(tool) && snapshotRef.current && startPosRef.current) {
+      ctx.putImageData(snapshotRef.current, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = size;
+      ctx.beginPath();
+      const s = startPosRef.current;
+      if (tool === 'line') {
+        ctx.moveTo(s.x, s.y); ctx.lineTo(pos.x, pos.y);
+      } else if (tool === 'rect') {
+        ctx.rect(s.x, s.y, pos.x - s.x, pos.y - s.y);
+      } else if (tool === 'circle') {
+        const rx = Math.abs(pos.x - s.x) / 2;
+        const ry = Math.abs(pos.y - s.y) / 2;
+        ctx.ellipse(s.x + (pos.x - s.x) / 2, s.y + (pos.y - s.y) / 2, rx, ry, 0, 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    } else {
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      if (prevPos) broadcastDrawPoint(prevPos, pos);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    handleMouseUp();
   };
 
   const handleMouseUp = () => {
@@ -385,8 +449,12 @@ export function DrawingCanvas({ pageTitle, pageId, initialContent, onSave }: Dra
     if (ctx) ctx.globalCompositeOperation = 'source-over';
     snapshotRef.current = null;
 
-    // Broadcast the completed stroke
-    broadcastStroke(currentStrokeRef.current);
+    // For shapes, broadcast the complete shape; for freehand, just signal end
+    if (['line', 'rect', 'circle'].includes(tool)) {
+      broadcastShapeStroke(currentStrokeRef.current);
+    } else {
+      broadcastStrokeEnd();
+    }
     currentStrokeRef.current = [];
 
     saveHistory();
