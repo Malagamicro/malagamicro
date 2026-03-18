@@ -347,89 +347,16 @@ export function LeadsList({
           </div>
         </div>
       ) : (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="w-12 px-4 py-3">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={selectAllLeads}
-                  />
-                </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Empresa</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Score</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Contacto</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Teléfono</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Estado</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Segmento</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-muted-foreground">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAndSortedLeads.map((lead) => (
-                <tr
-                  key={lead.id}
-                  className="border-t border-border hover:bg-muted/30 cursor-pointer transition-colors"
-                >
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedLeadIds.includes(lead.id)}
-                      onCheckedChange={() => toggleLeadSelection(lead.id)}
-                    />
-                  </td>
-                  <td className="px-4 py-3" onClick={() => onViewLead(lead.id)}>
-                    <span className="font-medium text-foreground">{lead.companyName}</span>
-                  </td>
-                  <td className="px-4 py-3" onClick={() => onViewLead(lead.id)}>
-                    <LeadScoreBadge score={lead.score ?? 0} />
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground" onClick={() => onViewLead(lead.id)}>
-                    {lead.contactName || '-'}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground" onClick={() => onViewLead(lead.id)}>
-                    {lead.phone || '-'}
-                  </td>
-                  <td className="px-4 py-3" onClick={() => onViewLead(lead.id)}>
-                    <LeadStatusBadge status={lead.status} />
-                  </td>
-                  <td className="px-4 py-3" onClick={() => onViewLead(lead.id)}>
-                    <span className="text-xs font-medium uppercase text-muted-foreground">
-                      {lead.segment}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-1">
-                      {onQuickWhatsApp && (lead.phone || lead.mobilePhone) && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-500/10"
-                          onClick={() => {
-                            const phone = lead.mobilePhone || lead.phone?.replace(/\D/g, '') || '';
-                            onQuickWhatsApp(phone);
-                          }}
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                      {onQuickEmail && lead.email && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-primary hover:bg-primary/10"
-                          onClick={() => onQuickEmail(lead.email!)}
-                        >
-                          <Mail className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <LeadsTableView
+          leads={filteredAndSortedLeads}
+          selectedIds={selectedLeadIds}
+          allSelected={allSelected}
+          onSelectAll={selectAllLeads}
+          onToggle={toggleLeadSelection}
+          onViewLead={onViewLead}
+          onQuickWhatsApp={onQuickWhatsApp}
+          onQuickEmail={onQuickEmail}
+        />
       )}
 
       {/* Load More Button */}
