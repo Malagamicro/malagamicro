@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { format, isAfter, startOfDay, subDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { es } from 'date-fns/locale';
@@ -12,10 +12,7 @@ import {
   Cloud,
   Upload,
   FileText,
-  Image as ImageIcon,
   File,
-  Video,
-  Music,
   Download,
   Trash2,
   Loader2,
@@ -34,8 +31,6 @@ import {
   FileUp,
   GripVertical,
   FolderInput,
-  FileSpreadsheet,
-  Presentation,
   Pencil,
   FolderDown,
 } from 'lucide-react';
@@ -47,37 +42,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useSharedFiles, useSharedFolders, formatFileSize, SharedFile, SharedFolder } from '@/hooks/useSharedFiles';
 import { useAllSharedFolders, useGlobalFileSearch } from '@/hooks/useAllSharedFiles';
@@ -86,100 +62,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { FolderTreeSidebar } from './FolderTreeSidebar';
+import { FilePreviewDialog } from './FilePreviewDialog';
+import { getFileIcon, getInitials, canPreview, canEditInEditor, TEMPLATE_CATEGORIES } from './sharedFilesHelpers';
 
-const TEMPLATE_CATEGORIES = [
-  { value: 'general', label: 'General' },
-  { value: 'ventas', label: 'Ventas' },
-  { value: 'soporte', label: 'Soporte' },
-  { value: 'bienvenida', label: 'Bienvenida' },
-  { value: 'seguimiento', label: 'Seguimiento' },
-  { value: 'otros', label: 'Otros' },
-];
-
-function getFileIcon(fileType: string | null) {
-  if (!fileType) return File;
-  if (fileType.startsWith('image/')) return ImageIcon;
-  if (fileType.startsWith('video/')) return Video;
-  if (fileType.startsWith('audio/')) return Music;
-  if (fileType.includes('spreadsheet') || fileType.includes('excel') || fileType.includes('csv')) return FileSpreadsheet;
-  if (fileType.includes('presentation') || fileType.includes('powerpoint')) return Presentation;
-  if (fileType.includes('pdf') || fileType.includes('document') || fileType.includes('text') || fileType.includes('word')) return FileText;
-  return File;
-}
-
-function getInitials(name: string | null | undefined) {
-  if (!name) return 'U';
-  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function canPreview(fileType: string | null): boolean {
-  if (!fileType) return false;
-  return (
-    fileType.startsWith('image/') ||
-    fileType.startsWith('video/') ||
-    fileType.startsWith('audio/') ||
-    fileType === 'application/pdf' ||
-    fileType === 'text/markdown' ||
-    fileType === 'text/plain' ||
-    fileType === 'text/html' ||
-    fileType === 'text/csv' ||
-    // Office docs via Google Docs viewer
-    fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    fileType === 'application/msword' ||
-    fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    fileType === 'application/vnd.ms-excel' ||
-    fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
-    fileType === 'application/vnd.ms-powerpoint'
-  );
-}
-
-function isOfficeDoc(fileType: string | null): boolean {
-  if (!fileType) return false;
-  return (
-    fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    fileType === 'application/msword' ||
-    fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    fileType === 'application/vnd.ms-excel' ||
-    fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
-    fileType === 'application/vnd.ms-powerpoint'
-  );
-}
-
-function canEditInEditor(fileType: string | null): boolean {
-  if (!fileType) return false;
-  return (
-    fileType === 'text/markdown' ||
-    fileType === 'text/plain' ||
-    fileType === 'text/csv' ||
-    fileType === 'text/html' ||
-    fileType.includes('spreadsheet') ||
-    fileType.includes('excel')
-  );
-}
-
-// Parse CSV text into rows/columns
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let current = '';
-  let inQuotes = false;
-  let row: string[] = [];
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"' && text[i + 1] === '"') { current += '"'; i++; }
-      else if (ch === '"') { inQuotes = false; }
-      else { current += ch; }
-    } else {
-      if (ch === '"') { inQuotes = true; }
-      else if (ch === ',') { row.push(current); current = ''; }
-      else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
-        row.push(current); current = ''; rows.push(row); row = [];
-        if (ch === '\r') i++;
-      } else { current += ch; }
-    }
-  }
-  if (current || row.length > 0) { row.push(current); rows.push(row); }
-  return rows;
+interface BreadcrumbItem {
+  id: string | null;
+  name: string;
 }
 
 // Preview dialog supporting images, PDF, text, office docs, video, audio
