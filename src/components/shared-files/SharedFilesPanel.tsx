@@ -70,7 +70,6 @@ interface BreadcrumbItem {
   name: string;
 }
 
-}
 
 export function SharedFilesPanel() {
   const { user } = useAuth();
