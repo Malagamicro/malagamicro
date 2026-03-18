@@ -139,45 +139,13 @@ export function LeadsList({
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 animate-fade-in">
-      {/* Floating bulk action bar - more compact on mobile */}
-      {selectedLeadIds.length > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-card border border-border shadow-lg rounded-xl px-3 md:px-4 py-2.5 md:py-3 flex items-center gap-2 md:gap-4 animate-slide-up max-w-[calc(100vw-2rem)]">
-          <span className="text-xs md:text-sm font-medium text-foreground whitespace-nowrap">
-            {selectedLeadIds.length} seleccionados
-          </span>
-          <div className="h-5 w-px bg-border hidden md:block" />
-          <Button 
-            onClick={() => setShowWhatsAppModal(true)} 
-            size="sm"
-            className="gap-1.5 md:gap-2 bg-success hover:bg-success/90 h-8 md:h-9 px-2.5 md:px-3 text-xs md:text-sm"
-          >
-            <MessageSquare className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </Button>
-          <Button 
-            onClick={() => setShowDeleteConfirm(true)} 
-            size="sm"
-            variant="destructive"
-            className="gap-1.5 md:gap-2 h-8 md:h-9 px-2.5 md:px-3 text-xs md:text-sm"
-            disabled={isBulkDeleting}
-          >
-            {isBulkDeleting ? (
-              <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" />
-            ) : (
-              <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            )}
-            <span className="hidden sm:inline">Eliminar</span>
-          </Button>
-          <Button 
-            onClick={() => setSelectedLeadIds([])} 
-            size="sm"
-            variant="ghost"
-            className="h-8 md:h-9 px-2 md:px-3"
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-      )}
+      <BulkActionBar
+        count={selectedLeadIds.length}
+        isBulkDeleting={isBulkDeleting}
+        onWhatsApp={() => setShowWhatsAppModal(true)}
+        onDelete={() => setShowDeleteConfirm(true)}
+        onClear={() => setSelectedLeadIds([])}
+      />
 
       {/* Header - more compact on mobile */}
       <div className="flex flex-col gap-3 md:gap-4">
