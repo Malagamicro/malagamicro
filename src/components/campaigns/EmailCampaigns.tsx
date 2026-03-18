@@ -1,71 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useEmailTemplates, useEmailCampaigns } from '@/hooks/useEmailCampaigns';
 import { useEmailProfiles } from '@/hooks/useEmailProfiles';
-import { sanitizeHtml } from '@/lib/sanitize';
 import { useLeads } from '@/hooks/useLeads';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { 
-  Mail, 
-  Plus, 
-  FileText, 
-  Send, 
-  Trash2, 
-  Users,
-  Clock,
-  CheckCircle,
-  Loader2,
-  Info,
-  Pencil,
-  Eye,
-  Sparkles,
-  Bot,
+  Mail, Plus, FileText, Send, Trash2, Users, Clock, CheckCircle, Loader2, Info, Pencil, Eye,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { EmailTemplateEditor, EmailBlock, generateEmailHtml } from './EmailTemplateEditor';
-import { AITemplateChat } from './AITemplateChat';
+import { EmailBlock } from './EmailTemplateEditor';
+import { TemplateDialog, TemplatePreviewDialog, CampaignDialog } from './EmailCampaignDialogs';
 
 interface EmailCampaignsProps {
   prefillEmail?: string | null;
@@ -413,223 +364,48 @@ export function EmailCampaigns({ prefillEmail, onPrefillConsumed }: EmailCampaig
         </TabsContent>
       </Tabs>
 
-      {/* Template Dialog - Editor + AI */}
-      <Dialog open={showTemplateDialog} onOpenChange={(open) => {
-        setShowTemplateDialog(open);
-        if (!open) resetTemplateForm();
-      }}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle>{editingTemplateId ? 'Editar Plantilla' : 'Nueva Plantilla de Email'}</DialogTitle>
-                <DialogDescription>
-                  Usa variables como {`{{nombre}}`}, {`{{empresa}}`}, {`{{ciudad}}`} para personalizar.
-                </DialogDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={templateMode === 'editor' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setTemplateMode('editor')}
-                  className="gap-1.5"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  Editor
-                </Button>
-                <Button
-                  variant={templateMode === 'ai' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setTemplateMode('ai')}
-                  className="gap-1.5"
-                >
-                  <Bot className="w-3.5 h-3.5" />
-                  Crear con IA
-                </Button>
-              </div>
-            </div>
-          </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Nombre de la plantilla</Label>
-                <Input
-                  placeholder="Ej: Presentación servicios"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Asunto del email</Label>
-                <Input
-                  placeholder="Ej: {{empresa}} - Propuesta de servicios"
-                  value={templateSubject}
-                  onChange={(e) => setTemplateSubject(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            {templateMode === 'editor' ? (
-              <>
-                <EmailTemplateEditor onChange={handleEditorChange} />
-                {templateHtml && (
-                  <div className="border rounded-lg p-3 bg-muted/30">
-                    <p className="text-xs text-muted-foreground mb-2">Vista previa del HTML generado:</p>
-                    <div 
-                      className="border rounded bg-white p-2 max-h-[200px] overflow-auto"
-                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(templateHtml) }}
-                    />
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="border rounded-lg h-[600px] overflow-hidden">
-                <AITemplateChat 
-                  key={editingTemplateId || templateHtml || 'new'}
-                  onApplyTemplate={handleAIApplyTemplate} 
-                  initialHtml={templateHtml || undefined}
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleCreateTemplate} disabled={isAddingTemplate || !templateName || !templateSubject || !templateHtml}>
-              {isAddingTemplate ? 'Guardando...' : 'Guardar Plantilla'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TemplateDialog
+        open={showTemplateDialog}
+        onOpenChange={setShowTemplateDialog}
+        editingTemplateId={editingTemplateId}
+        templateName={templateName}
+        setTemplateName={setTemplateName}
+        templateSubject={templateSubject}
+        setTemplateSubject={setTemplateSubject}
+        templateHtml={templateHtml}
+        templateMode={templateMode}
+        setTemplateMode={setTemplateMode}
+        onEditorChange={handleEditorChange}
+        onAIApply={handleAIApplyTemplate}
+        onSubmit={handleCreateTemplate}
+        isAdding={isAddingTemplate}
+        onReset={resetTemplateForm}
+      />
 
-      {/* Template Preview Dialog */}
-      <Dialog open={!!previewTemplateId} onOpenChange={(open) => !open && setPreviewTemplateId(null)}>
-        <DialogContent className="max-w-[700px] max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="w-5 h-5" />
-              Vista previa: {previewTemplate?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Asunto: {previewTemplate?.subject}
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
-            <div 
-              className="border rounded-lg p-4 bg-muted/30"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewTemplate?.body || '') }}
-            />
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      <TemplatePreviewDialog
+        open={!!previewTemplateId}
+        onClose={() => setPreviewTemplateId(null)}
+        template={previewTemplate}
+      />
 
-      {/* Campaign Dialog */}
-      <Dialog open={showCampaignDialog} onOpenChange={setShowCampaignDialog}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Nueva Campaña</DialogTitle>
-            <DialogDescription>
-              Selecciona una plantilla, perfil de correo y los leads que recibirán el email.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Nombre de la campaña</Label>
-              <Input
-                placeholder="Ej: Campaña Enero 2025"
-                value={campaignName}
-                onChange={(e) => setCampaignName(e.target.value)}
-              />
-            </div>
-
-            {/* Email Profile Selector */}
-            <div className="grid gap-2">
-              <Label className="flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                Perfil de correo
-              </Label>
-              {profiles.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No hay perfiles de correo configurados. Configura uno en Ajustes.
-                </p>
-              ) : (
-                <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un perfil de correo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        <div className="flex items-center gap-2">
-                          <span>{p.profile_name}</span>
-                          <span className="text-muted-foreground text-xs">({p.from_email})</span>
-                          {p.is_default && <Badge variant="secondary" className="text-[10px] px-1">Default</Badge>}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Plantilla</Label>
-              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una plantilla" />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <div className="flex items-center justify-between">
-                <Label>Destinatarios ({selectedLeadIds.length} seleccionados)</Label>
-                <Button variant="link" size="sm" onClick={selectAllLeads}>
-                  Seleccionar todos
-                </Button>
-              </div>
-              <ScrollArea className="h-[200px] border rounded-md p-3">
-                {eligibleLeads.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No hay leads con email válido
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {eligibleLeads.map((lead) => (
-                      <div key={lead.id} className="flex items-center gap-3">
-                        <Checkbox
-                          checked={selectedLeadIds.includes(lead.id)}
-                          onCheckedChange={() => toggleLeadSelection(lead.id)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{lead.companyName}</p>
-                          <p className="text-xs text-muted-foreground truncate">{lead.email}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCampaignDialog(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleCreateCampaign} 
-              disabled={isCreatingCampaign || !campaignName || !selectedTemplateId || selectedLeadIds.length === 0 || !selectedProfileId}
-            >
-              {isCreatingCampaign ? 'Creando...' : 'Crear Campaña'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CampaignDialog
+        open={showCampaignDialog}
+        onOpenChange={setShowCampaignDialog}
+        campaignName={campaignName}
+        setCampaignName={setCampaignName}
+        selectedTemplateId={selectedTemplateId}
+        setSelectedTemplateId={setSelectedTemplateId}
+        selectedProfileId={selectedProfileId}
+        setSelectedProfileId={setSelectedProfileId}
+        selectedLeadIds={selectedLeadIds}
+        toggleLeadSelection={toggleLeadSelection}
+        selectAllLeads={selectAllLeads}
+        templates={templates}
+        profiles={profiles}
+        eligibleLeads={eligibleLeads}
+        onSubmit={handleCreateCampaign}
+        isCreating={isCreatingCampaign}
+      />
     </div>
   );
 }
