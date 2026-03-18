@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { format, isAfter, startOfDay, subDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { es } from 'date-fns/locale';
@@ -12,10 +12,7 @@ import {
   Cloud,
   Upload,
   FileText,
-  Image as ImageIcon,
   File,
-  Video,
-  Music,
   Download,
   Trash2,
   Loader2,
@@ -34,8 +31,6 @@ import {
   FileUp,
   GripVertical,
   FolderInput,
-  FileSpreadsheet,
-  Presentation,
   Pencil,
   FolderDown,
 } from 'lucide-react';
@@ -47,37 +42,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useSharedFiles, useSharedFolders, formatFileSize, SharedFile, SharedFolder } from '@/hooks/useSharedFiles';
 import { useAllSharedFolders, useGlobalFileSearch } from '@/hooks/useAllSharedFiles';
@@ -86,261 +62,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { FolderTreeSidebar } from './FolderTreeSidebar';
-
-const TEMPLATE_CATEGORIES = [
-  { value: 'general', label: 'General' },
-  { value: 'ventas', label: 'Ventas' },
-  { value: 'soporte', label: 'Soporte' },
-  { value: 'bienvenida', label: 'Bienvenida' },
-  { value: 'seguimiento', label: 'Seguimiento' },
-  { value: 'otros', label: 'Otros' },
-];
-
-function getFileIcon(fileType: string | null) {
-  if (!fileType) return File;
-  if (fileType.startsWith('image/')) return ImageIcon;
-  if (fileType.startsWith('video/')) return Video;
-  if (fileType.startsWith('audio/')) return Music;
-  if (fileType.includes('spreadsheet') || fileType.includes('excel') || fileType.includes('csv')) return FileSpreadsheet;
-  if (fileType.includes('presentation') || fileType.includes('powerpoint')) return Presentation;
-  if (fileType.includes('pdf') || fileType.includes('document') || fileType.includes('text') || fileType.includes('word')) return FileText;
-  return File;
-}
-
-function getInitials(name: string | null | undefined) {
-  if (!name) return 'U';
-  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function canPreview(fileType: string | null): boolean {
-  if (!fileType) return false;
-  return (
-    fileType.startsWith('image/') ||
-    fileType.startsWith('video/') ||
-    fileType.startsWith('audio/') ||
-    fileType === 'application/pdf' ||
-    fileType === 'text/markdown' ||
-    fileType === 'text/plain' ||
-    fileType === 'text/html' ||
-    fileType === 'text/csv' ||
-    // Office docs via Google Docs viewer
-    fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    fileType === 'application/msword' ||
-    fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    fileType === 'application/vnd.ms-excel' ||
-    fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
-    fileType === 'application/vnd.ms-powerpoint'
-  );
-}
-
-function isOfficeDoc(fileType: string | null): boolean {
-  if (!fileType) return false;
-  return (
-    fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    fileType === 'application/msword' ||
-    fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    fileType === 'application/vnd.ms-excel' ||
-    fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
-    fileType === 'application/vnd.ms-powerpoint'
-  );
-}
-
-function canEditInEditor(fileType: string | null): boolean {
-  if (!fileType) return false;
-  return (
-    fileType === 'text/markdown' ||
-    fileType === 'text/plain' ||
-    fileType === 'text/csv' ||
-    fileType === 'text/html' ||
-    fileType.includes('spreadsheet') ||
-    fileType.includes('excel')
-  );
-}
-
-// Parse CSV text into rows/columns
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let current = '';
-  let inQuotes = false;
-  let row: string[] = [];
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"' && text[i + 1] === '"') { current += '"'; i++; }
-      else if (ch === '"') { inQuotes = false; }
-      else { current += ch; }
-    } else {
-      if (ch === '"') { inQuotes = true; }
-      else if (ch === ',') { row.push(current); current = ''; }
-      else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
-        row.push(current); current = ''; rows.push(row); row = [];
-        if (ch === '\r') i++;
-      } else { current += ch; }
-    }
-  }
-  if (current || row.length > 0) { row.push(current); rows.push(row); }
-  return rows;
-}
-
-// Preview dialog supporting images, PDF, text, office docs, video, audio
-function FilePreviewDialog({ open, onOpenChange, file, onOpenInEditor }: { open: boolean; onOpenChange: (v: boolean) => void; file: SharedFile | null; onOpenInEditor?: (file: SharedFile) => void }) {
-  const [textContent, setTextContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open || !file) { setTextContent(null); return; }
-    const isText = file.file_type === 'text/markdown' || file.file_type === 'text/plain' || file.file_type === 'text/html' || file.file_type === 'text/csv';
-    if (!isText) { setTextContent(null); return; }
-
-    setLoading(true);
-    fetch(file.file_path)
-      .then(r => r.text())
-      .then(t => setTextContent(t))
-      .catch(() => setTextContent(null))
-      .finally(() => setLoading(false));
-  }, [open, file]);
-
-  const isCsv = file?.file_type === 'text/csv';
-  const isMarkdown = file?.file_type === 'text/markdown';
-  const isText = file?.file_type === 'text/plain' || file?.file_type === 'text/html' || isCsv || isMarkdown;
-
-  const [ReactMarkdown, setReactMarkdown] = useState<any>(null);
-  useEffect(() => {
-    if (isMarkdown && open) {
-      import('react-markdown').then(mod => setReactMarkdown(() => mod.default));
-    }
-  }, [isMarkdown, open]);
-
-  const csvData = useMemo(() => {
-    if (isCsv && textContent) return parseCsv(textContent);
-    return null;
-  }, [isCsv, textContent]);
-
-  const showEditorButton = file && canEditInEditor(file.file_type) && onOpenInEditor;
-
-  const renderContent = () => {
-    if (!file) return null;
-
-    // Images
-    if (file.file_type?.startsWith('image/')) {
-      return <img src={file.file_path} alt={file.file_name} className="max-w-full h-auto mx-auto rounded-lg" />;
-    }
-
-    // PDF
-    if (file.file_type === 'application/pdf') {
-      return <iframe src={file.file_path} className="w-full h-[70vh] rounded-lg border" title={file.file_name} />;
-    }
-
-    // Office docs (DOCX, XLSX, PPTX) via Google Docs Viewer
-    if (isOfficeDoc(file.file_type)) {
-      const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(file.file_path)}&embedded=true`;
-      return <iframe src={viewerUrl} className="w-full h-[70vh] rounded-lg border" title={file.file_name} />;
-    }
-
-    // Video
-    if (file.file_type?.startsWith('video/')) {
-      return (
-        <video controls className="w-full max-h-[70vh] rounded-lg" preload="metadata">
-          <source src={file.file_path} type={file.file_type} />
-          Tu navegador no soporta la reproducción de video.
-        </video>
-      );
-    }
-
-    // Audio
-    if (file.file_type?.startsWith('audio/')) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 gap-4">
-          <Music className="h-16 w-16 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">{file.file_name}</p>
-          <audio controls className="w-full max-w-md" preload="metadata">
-            <source src={file.file_path} type={file.file_type} />
-          </audio>
-        </div>
-      );
-    }
-
-    // Text/Markdown/CSV
-    if (isText && textContent !== null) {
-      if (loading) return <div className="flex items-center justify-center h-48"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-
-      // CSV → table
-      if (isCsv && csvData && csvData.length > 0) {
-        const header = csvData[0];
-        const body = csvData.slice(1);
-        return (
-          <div className="overflow-auto max-h-[70vh]">
-            <table className="w-full text-sm border-collapse">
-              <thead className="sticky top-0 z-10">
-                <tr>
-                  {header.map((cell, i) => (
-                    <th key={i} className="bg-muted border border-border px-3 py-2 text-left font-semibold text-foreground whitespace-nowrap">
-                      {cell}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {body.map((row, ri) => (
-                  <tr key={ri} className="hover:bg-muted/50">
-                    {row.map((cell, ci) => (
-                      <td key={ci} className="border border-border px-3 py-1.5 text-foreground whitespace-nowrap">
-                        {cell}
-                      </td>
-                    ))}
-                    {/* Fill missing cells if row is shorter than header */}
-                    {row.length < header.length && Array.from({ length: header.length - row.length }).map((_, ci) => (
-                      <td key={`empty-${ci}`} className="border border-border px-3 py-1.5" />
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
-      }
-
-      // Markdown → rendered
-      if (isMarkdown && ReactMarkdown) {
-        return <div className="p-6 prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown>{textContent}</ReactMarkdown></div>;
-      }
-
-      // Plain text
-      return <pre className="p-6 text-sm whitespace-pre-wrap font-mono bg-muted rounded-lg">{textContent}</pre>;
-    }
-
-    return <div className="flex items-center justify-center h-48 text-muted-foreground">Vista previa no disponible</div>;
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="truncate">{file?.file_name}</DialogTitle>
-        </DialogHeader>
-        <div className="flex-1 overflow-auto">{renderContent()}</div>
-        <DialogFooter className="flex-shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
-          {showEditorButton && (
-            <Button variant="secondary" onClick={() => { onOpenInEditor(file); onOpenChange(false); }}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Abrir en Editor
-            </Button>
-          )}
-          <Button onClick={() => file && window.open(file.file_path, '_blank')}>
-            <Download className="h-4 w-4 mr-2" />
-            Descargar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+import { FilePreviewDialog } from './FilePreviewDialog';
+import { getFileIcon, getInitials, canPreview, canEditInEditor, TEMPLATE_CATEGORIES } from './sharedFilesHelpers';
 
 interface BreadcrumbItem {
   id: string | null;
   name: string;
 }
+
 
 export function SharedFilesPanel() {
   const { user } = useAuth();
