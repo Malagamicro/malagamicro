@@ -9,45 +9,10 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-
-interface VideoCallModalProps {
-  open: boolean;
-  onClose: () => void;
-  roomName: string;
-  displayName: string;
-  isVideoCall: boolean;
-  isReceiver?: boolean;
-  initialStream?: MediaStream | null;
-}
-
-interface RemotePeer {
-  peerId: string;
-  displayName: string;
-  pc: RTCPeerConnection;
-  stream: MediaStream | null;
-  isScreenSharing: boolean;
-}
-
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  // Free TURN servers for NAT traversal (critical for mobile/corporate networks)
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-];
+import { 
+  VideoCallModalProps, ICE_SERVERS, 
+  formatCallDuration, getGridClass, VideoTile 
+} from './videoCallHelpers';
 
 export function VideoCallModal({ 
   open, onClose, roomName, displayName, isVideoCall, isReceiver = false, initialStream = null 
