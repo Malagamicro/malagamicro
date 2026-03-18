@@ -134,10 +134,6 @@ export function PerplexityChatbot() {
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
   useEffect(() => { if (isMobile) setShowSidebar(false); }, [isMobile]);
 
-  const getAuthToken = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token;
-  };
 
   const streamChat = async (userMessages: { role: string; content: string | any[] }[], sessionId: string) => {
     const token = await getAuthToken();
