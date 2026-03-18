@@ -555,12 +555,6 @@ export function VideoCallModal({
     onCloseRef.current();
   };
 
-  const fmt = (s: number) => {
-    const m = Math.floor(s / 60).toString().padStart(2, '0');
-    const sec = (s % 60).toString().padStart(2, '0');
-    return `${m}:${sec}`;
-  };
-
   // Build participants list for grid
   const remoteEntries = Array.from(remotePeers.entries());
   const totalParticipants = remoteEntries.length + 1;
@@ -568,15 +562,6 @@ export function VideoCallModal({
   const screenSharer = remoteEntries.find(([, p]) => p.isScreenSharing);
   const isSelfSharing = isScreenSharing;
   const hasScreenShare = !!screenSharer || isSelfSharing;
-
-  const getGridClass = () => {
-    if (hasScreenShare) return 'grid-cols-1 grid-rows-[2fr_1fr]';
-    if (totalParticipants <= 1) return 'grid-cols-1';
-    if (totalParticipants === 2) return 'grid-cols-1 sm:grid-cols-2';
-    if (totalParticipants <= 4) return 'grid-cols-2';
-    if (totalParticipants <= 6) return 'grid-cols-2 sm:grid-cols-3';
-    return 'grid-cols-3 sm:grid-cols-4';
-  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && hangUp()}>
