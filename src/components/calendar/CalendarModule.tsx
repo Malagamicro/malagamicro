@@ -2,24 +2,18 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek,
   isSameMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, parseISO,
-  eachHourOfInterval, startOfDay, endOfDay, differenceInMinutes, setHours, setMinutes,
+  startOfDay, endOfDay,
   isToday as isDateToday, addDays
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
-  ChevronLeft, ChevronRight, Plus, Clock, Users, Trash2,
+  ChevronLeft, ChevronRight, Plus, Clock, Trash2,
   CalendarDays, CalendarRange, CalendarCheck2, Search, Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useCalendarEvents, CalendarEvent, CreateEventData } from '@/hooks/useCalendarEvents';
@@ -27,27 +21,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-
-const COLOR_OPTIONS = [
-  { value: '#3b82f6', label: 'Azul' },
-  { value: '#ef4444', label: 'Rojo' },
-  { value: '#22c55e', label: 'Verde' },
-  { value: '#f59e0b', label: 'Naranja' },
-  { value: '#8b5cf6', label: 'Morado' },
-  { value: '#ec4899', label: 'Rosa' },
-  { value: '#14b8a6', label: 'Teal' },
-];
-
-const REMINDER_OPTIONS = [
-  { value: 0, label: 'Sin recordatorio' },
-  { value: 5, label: '5 minutos antes' },
-  { value: 15, label: '15 minutos antes' },
-  { value: 30, label: '30 minutos antes' },
-  { value: 60, label: '1 hora antes' },
-  { value: 1440, label: '1 día antes' },
-];
-
-const HOURS = Array.from({ length: 16 }, (_, i) => i + 7); // 7:00 - 22:00
+import { COLOR_OPTIONS, HOURS } from './CalendarConstants';
+import { EventDetailDialog, EventFormDialog, EventFormData } from './CalendarDialogs';
 
 export function CalendarModule() {
   const { user } = useAuth();
