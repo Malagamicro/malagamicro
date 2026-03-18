@@ -393,40 +393,13 @@ export function LeadsList({
         }}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-destructive" />
-              Eliminar {selectedLeadIds.length} leads
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminarán permanentemente los {selectedLeadIds.length} leads seleccionados junto con todas sus actividades y recordatorios asociados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBulkDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isBulkDeleting}
-            >
-              {isBulkDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Eliminando...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Eliminar {selectedLeadIds.length} leads
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteLeadsDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        count={selectedLeadIds.length}
+        isBulkDeleting={isBulkDeleting}
+        onConfirm={handleBulkDelete}
+      />
     </div>
   );
 }
