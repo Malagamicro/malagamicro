@@ -12,7 +12,7 @@ import { ThemeSyncProvider } from "@/components/app/ThemeSyncProvider";
 import { MascotChatWidget } from "@/components/chat/MascotChatWidget";
 import { GlobalCallListener } from "@/components/internal-chat/GlobalCallListener";
 import { EventReminderMonitor } from "@/components/calendar/EventReminderMonitor";
-import { VersionChecker } from "@/components/VersionChecker";
+import { VersionChecker } from "@/components/app/VersionChecker";
 import { NotificationPopupStack } from "@/components/notifications/NotificationPopup";
 import { useCustomNotifications } from "@/hooks/useCustomNotifications";
 import Index from "./pages/Index";
