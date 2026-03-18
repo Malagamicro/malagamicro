@@ -10,61 +10,29 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Send, Bot, User, Loader2, Sparkles, Brain, RotateCcw, Plus,
+  Send, Bot, User, Loader2, Sparkles, RotateCcw, Plus,
   MessageSquare, Trash2, MoreVertical, PanelLeftClose, Mic,
   MicOff, PanelLeft, Pencil, X, Paperclip, Image, FileText,
-  Settings2, Zap, ImageIcon, Users, GripVertical,
+  Settings2, ImageIcon, Users,
   ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAIChatHistory, AIChatSession, AIChatMessage } from '@/hooks/useAIChatHistory';
+import { useAIChatHistory, AIChatSession } from '@/hooks/useAIChatHistory';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAISubagents, AISubagent } from '@/hooks/useAISubagents';
 import { SubagentManager } from './SubagentManager';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { ImperativePanelHandle } from 'react-resizable-panels';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  attachments?: FileAttachment[];
-  subagent?: string; // which subagent responded
-  subagentEmoji?: string;
-  subagentColor?: string;
-  isImage?: boolean;
-  imageUrls?: string[];
-  isDelegationNotice?: boolean;
-}
-
-interface FileAttachment {
-  name: string;
-  type: string;
-  size: number;
-  content?: string;
-  url?: string;
-}
-
-const MODELS = [
-  { id: 'openai/gpt-5-nano', name: 'GPT-5 Nano', icon: Brain, color: 'text-emerald-500' },
-  { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini', icon: Sparkles, color: 'text-blue-500' },
-  { id: 'openai/gpt-5', name: 'GPT-5', icon: Sparkles, color: 'text-violet-500' },
-  { id: 'google/gemini-2.5-flash', name: 'Gemini Flash', icon: Zap, color: 'text-amber-500' },
-  { id: 'google/gemini-2.5-pro', name: 'Gemini Pro', icon: Brain, color: 'text-indigo-500' },
-  { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet', icon: Brain, color: 'text-orange-500' },
-  { id: 'openai/gpt-5.2', name: 'GPT-5.2', icon: Sparkles, color: 'text-cyan-500' },
-  { id: 'custom', name: 'Personalizado', icon: Pencil, color: 'text-muted-foreground' },
-];
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/perplexity-chat`;
+import {
+  type Message, type FileAttachment,
+  MODELS, CHAT_URL, isImageFile, isTextFile,
+} from './chatTypes';
+import { getAuthToken, handleFileSelection, formatSessionDate } from './chatHelpers';
 
 export function PerplexityChatbot() {
   const [messages, setMessages] = useState<Message[]>([]);
