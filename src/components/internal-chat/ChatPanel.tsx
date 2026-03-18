@@ -13,10 +13,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Conversation, InternalMessage } from '@/hooks/useInternalChat';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,6 +20,7 @@ import { toast } from 'sonner';
 import { BudgetApprovalMessage } from './BudgetApprovalMessage';
 import { EmojiStickerPicker } from './EmojiStickerPicker';
 import { VideoCallModal } from './VideoCallModal';
+import { GroupSettingsDialog, ParticipantsDialog } from './ChatPanelDialogs';
 import { useActiveCalls } from '@/contexts/ActiveCallsContext';
 
 interface ChatPanelProps {
@@ -59,7 +56,6 @@ export function ChatPanel({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
-  const [groupName, setGroupName] = useState('');
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,13 +145,11 @@ export function ChatPanel({
     if (!input.trim() && pendingFiles.length === 0) return;
     if (isSending) return;
 
-    // Send text first if any
     if (input.trim()) {
       onSendMessage(input.trim());
       setInput('');
     }
 
-    // Send each file
     if (pendingFiles.length > 0) {
       setIsUploading(true);
       for (const file of pendingFiles) {
@@ -261,13 +255,6 @@ export function ChatPanel({
     if (onDeleteMessage) onDeleteMessage(msgId);
   };
 
-  const handleSaveGroupSettings = () => {
-    if (conversation && onUpdateGroup && groupName.trim()) {
-      onUpdateGroup(conversation.id, groupName.trim());
-      setGroupSettingsOpen(false);
-    }
-  };
-
   const callRoomName = conversation?.id?.replace(/-/g, '') || 'room';
 
   if (!conversation) {
@@ -316,7 +303,7 @@ export function ChatPanel({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {conversation.is_group && isAdmin && (
-                  <DropdownMenuItem onClick={() => { setGroupName(conversation.name || ''); setGroupSettingsOpen(true); }}>
+                  <DropdownMenuItem onClick={() => setGroupSettingsOpen(true)}>
                     <Settings className="h-4 w-4 mr-2" /> Configurar grupo
                   </DropdownMenuItem>
                 )}
@@ -352,7 +339,6 @@ export function ChatPanel({
               const showAvatar = !isMe && (idx === 0 || messages[idx - 1]?.sender_id !== message.sender_id);
               const isEditing = editingMessageId === message.id;
 
-              // Date separator logic
               const msgDate = new Date(message.created_at);
               const prevDate = idx > 0 ? new Date(messages[idx - 1].created_at) : null;
               const showDateSeparator = !prevDate || 
@@ -397,7 +383,6 @@ export function ChatPanel({
                       <p className="text-xs text-muted-foreground mb-1 ml-1">{message.sender?.full_name}</p>
                     )}
 
-                    {/* Message actions (hover) */}
                     {isMe && !message.is_deleted && !isEditing && (
                       <div className={cn(
                         'absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex gap-0.5',
@@ -536,95 +521,24 @@ export function ChatPanel({
         </div>
       </div>
 
-      {/* Group Settings Dialog */}
-      <Dialog open={groupSettingsOpen} onOpenChange={setGroupSettingsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Configurar grupo</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Nombre del grupo</label>
-              <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nombre del grupo" />
-            </div>
-            {conversation?.participants && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Participantes ({conversation.participants.length})</label>
-                <div className="space-y-1 max-h-40 overflow-auto">
-                  {conversation.participants.map(p => (
-                    <div key={p.user_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          {p.profile?.avatar_url && <AvatarImage src={p.profile.avatar_url} />}
-                          <AvatarFallback className="text-[10px]">
-                            {(p.profile?.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{p.profile?.full_name || 'Usuario'}</span>
-                        {p.is_admin && <Badge variant="secondary" className="text-[10px] h-4">Admin</Badge>}
-                      </div>
-                      {isAdmin && p.user_id !== user?.id && onRemoveParticipant && (
-                        <Button
-                          variant="ghost" size="icon" className="h-6 w-6 text-destructive"
-                          onClick={() => onRemoveParticipant(conversation.id, p.user_id)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setGroupSettingsOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveGroupSettings}>Guardar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <GroupSettingsDialog
+        open={groupSettingsOpen}
+        onOpenChange={setGroupSettingsOpen}
+        conversation={conversation}
+        isAdmin={!!isAdmin}
+        currentUserId={user?.id}
+        onUpdateGroup={onUpdateGroup}
+        onRemoveParticipant={onRemoveParticipant}
+      />
 
-      {/* Participants Dialog */}
-      <Dialog open={participantsOpen} onOpenChange={setParticipantsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" /> Participantes ({conversation?.participants?.length || 0})
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-1 max-h-60 overflow-auto">
-            {conversation?.participants?.map(p => (
-              <div key={p.user_id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    {p.profile?.avatar_url && <AvatarImage src={p.profile.avatar_url} />}
-                    <AvatarFallback className="text-xs">
-                      {(p.profile?.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <span className="text-sm font-medium">{p.profile?.full_name || 'Usuario'}</span>
-                    {p.user_id === conversation?.created_by && (
-                      <Badge variant="secondary" className="ml-2 text-[10px] h-4">Creador</Badge>
-                    )}
-                    {p.is_admin && p.user_id !== conversation?.created_by && (
-                      <Badge variant="outline" className="ml-2 text-[10px] h-4">Admin</Badge>
-                    )}
-                  </div>
-                </div>
-                {isAdmin && p.user_id !== user?.id && onRemoveParticipant && (
-                  <Button
-                    variant="ghost" size="sm" className="h-7 text-destructive text-xs"
-                    onClick={() => { onRemoveParticipant(conversation!.id, p.user_id); }}
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" /> Eliminar
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ParticipantsDialog
+        open={participantsOpen}
+        onOpenChange={setParticipantsOpen}
+        conversation={conversation}
+        isAdmin={!!isAdmin}
+        currentUserId={user?.id}
+        onRemoveParticipant={onRemoveParticipant}
+      />
 
       <VideoCallModal
         open={callModalOpen}
