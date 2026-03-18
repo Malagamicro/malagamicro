@@ -1,71 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useEmailTemplates, useEmailCampaigns } from '@/hooks/useEmailCampaigns';
 import { useEmailProfiles } from '@/hooks/useEmailProfiles';
-import { sanitizeHtml } from '@/lib/sanitize';
 import { useLeads } from '@/hooks/useLeads';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { 
-  Mail, 
-  Plus, 
-  FileText, 
-  Send, 
-  Trash2, 
-  Users,
-  Clock,
-  CheckCircle,
-  Loader2,
-  Info,
-  Pencil,
-  Eye,
-  Sparkles,
-  Bot,
+  Mail, Plus, FileText, Send, Trash2, Users, Clock, CheckCircle, Loader2, Info, Pencil, Eye,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { EmailTemplateEditor, EmailBlock, generateEmailHtml } from './EmailTemplateEditor';
-import { AITemplateChat } from './AITemplateChat';
+import { EmailBlock } from './EmailTemplateEditor';
+import { TemplateDialog, TemplatePreviewDialog, CampaignDialog } from './EmailCampaignDialogs';
 
 interface EmailCampaignsProps {
   prefillEmail?: string | null;
