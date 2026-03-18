@@ -50,7 +50,7 @@ import { SeoGeneratorInline } from '@/components/seo/SeoGeneratorInline';
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
-import { Loader2, ShieldAlert, FileText, Sparkles, CheckCircle2, LayoutGrid, List, Search, Kanban, MapPin, MessageSquare, Ticket, Bot, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, ArrowLeft, Megaphone, MailOpen, FileCode, Activity, Brain, StickyNote, Workflow } from 'lucide-react';
+import { Loader2, ShieldAlert, Search, Kanban, MapPin, MessageSquare, Ticket, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, Megaphone, MailOpen, FileCode, Activity, Brain, StickyNote, FileText } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
