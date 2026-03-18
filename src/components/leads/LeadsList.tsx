@@ -1,7 +1,5 @@
 import { useState, useMemo } from 'react';
 import { Lead, LeadStatus, LeadSegment } from '@/types/lead';
-import { LeadStatusBadge } from './LeadStatusBadge';
-import { LeadScoreBadge } from './LeadScoreBadge';
 import { LeadCard } from './LeadCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,15 +13,9 @@ import {
   Upload,
   Download,
   ArrowUpDown,
-  MessageSquare,
   Loader2,
   FolderOpen,
-  Trash2,
-  AlertTriangle,
   FileSpreadsheet,
-  X,
-  Mail,
-  MessageCircle,
 } from 'lucide-react';
 import {
   Select,
@@ -38,21 +30,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { exportToCSV, exportToExcel } from '@/lib/exportLeads';
 import { toast } from 'sonner';
 import { WhatsAppBulkModal } from './WhatsAppBulkModal';
-import { useLeadFolders, type LeadFolder } from '@/hooks/useLeadFolders';
+import { useLeadFolders } from '@/hooks/useLeadFolders';
 import { useLeads } from '@/hooks/useLeads';
+import { BulkActionBar, LeadsTableView, DeleteLeadsDialog } from './LeadsListSubComponents';
 
 type SortOption = 'recent' | 'score' | 'name';
 
