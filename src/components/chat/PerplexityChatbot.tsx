@@ -567,14 +567,6 @@ export function PerplexityChatbot() {
 
   const selectedModelInfo = MODELS.find(m => m.id === selectedModel) || MODELS[0];
 
-  const formatSessionDate = (date: Date) => {
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'Hoy';
-    if (diffDays === 1) return 'Ayer';
-    if (diffDays < 7) return format(date, 'EEEE', { locale: es });
-    return format(date, 'dd/MM/yyyy');
-  };
 
   const toggleSidebar = () => {
     const panel = sidebarPanelRef.current;
