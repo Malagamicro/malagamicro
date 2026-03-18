@@ -38,17 +38,7 @@ export function CalendarModule() {
   const [showEventDetail, setShowEventDetail] = useState<CalendarEvent | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState<{
-    title: string;
-    description: string;
-    event_date: string;
-    start_time: string;
-    end_time: string;
-    all_day: boolean;
-    color: string;
-    reminder_minutes: number;
-    selectedUsers: { user_id: string; permission: 'view' | 'edit' }[];
-  }>({
+  const [formData, setFormData] = useState<EventFormData>({
     title: '',
     description: '',
     event_date: '',
