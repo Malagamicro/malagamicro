@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { 
-  LayoutDashboard, Users, Search, Mail, MessageSquare, MessagesSquare,
-  MapPin, Settings, LogOut, Kanban, BarChart3, Sun, Moon, Inbox,
-  FileText, Globe, Ticket, FolderOpen, Bot, Cloud, Calculator,
-  Menu, X, Bell, Megaphone, Briefcase, Wrench, MessageCircle,
-  ChevronDown, PanelLeftClose, PanelLeft, Sparkles, Pencil,
-  GripVertical, Plus, RotateCcw, Trash2, FolderPlus, Check,
-  Calendar as CalendarIcon, Palette, Eye, EyeOff,
+  Settings, LogOut, Sun, Moon,
+  Menu, X, ChevronDown, Pencil,
+  GripVertical, RotateCcw, Trash2,
+  Palette, Eye, EyeOff,
   PanelLeft as PanelLeftIcon, PanelRight, PanelTop, PanelBottom,
-  ExternalLink, Link, FileEdit, LayoutGrid, StickyNote,
+  ExternalLink,
 } from 'lucide-react';
 import { ThemeCustomizer } from '@/components/layout/ThemeCustomizer';
 import { QuickNotesPopover } from '@/components/notes/QuickNotesPopover';
