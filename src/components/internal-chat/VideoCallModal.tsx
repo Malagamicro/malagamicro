@@ -599,7 +599,7 @@ export function VideoCallModal({
           </div>
 
           {/* Video grid */}
-          <div className={cn('flex-1 min-h-0 grid gap-1 p-1', getGridClass())}>
+          <div className={cn('flex-1 min-h-0 grid gap-1 p-1', getGridClass(totalParticipants, hasScreenShare))}>
             {hasScreenShare && (
               <div className="relative rounded-lg overflow-hidden bg-[#1a1a1a] col-span-full">
                 {isSelfSharing ? (
