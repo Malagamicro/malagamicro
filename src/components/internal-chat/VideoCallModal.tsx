@@ -584,7 +584,7 @@ export function VideoCallModal({
                   isConnecting ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'
                 )} />
                 <span className="text-sm font-medium">
-                  {isConnecting ? 'Conectando...' : fmt(callDuration)}
+                  {isConnecting ? 'Conectando...' : formatCallDuration(callDuration)}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-white/60">
