@@ -6,9 +6,9 @@
 import { supabase } from "@/integrations/supabase/client";
 
 // Configuration from environment variables
-const EVOLUTION_API_URL = import.meta.env.VITE_EVOLUTION_API_URL || 'https://evolutionapi.malagamicro.com';
-const EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || '11FDB67E6321-4765-930B-67A70A058614';
-const INSTANCE_NAME = import.meta.env.VITE_EVOLUTION_INSTANCE || 'CRM';
+const EVOLUTION_API_URL = import.meta.env.VITE_EVOLUTION_API_URL || '';
+const EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || '';
+const INSTANCE_NAME = import.meta.env.VITE_EVOLUTION_INSTANCE || '';
 
 // Types
 export type ConnectionState = 'open' | 'close' | 'connecting';

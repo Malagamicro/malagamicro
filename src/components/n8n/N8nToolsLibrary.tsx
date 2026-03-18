@@ -8,7 +8,7 @@ import { Copy, Search, Download, BookOpen, Zap, Users, Calendar, Bell, FileText,
 import { toast } from 'sonner';
 import { ApiKeysManager } from './ApiKeysManager';
 
-const BASE_URL_PLACEHOLDER = 'https://tkbwrtdniyijjqmaynow.supabase.co/functions/v1/crm-api';
+const BASE_URL_PLACEHOLDER = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-api`;
 
 interface N8nTool {
   id: string;
