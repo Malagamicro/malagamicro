@@ -5,9 +5,9 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-// Configuration from environment variables with fallbacks for local development
-const WAHA_API_URL = import.meta.env.VITE_WAHA_API_URL || 'http://localhost:3000';
-const WAHA_API_KEY = import.meta.env.VITE_WAHA_API_KEY || '12345678';
+// Configuration from environment variables
+const WAHA_API_URL = import.meta.env.VITE_WAHA_API_URL || '';
+const WAHA_API_KEY = import.meta.env.VITE_WAHA_API_KEY || '';
 const SESSION_NAME = 'default';
 
 // Types
