@@ -689,4 +689,6 @@ export function CalendarModule() {
         toggleUserSelection={toggleUserSelection}
         updateUserPermission={updateUserPermission}
       />
+    </div>
+  );
 }
