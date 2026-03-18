@@ -9,15 +9,11 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { ThemeCustomizer } from '@/components/layout/ThemeCustomizer';
-import { QuickNotesPopover } from '@/components/notes/QuickNotesPopover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from 'next-themes';
@@ -29,6 +25,9 @@ import { useSidebarConfig, SidebarCategory, SidebarItem, SidebarPosition } from 
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import logoFull from '@/assets/logo-full.png';
 import logoIcon from '@/assets/logo-icon.png';
+import { APP_VERSION, APP_BUILD_DATE, getIcon, BG_COLOR_OPTIONS } from './sidebarConstants';
+import { AddCategoryDialog, AddAppDialog, AddLinkDialog } from './SidebarDialogs';
+import { SidebarToggle, CollapsedIconButton } from './SidebarSubComponents';
 
 const APP_VERSION = 'v2.9.0';
 const APP_BUILD_DATE = '2026-02-25 12:00';
