@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserPlus, Trash2, ArrowLeft, Users, KeyRound, ShieldAlert, Unlock } from 'lucide-react';
+import { Loader2, UserPlus, Trash2, ArrowLeft, Users, KeyRound, ShieldAlert, Unlock, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SecurityTab, SecurityBlock } from './AdminUsersSecurityTab';
