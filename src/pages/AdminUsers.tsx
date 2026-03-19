@@ -270,7 +270,7 @@ export default function AdminUsers() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-250:                         <TableHead>Email</TableHead><TableHead>Nombre</TableHead><TableHead>Rol</TableHead><TableHead>Registro</TableHead>
+<TableHead>Email</TableHead><TableHead>Nombre</TableHead><TableHead>Rol</TableHead><TableHead>Registro</TableHead>
                         <TableHead>Último Acceso</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
