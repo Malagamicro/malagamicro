@@ -632,6 +632,14 @@ const IndexContent = () => {
             </div>
           </div>
         );
+      case 'botqueron':
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <div className="flex-1 min-h-0">
+              <BotqueronPanel />
+            </div>
+          </div>
+        );
       default:
         return <Dashboard onViewLead={handleViewLead} />;
     }
