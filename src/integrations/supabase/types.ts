@@ -284,6 +284,54 @@ export type Database = {
         }
         Relationships: []
       }
+      botqueron_appointments: {
+        Row: {
+          appointment_date: string
+          appointment_time: string
+          client_email: string | null
+          client_name: string
+          client_phone: string | null
+          created_at: string | null
+          created_by: string | null
+          duration_minutes: number | null
+          id: string
+          notes: string | null
+          service: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          appointment_date: string
+          appointment_time: string
+          client_email?: string | null
+          client_name: string
+          client_phone?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          service?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          appointment_date?: string
+          appointment_time?: string
+          client_email?: string | null
+          client_name?: string
+          client_phone?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          duration_minutes?: number | null
+          id?: string
+          notes?: string | null
+          service?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       budget_notifications: {
         Row: {
           created_at: string
