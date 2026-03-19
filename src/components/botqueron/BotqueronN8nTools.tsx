@@ -82,15 +82,17 @@ const TOOLS: N8nTool[] = [
 ];
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: 'bg-emerald-100 text-emerald-700 border-emerald-300',
-  POST: 'bg-sky-100 text-sky-700 border-sky-300',
-  PATCH: 'bg-amber-100 text-amber-700 border-amber-300',
-  DELETE: 'bg-red-100 text-red-700 border-red-300',
+  GET: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  POST: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  PATCH: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  DELETE: 'bg-red-500/10 text-red-400 border-red-500/20',
 };
 
 function generateN8nNode(tool: N8nTool): object {
-  const node: Record<string, unknown> = {
+  const nodeName = `Botqueron_${tool.name.replace(/\s+/g, '')}`;
+  const nodeDef: Record<string, unknown> = {
     parameters: {
+      toolDescription: tool.description,
       method: tool.method,
       url: `=${BASE_URL_PLACEHOLDER}${tool.path}`,
       authentication: 'genericCredentialType',
@@ -104,20 +106,29 @@ function generateN8nNode(tool: N8nTool): object {
           { name: 'Prefer', value: 'return=representation' },
         ],
       },
+      options: {}
     },
-    type: 'n8n-nodes-base.httpRequest',
-    typeVersion: 4.2,
+    type: 'n8n-nodes-base.httpRequestTool',
+    typeVersion: 4.3,
     position: [0, 0],
-    name: `Botquerón: ${tool.name}`,
+    id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(7),
+    name: nodeName,
   };
 
   if (tool.body) {
-    (node.parameters as Record<string, unknown>).sendBody = true;
-    (node.parameters as Record<string, unknown>).specifyBody = 'json';
-    (node.parameters as Record<string, unknown>).jsonBody = JSON.stringify(tool.body, null, 2);
+    (nodeDef.parameters as Record<string, unknown>).sendBody = true;
+    (nodeDef.parameters as Record<string, unknown>).specifyBody = 'json';
+    (nodeDef.parameters as Record<string, unknown>).jsonBody = JSON.stringify(tool.body, null, 2);
   }
 
-  return node;
+  return {
+    nodes: [nodeDef],
+    connections: {
+      [nodeName]: {
+        ai_tool: [[]]
+      }
+    }
+  };
 }
 
 export function BotqueronN8nTools() {
@@ -133,46 +144,62 @@ export function BotqueronN8nTools() {
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
-      <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, #0369a1, #0ea5e9)', color: 'white' }}>
-        <h3 className="font-bold text-base mb-1">🤖 Herramientas n8n para tu Agente IA</h3>
-        <p className="text-sky-100 text-xs">
-          Copia estos nodos JSON en tu workflow de n8n para que tu agente de IA pueda gestionar citas automáticamente.
-          Recuerda configurar las variables <code className="bg-white/20 px-1 rounded">SUPABASE_URL</code> y{' '}
-          <code className="bg-white/20 px-1 rounded">SUPABASE_ANON_KEY</code> en tu entorno de n8n.
+      <div className="rounded-xl p-5 bg-slate-900 border border-slate-800 shadow-lg text-slate-100 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl -mr-10 -mt-10" />
+        <h3 className="font-bold text-lg mb-2 text-white flex items-center gap-2">
+          <span className="text-orange-500">🤖</span> Herramientas n8n para Agentes IA
+        </h3>
+        <p className="text-slate-400 text-sm leading-relaxed relative z-10">
+          Copia estos nodos JSON e impórtalos en tu flujo de n8n. Proveen al Agente IA la capacidad de gestionar citas automáticamente usando el nodo <strong className="text-slate-200">HTTP Request Tool</strong>.
+          <br className="my-2" />
+          Asegúrate de definir <code className="bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded text-orange-400">SUPABASE_URL</code> y{' '}
+          <code className="bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded text-orange-400">SUPABASE_ANON_KEY</code> en tu n8n.
         </p>
       </div>
 
-      {TOOLS.map(tool => (
-        <Card key={tool.name} className="p-4 border hover:shadow-md transition-shadow" style={{ background: 'white', borderColor: '#bae6fd' }}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span style={{ color: '#f97316' }}>{tool.icon}</span>
-                <span className="font-semibold text-sm" style={{ color: '#0369a1' }}>{tool.name}</span>
-                <Badge variant="outline" className={`text-xs ${METHOD_COLORS[tool.method]}`}>{tool.method}</Badge>
+      <div className="grid gap-4">
+        {TOOLS.map(tool => (
+          <Card key={tool.name} className="p-4 bg-slate-900 border-slate-800 hover:border-slate-700 transition-colors shadow-none group">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-orange-500 group-hover:scale-105 transition-transform shrink-0">
+                    {tool.icon}
+                  </div>
+                  <h4 className="font-semibold text-slate-200 truncate">{tool.name}</h4>
+                  <Badge variant="outline" className={`ml-auto shrink-0 ${METHOD_COLORS[tool.method]}`}>
+                     {tool.method}
+                  </Badge>
+                </div>
+                
+                <p className="text-sm text-slate-400 mb-3 pl-11">{tool.description}</p>
+                
+                <div className="pl-11 space-y-2">
+                  <div className="bg-slate-950 rounded-md border border-slate-800 p-2 text-xs font-mono text-slate-300 break-all">
+                    {tool.path}
+                  </div>
+                  {tool.body && (
+                    <div className="bg-slate-950 rounded-md border border-slate-800 p-2 overflow-x-auto">
+                      <pre className="text-xs font-mono text-slate-400">
+                        {JSON.stringify(tool.body, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="text-xs mb-2" style={{ color: '#64748b' }}>{tool.description}</p>
-              <code className="text-xs block p-2 rounded" style={{ background: '#f0f9ff', color: '#0369a1', wordBreak: 'break-all' }}>
-                {tool.path}
-              </code>
-              {tool.body && (
-                <pre className="text-xs mt-2 p-2 rounded overflow-x-auto" style={{ background: '#f8fafc', color: '#334155' }}>
-                  {JSON.stringify(tool.body, null, 2)}
-                </pre>
-              )}
+              
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => handleCopy(tool)}
+                className="shrink-0 bg-slate-950 border-slate-700 hover:bg-orange-500/10 hover:text-orange-500 hover:border-orange-500/50 transition-colors text-slate-400"
+              >
+                {copiedId === tool.name ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+              </Button>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleCopy(tool)}
-              style={{ borderColor: '#f97316', color: '#f97316' }}
-              className="shrink-0"
-            >
-              {copiedId === tool.name ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            </Button>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
