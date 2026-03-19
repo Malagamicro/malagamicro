@@ -359,6 +359,19 @@ export default function AdminUsers() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={nameDialogOpen} onOpenChange={setNameDialogOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Cambiar Nombre</DialogTitle><DialogDescription>Nuevo nombre para <strong>{nameTarget?.email}</strong></DialogDescription></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2"><Label htmlFor="new-name">Nombre Completo</Label><Input id="new-name" type="text" placeholder="Nombre del usuario" value={newFullName} onChange={(e) => setNewFullName(e.target.value)} /></div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setNameDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={changeName} disabled={changingName}>{changingName && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Guardar Nombre</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
