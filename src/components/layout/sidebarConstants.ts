@@ -4,6 +4,7 @@ import {
   Ticket, FolderOpen, Bot, Cloud, Calculator, Bell, Megaphone,
   Briefcase, Wrench, MessageCircle, Sparkles, FolderPlus,
   Calendar as CalendarIcon, ExternalLink, Link, FileEdit, LayoutGrid, StickyNote,
+  Fish,
 } from 'lucide-react';
 import type { SidebarItem } from '@/hooks/useSidebarConfig';
 
@@ -16,7 +17,7 @@ export const ICON_MAP: Record<string, React.ComponentType<{ className?: string }
   MapPin, Settings, Kanban, BarChart3, Inbox, FileText, Globe,
   Ticket, FolderOpen, Bot, Cloud, Calculator, Bell, Megaphone,
   Briefcase, Wrench, MessageCircle, Sparkles, FolderPlus, Calendar: CalendarIcon,
-  ExternalLink, Link, FileEdit, LayoutGrid, StickyNote,
+  ExternalLink, Link, FileEdit, LayoutGrid, StickyNote, Fish,
 };
 
 export const ICON_OPTIONS = Object.keys(ICON_MAP);
@@ -62,5 +63,6 @@ export const AVAILABLE_APPS: SidebarItem[] = [
   { id: 'chat-ai', label: 'Chat IA', icon: 'Bot', color: 'text-violet-500' },
   { id: 'editor', label: 'Editor', icon: 'FileEdit', color: 'text-blue-500' },
   { id: 'seo-generator', label: 'SEO', icon: 'Globe', color: 'text-green-500' },
+  { id: 'botqueron', label: 'Botquerón', icon: 'Fish', color: 'text-orange-500' },
   { id: 'settings', label: 'Ajustes', icon: 'Settings', color: 'text-slate-400' },
 ];

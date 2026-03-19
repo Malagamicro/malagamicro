@@ -44,6 +44,7 @@ import { AppsHub } from '@/components/apps/AppsHub';
 import { GeneralRemindersList } from '@/components/reminders/GeneralRemindersList';
 import { SeoArticleGenerator } from '@/components/seo/SeoArticleGenerator';
 import { N8nIntegrationPage } from '@/components/n8n/N8nIntegrationPage';
+import { BotqueronPanel } from '@/components/botqueron/BotqueronPanel';
 import { WorkspacesModule } from '@/components/workspaces/WorkspacesModule';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { SeoGeneratorInline } from '@/components/seo/SeoGeneratorInline';
@@ -628,6 +629,14 @@ const IndexContent = () => {
             />
             <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6 max-w-6xl mx-auto w-full">
               <QuickNotesApp />
+            </div>
+          </div>
+        );
+      case 'botqueron':
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <div className="flex-1 min-h-0">
+              <BotqueronPanel />
             </div>
           </div>
         );
