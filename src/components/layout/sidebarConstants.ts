@@ -17,7 +17,7 @@ export const ICON_MAP: Record<string, React.ComponentType<{ className?: string }
   MapPin, Settings, Kanban, BarChart3, Inbox, FileText, Globe,
   Ticket, FolderOpen, Bot, Cloud, Calculator, Bell, Megaphone,
   Briefcase, Wrench, MessageCircle, Sparkles, FolderPlus, Calendar: CalendarIcon,
-  ExternalLink, Link, FileEdit, LayoutGrid, StickyNote,
+  ExternalLink, Link, FileEdit, LayoutGrid, StickyNote, Fish,
 };
 
 export const ICON_OPTIONS = Object.keys(ICON_MAP);
