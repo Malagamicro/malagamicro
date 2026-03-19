@@ -197,6 +197,24 @@ export default function AdminUsers() {
     } finally { setChangingPassword(false); }
   };
 
+  const changeName = async () => {
+    if (!nameTarget) return;
+    try {
+      setChangingName(true);
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=update-name`, {
+        method: 'POST', headers, body: JSON.stringify({ userId: nameTarget.id, fullName: newFullName }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Error al cambiar nombre');
+      toast({ title: 'Nombre actualizado', description: `El nombre de ${nameTarget.email} ha sido cambiado a "${newFullName}"` });
+      setNameDialogOpen(false); setNewFullName(''); setNameTarget(null);
+      fetchUsers();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally { setChangingName(false); }
+  };
+
   if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (!isAdmin) return null;
 
