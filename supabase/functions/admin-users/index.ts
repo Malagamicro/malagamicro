@@ -388,6 +388,30 @@ serve(async (req) => {
       );
     }
 
+    // UPDATE USER NAME
+    if (req.method === 'POST' && action === 'update-name') {
+      const { userId, fullName } = await req.json();
+
+      if (!userId || fullName === undefined) {
+        return new Response(
+          JSON.stringify({ error: 'User ID and fullName are required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { error: updateError } = await adminClient
+        .from('profiles')
+        .update({ full_name: fullName, updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+
+      if (updateError) throw updateError;
+
+      return new Response(
+        JSON.stringify({ message: 'Name updated successfully' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: 'Invalid action' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
