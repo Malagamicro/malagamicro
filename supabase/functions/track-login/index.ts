@@ -281,50 +281,10 @@ serve(async (req) => {
       blockReasons.push('IP desconocida combinada con comportamiento sospechoso');
     }
 
-    // Create block if critical alerts detected
+    // BLOCKS ARE NO LONGER AUTOMATIC BASED ON NEW IPS OR LOCATION.
+    // IP Blocking is now strictly decoupled and managed by other rules (e.g. 5 failed attempts).
     let blocked = false;
     let blockReason = '';
-    if (blockReasons.length > 0) {
-      // Check if IP is whitelisted (admin previously unblocked it)
-      const { data: whitelisted } = await supabase
-        .from('ip_whitelist')
-        .select('id')
-        .eq('ip_address', ip)
-        .limit(1)
-        .maybeSingle();
-
-      if (whitelisted) {
-        console.log(`Skipping block for whitelisted IP: ${ip}`);
-      } else {
-      // Check if user was recently unblocked (grace period of 1 hour)
-      const oneHourAgoISO = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-      const { data: recentUnblock } = await supabase
-        .from('login_security_blocks')
-        .select('id, resolved_at')
-        .eq('user_id', user.id)
-        .eq('is_active', false)
-        .not('resolved_at', 'is', null)
-        .gte('resolved_at', oneHourAgoISO)
-        .limit(1)
-        .maybeSingle();
-
-      if (!recentUnblock) {
-        blockReason = blockReasons.join('; ');
-        const expiresAt = new Date(now.getTime() + BLOCK_DURATION_HOURS * 60 * 60 * 1000).toISOString();
-        
-        await supabase.from('login_security_blocks').insert({
-          user_id: user.id,
-          ip_address: ip,
-          reason: blockReason,
-          alert_details: { alerts: alerts.length, ip, geo, device_type, user_agent },
-          expires_at: expiresAt,
-        });
-        blocked = true;
-      } else {
-        console.log(`Skipping re-block for user ${user.id}: recently unblocked at ${recentUnblock.resolved_at}`);
-      }
-      } // end whitelisted check
-    }
 
     // Send alert email if any checks triggered
     if (alerts.length > 0) {
