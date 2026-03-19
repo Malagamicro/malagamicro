@@ -226,7 +226,7 @@ export function LoginSupportPanel({ show, onToggle, cooldownRemaining }: LoginSu
 
       const SUPPORT_COOLDOWN_MS = 5 * 60 * 1000;
       const cooldownEnd = Date.now() + SUPPORT_COOLDOWN_MS;
-      localStorage.setItem('login_support_last_sent', cooldownEnd.toString());
+      sessionStorage.setItem('login_support_last_sent', cooldownEnd.toString());
       setSupportMessage('');
       onToggle();
       toast({ title: 'Enviado', description: 'Tu mensaje ha sido enviado al administrador.' });

@@ -9,26 +9,22 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 const STORAGE_KEY = 'login_rate_limit';
 
+const store = new Map<string, RateLimitState>();
+
 function getStoredState(email: string): RateLimitState {
-  try {
-    const stored = localStorage.getItem(`${STORAGE_KEY}_${email}`);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Clear expired lockout
-      if (parsed.lockedUntil && Date.now() > parsed.lockedUntil) {
-        localStorage.removeItem(`${STORAGE_KEY}_${email}`);
-        return { attempts: 0, lockedUntil: null };
-      }
-      return parsed;
+  const stored = store.get(email);
+  if (stored) {
+    if (stored.lockedUntil && Date.now() > stored.lockedUntil) {
+      store.delete(email);
+      return { attempts: 0, lockedUntil: null };
     }
-  } catch {
-    // Invalid stored data
+    return stored;
   }
   return { attempts: 0, lockedUntil: null };
 }
 
 function saveState(email: string, state: RateLimitState) {
-  localStorage.setItem(`${STORAGE_KEY}_${email}`, JSON.stringify(state));
+  store.set(email, state);
 }
 
 export function useLoginRateLimit(email: string) {
@@ -91,7 +87,7 @@ export function useLoginRateLimit(email: string) {
   }, [email]);
 
   const resetAttempts = useCallback(() => {
-    localStorage.removeItem(`${STORAGE_KEY}_${email}`);
+    store.delete(email);
     setState({ attempts: 0, lockedUntil: null });
   }, [email]);
 
