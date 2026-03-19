@@ -63,5 +63,6 @@ export const AVAILABLE_APPS: SidebarItem[] = [
   { id: 'chat-ai', label: 'Chat IA', icon: 'Bot', color: 'text-violet-500' },
   { id: 'editor', label: 'Editor', icon: 'FileEdit', color: 'text-blue-500' },
   { id: 'seo-generator', label: 'SEO', icon: 'Globe', color: 'text-green-500' },
+  { id: 'botqueron', label: 'Botquerón', icon: 'Fish', color: 'text-orange-500' },
   { id: 'settings', label: 'Ajustes', icon: 'Settings', color: 'text-slate-400' },
 ];
