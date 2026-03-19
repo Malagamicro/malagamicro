@@ -27,6 +27,7 @@ interface User {
   email_confirmed_at: string | null;
   last_sign_in_at: string | null;
   roles: string[];
+  full_name: string | null;
 }
 
 export default function AdminUsers() {
