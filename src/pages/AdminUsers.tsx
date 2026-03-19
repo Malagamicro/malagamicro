@@ -51,6 +51,10 @@ export default function AdminUsers() {
   const [blocksLoading, setBlocksLoading] = useState(false);
   const [unblocking, setUnblocking] = useState<string | null>(null);
   const [userBlocks, setUserBlocks] = useState<Record<string, boolean>>({});
+  const [nameDialogOpen, setNameDialogOpen] = useState(false);
+  const [nameTarget, setNameTarget] = useState<{ id: string; email: string; fullName: string } | null>(null);
+  const [newFullName, setNewFullName] = useState('');
+  const [changingName, setChangingName] = useState(false);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
 
