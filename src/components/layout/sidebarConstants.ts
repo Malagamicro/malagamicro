@@ -4,6 +4,7 @@ import {
   Ticket, FolderOpen, Bot, Cloud, Calculator, Bell, Megaphone,
   Briefcase, Wrench, MessageCircle, Sparkles, FolderPlus,
   Calendar as CalendarIcon, ExternalLink, Link, FileEdit, LayoutGrid, StickyNote,
+  Fish,
 } from 'lucide-react';
 import type { SidebarItem } from '@/hooks/useSidebarConfig';
 
