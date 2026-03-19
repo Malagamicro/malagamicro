@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserPlus, Trash2, ArrowLeft, Users, KeyRound, ShieldAlert, Unlock } from 'lucide-react';
+import { Loader2, UserPlus, Trash2, ArrowLeft, Users, KeyRound, ShieldAlert, Unlock, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SecurityTab, SecurityBlock } from './AdminUsersSecurityTab';
@@ -27,6 +27,7 @@ interface User {
   email_confirmed_at: string | null;
   last_sign_in_at: string | null;
   roles: string[];
+  full_name: string | null;
 }
 
 export default function AdminUsers() {
@@ -50,6 +51,10 @@ export default function AdminUsers() {
   const [blocksLoading, setBlocksLoading] = useState(false);
   const [unblocking, setUnblocking] = useState<string | null>(null);
   const [userBlocks, setUserBlocks] = useState<Record<string, boolean>>({});
+  const [nameDialogOpen, setNameDialogOpen] = useState(false);
+  const [nameTarget, setNameTarget] = useState<{ id: string; email: string; fullName: string } | null>(null);
+  const [newFullName, setNewFullName] = useState('');
+  const [changingName, setChangingName] = useState(false);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
 
@@ -192,6 +197,24 @@ export default function AdminUsers() {
     } finally { setChangingPassword(false); }
   };
 
+  const changeName = async () => {
+    if (!nameTarget) return;
+    try {
+      setChangingName(true);
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users?action=update-name`, {
+        method: 'POST', headers, body: JSON.stringify({ userId: nameTarget.id, fullName: newFullName }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Error al cambiar nombre');
+      toast({ title: 'Nombre actualizado', description: `El nombre de ${nameTarget.email} ha sido cambiado a "${newFullName}"` });
+      setNameDialogOpen(false); setNewFullName(''); setNameTarget(null);
+      fetchUsers();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally { setChangingName(false); }
+  };
+
   if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (!isAdmin) return null;
 
@@ -247,7 +270,7 @@ export default function AdminUsers() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Email</TableHead><TableHead>Rol</TableHead><TableHead>Registro</TableHead>
+<TableHead>Email</TableHead><TableHead>Nombre</TableHead><TableHead>Rol</TableHead><TableHead>Registro</TableHead>
                         <TableHead>Último Acceso</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -259,6 +282,15 @@ export default function AdminUsers() {
                               {u.email}
                               {u.email === ADMIN_EMAIL && <Badge variant="outline" className="text-xs">Admin Principal</Badge>}
                               {userBlocks[u.id] && <Badge variant="destructive" className="text-xs gap-1"><ShieldAlert className="h-3 w-3" />Bloqueado</Badge>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm">{u.full_name || <span className="text-muted-foreground italic">Sin nombre</span>}</span>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" title="Cambiar nombre"
+                                onClick={() => { setNameTarget({ id: u.id, email: u.email || '', fullName: u.full_name || '' }); setNewFullName(u.full_name || ''); setNameDialogOpen(true); }}>
+                                <Pencil className="h-3 w-3" />
+                              </Button>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -324,6 +356,19 @@ export default function AdminUsers() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>Cancelar</Button>
               <Button onClick={changePassword} disabled={changingPassword || newPassword.length < 6}>{changingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Cambiar Contraseña</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={nameDialogOpen} onOpenChange={setNameDialogOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Cambiar Nombre</DialogTitle><DialogDescription>Nuevo nombre para <strong>{nameTarget?.email}</strong></DialogDescription></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2"><Label htmlFor="new-name">Nombre Completo</Label><Input id="new-name" type="text" placeholder="Nombre del usuario" value={newFullName} onChange={(e) => setNewFullName(e.target.value)} /></div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setNameDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={changeName} disabled={changingName}>{changingName && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Guardar Nombre</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

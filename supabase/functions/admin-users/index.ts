@@ -80,6 +80,10 @@ serve(async (req) => {
         .from('user_roles')
         .select('user_id, role');
 
+      const { data: profiles } = await adminClient
+        .from('profiles')
+        .select('user_id, full_name');
+
       const rolesMap = new Map();
       roles?.forEach(r => {
         if (!rolesMap.has(r.user_id)) {
@@ -88,13 +92,19 @@ serve(async (req) => {
         rolesMap.get(r.user_id).push(r.role);
       });
 
+      const profilesMap = new Map();
+      profiles?.forEach(p => {
+        profilesMap.set(p.user_id, p.full_name);
+      });
+
       const usersWithRoles = users.map(u => ({
         id: u.id,
         email: u.email,
         created_at: u.created_at,
         email_confirmed_at: u.email_confirmed_at,
         last_sign_in_at: u.last_sign_in_at,
-        roles: rolesMap.get(u.id) || []
+        roles: rolesMap.get(u.id) || [],
+        full_name: profilesMap.get(u.id) || null
       }));
 
       return new Response(
@@ -374,6 +384,30 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ message: `IP ${ip_address} bloqueada por ${hours}h`, expires_at: expiresAt }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // UPDATE USER NAME
+    if (req.method === 'POST' && action === 'update-name') {
+      const { userId, fullName } = await req.json();
+
+      if (!userId || fullName === undefined) {
+        return new Response(
+          JSON.stringify({ error: 'User ID and fullName are required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { error: updateError } = await adminClient
+        .from('profiles')
+        .update({ full_name: fullName, updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+
+      if (updateError) throw updateError;
+
+      return new Response(
+        JSON.stringify({ message: 'Name updated successfully' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
