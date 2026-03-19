@@ -285,6 +285,15 @@ export default function AdminUsers() {
                             </div>
                           </TableCell>
                           <TableCell>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm">{u.full_name || <span className="text-muted-foreground italic">Sin nombre</span>}</span>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" title="Cambiar nombre"
+                                onClick={() => { setNameTarget({ id: u.id, email: u.email || '', fullName: u.full_name || '' }); setNewFullName(u.full_name || ''); setNameDialogOpen(true); }}>
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             <Select value={u.roles[0] || 'user'} onValueChange={(role) => setUserRole(u.id, role)} disabled={u.email === ADMIN_EMAIL}>
                               <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                               <SelectContent><SelectItem value="user">Usuario</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
