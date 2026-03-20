@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format, parseISO, isToday, isTomorrow, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Bot, Calendar, Plus, ChevronLeft, ChevronRight, Clock, Trash2, Edit2, Phone, Mail, FileText, ExternalLink } from 'lucide-react';
+import { Bot, Calendar, Plus, ChevronLeft, ChevronRight, Clock, Trash2, Edit2, Phone, Mail, FileText, ExternalLink, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
