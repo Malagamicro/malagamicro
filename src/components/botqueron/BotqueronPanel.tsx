@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format, parseISO, isToday, isTomorrow, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Bot, Calendar, Plus, ChevronLeft, ChevronRight, Clock, Trash2, Edit2, Phone, Mail, FileText, ExternalLink } from 'lucide-react';
+import { Bot, Calendar, Plus, ChevronLeft, ChevronRight, Clock, Trash2, Edit2, Phone, Mail, FileText, ExternalLink, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,6 +14,7 @@ import { useBotqueronAppointments, BotqueronAppointment } from '@/hooks/useBotqu
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { BotqueronN8nTools } from './BotqueronN8nTools';
+import { BotqueronKnowledgeBase } from './BotqueronKnowledgeBase';
 
 const SERVICES = ['Consulta Agente IA', 'Demo Agente', 'Configuración Bot', 'Soporte Técnico', 'Plan Personalizado'];
 const STATUS_COLORS: Record<string, string> = {
@@ -35,7 +36,7 @@ export function BotqueronPanel() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showForm, setShowForm] = useState(false);
   const [editingAppt, setEditingAppt] = useState<BotqueronAppointment | null>(null);
-  const [activeView, setActiveView] = useState<'calendar' | 'tools'>('calendar');
+  const [activeView, setActiveView] = useState<'calendar' | 'tools' | 'knowledge'>('calendar');
 
   const [formData, setFormData] = useState({
     client_name: '',
@@ -144,6 +145,16 @@ export function BotqueronPanel() {
             </Button>
             <Button
               size="sm"
+              onClick={() => setActiveView('knowledge')}
+              className={`transition-colors ${activeView === 'knowledge'
+                ? 'bg-orange-500 hover:bg-orange-600 text-white border-transparent'
+                : 'bg-transparent text-slate-400 border-slate-700 hover:text-slate-200 hover:bg-slate-800'}`}
+              variant={activeView === 'knowledge' ? 'default' : 'outline'}
+            >
+              <BookOpen className="w-4 h-4 mr-2" /> RAG
+            </Button>
+            <Button
+              size="sm"
               onClick={() => setActiveView('tools')}
               className={`transition-colors ${activeView === 'tools'
                 ? 'bg-orange-500 hover:bg-orange-600 text-white border-transparent'
@@ -159,6 +170,10 @@ export function BotqueronPanel() {
       {activeView === 'tools' ? (
         <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           <BotqueronN8nTools />
+        </div>
+      ) : activeView === 'knowledge' ? (
+        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+          <BotqueronKnowledgeBase />
         </div>
       ) : (
         <div className="flex-1 overflow-auto flex flex-col lg:flex-row">

@@ -131,3 +131,6 @@ verify_jwt = false
 
 [functions.track-login]
 verify_jwt = false
+
+[functions.botqueron-rag]
+verify_jwt = false
