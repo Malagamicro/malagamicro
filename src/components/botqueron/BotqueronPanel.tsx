@@ -145,6 +145,16 @@ export function BotqueronPanel() {
             </Button>
             <Button
               size="sm"
+              onClick={() => setActiveView('knowledge')}
+              className={`transition-colors ${activeView === 'knowledge'
+                ? 'bg-orange-500 hover:bg-orange-600 text-white border-transparent'
+                : 'bg-transparent text-slate-400 border-slate-700 hover:text-slate-200 hover:bg-slate-800'}`}
+              variant={activeView === 'knowledge' ? 'default' : 'outline'}
+            >
+              <BookOpen className="w-4 h-4 mr-2" /> RAG
+            </Button>
+            <Button
+              size="sm"
               onClick={() => setActiveView('tools')}
               className={`transition-colors ${activeView === 'tools'
                 ? 'bg-orange-500 hover:bg-orange-600 text-white border-transparent'
