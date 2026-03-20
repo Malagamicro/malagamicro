@@ -14,6 +14,7 @@ import { useBotqueronAppointments, BotqueronAppointment } from '@/hooks/useBotqu
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { BotqueronN8nTools } from './BotqueronN8nTools';
+import { BotqueronKnowledgeBase } from './BotqueronKnowledgeBase';
 
 const SERVICES = ['Consulta Agente IA', 'Demo Agente', 'Configuración Bot', 'Soporte Técnico', 'Plan Personalizado'];
 const STATUS_COLORS: Record<string, string> = {
