@@ -36,7 +36,7 @@ export function BotqueronPanel() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showForm, setShowForm] = useState(false);
   const [editingAppt, setEditingAppt] = useState<BotqueronAppointment | null>(null);
-  const [activeView, setActiveView] = useState<'calendar' | 'tools'>('calendar');
+  const [activeView, setActiveView] = useState<'calendar' | 'tools' | 'knowledge'>('calendar');
 
   const [formData, setFormData] = useState({
     client_name: '',
