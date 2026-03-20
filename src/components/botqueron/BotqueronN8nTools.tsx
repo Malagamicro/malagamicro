@@ -79,6 +79,25 @@ const TOOLS: N8nTool[] = [
     path: '/rest/v1/botqueron_appointments?appointment_date=eq.{{YYYY-MM-DD}}&appointment_time=eq.{{HH:mm}}&status=neq.cancelada',
     icon: <Calendar className="w-4 h-4" />,
   },
+  {
+    name: 'RAG - Buscar Conocimiento',
+    description: 'Busca información relevante en la base de conocimiento para responder preguntas del usuario. Usa el campo "context" de la respuesta como contexto para generar la respuesta.',
+    method: 'POST',
+    path: '/functions/v1/botqueron-rag',
+    icon: <BookOpen className="w-4 h-4" />,
+    body: {
+      query: '{{pregunta_del_usuario}}',
+      category: '',
+      limit: 5,
+    },
+  },
+  {
+    name: 'RAG - Listar Base de Conocimiento',
+    description: 'Lista todos los documentos disponibles en la base de conocimiento',
+    method: 'GET',
+    path: '/rest/v1/botqueron_knowledge?select=id,title,category,tags&order=created_at.desc',
+    icon: <Search className="w-4 h-4" />,
+  },
 ];
 
 const METHOD_COLORS: Record<string, string> = {
