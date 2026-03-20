@@ -171,6 +171,10 @@ export function BotqueronPanel() {
         <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           <BotqueronN8nTools />
         </div>
+      ) : activeView === 'knowledge' ? (
+        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+          <BotqueronKnowledgeBase />
+        </div>
       ) : (
         <div className="flex-1 overflow-auto flex flex-col lg:flex-row">
           {/* Calendar Sidebar */}
