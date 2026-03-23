@@ -286,15 +286,17 @@ export function useGoogleSheetsSync(configId?: string) {
   const config = configs.find(c => c.id === configId);
 
   // Fetch headers from sheet (for column mapping UI)
+  const fetchSheetText = useCallback(async (spreadsheetId: string, sheetName: string): Promise<string> => {
+    const { data, error } = await supabase.functions.invoke('google-sheets-proxy', {
+      body: { spreadsheetId, sheetName },
+    });
+    if (error) throw new Error('No se pudo acceder a la hoja. Asegúrate de que es pública.');
+    if (data?.error) throw new Error(data.error);
+    return data.data as string;
+  }, []);
+
   const fetchHeaders = useCallback(async (spreadsheetId: string, sheetName: string): Promise<string[]> => {
-    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error('No se pudo acceder a la hoja. Asegúrate de que es pública.');
-    }
-    
-    const text = await response.text();
+    const text = await fetchSheetText(spreadsheetId, sheetName);
     const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?$/);
     if (!jsonMatch) {
       throw new Error('Formato de respuesta no válido.');
@@ -316,7 +318,7 @@ export function useGoogleSheetsSync(configId?: string) {
     }
     
     return headers.filter((h: string) => h);
-  }, []);
+  }, [fetchSheetText]);
 
   // Fetch data from Google Sheets
   const fetchSheetData = async (spreadsheetId: string, sheetName: string): Promise<SheetRow[]> => {
