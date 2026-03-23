@@ -254,7 +254,7 @@ export function LeadImportModal({
           autoMapping.source = header;
         } else if (lowerHeader.includes('equipo') || lowerHeader.includes('equipment')) {
           autoMapping.equipmentCount = header;
-        } else if (lowerHeader.includes('nota') || lowerHeader.includes('notes') || lowerHeader.includes('comentario')) {
+        } else if (lowerHeader.includes('nota') || lowerHeader.includes('notes') || lowerHeader.includes('comentario') || lowerHeader.includes('mensaje') || lowerHeader.includes('busca')) {
           autoMapping.notes = header;
         } else if (lowerHeader.includes('etiqueta') || lowerHeader.includes('tag')) {
           autoMapping.tags = header;

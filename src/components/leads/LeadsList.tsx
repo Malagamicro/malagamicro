@@ -16,6 +16,7 @@ import {
   Loader2,
   FolderOpen,
   FileSpreadsheet,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Select,
@@ -35,6 +36,7 @@ import { toast } from 'sonner';
 import { WhatsAppBulkModal } from './WhatsAppBulkModal';
 import { useLeadFolders } from '@/hooks/useLeadFolders';
 import { useLeads } from '@/hooks/useLeads';
+import { useGoogleSheetsConfigs, useGoogleSheetsSync } from '@/hooks/useGoogleSheetsSync';
 import { BulkActionBar, LeadsTableView, DeleteLeadsDialog } from './LeadsListSubComponents';
 
 type SortOption = 'recent' | 'score' | 'name';
@@ -69,6 +71,18 @@ export function LeadsList({
 }: LeadsListProps) {
   const { folders } = useLeadFolders();
   const { bulkDeleteLeads, isBulkDeleting } = useLeads();
+  const { configs } = useGoogleSheetsConfigs();
+  const mainConfig = configs[0];
+  const { sync, isSyncing } = useGoogleSheetsSync(mainConfig?.id);
+
+  const handleQuickSync = () => {
+    if (mainConfig) {
+      sync(mainConfig);
+    } else {
+      onImportFromGoogleSheets();
+    }
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [segmentFilter, setSegmentFilter] = useState<LeadSegment | 'all'>('all');
@@ -171,6 +185,17 @@ export function LeadsList({
         
         {/* Secondary actions - horizontal scroll on mobile */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1.5 h-8 md:h-9 text-xs md:text-sm shrink-0" 
+            onClick={handleQuickSync}
+            disabled={isSyncing}
+          >
+            {isSyncing ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+            <span className="hidden sm:inline">Sincronizar Sheets</span>
+            <span className="sm:hidden">Sincronizar</span>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5 h-8 md:h-9 text-xs md:text-sm shrink-0" disabled={leads.length === 0}>

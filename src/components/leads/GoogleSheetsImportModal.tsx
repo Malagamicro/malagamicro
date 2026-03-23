@@ -10,6 +10,7 @@ import {
   Loader2,
   Check,
   ExternalLink,
+  Edit,
 } from 'lucide-react';
 import { 
   useGoogleSheetsConfigs, 
@@ -40,11 +41,14 @@ interface GoogleSheetsImportModalProps {
 }
 
 export function GoogleSheetsImportModal({ open, onOpenChange }: GoogleSheetsImportModalProps) {
-  const { configs, isLoading, createConfig } = useGoogleSheetsConfigs();
+  const { configs, isLoading, createConfig, updateConfig } = useGoogleSheetsConfigs();
   const [selectedConfigId, setSelectedConfigId] = useState<string>('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickSpreadsheetId, setQuickSpreadsheetId] = useState('');
   const [quickSheetName, setQuickSheetName] = useState('Hoja 1');
+  const [quickName, setQuickName] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState('');
   
   const selectedConfig = configs.find(c => c.id === selectedConfigId);
   const { sync, isSyncing, lastResult } = useGoogleSheetsSync(selectedConfigId);
@@ -59,7 +63,7 @@ export function GoogleSheetsImportModal({ open, onOpenChange }: GoogleSheetsImpo
     if (!quickSpreadsheetId) return;
     
     createConfig.mutate({
-      name: `Sheet ${format(new Date(), 'dd/MM HH:mm')}`,
+      name: quickName.trim() || `Sheet ${format(new Date(), 'dd/MM HH:mm')}`,
       spreadsheet_id: extractSpreadsheetId(quickSpreadsheetId),
       sheet_name: quickSheetName || 'Hoja 1',
       auto_sync_enabled: false,
@@ -70,6 +74,7 @@ export function GoogleSheetsImportModal({ open, onOpenChange }: GoogleSheetsImpo
         setShowQuickAdd(false);
         setQuickSpreadsheetId('');
         setQuickSheetName('Hoja 1');
+        setQuickName('');
         if (data?.id) {
           setSelectedConfigId(data.id);
         }
@@ -80,6 +85,12 @@ export function GoogleSheetsImportModal({ open, onOpenChange }: GoogleSheetsImpo
   const handleSync = async () => {
     if (!selectedConfig) return;
     await sync(selectedConfig);
+  };
+
+  const handleSaveName = () => {
+    if (!selectedConfig || !editNameValue.trim()) return;
+    updateConfig.mutate({ id: selectedConfig.id, name: editNameValue.trim() });
+    setIsEditingName(false);
   };
 
   return (
@@ -111,6 +122,14 @@ export function GoogleSheetsImportModal({ open, onOpenChange }: GoogleSheetsImpo
             </div>
           ) : showQuickAdd ? (
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nombre para mostrar (Opcional)</Label>
+                <Input
+                  placeholder="Ej. LEADS BOTQUERON"
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                />
+              </div>
               <div className="space-y-2">
                 <Label>URL o ID de la hoja de Google</Label>
                 <Input
@@ -172,8 +191,41 @@ export function GoogleSheetsImportModal({ open, onOpenChange }: GoogleSheetsImpo
                 <div className="p-4 border rounded-lg space-y-3 bg-muted/30">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">{selectedConfig.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        {isEditingName ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editNameValue}
+                              onChange={(e) => setEditNameValue(e.target.value)}
+                              className="h-7 text-sm w-40"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveName();
+                                if (e.key === 'Escape') setIsEditingName(false);
+                              }}
+                            />
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}>
+                              <Check className="h-4 w-4 text-green-600" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="font-medium text-foreground">{selectedConfig.name}</p>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground" 
+                              onClick={() => {
+                                setEditNameValue(selectedConfig.name);
+                                setIsEditingName(true);
+                              }}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         Pestaña: {selectedConfig.sheet_name}
                       </p>
                     </div>
