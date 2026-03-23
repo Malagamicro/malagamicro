@@ -322,14 +322,7 @@ export function useGoogleSheetsSync(configId?: string) {
 
   // Fetch data from Google Sheets
   const fetchSheetData = async (spreadsheetId: string, sheetName: string): Promise<SheetRow[]> => {
-    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Error al acceder a la hoja: ${response.status}`);
-    }
-    
-    const text = await response.text();
+    const text = await fetchSheetText(spreadsheetId, sheetName);
     const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?$/);
     if (!jsonMatch) {
       throw new Error('Formato de respuesta no válido.');
