@@ -19,19 +19,26 @@ Deno.serve(async (req) => {
     }
 
     const sheet = sheetName || 'Hoja 1';
-    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}`;
+    // Use the public CSV export URL which doesn't require authentication
+    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=${encodeURIComponent(sheet)}`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+      },
+      redirect: 'follow',
+    });
+
     if (!response.ok) {
-      return new Response(JSON.stringify({ error: `Google responded with ${response.status}` }), {
+      return new Response(JSON.stringify({ error: `Google responded with ${response.status}. Asegúrate de que la hoja es pública.` }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const text = await response.text();
+    const csvText = await response.text();
 
-    return new Response(JSON.stringify({ data: text }), {
+    return new Response(JSON.stringify({ data: csvText, format: 'csv' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
