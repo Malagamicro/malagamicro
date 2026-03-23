@@ -285,8 +285,53 @@ export function useGoogleSheetsSync(configId?: string) {
   const { configs, updateConfig } = useGoogleSheetsConfigs();
   const config = configs.find(c => c.id === configId);
 
-  // Fetch headers from sheet (for column mapping UI)
-  const fetchSheetText = useCallback(async (spreadsheetId: string, sheetName: string): Promise<string> => {
+  // Parse CSV text into rows
+  const parseCsv = useCallback((csvText: string): { headers: string[]; rows: SheetRow[] } => {
+    const lines = csvText.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return { headers: [], rows: [] };
+
+    const parseLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const headers = parseLine(lines[0]);
+    const rows: SheetRow[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseLine(lines[i]);
+      const obj: SheetRow = {};
+      let hasData = false;
+      headers.forEach((h, idx) => {
+        if (h) {
+          obj[h] = values[idx] || '';
+          if (values[idx]) hasData = true;
+        }
+      });
+      if (hasData) rows.push(obj);
+    }
+    return { headers: headers.filter(h => h), rows };
+  }, []);
+
+  const fetchSheetCsv = useCallback(async (spreadsheetId: string, sheetName: string): Promise<string> => {
     const { data, error } = await supabase.functions.invoke('google-sheets-proxy', {
       body: { spreadsheetId, sheetName },
     });
@@ -296,80 +341,15 @@ export function useGoogleSheetsSync(configId?: string) {
   }, []);
 
   const fetchHeaders = useCallback(async (spreadsheetId: string, sheetName: string): Promise<string[]> => {
-    const text = await fetchSheetText(spreadsheetId, sheetName);
-    const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?$/);
-    if (!jsonMatch) {
-      throw new Error('Formato de respuesta no válido.');
-    }
-    
-    const data = JSON.parse(jsonMatch[1]);
-    const table = data.table;
-    
-    if (!table || !table.rows || table.rows.length === 0) {
-      return [];
-    }
-    
-    let headers: string[] = table.cols.map((col: any) => col.label || col.id || '');
-    
-    if (headers.every((h: string) => !h || h.match(/^[A-Z]$/))) {
-      if (table.rows[0]) {
-        headers = table.rows[0].c.map((cell: any) => cell?.v?.toString() || '');
-      }
-    }
-    
-    return headers.filter((h: string) => h);
-  }, [fetchSheetText]);
+    const csvText = await fetchSheetCsv(spreadsheetId, sheetName);
+    const { headers } = parseCsv(csvText);
+    return headers;
+  }, [fetchSheetCsv, parseCsv]);
 
   // Fetch data from Google Sheets
   const fetchSheetData = async (spreadsheetId: string, sheetName: string): Promise<SheetRow[]> => {
-    const text = await fetchSheetText(spreadsheetId, sheetName);
-    const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?$/);
-    if (!jsonMatch) {
-      throw new Error('Formato de respuesta no válido.');
-    }
-    
-    const data = JSON.parse(jsonMatch[1]);
-    if (data.status === 'error') {
-      throw new Error(data.errors?.[0]?.detailed_message || 'Error al leer la hoja');
-    }
-    
-    const table = data.table;
-    if (!table || !table.rows || table.rows.length === 0) {
-      return [];
-    }
-    
-    let headers: string[] = table.cols.map((col: any) => col.label || col.id || '');
-    let dataStartIndex = 0;
-    
-    if (headers.every(h => !h || h.match(/^[A-Z]$/))) {
-      if (table.rows[0]) {
-        headers = table.rows[0].c.map((cell: any) => cell?.v?.toString() || '');
-        dataStartIndex = 1;
-      }
-    }
-    
-    const rows: SheetRow[] = [];
-    for (let i = dataStartIndex; i < table.rows.length; i++) {
-      const row = table.rows[i];
-      if (!row || !row.c) continue;
-      
-      const obj: SheetRow = {};
-      let hasData = false;
-      
-      row.c.forEach((cell: any, idx: number) => {
-        const header = headers[idx];
-        if (header) {
-          const value = cell?.v?.toString() || '';
-          obj[header] = value;
-          if (value) hasData = true;
-        }
-      });
-      
-      if (hasData) {
-        rows.push(obj);
-      }
-    }
-    
+    const csvText = await fetchSheetCsv(spreadsheetId, sheetName);
+    const { rows } = parseCsv(csvText);
     return rows;
   };
 
