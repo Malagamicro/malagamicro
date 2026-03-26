@@ -499,6 +499,14 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_current_time",
+      description: "Obtener la fecha y hora actual en Madrid (España). Úsalo cuando necesites saber el día de la semana, la fecha exacta o la hora para calendarios, saludos o dudas.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
 ];
 // Confirmation check for write operations
 function needsConfirmation(toolName: string, args: Record<string, unknown>): string | null {
@@ -1400,6 +1408,27 @@ async function executeToolCall(
         return JSON.stringify({ success: true, message: `Notificación enviada: "${title}"` });
       }
 
+      case "get_current_time": {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('es-ES', {
+          timeZone: 'Europe/Madrid',
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        const dateString = formatter.format(now);
+        return JSON.stringify({
+          success: true,
+          message: `La fecha y hora actual en Madrid es: ${dateString}`,
+          iso: now.toISOString(),
+          timezone: 'Europe/Madrid'
+        });
+      }
+
       default:
         return JSON.stringify({ error: `Herramienta desconocida: ${toolName}` });
     }
@@ -1489,6 +1518,7 @@ HERRAMIENTAS DISPONIBLES:
 - get_ai_memories (consultar recuerdos almacenados sobre leads o usuario)
 - view_shared_file (ver/describir un archivo o imagen compartida - busca por nombre)
 - view_ai_memory_file (leer archivos de la Memoria IA: PDF, DOCX, Excel, imágenes, texto, CSV y más - el texto se extrae automáticamente al subirse)
+- get_current_time (obtener la fecha y hora actual exacta en Madrid)
 
 🖼️ CAPACIDAD VISUAL Y DOCUMENTAL:
 - Puedes recibir y analizar imágenes que el usuario adjunte directamente en el chat.
