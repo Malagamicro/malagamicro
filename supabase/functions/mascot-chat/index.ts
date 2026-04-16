@@ -181,13 +181,13 @@ const tools = [
     type: "function",
     function: {
       name: "create_reminder",
-      description: "Crear un nuevo recordatorio general. REQUIERE CONFIRMACIÓN. Puede asignar a otros usuarios del equipo.",
+      description: "Crear un nuevo recordatorio general. REQUIERE CONFIRMACIÓN. Puede asignar a otros usuarios del equipo. IMPORTANTE: Usa SIEMPRE el calendario de referencia del system prompt para determinar la fecha ISO correcta. NUNCA calcules días de la semana por tu cuenta.",
       parameters: {
         type: "object",
         properties: {
           title: { type: "string", description: "Título del recordatorio" },
           description: { type: "string", description: "Descripción" },
-          reminder_date: { type: "string", description: "Fecha y hora (formato ISO o YYYY-MM-DD HH:MM)" },
+          reminder_date: { type: "string", description: "Fecha y hora (formato ISO o YYYY-MM-DD HH:MM). Consulta el calendario de referencia para convertir expresiones como 'el lunes' o 'mañana' a la fecha ISO correcta." },
           priority: { type: "string", description: "Prioridad: low, normal, high, urgent (default: normal)" },
           category: { type: "string", description: "Categoría (default: general)" },
           target_users: {
@@ -266,12 +266,12 @@ const tools = [
     type: "function",
     function: {
       name: "create_calendar_event",
-      description: "Crear un nuevo evento en el calendario. REQUIERE CONFIRMACIÓN. Puede añadir participantes (usuarios del equipo).",
+      description: "Crear un nuevo evento en el calendario. REQUIERE CONFIRMACIÓN. Puede añadir participantes (usuarios del equipo). IMPORTANTE: Usa SIEMPRE el calendario de referencia del system prompt para determinar la fecha ISO correcta. NUNCA calcules días de la semana por tu cuenta.",
       parameters: {
         type: "object",
         properties: {
           title: { type: "string", description: "Título del evento" },
-          event_date: { type: "string", description: "Fecha del evento (formato YYYY-MM-DD)" },
+          event_date: { type: "string", description: "Fecha del evento (formato YYYY-MM-DD). Consulta el calendario de referencia para convertir 'el lunes', 'mañana', etc. a la fecha ISO correcta." },
           start_time: { type: "string", description: "Hora de inicio (formato HH:MM)" },
           end_time: { type: "string", description: "Hora de fin (formato HH:MM)" },
           description: { type: "string", description: "Descripción del evento" },
@@ -1480,7 +1480,47 @@ serve(async (req) => {
       });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const todayISO = now.toISOString().split('T')[0];
+
+    // Generate rich date context with weekday, time, and timezone
+    const fullDateFormatter = new Intl.DateTimeFormat('es-ES', {
+      timeZone: 'Europe/Madrid',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    const timeFormatter = new Intl.DateTimeFormat('es-ES', {
+      timeZone: 'Europe/Madrid',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const fullDateStr = fullDateFormatter.format(now); // e.g. "jueves, 16 de abril de 2026"
+    const timeStr = timeFormatter.format(now);           // e.g. "23:22"
+
+    // Build a mini-calendar of the next 7 days so the AI has a reference
+    const upcomingDays: string[] = [];
+    for (let i = 0; i <= 7; i++) {
+      const d = new Date(now.getTime() + i * 86400000);
+      // Convert to Madrid timezone for accurate weekday
+      const madridParts = new Intl.DateTimeFormat('es-ES', {
+        timeZone: 'Europe/Madrid',
+        weekday: 'long',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(d);
+      const weekday = madridParts.find(p => p.type === 'weekday')?.value || '';
+      const day = madridParts.find(p => p.type === 'day')?.value || '';
+      const month = madridParts.find(p => p.type === 'month')?.value || '';
+      const year = madridParts.find(p => p.type === 'year')?.value || '';
+      const iso = `${year}-${month}-${day}`;
+      const label = i === 0 ? '(HOY)' : i === 1 ? '(MAÑANA)' : '';
+      upcomingDays.push(`  ${weekday} ${day}/${month}/${year} → ${iso} ${label}`.trim());
+    }
+    const calendarReference = upcomingDays.join('\n');
 
     // Load user's AI memories for context
     const { data: userMemories } = await supabase
@@ -1496,7 +1536,20 @@ serve(async (req) => {
 
     const systemPrompt = `Eres Micro, el asistente virtual de MalagaMicro CRM. Eres una criatura fluida, adorable y amigable con las mismas capacidades que un administrador.
 
-Fecha actual: ${today}
+📅 FECHA Y HORA ACTUAL (zona horaria Europe/Madrid):
+- Hoy es: ${fullDateStr}
+- Hora actual: ${timeStr}
+- Fecha ISO: ${todayISO}
+
+📆 CALENDARIO DE REFERENCIA (próximos 7 días):
+${calendarReference}
+
+⚠️ REGLA CRÍTICA SOBRE FECHAS:
+- NUNCA calcules o adivines qué día de la semana corresponde a una fecha. Usa SIEMPRE el calendario de referencia de arriba.
+- Si el usuario dice "el próximo lunes", "este viernes", "mañana", etc., consulta el calendario de referencia para obtener la fecha ISO correcta.
+- Si la fecha solicitada no está en el calendario de referencia (más de 7 días), usa la herramienta get_current_time para verificar y calcula cuidadosamente a partir de los datos proporcionados.
+- NUNCA digas frases como "el 20 de abril es domingo" sin verificar con el calendario de referencia. Los errores en días de la semana son INACEPTABLES.
+- Cuando confirmes una cita/evento/recordatorio al usuario, incluye siempre el día de la semana correcto según el calendario de referencia.
 
 Tu buzón de correo dedicado: ia@malagamicro.com (envías y recibes correos desde esta cuenta)
 
