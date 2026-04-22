@@ -503,8 +503,17 @@ const tools = [
     type: "function",
     function: {
       name: "get_current_time",
-      description: "Obtener la fecha y hora actual en Madrid (España). Úsalo cuando necesites saber el día de la semana, la fecha exacta o la hora para calendarios, saludos o dudas.",
-      parameters: { type: "object", properties: {}, required: [] },
+      description: "Obtener la fecha/hora actual en Madrid Y/O consultar qué día de la semana es cualquier fecha de cualquier año. Si el usuario menciona una fecha concreta (ej: '15 de junio de 2027', '3 de marzo de 2025', etc.) que no está en el calendario de referencia del sistema, llama a esta herramienta con ese parámetro date para obtener el día de la semana correcto. Sin parámetros devuelve la fecha/hora actual más el calendario de los próximos 14 días.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: {
+            type: "string",
+            description: "Fecha a consultar en formato YYYY-MM-DD (ej: '2027-06-15'). Si no se proporciona, devuelve la fecha y hora actual de Madrid."
+          }
+        },
+        required: []
+      },
     },
   },
 ];
@@ -1410,22 +1419,141 @@ async function executeToolCall(
 
       case "get_current_time": {
         const now = new Date();
-        const formatter = new Intl.DateTimeFormat('es-ES', {
-          timeZone: 'Europe/Madrid',
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        });
-        const dateString = formatter.format(now);
+
+        // Helper: get full info for a given Date object in Madrid timezone
+        function getMadridDateInfo(d: Date) {
+          const dateParts = new Intl.DateTimeFormat('es-ES', {
+            timeZone: 'Europe/Madrid',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+          }).formatToParts(d);
+          const yr = dateParts.find(p => p.type === 'year')?.value || '';
+          const mo = dateParts.find(p => p.type === 'month')?.value || '';
+          const dy = dateParts.find(p => p.type === 'day')?.value || '';
+          const fullParts = new Intl.DateTimeFormat('es-ES', {
+            timeZone: 'Europe/Madrid',
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          }).formatToParts(d);
+          const weekday = fullParts.find(p => p.type === 'weekday')?.value || '';
+          const monthLong = fullParts.find(p => p.type === 'month')?.value || '';
+          return { yr, mo, dy, weekday, monthLong, iso: `${yr}-${mo}-${dy}` };
+        }
+
+        // Helper: build a calendar week (Mon-Sun) surrounding a given date
+        function buildWeekCalendar(isoDate: string): string[] {
+          const [y, m, day] = isoDate.split('-').map(Number);
+          // Use noon UTC to avoid DST issues
+          const noonUTC = Date.UTC(y, m - 1, day, 12, 0, 0);
+          const ref = new Date(noonUTC);
+          const refInfo = getMadridDateInfo(ref);
+          // Find Monday of the week
+          const DAYS_ES = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+          const refDayJS = ref.getUTCDay(); // 0=Sun, 1=Mon ... 6=Sat
+          const daysFromMon = refDayJS === 0 ? 6 : refDayJS - 1;
+          const monNoon = noonUTC - daysFromMon * 86400000;
+          const week: string[] = [];
+          for (let i = 0; i < 7; i++) {
+            const d = new Date(monNoon + i * 86400000);
+            const info = getMadridDateInfo(d);
+            const isTarget = info.iso === refInfo.iso;
+            week.push(`${info.weekday} ${info.dy}/${info.mo}/${info.yr} → ${info.iso}${isTarget ? ' ← FECHA SOLICITADA' : ''}`);
+          }
+          return week;
+        }
+
+        // Helper: build a full month calendar
+        function buildMonthCalendar(year: number, month: number): string[] {
+          const lines: string[] = [];
+          const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+          for (let d = 1; d <= daysInMonth; d++) {
+            const date = new Date(Date.UTC(year, month - 1, d, 12, 0, 0));
+            const info = getMadridDateInfo(date);
+            lines.push(`  ${info.weekday} ${String(d).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year} → ${info.iso}`);
+          }
+          return lines;
+        }
+
+        // --- MODE A: specific date query ---
+        if (args.date && typeof args.date === 'string') {
+          const inputDate = String(args.date).trim();
+          // Parse YYYY-MM-DD
+          const match = inputDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (!match) {
+            return JSON.stringify({ error: `Formato de fecha inválido: "${inputDate}". Usa YYYY-MM-DD (ej: 2027-06-15)` });
+          }
+          const [, qYear, qMonth, qDay] = match;
+          const qNoonUTC = Date.UTC(parseInt(qYear), parseInt(qMonth) - 1, parseInt(qDay), 12, 0, 0);
+          const qDate = new Date(qNoonUTC);
+          const qInfo = getMadridDateInfo(qDate);
+
+          // Build current time info too
+          const nowInfo = getMadridDateInfo(now);
+          const timeParts = new Intl.DateTimeFormat('es-ES', {
+            timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hour12: false,
+          }).formatToParts(now);
+          const nowHour = timeParts.find(p => p.type === 'hour')?.value || '00';
+          const nowMinute = timeParts.find(p => p.type === 'minute')?.value || '00';
+
+          // Week surrounding the queried date
+          const weekCal = buildWeekCalendar(qInfo.iso);
+          // Full month calendar for the queried month
+          const monthCal = buildMonthCalendar(parseInt(qYear), parseInt(qMonth));
+
+          return JSON.stringify({
+            success: true,
+            consulta: inputDate,
+            resultado: {
+              dia_semana: qInfo.weekday,
+              fecha_completa: `${qInfo.weekday}, ${parseInt(qDay)} de ${qInfo.monthLong} de ${qYear}`,
+              fecha_iso: qInfo.iso,
+              anio: qYear,
+              mes: qInfo.monthLong,
+              dia: parseInt(qDay),
+            },
+            semana_de_la_fecha: weekCal,
+            mes_completo: {
+              titulo: `${qInfo.monthLong} ${qYear}`,
+              dias: monthCal,
+            },
+            hoy: {
+              fecha_iso: nowInfo.iso,
+              dia_semana: nowInfo.weekday,
+              hora_madrid: `${nowHour}:${nowMinute}`,
+            },
+            instruccion: `Usa el campo 'resultado.dia_semana' y 'resultado.fecha_iso' para confirmar la cita/evento. El campo 'mes_completo' muestra todos los días del mes ${qInfo.monthLong} ${qYear} con su día de la semana correcto.`,
+          });
+        }
+
+        // --- MODE B: current time (no date param) ---
+        const nowInfo = getMadridDateInfo(now);
+        const timeParts = new Intl.DateTimeFormat('es-ES', {
+          timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+        }).formatToParts(now);
+        const mHour = timeParts.find(p => p.type === 'hour')?.value || '00';
+        const mMinute = timeParts.find(p => p.type === 'minute')?.value || '00';
+        const mSecond = timeParts.find(p => p.type === 'second')?.value || '00';
+        const madridISO = `${nowInfo.iso}T${mHour}:${mMinute}:${mSecond}`;
+        const dateString = new Intl.DateTimeFormat('es-ES', {
+          timeZone: 'Europe/Madrid', weekday: 'long', year: 'numeric', month: 'long',
+          day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).format(now);
+        // 14-day reference calendar
+        const todayNoonUTCt = Date.UTC(parseInt(nowInfo.yr), parseInt(nowInfo.mo) - 1, parseInt(nowInfo.dy), 12, 0, 0);
+        const calDays: string[] = [];
+        for (let i = 0; i <= 14; i++) {
+          const d = new Date(todayNoonUTCt + i * 24 * 60 * 60 * 1000);
+          const info = getMadridDateInfo(d);
+          const label = i === 0 ? ' (HOY)' : i === 1 ? ' (MAÑANA)' : '';
+          calDays.push(`${info.weekday} ${info.dy}/${info.mo}/${info.yr} → ${info.iso}${label}`);
+        }
         return JSON.stringify({
           success: true,
           message: `La fecha y hora actual en Madrid es: ${dateString}`,
-          iso: now.toISOString(),
-          timezone: 'Europe/Madrid'
+          fecha_hora_madrid: madridISO,
+          fecha_iso_madrid: nowInfo.iso,
+          utc_iso: now.toISOString(),
+          timezone: 'Europe/Madrid',
+          calendario_proximos_14_dias: calDays,
+          nota: 'Para consultar el día de la semana de cualquier fecha futura o pasada, llama de nuevo con el parámetro date (YYYY-MM-DD)',
         });
       }
 
@@ -1481,7 +1609,19 @@ serve(async (req) => {
     }
 
     const now = new Date();
-    const todayISO = now.toISOString().split('T')[0];
+
+    // Get the current date parts in Madrid timezone (DST-safe)
+    const madridTodayParts = new Intl.DateTimeFormat('es-ES', {
+      timeZone: 'Europe/Madrid',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const todayYear = madridTodayParts.find(p => p.type === 'year')?.value || '';
+    const todayMonth = madridTodayParts.find(p => p.type === 'month')?.value || '';
+    const todayDay = madridTodayParts.find(p => p.type === 'day')?.value || '';
+    // ISO date in Madrid local time (NOT UTC — avoids midnight DST shifts)
+    const todayISO = `${todayYear}-${todayMonth}-${todayDay}`;
 
     // Generate rich date context with weekday, time, and timezone
     const fullDateFormatter = new Intl.DateTimeFormat('es-ES', {
@@ -1500,11 +1640,18 @@ serve(async (req) => {
     const fullDateStr = fullDateFormatter.format(now); // e.g. "jueves, 16 de abril de 2026"
     const timeStr = timeFormatter.format(now);           // e.g. "23:22"
 
-    // Build a mini-calendar of the next 7 days so the AI has a reference
+    // Build a mini-calendar of the next 14 days — DST-safe method:
+    // We use noon UTC anchored on the Madrid local date (+i days) so that
+    // DST transitions (±1h) can never push us onto a different calendar date.
     const upcomingDays: string[] = [];
-    for (let i = 0; i <= 7; i++) {
-      const d = new Date(now.getTime() + i * 86400000);
-      // Convert to Madrid timezone for accurate weekday
+    const todayNoonUTC = Date.UTC(
+      parseInt(todayYear), parseInt(todayMonth) - 1, parseInt(todayDay), 12, 0, 0
+    );
+
+    for (let i = 0; i <= 14; i++) {
+      const targetMs = todayNoonUTC + i * 24 * 60 * 60 * 1000;
+      const d = new Date(targetMs);
+      // Convert to Madrid timezone for accurate weekday and date
       const madridParts = new Intl.DateTimeFormat('es-ES', {
         timeZone: 'Europe/Madrid',
         weekday: 'long',
@@ -1516,6 +1663,7 @@ serve(async (req) => {
       const day = madridParts.find(p => p.type === 'day')?.value || '';
       const month = madridParts.find(p => p.type === 'month')?.value || '';
       const year = madridParts.find(p => p.type === 'year')?.value || '';
+      // ISO built from the Madrid-local parts (NOT from d.toISOString which is UTC)
       const iso = `${year}-${month}-${day}`;
       const label = i === 0 ? '(HOY)' : i === 1 ? '(MAÑANA)' : '';
       upcomingDays.push(`  ${weekday} ${day}/${month}/${year} → ${iso} ${label}`.trim());
@@ -1544,12 +1692,14 @@ serve(async (req) => {
 📆 CALENDARIO DE REFERENCIA (próximos 7 días):
 ${calendarReference}
 
-⚠️ REGLA CRÍTICA SOBRE FECHAS:
-- NUNCA calcules o adivines qué día de la semana corresponde a una fecha. Usa SIEMPRE el calendario de referencia de arriba.
-- Si el usuario dice "el próximo lunes", "este viernes", "mañana", etc., consulta el calendario de referencia para obtener la fecha ISO correcta.
-- Si la fecha solicitada no está en el calendario de referencia (más de 7 días), usa la herramienta get_current_time para verificar y calcula cuidadosamente a partir de los datos proporcionados.
-- NUNCA digas frases como "el 20 de abril es domingo" sin verificar con el calendario de referencia. Los errores en días de la semana son INACEPTABLES.
-- Cuando confirmes una cita/evento/recordatorio al usuario, incluye siempre el día de la semana correcto según el calendario de referencia.
+⚠️ REGLA CRÍTICA SOBRE FECHAS — LEE ESTO CON ATENCIÓN:
+- NUNCA calcules, adivines ni asumas qué día de la semana corresponde a una fecha. Tienes una herramienta para eso.
+- Para los PRÓXIMOS 14 DÍAS: usa el calendario de referencia de arriba (es 100% fiable).
+- Para CUALQUIER fecha FUERA de esos 14 días (pasada o futura, de cualquier año): llama a get_current_time con el parámetro date en formato YYYY-MM-DD.
+  Ejemplo: si el usuario dice "el 15 de junio de 2027", llama get_current_time({date: "2027-06-15"}) y la respuesta te dirá exactamente que es un lunes/martes/etc. y te mostrará el mes completo.
+- OBLIGATORIO: Antes de confirmar cualquier cita, evento o recordatorio, verifica el día de la semana con el calendario de referencia O con get_current_time(date).
+- NUNCA digas "el 20 de abril es domingo" sin haberlo verificado. Los errores en días de la semana son INACEPTABLES.
+- Cuando confirmes una cita al usuario, incluye siempre el día de la semana verificado: "He agendado tu reunión para el MARTES 15 de junio de 2027".
 
 Tu buzón de correo dedicado: ia@malagamicro.com (envías y recibes correos desde esta cuenta)
 
@@ -1571,7 +1721,7 @@ HERRAMIENTAS DISPONIBLES:
 - get_ai_memories (consultar recuerdos almacenados sobre leads o usuario)
 - view_shared_file (ver/describir un archivo o imagen compartida - busca por nombre)
 - view_ai_memory_file (leer archivos de la Memoria IA: PDF, DOCX, Excel, imágenes, texto, CSV y más - el texto se extrae automáticamente al subirse)
-- get_current_time (obtener la fecha y hora actual exacta en Madrid)
+- get_current_time (obtener la fecha/hora actual en Madrid; o consultar qué día de la semana es CUALQUIER fecha de cualquier año pasando el parámetro date=YYYY-MM-DD)
 
 🖼️ CAPACIDAD VISUAL Y DOCUMENTAL:
 - Puedes recibir y analizar imágenes que el usuario adjunte directamente en el chat.
