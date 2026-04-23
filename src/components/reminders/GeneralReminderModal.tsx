@@ -83,6 +83,8 @@ export function GeneralReminderModal({ open, onOpenChange, editReminder }: Gener
       setCategory(editReminder.category || 'general');
       setRecurrence(editReminder.recurrence_type || 'once');
       setNote(editReminder.note || '');
+      // Load shared users
+      setSelectedUserIds(editReminder.target_user_ids || []);
     } else if (!editReminder && open) {
       resetForm();
     }
@@ -117,6 +119,7 @@ export function GeneralReminderModal({ open, onOpenChange, editReminder }: Gener
           category,
           recurrence_type: recurrence,
           note: note.trim() || undefined,
+          target_user_ids: selectedUserIds.length > 0 ? selectedUserIds : [],
         },
         { onSuccess: () => { onOpenChange(false); resetForm(); } }
       );

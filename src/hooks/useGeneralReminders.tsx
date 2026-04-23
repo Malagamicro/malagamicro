@@ -17,6 +17,7 @@ export interface GeneralReminder {
   linked_entity_type: string | null;
   linked_entity_id: string | null;
   note: string | null;
+  target_user_ids: string[] | null;
   created_at: string;
   updated_at: string;
   is_owner: boolean; // whether current user created it
@@ -48,6 +49,7 @@ interface UpdateReminderData {
   linked_entity_type?: string | null;
   linked_entity_id?: string | null;
   note?: string | null;
+  target_user_ids?: string[] | null;
 }
 
 export function useGeneralReminders() {
@@ -142,6 +144,7 @@ export function useGeneralReminders() {
       if (data.linked_entity_type !== undefined) updateData.linked_entity_type = data.linked_entity_type;
       if (data.linked_entity_id !== undefined) updateData.linked_entity_id = data.linked_entity_id;
       if (data.note !== undefined) updateData.note = data.note;
+      if (data.target_user_ids !== undefined) updateData.target_user_ids = data.target_user_ids;
 
       // Don't update is_completed on the main table anymore
       const { error } = await supabase

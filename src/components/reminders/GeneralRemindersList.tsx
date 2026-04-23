@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format, isPast, isToday, isThisWeek, addMinutes, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   Bell, Check, Clock, Trash2, Plus, Calendar, AlertTriangle,
   CheckCircle2, Eye, Repeat, AlarmClock, Phone, Users2,
-  CreditCard, Target, StickyNote, Timer, Pause, Pencil
+  CreditCard, Target, StickyNote, Timer, Pause, Pencil, Users
 } from 'lucide-react';
 import { useGeneralReminders, GeneralReminder } from '@/hooks/useGeneralReminders';
 import { GeneralReminderModal } from './GeneralReminderModal';
@@ -25,6 +25,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 const priorityConfig: Record<string, { label: string; gradient: string; border: string; badge: string; dot: string }> = {
   low: { label: 'Baja', gradient: 'from-muted/40 to-muted/20', border: 'border-border', badge: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground' },
@@ -51,6 +52,75 @@ const categoryLabels: Record<string, string> = {
 const recurrenceLabels: Record<string, string> = {
   once: '', daily: 'Diaria', weekly: 'Semanal', monthly: 'Mensual',
 };
+
+// --- Shared Users Indicator ---
+interface SharedUserProfile {
+  user_id: string;
+  full_name: string | null;
+}
+
+function SharedUsersIndicator({ targetUserIds, compact = false }: { targetUserIds: string[] | null; compact?: boolean }) {
+  const [profiles, setProfiles] = useState<SharedUserProfile[]>([]);
+
+  useEffect(() => {
+    if (!targetUserIds || targetUserIds.length === 0) {
+      setProfiles([]);
+      return;
+    }
+    supabase
+      .from('profiles')
+      .select('user_id, full_name')
+      .in('user_id', targetUserIds)
+      .then(({ data }) => { if (data) setProfiles(data as SharedUserProfile[]); });
+  }, [JSON.stringify(targetUserIds)]);
+
+  if (!targetUserIds || targetUserIds.length === 0) return null;
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1 flex-wrap">
+        <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+        {profiles.length === 0 ? (
+          <span className="text-[10px] text-muted-foreground">{targetUserIds.length} compartido(s)</span>
+        ) : (
+          profiles.map((p) => (
+            <span
+              key={p.user_id}
+              className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold border border-primary/30"
+              title={p.full_name || 'Usuario'}
+            >
+              {(p.full_name || 'U').charAt(0).toUpperCase()}
+            </span>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <h4 className="text-xs font-heading tracking-widest text-muted-foreground flex items-center gap-1.5">
+        <Users className="h-3.5 w-3.5" /> Compartido con
+      </h4>
+      <div className="flex flex-wrap gap-1.5">
+        {profiles.length === 0 ? (
+          Array.from({ length: targetUserIds.length }).map((_, i) => (
+            <Badge key={i} variant="secondary" className="text-xs">Cargando...</Badge>
+          ))
+        ) : (
+          profiles.map((p) => (
+            <Badge key={p.user_id} variant="secondary" className="text-xs flex items-center gap-1">
+              <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary/30 text-primary text-[8px] font-bold">
+                {(p.full_name || 'U').charAt(0).toUpperCase()}
+              </span>
+              {p.full_name || 'Sin nombre'}
+            </Badge>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
 
 function UrgencyBadge({ reminder }: { reminder: GeneralReminder }) {
   const date = new Date(reminder.reminder_date);
@@ -150,6 +220,7 @@ function ReminderCard({ reminder, onToggle, onDelete, onView, onSnooze, onEdit }
               <Repeat className="h-3 w-3" /> {recurrenceLabels[reminder.recurrence_type]}
             </span>
           )}
+          <SharedUsersIndicator targetUserIds={reminder.target_user_ids} compact />
         </div>
       </div>
 
@@ -225,6 +296,10 @@ function ReminderDetailModal({ reminder, open, onOpenChange, onToggle, onDelete,
 
           {reminder.description && (<><Separator /><div className="space-y-2"><h4 className="text-xs font-heading tracking-widest text-muted-foreground">Descripción</h4><p className="text-sm whitespace-pre-wrap">{reminder.description}</p></div></>)}
           {reminder.note && (<><Separator /><div className="space-y-2"><h4 className="text-xs font-heading tracking-widest text-muted-foreground">Nota</h4><div className="flex items-start gap-2 text-sm bg-muted/50 rounded-lg p-3"><StickyNote className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" /><p>{reminder.note}</p></div></div></>)}
+
+          {reminder.target_user_ids && reminder.target_user_ids.length > 0 && (
+            <><Separator /><SharedUsersIndicator targetUserIds={reminder.target_user_ids} /></>
+          )}
 
           <Separator />
 
