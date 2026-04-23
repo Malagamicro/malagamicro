@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek,
   isSameMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, parseISO,
@@ -8,12 +8,14 @@ import {
 import { es } from 'date-fns/locale';
 import {
   ChevronLeft, ChevronRight, Plus, Clock, Trash2,
-  CalendarDays, CalendarRange, CalendarCheck2, Search, Filter
+  CalendarDays, CalendarRange, CalendarCheck2, Search, Filter, Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useCalendarEvents, CalendarEvent, CreateEventData } from '@/hooks/useCalendarEvents';
@@ -37,6 +39,17 @@ export function CalendarModule() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showEventDetail, setShowEventDetail] = useState<CalendarEvent | null>(null);
 
+  // Quick-add sidebar form state
+  const [quickAdd, setQuickAdd] = useState({
+    title: '',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    start_time: '09:00',
+    end_time: '10:00',
+    all_day: false,
+    color: '#3b82f6',
+  });
+  const [quickAdding, setQuickAdding] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState<EventFormData>({
     title: '',
@@ -49,6 +62,13 @@ export function CalendarModule() {
     reminder_minutes: 15,
     selectedUsers: [],
   });
+
+  // Sync quick-add date when a day is selected in the calendar
+  useEffect(() => {
+    if (selectedDate) {
+      setQuickAdd(prev => ({ ...prev, date: format(selectedDate, 'yyyy-MM-dd') }));
+    }
+  }, [selectedDate]);
 
   // Calendar days for month view
   const calendarDays = useMemo(() => {
@@ -155,6 +175,26 @@ export function CalendarModule() {
     setShowDeleteConfirm(null);
     setShowForm(false);
     setShowEventDetail(null);
+  };
+
+  const handleQuickAdd = async () => {
+    if (!quickAdd.title.trim()) return;
+    setQuickAdding(true);
+    try {
+      await createEvent({
+        title: quickAdd.title.trim(),
+        event_date: quickAdd.date,
+        start_time: quickAdd.all_day ? undefined : quickAdd.start_time,
+        end_time: quickAdd.all_day ? undefined : quickAdd.end_time,
+        all_day: quickAdd.all_day,
+        color: quickAdd.color,
+        reminder_minutes: 15,
+        participants: [],
+      });
+      setQuickAdd(prev => ({ ...prev, title: '' }));
+    } finally {
+      setQuickAdding(false);
+    }
   };
 
   const toggleUserSelection = (userId: string) => {
@@ -584,8 +624,110 @@ export function CalendarModule() {
           )}
         </div>
 
-        {/* Sidebar: upcoming events */}
+        {/* Sidebar */}
         <div className="w-full lg:w-72 shrink-0 space-y-4">
+
+          {/* ── Quick Add Panel ── */}
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/[0.02]">
+            <CardHeader className="pb-3 pt-4 px-4">
+              <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-primary">
+                <Zap className="w-4 h-4" />
+                Agregar rápido
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-3">
+              {/* Title */}
+              <Input
+                id="quick-add-title"
+                placeholder="Título del evento…"
+                value={quickAdd.title}
+                onChange={e => setQuickAdd(p => ({ ...p, title: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && handleQuickAdd()}
+                className="h-8 text-sm"
+              />
+
+              {/* Date */}
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Fecha</Label>
+                <Input
+                  type="date"
+                  value={quickAdd.date}
+                  onChange={e => setQuickAdd(p => ({ ...p, date: e.target.value }))}
+                  className="h-8 text-sm"
+                />
+              </div>
+
+              {/* All-day toggle */}
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="quick-all-day"
+                  checked={quickAdd.all_day}
+                  onCheckedChange={v => setQuickAdd(p => ({ ...p, all_day: v }))}
+                  className="scale-90"
+                />
+                <Label htmlFor="quick-all-day" className="text-xs cursor-pointer">Todo el día</Label>
+              </div>
+
+              {/* Time range */}
+              {!quickAdd.all_day && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Inicio</Label>
+                    <Input
+                      type="time"
+                      value={quickAdd.start_time}
+                      onChange={e => setQuickAdd(p => ({ ...p, start_time: e.target.value }))}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Fin</Label>
+                    <Input
+                      type="time"
+                      value={quickAdd.end_time}
+                      onChange={e => setQuickAdd(p => ({ ...p, end_time: e.target.value }))}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Color picker */}
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Color</Label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {COLOR_OPTIONS.map(c => (
+                    <button
+                      key={c.value}
+                      className={cn(
+                        'w-6 h-6 rounded-full transition-all hover:scale-110',
+                        quickAdd.color === c.value && 'ring-2 ring-offset-2 ring-primary scale-110'
+                      )}
+                      style={{ backgroundColor: c.value }}
+                      onClick={() => setQuickAdd(p => ({ ...p, color: c.value }))}
+                      title={c.label}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Submit */}
+              <Button
+                className="w-full h-8 text-sm gap-1.5"
+                onClick={handleQuickAdd}
+                disabled={!quickAdd.title.trim() || quickAdding}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {quickAdding ? 'Añadiendo…' : 'Añadir evento'}
+              </Button>
+
+              <p className="text-[10px] text-muted-foreground text-center">
+                O usa <span className="font-medium">doble clic</span> en cualquier día del calendario
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Próximos eventos */}
           <Card>
             <CardContent className="p-4">
               <h3 className="font-semibold text-sm mb-3 flex items-center gap-1.5">
