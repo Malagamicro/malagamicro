@@ -6,6 +6,13 @@ import {
 } from '@/components/ui/dialog';
 import type { SharedFile } from '@/hooks/useSharedFiles';
 import { isOfficeDoc, canEditInEditor, parseCsv } from './sharedFilesHelpers';
+import { supabase } from '@/integrations/supabase/client';
+
+function resolveFileUrl(path: string): string {
+  if (!path) return path;
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) return path;
+  return supabase.storage.from('shared-files').getPublicUrl(path).data.publicUrl;
+}
 
 export function FilePreviewDialog({
   open, onOpenChange, file, onOpenInEditor,
