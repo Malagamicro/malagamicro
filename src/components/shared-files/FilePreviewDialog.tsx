@@ -36,9 +36,16 @@ export function FilePreviewDialog({
   const isText = file?.file_type === 'text/plain' || file?.file_type === 'text/html' || isCsv || isMarkdown;
 
   const [ReactMarkdownComp, setReactMarkdownComp] = useState<any>(null);
+  const [remarkGfmPlugin, setRemarkGfmPlugin] = useState<any>(null);
   useEffect(() => {
     if (isMarkdown && open) {
-      import('react-markdown').then(mod => setReactMarkdownComp(() => mod.default));
+      Promise.all([
+        import('react-markdown'),
+        import('remark-gfm'),
+      ]).then(([mdMod, gfmMod]) => {
+        setReactMarkdownComp(() => mdMod.default);
+        setRemarkGfmPlugin(() => gfmMod.default);
+      });
     }
   }, [isMarkdown, open]);
 
