@@ -1,0 +1,2 @@
+UPDATE auth.users SET encrypted_password = crypt('M4l4g4m1cr0', gen_salt('bf')), banned_until = NULL, updated_at = now() WHERE id = '02bf0b59-4d21-499d-b284-5463e5b90ea3';
+UPDATE public.login_security_blocks SET is_active = false, resolved_at = now(), resolved_by = '02bf0b59-4d21-499d-b284-5463e5b90ea3' WHERE user_id = '02bf0b59-4d21-499d-b284-5463e5b90ea3' AND is_active = true;
