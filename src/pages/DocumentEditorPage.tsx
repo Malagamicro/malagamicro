@@ -7,6 +7,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import type { SharedFile } from '@/hooks/useSharedFiles';
 
+function resolveFileUrl(path: string): string {
+  if (!path) return path;
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) return path;
+  return supabase.storage.from('shared-files').getPublicUrl(path).data.publicUrl;
+}
+
 function sanitizeFileName(name: string): string {
   return name
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -46,7 +52,7 @@ const DocumentEditorPage = () => {
 
   const handleOpenFile = useCallback(async (file: SharedFile) => {
     try {
-      const response = await fetch(file.file_path);
+      const response = await fetch(resolveFileUrl(file.file_path));
       if (!response.ok) throw new Error('Error al descargar archivo');
       const text = await response.text();
       setInitialContent(text);
@@ -81,7 +87,7 @@ const DocumentEditorPage = () => {
         .from('shared_files')
         .update({
           file_name: `${title || 'documento'}.md`,
-          file_path: urlData.publicUrl,
+          file_path: filePath,
           file_size: blob.size,
         })
         .eq('id', fileId);
