@@ -6,6 +6,13 @@ import {
 } from '@/components/ui/dialog';
 import type { SharedFile } from '@/hooks/useSharedFiles';
 import { isOfficeDoc, canEditInEditor, parseCsv } from './sharedFilesHelpers';
+import { supabase } from '@/integrations/supabase/client';
+
+function resolveFileUrl(path: string): string {
+  if (!path) return path;
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) return path;
+  return supabase.storage.from('shared-files').getPublicUrl(path).data.publicUrl;
+}
 
 export function FilePreviewDialog({
   open, onOpenChange, file, onOpenInEditor,
@@ -24,7 +31,7 @@ export function FilePreviewDialog({
     if (!isText) { setTextContent(null); return; }
 
     setLoading(true);
-    fetch(file.file_path)
+    fetch(resolveFileUrl(file.file_path))
       .then(r => r.text())
       .then(t => setTextContent(t))
       .catch(() => setTextContent(null))
@@ -59,23 +66,25 @@ export function FilePreviewDialog({
   const renderContent = () => {
     if (!file) return null;
 
+    const fileUrl = resolveFileUrl(file.file_path);
+
     if (file.file_type?.startsWith('image/')) {
-      return <img src={file.file_path} alt={file.file_name} className="max-w-full h-auto mx-auto rounded-lg" />;
+      return <img src={fileUrl} alt={file.file_name} className="max-w-full h-auto mx-auto rounded-lg" />;
     }
 
     if (file.file_type === 'application/pdf') {
-      return <iframe src={file.file_path} className="w-full h-[70vh] rounded-lg border" title={file.file_name} />;
+      return <iframe src={fileUrl} className="w-full h-[70vh] rounded-lg border" title={file.file_name} />;
     }
 
     if (isOfficeDoc(file.file_type)) {
-      const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(file.file_path)}&embedded=true`;
+      const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
       return <iframe src={viewerUrl} className="w-full h-[70vh] rounded-lg border" title={file.file_name} />;
     }
 
     if (file.file_type?.startsWith('video/')) {
       return (
         <video controls className="w-full max-h-[70vh] rounded-lg" preload="metadata">
-          <source src={file.file_path} type={file.file_type} />
+          <source src={fileUrl} type={file.file_type} />
           Tu navegador no soporta la reproducción de video.
         </video>
       );
@@ -87,7 +96,7 @@ export function FilePreviewDialog({
           <Music className="h-16 w-16 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">{file.file_name}</p>
           <audio controls className="w-full max-w-md" preload="metadata">
-            <source src={file.file_path} type={file.file_type} />
+            <source src={fileUrl} type={file.file_type} />
           </audio>
         </div>
       );
@@ -161,7 +170,7 @@ export function FilePreviewDialog({
               Abrir en Editor
             </Button>
           )}
-          <Button onClick={() => file && window.open(file.file_path, '_blank')}>
+          <Button onClick={() => file && window.open(resolveFileUrl(file.file_path), '_blank')}>
             <Download className="h-4 w-4 mr-2" />
             Descargar
           </Button>

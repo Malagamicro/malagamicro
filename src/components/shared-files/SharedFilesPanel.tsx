@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useCallback } from 'react';
 import { format, isAfter, startOfDay, subDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { es } from 'date-fns/locale';
 import {
   DragDropContext,
@@ -353,7 +354,11 @@ export function SharedFilesPanel() {
 
   const handleEditInEditor = async (file: SharedFile) => {
     try {
-      const resp = await fetch(file.file_path);
+      const url = /^https?:\/\//i.test(file.file_path)
+        ? file.file_path
+        : supabase.storage.from('shared-files').getPublicUrl(file.file_path).data.publicUrl;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('No se pudo descargar el archivo');
       const text = await resp.text();
       // Store content in sessionStorage for the editor to pick up
       sessionStorage.setItem('editor_file_content', text);
