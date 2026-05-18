@@ -8,8 +8,8 @@ import {
 } from 'lucide-react';
 import type { SidebarItem } from '@/hooks/useSidebarConfig';
 
-export const APP_VERSION = 'v2.9.0';
-export const APP_BUILD_DATE = '2026-02-25 12:00';
+export const APP_VERSION = 'v2.9.1';
+export const APP_BUILD_DATE = '2026-05-18 09:45';
 
 // Icon registry
 export const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
