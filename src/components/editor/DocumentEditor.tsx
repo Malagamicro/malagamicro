@@ -1121,12 +1121,10 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
       const { error: uploadError } = await supabase.storage.from('shared-files').upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from('shared-files').getPublicUrl(filePath);
-
       const { error: dbError } = await supabase.from('shared_files').insert({
         user_id: user.id,
         file_name: `${title || 'documento'}.${ext}`,
-        file_path: urlData.publicUrl,
+        file_path: filePath,
         file_size: blob.size,
         file_type: mimeType,
         description: `Creado con el Editor IA (${isSpreadsheet ? 'Hoja de cálculo' : 'Documento'})`,
