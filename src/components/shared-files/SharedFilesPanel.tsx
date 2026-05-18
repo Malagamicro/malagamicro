@@ -71,6 +71,12 @@ interface BreadcrumbItem {
   name: string;
 }
 
+function resolveFileUrl(path: string): string {
+  if (!path) return path;
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) return path;
+  return supabase.storage.from('shared-files').getPublicUrl(path).data.publicUrl;
+}
+
 
 export function SharedFilesPanel() {
   const { user } = useAuth();
@@ -354,9 +360,7 @@ export function SharedFilesPanel() {
 
   const handleEditInEditor = async (file: SharedFile) => {
     try {
-      const url = /^https?:\/\//i.test(file.file_path)
-        ? file.file_path
-        : supabase.storage.from('shared-files').getPublicUrl(file.file_path).data.publicUrl;
+      const url = resolveFileUrl(file.file_path);
       const resp = await fetch(url);
       if (!resp.ok) throw new Error('No se pudo descargar el archivo');
       const text = await resp.text();
@@ -555,7 +559,7 @@ export function SharedFilesPanel() {
                               )}
                             </div>
                           </div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); window.open(file.file_path, '_blank'); }}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); window.open(resolveFileUrl(file.file_path), '_blank'); }}>
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
@@ -698,7 +702,7 @@ export function SharedFilesPanel() {
                                       </Button>
                                     )}
 
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 shrink-0" onClick={() => window.open(file.file_path, '_blank')} title="Descargar">
+                                     <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 shrink-0" onClick={() => window.open(resolveFileUrl(file.file_path), '_blank')} title="Descargar">
                                       <Download className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                     </Button>
 
@@ -715,7 +719,7 @@ export function SharedFilesPanel() {
                                             <Eye className="h-4 w-4 mr-2" />Vista previa
                                           </DropdownMenuItem>
                                         )}
-                                        <DropdownMenuItem className="md:hidden" onClick={() => window.open(file.file_path, '_blank')}>
+                                         <DropdownMenuItem className="md:hidden" onClick={() => window.open(resolveFileUrl(file.file_path), '_blank')}>
                                           <Download className="h-4 w-4 mr-2" />Descargar
                                         </DropdownMenuItem>
                                         {/* Move to folder - available for everyone */}
