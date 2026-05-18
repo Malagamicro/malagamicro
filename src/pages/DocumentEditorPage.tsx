@@ -79,10 +79,6 @@ const DocumentEditorPage = () => {
         .upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from('shared-files')
-        .getPublicUrl(filePath);
-
       const { error: dbError } = await supabase
         .from('shared_files')
         .update({
