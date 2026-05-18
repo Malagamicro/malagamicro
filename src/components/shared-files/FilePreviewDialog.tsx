@@ -131,7 +131,13 @@ export function FilePreviewDialog({
       }
 
       if (isMarkdown && ReactMarkdownComp) {
-        return <div className="p-6 prose prose-sm dark:prose-invert max-w-none"><ReactMarkdownComp>{textContent}</ReactMarkdownComp></div>;
+        return (
+          <div className="p-6 prose prose-sm md:prose-base dark:prose-invert max-w-none prose-headings:scroll-mt-20 prose-pre:bg-muted prose-pre:text-foreground prose-code:before:hidden prose-code:after:hidden prose-table:text-sm">
+            <ReactMarkdownComp remarkPlugins={remarkGfmPlugin ? [remarkGfmPlugin] : []}>
+              {textContent}
+            </ReactMarkdownComp>
+          </div>
+        );
       }
 
       return <pre className="p-6 text-sm whitespace-pre-wrap font-mono bg-muted rounded-lg">{textContent}</pre>;
