@@ -283,8 +283,8 @@ serve(async (req) => {
 
     // BLOCKS ARE NO LONGER AUTOMATIC BASED ON NEW IPS OR LOCATION.
     // IP Blocking is now strictly decoupled and managed by other rules (e.g. 5 failed attempts).
-    let blocked = false;
-    let blockReason = '';
+    const blocked = false;
+    const blockReason = '';
 
     // Send alert email if any checks triggered
     if (alerts.length > 0) {

@@ -36,17 +36,17 @@
     --muted-foreground: 220 9% 46%;
 
     /* Accent - Orange for CTAs */
-    --accent: 25 95% 53%;
+    --accent: 25 90% 58%; /* Softer orange */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --border: 220 13% 93%; /* Softer border */
+    --input: 220 13% 93%;
     --ring: 224 40% 39%;
 
-    --radius: 0.625rem;
+    --radius: 0.75rem; /* Smoother radius */
 
     /* Status colors for leads */
     --status-new: 210 100% 50%;
@@ -83,11 +83,11 @@
     --gradient-accent: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--primary)));
     --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(var(--muted)));
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    /* Shadows - Ultra soft for minimal feel */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+    --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.05), 0 2px 6px -2px rgb(0 0 0 / 0.03);
+    --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.05), 0 6px 12px -6px rgb(0 0 0 / 0.04);
+    --shadow-card: 0 2px 8px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.02);
   }
 
   .dark {
@@ -106,17 +106,17 @@
     --secondary: 232 23% 45%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 222 47% 18%;
+    --muted: 222 47% 16%;
     --muted-foreground: 220 14% 65%;
 
-    --accent: 25 95% 53%;
+    --accent: 25 90% 58%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 222 47% 20%;
-    --input: 222 47% 20%;
+    --border: 222 47% 18%; /* Softer border dark */
+    --input: 222 47% 18%;
     --ring: 224 50% 55%;
 
     --sidebar-background: 222 47% 8%;
@@ -174,28 +174,25 @@
   /* Sora for all headings */
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading, 'Space Grotesk', 'DM Sans', system-ui, sans-serif);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 700;
+    letter-spacing: -0.02em; /* Tighter letter spacing, removed uppercase */
+    font-weight: 600;
   }
 
-  /* Uppercase labels, buttons, badges */
+  /* Relaxed text rules, removed uppercase */
   label,
   button,
   [role="button"],
   th,
   .badge,
   [class*="Badge"] {
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.01em;
   }
 
-  /* Tabs triggers uppercase */
+  /* Tabs triggers */
   [role="tab"] {
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 600;
-    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    font-weight: 500;
+    font-size: 0.875rem;
   }
 
   /* Mobile-friendly inputs to prevent iOS zoom */
@@ -371,6 +368,29 @@
   border-right: 2px solid hsl(var(--primary) / 0.5);
   border-bottom: 2px solid hsl(var(--primary) / 0.5);
   border-radius: 0 0 2px 0;
+}
+/* Date picker customizations */
+.rdp {
+  --rdp-cell-size: 32px !important;
+  --rdp-accent-color: hsl(var(--primary)) !important;
+  --rdp-background-color: hsl(var(--primary) / 0.1) !important;
+  margin: 0 !important;
+}
+
+/* Custom scrollbar for clean UI */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
 }
 .react-grid-placeholder {
   background: hsl(var(--primary) / 0.15) !important;

@@ -316,6 +316,43 @@ export function useLeads() {
         .eq('id', id);
       
       if (error) throw error;
+      
+      // We must return the updated lead data to allow optimistic updates to be merged correctly
+      // but since we don't return from the mutationFn normally, the cache update in onMutate handles it.
+    },
+    onMutate: async (updatedLead) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['leads'] });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(['leads']);
+
+      // Optimistically update the cache
+      queryClient.setQueryData(['leads'], (oldData: any) => {
+        if (!oldData?.pages) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: LeadsPage) => ({
+            ...page,
+            leads: page.leads.map((lead: Lead) =>
+              lead.id === updatedLead.id ? { ...lead, ...updatedLead } : lead
+            ),
+          })),
+        };
+      });
+
+      return { previousData };
+    },
+    onError: (error, variables, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(['leads'], context.previousData);
+      }
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el lead.',
+        variant: 'destructive',
+      });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
@@ -327,12 +364,9 @@ export function useLeads() {
         description: 'El lead ha sido actualizado correctamente.',
       });
     },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar el lead.',
-        variant: 'destructive',
-      });
+    onSettled: () => {
+      // Refetch after mutation settles to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
     },
   });
 
@@ -627,28 +661,39 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async (): Promise<DashboardStats> => {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('status, created_at');
-      
-      if (error) throw error;
-
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const weekIso = oneWeekAgo.toISOString();
 
-      const stats = {
-        totalLeads: data.length,
-        newLeads: data.filter(l => l.status === 'nuevo').length,
-        contactedLeads: data.filter(l => l.status === 'contactado').length,
-        interestedLeads: data.filter(l => l.status === 'interesado').length,
-        clients: data.filter(l => l.status === 'cliente').length,
-        thisWeekLeads: data.filter(l => new Date(l.created_at) >= oneWeekAgo).length,
-        conversionRate: data.length > 0 
-          ? Number(((data.filter(l => l.status === 'cliente').length / data.length) * 100).toFixed(1))
-          : 0,
+      // Run fast count queries in parallel instead of downloading all rows
+      const [
+        { count: totalCount },
+        { count: newCount },
+        { count: contactedCount },
+        { count: interestedCount },
+        { count: clientCount },
+        { count: thisWeekCount }
+      ] = await Promise.all([
+        supabase.from('leads').select('*', { count: 'exact', head: true }),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'nuevo'),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'contactado'),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'interesado'),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'cliente'),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).gte('created_at', weekIso)
+      ]);
+
+      const t = totalCount || 0;
+      const c = clientCount || 0;
+
+      return {
+        totalLeads: t,
+        newLeads: newCount || 0,
+        contactedLeads: contactedCount || 0,
+        interestedLeads: interestedCount || 0,
+        clients: c,
+        thisWeekLeads: thisWeekCount || 0,
+        conversionRate: t > 0 ? Number(((c / t) * 100).toFixed(1)) : 0,
       };
-
-      return stats;
     },
     enabled: !!user,
   });

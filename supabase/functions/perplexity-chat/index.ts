@@ -1895,7 +1895,7 @@ Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`
       requestBody.tool_choice = "auto";
     }
 
-    let response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
@@ -1924,7 +1924,7 @@ Para presupuestos, usa las herramientas stel_* para interactuar con STEL Order.`
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let fullContent = "";
-    let toolCalls: ToolCall[] = [];
+    const toolCalls: ToolCall[] = [];
 
     while (true) {
       const { done, value } = await reader.read();

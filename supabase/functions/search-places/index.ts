@@ -21,6 +21,22 @@ interface PlaceResult {
   location?: { lat: number; lng: number };
 }
 
+interface GooglePlaceResult {
+  place_id: string;
+  name?: string;
+  formatted_address?: string;
+  types?: string[];
+  rating?: number;
+  user_ratings_total?: number;
+  geometry?: {
+    location?: {
+      lat: number;
+      lng: number;
+    }
+  };
+  [key: string]: unknown;
+}
+
 function analyzeSpanishPhone(phone: string): 'mobile' | 'landline' | 'unknown' {
   let clean = phone.replace(/\D/g, '');
   if (clean.startsWith('34')) clean = clean.substring(2);
@@ -69,8 +85,8 @@ async function fetchAllPages(
   baseUrl: URL,
   apiKey: string,
   maxPages: number
-): Promise<{ results: any[]; totalPages: number }> {
-  const allResults: any[] = [];
+): Promise<{ results: GooglePlaceResult[]; totalPages: number }> {
+  const allResults: GooglePlaceResult[] = [];
   let pageToken: string | undefined;
   let pageCount = 0;
 
@@ -216,7 +232,7 @@ serve(async (req) => {
       textSearchUrl.searchParams.set('radius', String(Math.min((radiusKm || 5) * 1000, 50000)));
     }
 
-    let rawResults: any[];
+    let rawResults: GooglePlaceResult[];
     let nextPageTokenOut: string | null = null;
 
     if (recursive) {
@@ -246,7 +262,7 @@ serve(async (req) => {
 
     // Deduplicate by place_id
     const seen = new Set<string>();
-    const uniqueResults = rawResults.filter((r: any) => {
+    const uniqueResults = rawResults.filter((r: GooglePlaceResult) => {
       if (seen.has(r.place_id)) return false;
       seen.add(r.place_id);
       return true;
@@ -259,10 +275,10 @@ serve(async (req) => {
     for (let i = 0; i < uniqueResults.length; i += BATCH_SIZE) {
       const batch = uniqueResults.slice(i, i + BATCH_SIZE);
       const detailsResults = await Promise.allSettled(
-        batch.map((place: any) => fetchPlaceDetails(place.place_id, apiKey))
+        batch.map((place: GooglePlaceResult) => fetchPlaceDetails(place.place_id, apiKey))
       );
 
-      batch.forEach((place: any, idx: number) => {
+      batch.forEach((place: GooglePlaceResult, idx: number) => {
         const detailsResult = detailsResults[idx];
         const details = detailsResult.status === 'fulfilled' ? detailsResult.value : {};
         places.push({

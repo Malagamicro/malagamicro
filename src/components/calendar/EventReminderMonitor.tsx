@@ -1,46 +1,19 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { toast } from 'sonner';
-
-// Sound alert using Web Audio API
-function playAlertSound() {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 800;
-    osc.type = 'sine';
-    gain.gain.value = 0.3;
-    osc.start();
-    osc.stop(ctx.currentTime + 0.3);
-    setTimeout(() => {
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.frequency.value = 1000;
-      osc2.type = 'sine';
-      gain2.gain.value = 0.3;
-      osc2.start();
-      osc2.stop(ctx.currentTime + 0.3);
-    }, 350);
-  } catch (e) {
-    console.warn('Could not play alert sound:', e);
-  }
-}
-
-function showBrowserNotification(title: string, body: string) {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, { body, icon: '/favicon.png' });
-  }
-}
 
 export function EventReminderMonitor() {
   const { user } = useAuth();
   const notifiedRef = useRef<Set<string>>(new Set());
+
+  // We use the notification context's persistAndNotify indirectly.
+  // Since EventReminderMonitor is rendered inside NotificationProvider,
+  // we can access the context. But persistAndNotify is not exposed directly,
+  // so we use the same pattern: persist to custom_notifications via supabase
+  // and let the realtime subscription in useCustomNotifications handle the popup.
+  // The browser notification is handled by the shared system.
 
   const checkUpcomingEvents = useCallback(async () => {
     if (!user) return;
@@ -75,9 +48,20 @@ export function EventReminderMonitor() {
             ? `"${event.title}" empieza en ${minutesLeft} minutos`
             : `"${event.title}" empieza ahora`;
 
+          // Show sonner toast (persistent, 15s)
           toast.info(`🔔 Recordatorio: ${event.title}`, { description: message, duration: 15000 });
-          playAlertSound();
-          showBrowserNotification('📅 Recordatorio', message);
+
+          // Persist to custom_notifications so it flows through the unified system
+          // (browser notification + popup + history)
+          await supabase.from('custom_notifications').insert({
+            user_id: user.id,
+            title: '📅 Recordatorio de evento',
+            message: message,
+            type: 'warning',
+            source: 'calendario',
+            icon: '📅',
+            is_popup: true,
+          });
         }
       }
     } catch (err) {
@@ -87,10 +71,6 @@ export function EventReminderMonitor() {
 
   useEffect(() => {
     if (!user) return;
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
 
     // Check every 60 seconds
     checkUpcomingEvents();

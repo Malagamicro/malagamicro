@@ -1,66 +1,60 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useSidebarConfig } from '@/hooks/useSidebarConfig';
-import { Dashboard } from '@/components/dashboard/Dashboard';
-import { LeadsList } from '@/components/leads/LeadsList';
-import { LeadDetail } from '@/components/leads/LeadDetail';
-import { LeadKanban } from '@/components/leads/LeadKanban';
-import { LeadMap } from '@/components/leads/LeadMap';
+
+// Modales y Componentes Estáticos (siempre visibles o de carga inicial)
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadImportModal } from '@/components/leads/LeadImportModal';
-import { ProspectionModule } from '@/components/prospection/ProspectionModule';
-
-import { EmailCampaigns } from '@/components/campaigns/EmailCampaigns';
-import { ReportsDashboard } from '@/components/reports/ReportsDashboard';
+import { GoogleSheetsImportModal } from '@/components/leads/GoogleSheetsImportModal';
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 import { SessionTimeoutWarning } from '@/components/auth/SessionTimeoutWarning';
-import { AuditLogViewer } from '@/components/settings/AuditLogViewer';
-import { ProfileSettings } from '@/components/settings/ProfileSettings';
-import { AppUpdateCard } from '@/components/settings/AppUpdateCard';
-import { PasswordChangeCard } from '@/components/settings/PasswordChangeCard';
-import { NotificationPreferencesCard } from '@/components/settings/NotificationPreferencesCard';
-import { TwoFactorAuthCard } from '@/components/settings/TwoFactorAuthCard';
-import { DeleteAccountCard } from '@/components/settings/DeleteAccountCard';
-import { ThemeToggleCard } from '@/components/settings/ThemeToggleCard';
-import { WhatsAppPanel } from '@/components/whatsapp/WhatsAppPanel';
-import { NotificationProvider } from '@/contexts/NotificationContext';
-import { GoogleSheetsCard } from '@/components/settings/GoogleSheetsCard';
-import { OsTicketConfigCard } from '@/components/settings/OsTicketConfigCard';
-import Inbox from '@/pages/Inbox';
-import Templates from '@/pages/Templates';
-import { GoogleSheetsImportModal } from '@/components/leads/GoogleSheetsImportModal';
-import { PerplexityChatbot } from '@/components/chat/PerplexityChatbot';
-import { InternalChatPage } from '@/components/internal-chat/InternalChatPage';
-import { SharedFilesPanel } from '@/components/shared-files/SharedFilesPanel';
-import { DocumentEditor } from '@/components/editor/DocumentEditor';
-import { EmailModule } from '@/components/email/EmailModule';
-import { OsTicketHistory } from '@/components/osticket/OsTicketHistory';
-import { OsTicketPanel } from '@/components/osticket/OsTicketPanel';
-import { CalendarModule } from '@/components/calendar/CalendarModule';
-import { ReportsModule } from '@/components/reports/ReportsModule';
-import { AppsHub } from '@/components/apps/AppsHub';
-import { GeneralRemindersList } from '@/components/reminders/GeneralRemindersList';
-import { SeoArticleGenerator } from '@/components/seo/SeoArticleGenerator';
-import { N8nIntegrationPage } from '@/components/n8n/N8nIntegrationPage';
-import { BotqueronPanel } from '@/components/botqueron/BotqueronPanel';
-import { WorkspacesModule } from '@/components/workspaces/WorkspacesModule';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { SeoGeneratorInline } from '@/components/seo/SeoGeneratorInline';
+import { CommandPalette } from '@/components/layout/CommandPalette';
+import { RightSidebar } from '@/components/layout/RightSidebar';
+import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
+
+// Hooks y Utilidades
 import { useLeads } from '@/hooks/useLeads';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { Lead, LeadStatus } from '@/types/lead';
 import { Loader2, ShieldAlert, Search, Kanban, MapPin, MessageSquare, Ticket, Bell, Settings, Mail, Calendar as CalendarIcon, BarChart3, FolderOpen, FileEdit, Megaphone, MailOpen, FileCode, Activity, Brain, StickyNote, FileText } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
-import { Button } from '@/components/ui/button';
-import { CommandPalette } from '@/components/layout/CommandPalette';
-import { RightSidebar } from '@/components/layout/RightSidebar';
-import { PerformanceDashboard } from '@/components/performance/PerformanceDashboard';
 import { useInteractionTracking } from '@/hooks/useInteractionTracking';
-import { AIMemoryManager } from '@/components/ai-memory/AIMemoryManager';
-import { SecurityPanel } from '@/components/security/SecurityPanel';
-import { QuickNotesApp } from '@/components/notes/QuickNotesApp';
+
+// --- Lazy Loaded Modules ---
+const Dashboard = lazy(() => import('@/components/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
+const LeadsList = lazy(() => import('@/components/leads/LeadsList').then(m => ({ default: m.LeadsList })));
+const LeadDetail = lazy(() => import('@/components/leads/LeadDetail').then(m => ({ default: m.LeadDetail })));
+const LeadKanban = lazy(() => import('@/components/leads/LeadKanban').then(m => ({ default: m.LeadKanban })));
+const LeadMap = lazy(() => import('@/components/leads/LeadMap').then(m => ({ default: m.LeadMap })));
+const ProspectionModule = lazy(() => import('@/components/prospection/ProspectionModule').then(m => ({ default: m.ProspectionModule })));
+const EmailCampaigns = lazy(() => import('@/components/campaigns/EmailCampaigns').then(m => ({ default: m.EmailCampaigns })));
+const ReportsDashboard = lazy(() => import('@/components/reports/ReportsDashboard').then(m => ({ default: m.ReportsDashboard })));
+const SettingsView = lazy(() => import('@/components/settings/SettingsView').then(m => ({ default: m.SettingsView })));
+const AIMemoryManager = lazy(() => import('@/components/ai-memory/AIMemoryManager').then(m => ({ default: m.AIMemoryManager })));
+const SecurityPanel = lazy(() => import('@/components/security/SecurityPanel').then(m => ({ default: m.SecurityPanel })));
+const WhatsAppPanel = lazy(() => import('@/components/whatsapp/WhatsAppPanel').then(m => ({ default: m.WhatsAppPanel })));
+const Inbox = lazy(() => import('@/pages/Inbox'));
+const Templates = lazy(() => import('@/pages/Templates'));
+const PerplexityChatbot = lazy(() => import('@/components/chat/PerplexityChatbot').then(m => ({ default: m.PerplexityChatbot })));
+const InternalChatPage = lazy(() => import('@/components/internal-chat/InternalChatPage').then(m => ({ default: m.InternalChatPage })));
+const SharedFilesPanel = lazy(() => import('@/components/shared-files/SharedFilesPanel').then(m => ({ default: m.SharedFilesPanel })));
+const DocumentEditor = lazy(() => import('@/components/editor/DocumentEditor').then(m => ({ default: m.DocumentEditor })));
+const EmailModule = lazy(() => import('@/components/email/EmailModule').then(m => ({ default: m.EmailModule })));
+const OsTicketPanel = lazy(() => import('@/components/osticket/OsTicketPanel').then(m => ({ default: m.OsTicketPanel })));
+const CalendarModule = lazy(() => import('@/components/calendar/CalendarModule').then(m => ({ default: m.CalendarModule })));
+const ReportsModule = lazy(() => import('@/components/reports/ReportsModule').then(m => ({ default: m.ReportsModule })));
+const AppsHub = lazy(() => import('@/components/apps/AppsHub').then(m => ({ default: m.AppsHub })));
+const GeneralRemindersList = lazy(() => import('@/components/reminders/GeneralRemindersList').then(m => ({ default: m.GeneralRemindersList })));
+const N8nIntegrationPage = lazy(() => import('@/components/n8n/N8nIntegrationPage').then(m => ({ default: m.N8nIntegrationPage })));
+const BotqueronPanel = lazy(() => import('@/components/botqueron/BotqueronPanel').then(m => ({ default: m.BotqueronPanel })));
+const WorkspacesModule = lazy(() => import('@/components/workspaces/WorkspacesModule').then(m => ({ default: m.WorkspacesModule })));
+const SeoGeneratorInline = lazy(() => import('@/components/seo/SeoGeneratorInline').then(m => ({ default: m.SeoGeneratorInline })));
+const PerformanceDashboard = lazy(() => import('@/components/performance/PerformanceDashboard').then(m => ({ default: m.PerformanceDashboard })));
+const QuickNotesApp = lazy(() => import('@/components/notes/QuickNotesApp').then(m => ({ default: m.QuickNotesApp })));
+const SupportModule = lazy(() => import('@/components/support/SupportModule').then(m => ({ default: m.SupportModule })));
 
 
 const IndexContent = () => {
@@ -304,7 +298,7 @@ const IndexContent = () => {
               icon={<Search className="h-5 w-5 text-primary" />}
               onBack={goApps}
             />
-            <div className="flex-1 min-h-0 p-3 sm:p-6">
+            <div className="flex-1 min-h-0 p-4 sm:p-8">
               <ProspectionModule />
             </div>
           </div>
@@ -318,7 +312,7 @@ const IndexContent = () => {
               icon={<Kanban className="h-5 w-5 text-primary" />}
               onBack={goApps}
             />
-            <div className="flex-1 min-h-0 p-3 sm:p-6">
+            <div className="flex-1 min-h-0 p-4 sm:p-8">
               <LeadKanban 
                 leads={leads} 
                 onViewLead={handleViewLead} 
@@ -350,7 +344,7 @@ const IndexContent = () => {
               icon={<MapPin className="h-5 w-5 text-primary" />}
               onBack={goApps}
             />
-            <div className="flex-1 min-h-0 p-3 sm:p-6">
+            <div className="flex-1 min-h-0 p-4 sm:p-8">
               <LeadMap 
                 leads={leads} 
                 onViewLead={handleViewLead} 
@@ -397,7 +391,7 @@ const IndexContent = () => {
               icon={<MessageSquare className="h-5 w-5 text-primary" />}
               onBack={goApps}
             />
-            <div className="flex-1 min-h-0 p-3 sm:p-6">
+            <div className="flex-1 min-h-0 p-4 sm:p-8">
               <WhatsAppPanel prefillPhone={pendingWhatsAppPhone} onPrefillConsumed={() => setPendingWhatsAppPhone(null)} />
             </div>
           </div>
@@ -533,7 +527,7 @@ const IndexContent = () => {
               icon={<Bell className="h-5 w-5 text-primary" />}
               onBack={goApps}
             />
-            <div className="flex-1 min-h-0 p-3 sm:p-6 max-w-5xl mx-auto w-full">
+            <div className="flex-1 min-h-0 p-4 sm:p-8 max-w-5xl mx-auto w-full">
               <GeneralRemindersList />
             </div>
           </div>
@@ -541,33 +535,7 @@ const IndexContent = () => {
       case 'seo-generator':
         return <SeoGeneratorInline />;
       case 'settings':
-        return (
-          <div className="flex flex-col animate-fade-in h-full">
-            <PageHeader
-              title="Ajustes"
-              description="Configuración y registro de actividad"
-              icon={<Settings className="h-5 w-5 text-primary" />}
-              onBack={goApps}
-            />
-            <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6 space-y-4">
-              <AppUpdateCard />
-              <ProfileSettings />
-              <ThemeToggleCard />
-              <div className="pt-2 sm:pt-4">
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4">Integraciones</h2>
-                <div className="space-y-3 sm:space-y-4">
-                  <GoogleSheetsCard />
-                  <OsTicketConfigCard />
-                </div>
-              </div>
-              <PasswordChangeCard />
-              <TwoFactorAuthCard />
-              <NotificationPreferencesCard />
-              <AuditLogViewer />
-              <DeleteAccountCard />
-            </div>
-          </div>
-        );
+        return <SettingsView onBack={goApps} />;
       case 'rendimiento':
         return (
           <div className="flex flex-col animate-fade-in h-full">
@@ -577,7 +545,7 @@ const IndexContent = () => {
               icon={<Activity className="h-5 w-5 text-primary" />}
               onBack={goApps}
             />
-            <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6">
+            <div className="flex-1 min-h-0 overflow-auto p-4 sm:p-8">
               <PerformanceDashboard />
             </div>
           </div>
@@ -591,7 +559,7 @@ const IndexContent = () => {
               icon={<Brain className="h-5 w-5 text-primary" />}
               onBack={goApps}
             />
-            <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6">
+            <div className="flex-1 min-h-0 overflow-auto p-4 sm:p-8">
               <AIMemoryManager />
             </div>
           </div>
@@ -613,7 +581,7 @@ const IndexContent = () => {
               icon={<ShieldAlert className="h-5 w-5 text-primary" />}
               onBack={goApps}
             />
-            <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6">
+            <div className="flex-1 min-h-0 overflow-auto p-4 sm:p-8">
               <SecurityPanel />
             </div>
           </div>
@@ -627,7 +595,7 @@ const IndexContent = () => {
               icon={<StickyNote className="h-5 w-5 text-amber-500" />}
               onBack={goApps}
             />
-            <div className="flex-1 min-h-0 overflow-auto p-3 sm:p-6 max-w-6xl mx-auto w-full">
+            <div className="flex-1 min-h-0 overflow-auto p-4 sm:p-8 max-w-6xl mx-auto w-full">
               <QuickNotesApp />
             </div>
           </div>
@@ -637,6 +605,14 @@ const IndexContent = () => {
           <div className="flex flex-col animate-fade-in h-full">
             <div className="flex-1 min-h-0">
               <BotqueronPanel />
+            </div>
+          </div>
+        );
+      case 'soporte':
+        return (
+          <div className="flex flex-col animate-fade-in h-full">
+            <div className="flex-1 min-h-0">
+              <SupportModule />
             </div>
           </div>
         );
@@ -666,7 +642,15 @@ const IndexContent = () => {
           <EmailVerificationBanner />
           <main className="flex-1 overflow-auto pt-14 md:pt-0 flex flex-col min-h-0">
             <div className="flex-1 min-h-0 flex flex-col">
-              {renderContent()}
+              <ErrorBoundary>
+                <Suspense fallback={
+                  <div className="flex-1 flex items-center justify-center min-h-[400px]">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                }>
+                  {renderContent()}
+                </Suspense>
+              </ErrorBoundary>
             </div>
           </main>
         </div>

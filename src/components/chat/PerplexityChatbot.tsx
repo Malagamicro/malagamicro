@@ -176,7 +176,7 @@ export function PerplexityChatbot() {
       id: assistantId, role: 'assistant', content: '', timestamp: new Date(),
     }]);
 
-    let delegations: { agent_name: string; task: string; depends_on?: string }[] = [];
+    const delegations: { agent_name: string; task: string; depends_on?: string }[] = [];
 
     while (true) {
       const { done, value } = await reader.read();
@@ -355,7 +355,7 @@ export function PerplexityChatbot() {
         const data = await resp.json();
         const messageData = data.response?.choices?.[0]?.message;
         let imageContent = 'Imagen generada';
-        let imageUrls: string[] = [];
+        const imageUrls: string[] = [];
 
         // Extract text content
         if (typeof messageData?.content === 'string' && messageData.content.trim()) {

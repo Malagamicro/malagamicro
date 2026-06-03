@@ -275,7 +275,7 @@ export function Dashboard({ onViewLead, onTabChange }: DashboardProps) {
   const visibleLayouts = layouts.filter(l => visibleWidgets.some(w => w.id === l.i));
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-4 animate-fade-in">
+    <div className="p-4 md:p-8 lg:p-10 space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -370,7 +370,7 @@ export function Dashboard({ onViewLead, onTabChange }: DashboardProps) {
         isResizable={editMode}
         onLayoutChange={(layout) => { if (editMode) onLayoutChange(layout); }}
         draggableHandle=".drag-handle"
-        margin={[16, 16]}
+        margin={[24, 24]}
       >
         {visibleWidgets.map(widget => (
           <div key={widget.id} className="relative group">

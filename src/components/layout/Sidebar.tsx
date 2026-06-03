@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { 
-  Settings, LogOut, Sun, Moon,
+  Settings, LogOut, Sun, Moon, Bell,
   Menu, X, ChevronDown, Pencil,
   GripVertical, RotateCcw, Trash2,
   Palette, Eye, EyeOff,
@@ -20,6 +20,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useTheme } from 'next-themes';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationContext } from '@/contexts/NotificationContext';
+import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { useBadgeCounts } from '@/hooks/useBadgeCounts';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSidebarConfig, SidebarCategory, SidebarItem, SidebarPosition } from '@/hooks/useSidebarConfig';
@@ -57,7 +58,7 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
   const profileDisplayName = profile?.full_name || user?.email || 'Usuario';
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
-  const { unreadCount } = useNotificationContext();
+  const { unreadCount, customNotifications, customUnreadCount, markAsRead, markAllAsRead } = useNotificationContext();
   const badgeCounts = useBadgeCounts();
   const isMobile = useIsMobile();
   const {
@@ -160,17 +161,17 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
         key={item.id}
         onClick={() => handleItemClick(item)}
         className={cn(
-          "w-full flex items-center gap-2 px-2.5 py-1 rounded-md transition-colors duration-150 relative min-h-[30px]",
-          isMobile && "gap-1.5 px-2 py-0.5 min-h-[26px]",
-          "hover:bg-sidebar-accent",
-          isActive && "bg-primary/15 border-l-2 border-primary font-semibold shadow-sm",
-          !isActive && "border-l-2 border-transparent"
+          "w-full flex items-center gap-3 px-3 py-1.5 rounded-lg transition-all duration-200 relative min-h-[36px]",
+          isMobile && "gap-2 px-2.5 py-1 min-h-[32px]",
+          "hover:bg-sidebar-accent/50",
+          isActive && "bg-primary/10 border-l-2 border-primary font-medium text-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]",
+          !isActive && "border-l-2 border-transparent text-sidebar-foreground/80 hover:text-sidebar-foreground"
         )}
       >
         <div className="relative">
-          <Icon className={cn("w-3.5 h-3.5 flex-shrink-0", isMobile && "w-3 h-3", isActive ? "text-primary" : item.color)} />
+          <Icon className={cn("w-4 h-4 flex-shrink-0 transition-colors", isMobile && "w-3.5 h-3.5", isActive ? "text-primary" : item.color || "text-sidebar-foreground/60")} />
         </div>
-        <span className={cn("text-[11px] flex-1 text-left", isMobile && "text-[10px]", isActive && "text-primary font-semibold")}>{item.label}</span>
+        <span className={cn("text-sm flex-1 text-left tracking-tight", isMobile && "text-xs", isActive && "text-primary font-semibold")}>{item.label}</span>
         {item.isExternal && (
           <ExternalLink className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
         )}
@@ -482,9 +483,16 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
     <>
       <div className="px-4 py-2 border-b border-sidebar-border flex items-center justify-between">
         <span className="text-[9px] font-mono text-muted-foreground/60">{APP_VERSION} · {APP_BUILD_DATE}</span>
-        <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-7 w-7 text-sidebar-foreground hover:bg-sidebar-accent">
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
+        <div className="flex items-center gap-0.5">
+          <NotificationCenter
+            notifications={customNotifications}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+          />
+          <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-7 w-7 text-sidebar-foreground hover:bg-sidebar-accent">
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
       {/* Open Tabs Section - Collapsible */}
@@ -572,6 +580,11 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
       <div className="px-2.5 py-1.5 border-b border-sidebar-border flex items-center justify-between">
         <span className="text-[8px] font-mono text-muted-foreground/60">{APP_VERSION} · {APP_BUILD_DATE}</span>
         <div className="flex items-center gap-0.5">
+          <NotificationCenter
+            notifications={customNotifications}
+            onMarkAsRead={markAsRead}
+            onMarkAllAsRead={markAllAsRead}
+          />
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-7 w-7 text-sidebar-foreground hover:bg-sidebar-accent">
             {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </Button>
@@ -683,6 +696,11 @@ export function Sidebar({ activeTab, onTabChange, position = 'left', onPositionC
       </nav>
       <div className="h-6 w-px bg-sidebar-border mx-1 flex-shrink-0" />
       <div className="flex items-center gap-0.5 flex-shrink-0">
+        <NotificationCenter
+          notifications={customNotifications}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+        />
         <button onClick={toggleTheme} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors">
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>

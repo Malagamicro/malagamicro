@@ -31,7 +31,7 @@ export function PageHeader({ title, description, icon, actions = [], children, c
   ];
 
   return (
-    <div className={cn("px-4 sm:px-8 py-4 sm:py-5 border-b bg-card/50 flex-shrink-0", className)}>
+    <div className={cn("px-4 sm:px-8 py-5 sm:py-8 bg-transparent flex-shrink-0", className)}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           {onBack && (

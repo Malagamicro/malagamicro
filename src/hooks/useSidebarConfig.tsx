@@ -35,6 +35,7 @@ const DEFAULT_CATEGORIES: SidebarCategory[] = [
       { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', color: 'text-blue-500' },
       { id: 'notas', label: 'Notas', icon: 'StickyNote', color: 'text-amber-500' },
       { id: 'apps', label: 'Aplicaciones', icon: 'LayoutGrid', color: 'text-violet-500' },
+      { id: 'soporte', label: 'Soporte CRM', icon: 'LifeBuoy', color: 'text-emerald-500' },
     ]
   },
   {

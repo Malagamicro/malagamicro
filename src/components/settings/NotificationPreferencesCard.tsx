@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { toast } from '@/hooks/use-toast';
-import { Bell, Loader2, Mail, FileText, Calendar, Shield, TestTube2 } from 'lucide-react';
+import { Bell, Loader2, Mail, FileText, Calendar, Shield } from 'lucide-react';
 
 interface PreferenceItemProps {
   id: string;
@@ -45,7 +45,7 @@ function PreferenceItem({ id, label, description, icon, checked, onCheckedChange
 
 export function NotificationPreferencesCard() {
   const { preferences, isLoading, updatePreferences, isUpdating } = useNotificationPreferences();
-  const { permission, requestPermission, sendTestNotification } = useNotificationContext();
+  const { permission, requestPermission } = useNotificationContext();
 
   // Always read the real permission at render-time (avoids stale local state)
   const runtimePermission: NotificationPermission =
@@ -141,32 +141,10 @@ export function NotificationPreferencesCard() {
             </div>
 
             {runtimePermission === 'granted' ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  const result = await sendTestNotification();
-                  if (result.ok) {
-                    toast({
-                      title: '✅ Notificación enviada',
-                      description:
-                        result.method === 'serviceWorker'
-                          ? 'Enviada vía Service Worker (PWA)'
-                          : 'Enviada vía Notification() (constructor)',
-                    });
-                  } else {
-                    console.error('Test notification failed:', result.error);
-                    toast({
-                      title: '❌ Error al notificar',
-                      description: result.error || 'Error desconocido',
-                    });
-                  }
-                }}
-                className="gap-2"
-              >
-                <TestTube2 className="h-4 w-4" />
-                Enviar notificación de prueba
-              </Button>
+              <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 rounded-md border border-emerald-200 dark:border-emerald-500/20">
+                <Bell className="h-4 w-4" />
+                <span className="font-medium">Activadas</span>
+              </div>
             ) : (
               <Button
                 type="button"

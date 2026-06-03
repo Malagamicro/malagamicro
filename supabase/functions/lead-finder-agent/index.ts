@@ -307,13 +307,13 @@ INSTRUCCIONES:
 - Muestra valoraciones, teléfonos, webs y toda info útil.
 - Responde siempre en español.`;
 
-    let chatMessages = [
+    const chatMessages = [
       { role: "system", content: systemPrompt },
       ...messages,
     ];
 
     // Agent loop: call OpenRouter, handle tool calls, repeat
-    let maxIterations = 5;
+    const maxIterations = 5;
     let finalResponse = "";
 
     for (let i = 0; i < maxIterations; i++) {

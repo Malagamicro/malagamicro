@@ -877,7 +877,7 @@ async function executeToolCall(
         if (!title || !reminderDate) return JSON.stringify({ success: false, error: "title y reminder_date son obligatorios." });
 
         // Resolve target users by name
-        let targetUserIds: string[] = [];
+        const targetUserIds: string[] = [];
         const targetUserNames: string[] = [];
         if (Array.isArray(args.target_users) && args.target_users.length > 0) {
           const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").neq("user_id", userId);
@@ -1858,7 +1858,7 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
       return { error: true, status: 502, message: "Todos los modelos de IA fallaron." };
     }
 
-    let chatMessages = [{ role: "system", content: systemPrompt }, ...(messages ?? [])];
+    const chatMessages = [{ role: "system", content: systemPrompt }, ...(messages ?? [])];
 
     let result = await callWithFallback(chatMessages);
     if (result.error) {

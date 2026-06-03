@@ -225,7 +225,7 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
       "fixed right-0 top-0 h-screen z-40",
       "bg-card/95 backdrop-blur-xl border-l shadow-2xl",
       "flex flex-col transition-all duration-300 animate-in slide-in-from-right",
-      isMobile ? "w-[280px]" : "w-[300px]"
+      isMobile ? "w-[300px]" : "w-[340px]"
     )}>
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b">
@@ -235,15 +235,15 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-3 space-y-4">
+      <div className="flex-1 w-full overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <div className="w-full p-4 space-y-6">
           {/* Mini Calendar */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-3 px-1">
               <CalendarDays className="h-4 w-4 text-primary" />
-              <span className="text-xs font-semibold uppercase tracking-wide">Calendario</span>
+              <span className="text-sm font-medium">Calendario</span>
             </div>
-            <div className="rounded-lg border bg-background p-1">
+            <div className="rounded-xl bg-card border border-border/50 shadow-sm p-2">
               <Calendar
                 mode="single"
                 selected={selectedDate}
@@ -276,7 +276,7 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
                     );
                   },
                 }}
-                className="p-1 pointer-events-auto [&_.rdp-months]:!flex-col [&_.rdp-caption]:text-xs [&_.rdp-cell]:!w-8 [&_.rdp-cell]:!h-8 [&_.rdp-head_cell]:!w-8 [&_.rdp-day]:!h-7 [&_.rdp-day]:!w-7 [&_.rdp-day]:text-xs"
+                className="p-1 pointer-events-auto flex justify-center [&_.rdp-months]:!flex-col [&_.rdp-caption]:text-xs [&_.rdp-cell]:!w-7 [&_.rdp-cell]:!h-7 [&_.rdp-head_cell]:!w-7 [&_.rdp-day]:!h-6 [&_.rdp-day]:!w-6 [&_.rdp-day]:text-xs"
               />
             </div>
             <Button
@@ -290,16 +290,16 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
 
             {/* Events for upcoming days */}
             {calendarEvents.length > 0 && (
-              <div className="mt-2 space-y-1.5">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Próximos eventos</p>
+              <div className="mt-3 space-y-1.5 px-1">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Próximos eventos</p>
                 {calendarEvents.map(ev => (
                   <div
                     key={ev.id}
-                    className="flex items-start gap-2 p-2 rounded-lg border text-xs hover:bg-accent/50 cursor-pointer"
+                    className="flex items-start gap-3 p-2.5 rounded-xl bg-accent/20 border border-transparent hover:border-border/50 transition-colors cursor-pointer"
                     onClick={() => onNavigate('calendario')}
                   >
                     <div
-                      className="w-2 h-2 rounded-full mt-1.5 shrink-0"
+                      className="w-2.5 h-2.5 rounded-full mt-1 shrink-0 shadow-sm"
                       style={{ backgroundColor: ev.color || 'hsl(var(--primary))' }}
                     />
                     <div className="flex-1 min-w-0">
@@ -318,10 +318,10 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
 
           {/* Reminders */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3 px-1">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4 text-primary" />
-                <span className="text-xs font-semibold uppercase tracking-wide">Recordatorios</span>
+                <span className="text-sm font-medium">Recordatorios</span>
               </div>
               {overdueReminders.length > 0 && (
                 <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
@@ -343,7 +343,7 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
                     <div
                       key={r.id}
                       className={cn(
-                        "flex items-start gap-2 p-2 rounded-lg border text-xs transition-colors hover:bg-accent/50 cursor-pointer",
+                        "flex items-start gap-3 p-2.5 rounded-xl border border-border/50 bg-card transition-colors hover:bg-accent/30 cursor-pointer shadow-sm",
                         isOverdue && "border-destructive/30 bg-destructive/5"
                       )}
                       onClick={() => onNavigate('reminders')}
@@ -374,10 +374,10 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
 
           {/* Internal Chat - Recent messages */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3 px-1">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-primary" />
-                <span className="text-xs font-semibold uppercase tracking-wide">Chat interno</span>
+                <span className="text-sm font-medium">Chat interno</span>
               </div>
               {recentMessages.length > 0 && (
                 <Badge className="text-[10px] px-1.5 py-0">
@@ -404,10 +404,10 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
                   return (
                     <div
                       key={m.id}
-                      className="flex items-start gap-2 p-2 rounded-lg border text-xs transition-colors hover:bg-accent/50 cursor-pointer"
+                      className="flex items-start gap-3 p-2.5 rounded-xl border border-border/50 bg-card transition-colors hover:bg-accent/30 cursor-pointer shadow-sm"
                       onClick={() => onNavigate('mensajes')}
                     >
-                      <MessageSquare className="h-3.5 w-3.5 mt-0.5 text-primary" />
+                      <MessageSquare className="h-4 w-4 mt-0.5 text-primary opacity-80" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">
                           {m.sender_name}
@@ -435,10 +435,10 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
 
           {/* Quick Notes */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3 px-1">
               <div className="flex items-center gap-2">
                 <StickyNote className="h-4 w-4 text-amber-500" />
-                <span className="text-xs font-semibold uppercase tracking-wide">Notas</span>
+                <span className="text-sm font-medium">Notas</span>
               </div>
               {notes.length > 0 && (
                 <Badge className="text-[10px] px-1.5 py-0 bg-amber-500/20 text-amber-700 border-0">
@@ -457,8 +457,8 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
                 {notes.slice(0, 5).map(note => (
                   <div
                     key={note.id}
-                    className="group flex items-start gap-2 p-2 rounded-lg border text-xs transition-colors hover:bg-accent/50"
-                    style={{ borderLeftColor: note.color, borderLeftWidth: 3 }}
+                    className="group flex items-start gap-2 p-2.5 rounded-xl border border-border/50 bg-card transition-colors hover:bg-accent/30 shadow-sm"
+                    style={{ borderLeftColor: note.color, borderLeftWidth: 4 }}
                   >
                     <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onNavigate('notas')}>
                       {note.title && <p className="font-medium truncate">{note.title}</p>}
@@ -499,9 +499,9 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
 
           {/* AI Chat shortcut */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-3 px-1">
               <Bot className="h-4 w-4 text-primary" />
-              <span className="text-xs font-semibold uppercase tracking-wide">Asistente IA</span>
+              <span className="text-sm font-medium">Asistente IA</span>
             </div>
             <button
               onClick={() => onNavigate('chat-ai')}
@@ -518,7 +518,7 @@ export function RightSidebar({ onNavigate }: RightSidebarProps) {
             </button>
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

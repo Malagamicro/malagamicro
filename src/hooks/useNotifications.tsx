@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from '@/hooks/use-toast';
-import { useIsMobile } from '@/hooks/use-mobile';
+
 interface NotificationState {
   permission: NotificationPermission;
   unreadCount: number;
@@ -86,7 +86,6 @@ function createMp3PopSound(): () => boolean {
 export function useNotifications() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isMobile = useIsMobile();
   const playSoundRef = useRef<(() => void) | null>(null);
   const lastDeniedToastAtRef = useRef<number>(0);
   const lastNotificationErrorToastAtRef = useRef<number>(0);
@@ -336,7 +335,7 @@ export function useNotifications() {
     [],
   );
 
-  // Handle new incoming message
+  // Handle new incoming message — ALWAYS show notification (browser + in-app)
   const handleNewMessage = useCallback((senderName: string, messageContent: string) => {
     const perm = getRuntimePermission();
 
@@ -355,35 +354,30 @@ export function useNotifications() {
       return;
     }
 
-    const isHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
     const preview = messageContent.length > 100 ? messageContent.substring(0, 100) + '...' : messageContent;
 
-    if (isHidden) {
-      // Background tab -> show native notification
-      void showNotificationSmart(senderName, preview, undefined, { notifyOnError: false }).then((result) => {
-        // Visual notification failed for any reason -> sound fallback so the user doesn't miss it
-        if (!result.ok) playSound();
-      });
-    } else {
-      // Foreground (mobile): show an in-app toast so it"s not "silent"
-      if (isMobile) {
-        const now = Date.now();
-        if (now - lastForegroundToastAtRef.current > 1500) {
-          lastForegroundToastAtRef.current = now;
-          toast({
-            title: senderName,
-            description: preview,
-          });
-        }
-      }
+    // ALWAYS show browser notification (native OS) regardless of tab visibility
+    void showNotificationSmart(senderName, preview, undefined, { notifyOnError: false }).then((result) => {
+      // Visual notification failed for any reason -> sound fallback
+      if (!result.ok) playSound();
+    });
 
-      // Foreground -> play subtle sound
-      playSound();
+    // ALWAYS show in-app toast as well (throttled to avoid spam)
+    const now = Date.now();
+    if (now - lastForegroundToastAtRef.current > 1500) {
+      lastForegroundToastAtRef.current = now;
+      toast({
+        title: senderName,
+        description: preview,
+      });
     }
+
+    // Always play sound
+    playSound();
 
     // Invalidate unread count
     queryClient.invalidateQueries({ queryKey: ['unread-messages-count'] });
-  }, [isMobile, playSound, queryClient, showNotificationSmart]);
+  }, [playSound, queryClient, showNotificationSmart]);
 
   const sendTestNotification = useCallback(async (): Promise<NotificationAttemptResult> => {
     const result = await showNotificationSmart('Prueba', 'Si lees esto, funcionan ✅', undefined, {
