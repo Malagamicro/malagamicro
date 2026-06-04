@@ -69,7 +69,7 @@ export const useSeoArticles = () => {
     topic: string, 
     imageCount: number = 1, 
     generateVideo: boolean = false, 
-    videoDuration: number = 5,
+    videoDuration: number = 6,
     webhookUrl?: string
   ) => {
     if (!user) {

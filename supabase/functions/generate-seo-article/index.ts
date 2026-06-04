@@ -47,15 +47,25 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { topic, imageCount = 1, generateVideo = false, videoDuration = 5, articleId } = await req.json();
+    let { topic, imageCount = 1, generateVideo = false, videoDuration = 6, articleId } = await req.json();
 
     if (!topic) {
       throw new Error('Topic is required');
     }
 
-    console.log(`Generating SEO article directly for topic: "${topic}" with ${imageCount} images`);
+    // Sanitize video duration for google/veo-3.1-fast (supports 4, 6, 8)
     if (generateVideo) {
-      console.log(`Request includes video generation with duration ${videoDuration}s`);
+      if (videoDuration <= 4) {
+        videoDuration = 4;
+      } else if (videoDuration >= 8) {
+        videoDuration = 8;
+      } else {
+        videoDuration = 6;
+      }
+      console.log(`Generating SEO article directly for topic: "${topic}" with ${imageCount} images`);
+      console.log(`Request includes video generation with sanitized duration ${videoDuration}s (original might have been different)`);
+    } else {
+      console.log(`Generating SEO article directly for topic: "${topic}" with ${imageCount} images`);
     }
 
     // Crear o actualizar registro en la base de datos

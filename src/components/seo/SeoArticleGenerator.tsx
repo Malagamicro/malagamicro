@@ -41,7 +41,7 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
   const [testMode, setTestMode] = useState(false);
   const [imageCount, setImageCount] = useState(3);
   const [generateVideo, setGenerateVideo] = useState(false);
-  const [videoDuration, setVideoDuration] = useState(5);
+  const [videoDuration, setVideoDuration] = useState(6);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -229,20 +229,28 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
         </div>
 
         {generateVideo && (
-          <div className="flex flex-col gap-1.5 pl-4 border-l border-primary/30 animate-fade-in">
+          <div className="flex flex-col gap-2 pl-4 border-l border-primary/30 animate-fade-in">
             <div className="flex justify-between items-center text-xs">
               <span className="text-muted-foreground">Duración del video</span>
               <span className="text-primary font-bold font-mono">{videoDuration} segundos</span>
             </div>
-            <input
-              type="range"
-              min="5"
-              max="8"
-              value={videoDuration}
-              onChange={(e) => setVideoDuration(parseInt(e.target.value))}
-              className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-              disabled={generating}
-            />
+            <div className="flex gap-1.5">
+              {[4, 6, 8].map((duration) => (
+                <button
+                  key={duration}
+                  type="button"
+                  onClick={() => setVideoDuration(duration)}
+                  disabled={generating}
+                  className={`flex-1 py-1 px-2 text-xs font-medium rounded border transition-all ${
+                    videoDuration === duration
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background hover:bg-secondary text-muted-foreground border-muted'
+                  }`}
+                >
+                  {duration}s
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
