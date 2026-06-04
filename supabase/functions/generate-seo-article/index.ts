@@ -91,17 +91,49 @@ Deno.serve(async (req) => {
         .eq('id', recordId);
     }
 
-    // Iniciar procesamiento en segundo plano (asíncrono)
-    generateSeoArticleDirectly(
-      supabase,
-      recordId,
-      user.id,
-      topic,
-      imageCount,
-      generateVideo,
-      videoDuration,
-      openrouterKey
-    );
+    // Iniciar procesamiento en segundo plano (asíncrono) con EdgeRuntime.waitUntil para evitar la suspensión en serverless
+    try {
+      const globalRuntime = (globalThis as any).EdgeRuntime;
+      if (globalRuntime && typeof globalRuntime.waitUntil === 'function') {
+        console.log('[SEO] Programando procesamiento en segundo plano con EdgeRuntime.waitUntil');
+        globalRuntime.waitUntil(
+          generateSeoArticleDirectly(
+            supabase,
+            recordId,
+            user.id,
+            topic,
+            imageCount,
+            generateVideo,
+            videoDuration,
+            openrouterKey
+          )
+        );
+      } else {
+        console.log('[SEO] EdgeRuntime.waitUntil no disponible, ejecutando en segundo plano de forma estándar');
+        generateSeoArticleDirectly(
+          supabase,
+          recordId,
+          user.id,
+          topic,
+          imageCount,
+          generateVideo,
+          videoDuration,
+          openrouterKey
+        );
+      }
+    } catch (err) {
+      console.error("[SEO] Error al usar EdgeRuntime.waitUntil:", err);
+      generateSeoArticleDirectly(
+        supabase,
+        recordId,
+        user.id,
+        topic,
+        imageCount,
+        generateVideo,
+        videoDuration,
+        openrouterKey
+      );
+    }
 
     // Responder inmediatamente al cliente
     return new Response(
@@ -367,7 +399,10 @@ Debes responder ÚNICAMENTE con un objeto JSON válido (sin formato markdown ```
         }
 
         const videoData = await videoRes.json();
-        const pollingUrl = videoData.polling_url || `https://openrouter.ai/api/v1/videos/${videoData.id}`;
+        let pollingUrl = videoData.polling_url || `/api/v1/videos/${videoData.id}`;
+        if (pollingUrl.startsWith('/')) {
+          pollingUrl = `https://openrouter.ai${pollingUrl}`;
+        }
         console.log(`[SEO-BG] Trabajo de video creado. Polling URL: ${pollingUrl}`);
 
         let videoUrl = "";
@@ -387,7 +422,41 @@ Debes responder ÚNICAMENTE con un objeto JSON válido (sin formato markdown ```
             console.log(`[SEO-BG] Estado del video: ${pollData.status}`);
 
             if (pollData.status === 'completed' || pollData.status === 'succeeded') {
-              videoUrl = pollData.video_url || pollData.output?.[0] || pollData.url || (pollData.output && typeof pollData.output === 'string' ? pollData.output : "");
+              // Obtener la URL de descarga del video
+              const downloadUrl = pollData.unsigned_urls?.[0] || `https://openrouter.ai/api/v1/videos/${videoData.id || videoData.generation_id}/content`;
+              console.log(`[SEO-BG] Descargando video desde: ${downloadUrl}`);
+              
+              const downloadRes = await fetch(downloadUrl, {
+                headers: { "Authorization": `Bearer ${openrouterKey}` }
+              });
+
+              if (!downloadRes.ok) {
+                throw new Error(`Error al descargar video de OpenRouter: ${downloadRes.status} - ${downloadRes.statusText}`);
+              }
+
+              const videoBuffer = await downloadRes.arrayBuffer();
+              const videoBytes = new Uint8Array(videoBuffer);
+              const mimeType = downloadRes.headers.get('Content-Type') || 'video/mp4';
+
+              // Subir a Supabase Storage (en el bucket 'seo-images' que es público)
+              const ext = mimeType.split('/')[1] || 'mp4';
+              const fileName = `${recordId}/video.${ext}`;
+              console.log(`[SEO-BG] Subiendo video a Storage: ${fileName}`);
+
+              const { error: uploadError } = await supabase.storage
+                .from('seo-images')
+                .upload(fileName, videoBytes, {
+                  contentType: mimeType,
+                  upsert: true
+                });
+
+              if (uploadError) throw uploadError;
+
+              const { data: publicUrl } = supabase.storage
+                .from('seo-images')
+                .getPublicUrl(fileName);
+
+              videoUrl = publicUrl.publicUrl;
               break;
             } else if (pollData.status === 'failed') {
               throw new Error("El proveedor de video reportó fallo en la generación.");
@@ -397,7 +466,7 @@ Debes responder ÚNICAMENTE con un objeto JSON válido (sin formato markdown ```
         }
 
         if (videoUrl) {
-          console.log(`[SEO-BG] Video completado con éxito:`, videoUrl);
+          console.log(`[SEO-BG] Video completado y subido con éxito:`, videoUrl);
           await supabase
             .from('seo_articles')
             .update({
