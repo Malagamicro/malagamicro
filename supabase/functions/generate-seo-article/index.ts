@@ -171,7 +171,7 @@ async function generateSeoArticleDirectly(
     const systemPrompt = `Eres un experto redactor de contenidos de MálagaMicro, especialista en SEO.
 Tu objetivo es escribir un artículo de blog extenso (mínimo 1000 palabras), muy estructurado, didáctico, en español, profesional y completamente optimizado para SEO sobre el tema: "${topic}".
 Investiga en la web para incluir datos precisos, actuales y de gran valor para el usuario.
-Debes responder ÚNICAMENTE con un objeto JSON válido (sin formato markdown ```json fuera del JSON) que contenga la siguiente estructura exacta:
+Debes responder ÚNICAMENTE con un objeto JSON válido (sin formato markdown \`\`\`json fuera del JSON) que contenga la siguiente estructura exacta:
 {
   "title": "Un título sugerente, optimizado y atractivo de SEO para el artículo",
   "metaDescription": "Una meta descripción atractiva de menos de 160 caracteres",
