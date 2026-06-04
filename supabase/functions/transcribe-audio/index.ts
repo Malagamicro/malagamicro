@@ -27,49 +27,46 @@ serve(async (req) => {
       });
     }
 
-    // Send raw base64 audio (must be wav or mp3 for Voxtral)
-    const audioFormat = mimeType === "audio/wav" ? "wav" : "mp3";
+    // Format detection (supports wav, mp3, m4a, webm, ogg, etc.)
+    let audioFormat = "mp3";
+    if (mimeType) {
+      if (mimeType.includes("wav")) audioFormat = "wav";
+      else if (mimeType.includes("mp3")) audioFormat = "mp3";
+      else if (mimeType.includes("m4a")) audioFormat = "m4a";
+      else if (mimeType.includes("webm")) audioFormat = "webm";
+      else if (mimeType.includes("ogg")) audioFormat = "ogg";
+    }
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    console.log(`Sending transcription request with format: ${audioFormat} to openai/gpt-4o-mini-transcribe`);
+
+    const response = await fetch("https://openrouter.ai/api/v1/audio/transcriptions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "mistralai/voxtral-small-24b-2507",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "input_audio",
-                input_audio: {
-                  data: audio,
-                  format: audioFormat,
-                },
-              },
-              {
-                type: "text",
-                text: "Transcribe exactamente lo que dice el audio. Devuelve solo la transcripción, sin comentarios adicionales.",
-              },
-            ],
-          },
-        ],
+        model: "openai/gpt-4o-mini-transcribe",
+        input_audio: {
+          data: audio,
+          format: audioFormat,
+        },
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("OpenRouter error:", response.status, errorText);
-      return new Response(JSON.stringify({ error: `Transcription failed: ${response.status}` }), {
+      console.error("OpenRouter transcription error:", response.status, errorText);
+      return new Response(JSON.stringify({ error: `Transcription failed: ${response.status} - ${errorText}` }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const data = await response.json();
-    const transcription = data.choices?.[0]?.message?.content || "";
+    const transcription = data.text || "";
+
+    console.log("Transcription result:", transcription);
 
     return new Response(JSON.stringify({ transcription }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
