@@ -637,6 +637,71 @@ export type Database = {
           },
         ]
       }
+      crm_support_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "crm_support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_support_tickets: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          priority: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          priority?: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          priority?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       custom_notifications: {
         Row: {
           action_label: string | null
@@ -1930,6 +1995,10 @@ export type Database = {
           topic: string
           updated_at: string
           user_id: string
+          video_duration: number | null
+          video_prompt: string | null
+          video_status: string | null
+          video_url: string | null
           word_count: number | null
           workflow_id: string | null
         }
@@ -1958,6 +2027,10 @@ export type Database = {
           topic: string
           updated_at?: string
           user_id: string
+          video_duration?: number | null
+          video_prompt?: string | null
+          video_status?: string | null
+          video_url?: string | null
           word_count?: number | null
           workflow_id?: string | null
         }
@@ -1986,6 +2059,10 @@ export type Database = {
           topic?: string
           updated_at?: string
           user_id?: string
+          video_duration?: number | null
+          video_prompt?: string | null
+          video_status?: string | null
+          video_url?: string | null
           word_count?: number | null
           workflow_id?: string | null
         }
