@@ -30,6 +30,10 @@ export interface SeoArticle {
   error_details?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  video_url?: string;
+  video_prompt?: string;
+  video_status?: 'none' | 'pending' | 'processing' | 'completed' | 'error';
+  video_duration?: number;
 }
 
 export const useSeoArticles = () => {
@@ -61,7 +65,13 @@ export const useSeoArticles = () => {
   }, [user]);
 
   // Generar nuevo artículo — con protección contra clicks múltiples
-  const generateArticle = useCallback(async (topic: string, imageCount: number = 1, webhookUrl?: string) => {
+  const generateArticle = useCallback(async (
+    topic: string, 
+    imageCount: number = 1, 
+    generateVideo: boolean = false, 
+    videoDuration: number = 5,
+    webhookUrl?: string
+  ) => {
     if (!user) {
       toast.error('Debes iniciar sesión');
       return null;
@@ -87,7 +97,7 @@ export const useSeoArticles = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session?.access_token}`,
           },
-          body: JSON.stringify({ topic, imageCount, webhookUrl }),
+          body: JSON.stringify({ topic, imageCount, generateVideo, videoDuration, webhookUrl }),
         }
       );
 

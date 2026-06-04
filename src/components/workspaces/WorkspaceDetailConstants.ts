@@ -30,8 +30,8 @@ export const ROLE_LABELS: Record<string, { label: string; icon: any; color: stri
 };
 
 export const AI_MODELS = [
-  { value: 'openrouter/hunter-alpha', label: 'Hunter Alpha' },
-  { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { value: 'openai/gpt-5-mini', label: 'GPT-5 Mini' },
-  { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+  { value: 'google/gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
+  { value: 'google/gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
 ];

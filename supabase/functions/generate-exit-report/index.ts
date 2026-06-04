@@ -58,7 +58,7 @@ serve(async (req) => {
         "X-Title": "MalagaMicro CRM",
       },
       body: JSON.stringify({
-        model: "anthropic/claude-4-6-sonnet",
+        model: "anthropic/claude-3.5-sonnet",
         messages: [
           {
             role: "system",

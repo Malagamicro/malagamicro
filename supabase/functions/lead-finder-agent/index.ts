@@ -324,7 +324,7 @@ INSTRUCCIONES:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "openai/gpt-4.1-mini",
+          model: "openai/gpt-4o-mini",
           messages: chatMessages,
           tools,
           tool_choice: "auto",

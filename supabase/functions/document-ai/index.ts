@@ -80,7 +80,7 @@ Devuelve el texto completo mejorado sin formato Markdown. No añadas explicacion
         "X-Title": "MalagaMicro CRM",
       },
       body: JSON.stringify({
-        model: "anthropic/claude-4-6-sonnet",
+        model: "anthropic/claude-3.5-sonnet",
         messages: [
           { role: "system", content: systemContent },
           ...messages,

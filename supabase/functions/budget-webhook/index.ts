@@ -95,13 +95,18 @@ serve(async (req) => {
 
       // Find Inma's user ID (admin user)
       const { data: users } = await serviceClient.auth.admin.listUsers();
-      const inmaUser = users?.users?.find(u => 
+      let inmaUser = users?.users?.find(u => 
         u.email?.toLowerCase().includes('inma') || 
         u.email === 'administracion@malagamicro.com'
       );
 
+      if (!inmaUser && users?.users && users.users.length > 0) {
+        console.warn('Inma user not found, falling back to first user');
+        inmaUser = users.users[0];
+      }
+
       if (!inmaUser) {
-        console.error('Inma user not found');
+        console.error('No approval user found');
         return new Response(
           JSON.stringify({ error: 'Approval user not found' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

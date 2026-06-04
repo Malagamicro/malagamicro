@@ -22,11 +22,10 @@ interface WorkspaceAIChatProps {
 }
 
 const AI_MODELS = [
-  { value: 'openrouter/hunter-alpha', label: 'Hunter Alpha (default)' },
-  { value: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4' },
-  { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { value: 'openai/gpt-5-mini', label: 'GPT-5 Mini' },
-  { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini (default)' },
+  { value: 'google/gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet' },
+  { value: 'google/gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
 ];
 
 export function WorkspaceAIChat({ workspaceId, pages, open, onClose }: WorkspaceAIChatProps) {
@@ -34,7 +33,7 @@ export function WorkspaceAIChat({ workspaceId, pages, open, onClose }: Workspace
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState('openrouter/hunter-alpha');
+  const [model, setModel] = useState('openai/gpt-4o-mini');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

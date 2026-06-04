@@ -23,13 +23,11 @@ export interface FileAttachment {
 }
 
 export const MODELS = [
-  { id: 'openai/gpt-5-nano', name: 'GPT-5 Nano', icon: Brain, color: 'text-emerald-500' },
-  { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini', icon: Sparkles, color: 'text-blue-500' },
-  { id: 'openai/gpt-5', name: 'GPT-5', icon: Sparkles, color: 'text-violet-500' },
-  { id: 'google/gemini-2.5-flash', name: 'Gemini Flash', icon: Zap, color: 'text-amber-500' },
-  { id: 'google/gemini-2.5-pro', name: 'Gemini Pro', icon: Brain, color: 'text-indigo-500' },
-  { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet', icon: Brain, color: 'text-orange-500' },
-  { id: 'openai/gpt-5.2', name: 'GPT-5.2', icon: Sparkles, color: 'text-cyan-500' },
+  { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', icon: Sparkles, color: 'text-emerald-500' },
+  { id: 'openai/gpt-4o', name: 'GPT-4o', icon: Sparkles, color: 'text-violet-500' },
+  { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash', icon: Zap, color: 'text-amber-500' },
+  { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro', icon: Brain, color: 'text-indigo-500' },
+  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', icon: Brain, color: 'text-orange-500' },
   { id: 'custom', name: 'Personalizado', icon: Pencil, color: 'text-muted-foreground' },
 ];
 

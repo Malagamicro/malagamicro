@@ -69,7 +69,7 @@ Instruction: "${query}"`;
         'HTTP-Referer': 'https://malagamicro.lovable.app',
       },
       body: JSON.stringify({
-        model: isMagicColumn ? 'google/gemini-2.5-flash-preview' : 'google/gemini-2.5-flash-preview',
+        model: isMagicColumn ? 'google/gemini-2.0-flash' : 'google/gemini-2.0-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

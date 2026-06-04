@@ -16,6 +16,8 @@ import {
   ExternalLink,
   FolderUp,
   Loader2,
+  AlertCircle,
+  Video,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -106,6 +108,23 @@ export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerPro
         }
       }
 
+      // Upload video if any
+      if (article.video_url && article.video_status === 'completed') {
+        try {
+          const resp = await fetch(article.video_url);
+          const videoBlob = await resp.blob();
+          const videoPath = `${user.id}/${Date.now()}-${slug}-video.mp4`;
+          const { error: videoUpErr } = await supabase.storage.from('shared-files').upload(videoPath, videoBlob);
+          if (!videoUpErr) {
+            const { data: { publicUrl: videoUrl } } = supabase.storage.from('shared-files').getPublicUrl(videoPath);
+            await supabase.from('shared_files').insert({
+              user_id: user.id, file_name: `${slug}-video.mp4`, file_path: videoUrl,
+              file_size: videoBlob.size, file_type: videoBlob.type, folder_id: folder.id,
+            });
+          }
+        } catch { /* skip */ }
+      }
+
       toast.success('Artículo guardado en Archivos Compartidos');
     } catch (err) {
       console.error(err);
@@ -139,13 +158,20 @@ export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerPro
                 {(article.images as any[]).length} imágenes
               </Badge>
             )}
+            {article.video_status && article.video_status !== 'none' && (
+              <Badge variant="outline">
+                <Video className="h-3 w-3 mr-1" />
+                Video: {article.video_status}
+              </Badge>
+            )}
           </div>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="preview">Vista Previa</TabsTrigger>
             <TabsTrigger value="html">HTML</TabsTrigger>
+            <TabsTrigger value="video">Video</TabsTrigger>
             <TabsTrigger value="seo">SEO</TabsTrigger>
             <TabsTrigger value="meta">Meta</TabsTrigger>
           </TabsList>
@@ -199,8 +225,68 @@ export const SeoArticleViewer = ({ article, open, onClose }: SeoArticleViewerPro
               </ScrollArea>
             </TabsContent>
 
-
-
+            <TabsContent value="video" className="h-full m-0">
+              <div className="flex justify-center items-center h-[60vh] border rounded-lg p-6 bg-muted/5">
+                {article.video_status === 'completed' && article.video_url ? (
+                  <div className="space-y-4 w-full max-w-xl flex flex-col items-center">
+                    <video 
+                      controls 
+                      src={article.video_url} 
+                      className="w-full rounded-lg max-h-[45vh] bg-black shadow-lg"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = article.video_url!;
+                          a.download = `${article.slug || 'video'}.mp4`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Descargar Video
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(article.video_url, '_blank')}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Ver en pestaña
+                      </Button>
+                    </div>
+                  </div>
+                ) : article.video_status === 'processing' ? (
+                  <div className="flex flex-col items-center justify-center text-muted-foreground gap-4 text-center">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Generando video con google/veo-3.1-fast...</p>
+                      <p className="text-xs mt-1">El proceso tarda entre 1 y 2 minutos. El reproductor aparecerá automáticamente cuando esté listo.</p>
+                    </div>
+                  </div>
+                ) : article.video_status === 'error' ? (
+                  <div className="flex flex-col items-center justify-center text-destructive gap-3 text-center">
+                    <AlertCircle className="h-10 w-10" />
+                    <div>
+                      <p className="text-sm font-semibold">Error al generar el video</p>
+                      <p className="text-xs text-muted-foreground mt-1">{article.error_message || 'Fallo desconocido en el servidor.'}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-muted-foreground gap-3 text-center">
+                    <Video className="h-10 w-10 opacity-30" />
+                    <div>
+                      <p className="text-sm font-semibold">No se solicitó video</p>
+                      <p className="text-xs mt-1">Habilita la opción de video al crear un nuevo artículo para generarlo de forma automática.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
 
             <TabsContent value="seo" className="h-full m-0">
               <ScrollArea className="h-[60vh]">

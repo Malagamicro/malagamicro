@@ -1556,7 +1556,7 @@ serve(async (req) => {
 
       if (agentType === 'image') {
         // Image generation via OpenRouter
-        const imageModel = agentModel || 'google/gemini-2.5-flash-image-preview';
+        const imageModel = agentModel || 'google/gemini-2.0-flash';
         
         // Gemini image models need modalities param; FLUX and others don't
         const isGeminiImageModel = imageModel.includes('gemini') && imageModel.includes('image');
@@ -1595,9 +1595,9 @@ serve(async (req) => {
           const errText = await imageResponse.text();
           console.warn(`[perplexity-chat] Image model ${imageModel} failed (${imageResponse.status}): ${errText}`);
           
-          if (imageModel !== 'google/gemini-2.5-flash-image-preview') {
-            console.log(`[perplexity-chat] Trying fallback: google/gemini-2.5-flash-image-preview`);
-            imageResponse = await callImageApi(buildImageRequest('google/gemini-2.5-flash-image-preview', true));
+          if (imageModel !== 'google/gemini-2.0-flash') {
+            console.log(`[perplexity-chat] Trying fallback: google/gemini-2.0-flash`);
+            imageResponse = await callImageApi(buildImageRequest('google/gemini-2.0-flash', true));
             
             if (!imageResponse.ok) {
               const fbErr = await imageResponse.text();
@@ -1787,7 +1787,7 @@ serve(async (req) => {
     }
 
     // --- Normal orchestrator mode ---
-    const selectedModel = requestedModel || 'openai/gpt-5-nano';
+    const selectedModel = requestedModel || 'openai/gpt-4o-mini';
 
     // Build subagent info for system prompt
     const subagentList = Array.isArray(clientSubagents) && clientSubagents.length > 0

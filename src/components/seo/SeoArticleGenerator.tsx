@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Sparkles, Loader2, Send, Bot, User, FlaskConical, ImageIcon } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Sparkles, Loader2, Send, Bot, User, FlaskConical, ImageIcon, Video } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 const PRODUCTION_URL = 'https://n8n.malagamicro.com/webhook/generate-seo-article';
@@ -27,18 +26,28 @@ interface ChatMessage {
 }
 
 interface SeoArticleGeneratorProps {
-  onGenerate: (topic: string, imageCount: number, webhookUrl?: string) => Promise<unknown>;
+  onGenerate: (
+    topic: string,
+    imageCount: number,
+    generateVideo: boolean,
+    videoDuration: number,
+    webhookUrl?: string
+  ) => Promise<unknown>;
   generating: boolean;
 }
 
 export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGeneratorProps) => {
   const [input, setInput] = useState('');
   const [testMode, setTestMode] = useState(false);
+  const [imageCount, setImageCount] = useState(3);
+  const [generateVideo, setGenerateVideo] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(5);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: '¡Hola! 👋 Soy tu asistente de generación SEO. Dime sobre qué tema quieres que genere un artículo optimizado y me pondré a trabajar.\n\nPuedo crear artículos con:\n- 🔍 Investigación web automática\n- 🖼️ Imágenes generadas por IA\n- 📊 Optimización SEO completa',
+      content: '¡Hola! 👋 Soy tu asistente de generación SEO. Dime sobre qué tema quieres que genere un artículo optimizado y me pondré a trabajar.\n\nPuedo crear artículos con:\n- 🔍 Investigación web en vivo (Gemini 3.5 Flash)\n- 🖼️ Imágenes generadas por IA (Gemini 3.1)\n- 📹 Video descriptivo por IA (Veo 3.1 Fast)',
       timestamp: new Date(),
     },
   ]);
@@ -71,7 +80,7 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: topic,
+      content: `${topic} (${imageCount} imágenes${generateVideo ? `, video de ${videoDuration}s` : ''})`,
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMsg]);
@@ -80,19 +89,19 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
     const processingMsg: ChatMessage = {
       id: `processing-${Date.now()}`,
       role: 'assistant',
-      content: `⏳ Generando artículo sobre **"${topic}"**...\n\nEsto puede tardar 1-2 minutos. Recibirás el artículo automáticamente cuando esté listo.`,
+      content: `⏳ Iniciando la generación del artículo sobre **"${topic}"** con ${imageCount} imágenes${generateVideo ? ` y video de ${videoDuration}s con google/veo-3.1-fast` : ''}...\n\nEl sistema lo procesará en segundo plano. Podrás seguir el avance desde el listado de resultados.`,
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, processingMsg]);
 
     const url = testMode ? TEST_URL : PRODUCTION_URL;
-    const result = await onGenerate(topic, 1, url);
+    const result = await onGenerate(topic, imageCount, generateVideo, videoDuration, url);
 
     if (result) {
       const successMsg: ChatMessage = {
         id: `success-${Date.now()}`,
         role: 'assistant',
-        content: `✅ ¡Artículo sobre **"${topic}"** enviado a generar!\n\nCuando n8n termine el procesamiento, aparecerá automáticamente en la lista de artículos. Puedes seguir pidiendo más artículos mientras tanto.`,
+        content: `✅ ¡Procesando artículo sobre **"${topic}"**!\n\nGemini 3.5 Flash está investigando la web en tiempo real para redactar el artículo. Las imágenes y el video se generarán de manera consecutiva.`,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, successMsg]);
@@ -100,7 +109,7 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
       const errorMsg: ChatMessage = {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: `❌ Hubo un error al intentar generar el artículo sobre **"${topic}"**. Por favor, inténtalo de nuevo.`,
+        content: `❌ Hubo un error al intentar iniciar la generación para **"${topic}"**. Inténtalo de nuevo.`,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -110,7 +119,7 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
   };
 
   return (
-    <Card className="border-primary/20 bg-card/80 backdrop-blur-sm shadow-lg shadow-primary/5 flex flex-col h-[60vh] min-h-[400px]">
+    <Card className="border-primary/20 bg-card/80 backdrop-blur-sm shadow-lg shadow-primary/5 flex flex-col h-[70vh] min-h-[500px]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center gap-2">
@@ -118,8 +127,8 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
             <Bot className="h-4 w-4 text-primary-foreground" />
           </div>
           <div>
-            <p className="text-sm font-semibold">Asistente SEO</p>
-            <p className="text-[10px] text-muted-foreground">Genera artículos optimizados</p>
+            <p className="text-sm font-semibold">Asistente SEO Directo</p>
+            <p className="text-[10px] text-muted-foreground">Genera artículos con Gemini y Veo</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -177,7 +186,7 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
               <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Procesando...
+                  Procesando generación en el servidor...
                 </div>
               </div>
             </div>
@@ -185,12 +194,57 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
         </div>
       </ScrollArea>
 
-      {/* Info badge */}
-      <div className="px-4 pb-1">
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground bg-muted/50 rounded-lg px-2.5 py-1.5">
-          <ImageIcon className="h-3 w-3 shrink-0" />
-          1 imagen IA incluida por artículo
+      {/* Configuration Options */}
+      <div className="px-4 py-3 border-t bg-muted/20 space-y-3">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex justify-between items-center text-xs">
+            <span className="font-semibold text-foreground flex items-center gap-1.5">
+              <ImageIcon className="h-3.5 w-3.5 text-primary" />
+              Imágenes del artículo (Gemini 3.1)
+            </span>
+            <span className="text-primary font-bold font-mono">{imageCount}</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="5"
+            value={imageCount}
+            onChange={(e) => setImageCount(parseInt(e.target.value))}
+            className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+            disabled={generating}
+          />
         </div>
+
+        <div className="flex items-center justify-between border-t pt-2 mt-1">
+          <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+            <Video className="h-3.5 w-3.5 text-primary" />
+            Generar Video (Veo 3.1 Fast)
+          </span>
+          <Switch
+            checked={generateVideo}
+            onCheckedChange={setGenerateVideo}
+            disabled={generating}
+            className="scale-90"
+          />
+        </div>
+
+        {generateVideo && (
+          <div className="flex flex-col gap-1.5 pl-4 border-l border-primary/30 animate-fade-in">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-muted-foreground">Duración del video</span>
+              <span className="text-primary font-bold font-mono">{videoDuration} segundos</span>
+            </div>
+            <input
+              type="range"
+              min="5"
+              max="8"
+              value={videoDuration}
+              onChange={(e) => setVideoDuration(parseInt(e.target.value))}
+              className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+              disabled={generating}
+            />
+          </div>
+        )}
       </div>
 
       {/* Input */}
@@ -198,7 +252,7 @@ export const SeoArticleGenerator = ({ onGenerate, generating }: SeoArticleGenera
         <div className="flex gap-2">
           <Input
             ref={inputRef}
-            placeholder="Ej: Mejores prácticas de IA en 2026..."
+            placeholder="Ej: Tendencias de IA en Málaga en 2026..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={generating}

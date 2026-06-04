@@ -724,7 +724,7 @@ serve(async (req) => {
           const aiResp = await fetch(`${supabaseUrl}/functions/v1/ai-completion`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceRoleKey}` },
-            body: JSON.stringify({ prompt, model: model || 'google/gemini-2.5-flash', system_prompt }),
+            body: JSON.stringify({ prompt, model: model || 'google/gemini-2.0-flash', system_prompt }),
           });
           result = await aiResp.json();
         }

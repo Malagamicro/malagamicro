@@ -516,13 +516,30 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "edit_file",
+      description: "Editar/actualizar el contenido de un archivo de texto existente en el sistema de archivos compartidos. Permite sobrescribir el archivo con nuevo contenido. REQUIERE CONFIRMACIÓN.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_name: { type: "string", description: "Nombre (o parte) del archivo a editar" },
+          file_id: { type: "string", description: "ID específico del archivo si se conoce (opcional)" },
+          content: { type: "string", description: "El nuevo contenido completo del archivo" },
+          confirmed: { type: "boolean", description: "Si el usuario ya confirmó la acción" },
+        },
+        required: ["content"],
+      },
+    },
+  },
 ];
 // Confirmation check for write operations
 function needsConfirmation(toolName: string, args: Record<string, unknown>): string | null {
   const writeTools = [
     "send_internal_message", "send_email", "send_whatsapp",
     "create_lead", "update_lead", "create_reminder", "complete_reminder",
-    "send_notification", "create_file",
+    "send_notification", "create_file", "edit_file",
     "create_calendar_event", "delete_calendar_event", "update_apps_config",
   ];
   if (!writeTools.includes(toolName)) return null;
@@ -559,6 +576,8 @@ function needsConfirmation(toolName: string, args: Record<string, unknown>): str
       return `🎨 **Modificar aplicaciones**\n- **Acción:** ${args.action}\n${args.category_name ? `- **Categoría:** ${args.category_name}\n` : ''}${args.icon ? `- **Icono:** ${args.icon}\n` : ''}${args.color ? `- **Color:** ${args.color}\n` : ''}${args.icon_size ? `- **Tamaño:** ${args.icon_size}\n` : ''}\n¿Confirmas?`;
     case "create_file":
       return `📄 **Crear archivo**\n- **Nombre:** ${args.file_name}\n- **Contenido:** ${String(args.content).slice(0, 200)}${String(args.content).length > 200 ? '...' : ''}\n${args.folder_name ? `- **Carpeta:** ${args.folder_name}\n` : ''}\n¿Confirmas?`;
+    case "edit_file":
+      return `✏️ **Editar archivo**\n- **Nombre:** ${args.file_name || args.file_id}\n- **Nuevo Contenido:** ${String(args.content).slice(0, 200)}${String(args.content).length > 200 ? '...' : ''}\n\n¿Confirmas?`;
     default:
       return null;
   }
@@ -664,45 +683,103 @@ async function executeToolCall(
         const body = String(args.body || "");
         if (!to || !subject || !body) return JSON.stringify({ success: false, error: "Faltan parámetros: to, subject y body son obligatorios." });
 
-        // Use Micro's dedicated email profile
+        let selectedProfileId: string | undefined = undefined;
+        try {
+          const { data: microProf } = await supabase.from("email_profiles").select("id").eq("id", MICRO_EMAIL_PROFILE_ID).maybeSingle();
+          if (microProf) {
+            selectedProfileId = MICRO_EMAIL_PROFILE_ID;
+          } else {
+            const { data: defaultProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
+            if (defaultProf) {
+              selectedProfileId = defaultProf.id;
+            } else {
+              const { data: anyProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).limit(1).maybeSingle();
+              if (anyProf) {
+                selectedProfileId = anyProf.id;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[mascot-chat] Error fetching email profile, falling back to environment config:", e);
+        }
+
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const reqBody: Record<string, any> = { to, subject, html: body };
+        if (selectedProfileId) {
+          reqBody.profileId = selectedProfileId;
+        }
+
         const res = await fetch(`${supabaseUrl}/functions/v1/send-smtp-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
-          body: JSON.stringify({ to, subject, html: body, profileId: MICRO_EMAIL_PROFILE_ID }),
+          body: JSON.stringify(reqBody),
         });
         const result = await res.json();
         if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al enviar" });
-        return JSON.stringify({ success: true, message: "Correo enviado a " + to + " desde ia@malagamicro.com (Micro)" });
+        return JSON.stringify({ success: true, message: `Correo enviado a ${to}${selectedProfileId ? '' : ' (usando configuración del sistema)'}` });
       }
 
       case "get_inbox": {
         const limit = Number(args.limit) || 5;
-        // Get emails from FluiMicro'sicated profile
-        const { data: microProfile } = await supabase.from("email_profiles").select("user_id").eq("id", MICRO_EMAIL_PROFILE_ID).single();
-        const microUserId = (microProfile as any)?.user_id || userId;
-        const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, folder, has_attachments").eq("profile_id", MICRO_EMAIL_PROFILE_ID).eq("folder", "inbox").eq("is_deleted", false).order("date", { ascending: false }).limit(limit);
+        
+        let targetProfileId = MICRO_EMAIL_PROFILE_ID;
+        try {
+          const { data: microProfile } = await supabase.from("email_profiles").select("id").eq("id", MICRO_EMAIL_PROFILE_ID).maybeSingle();
+          if (!microProfile) {
+            const { data: defaultProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
+            if (defaultProf) {
+              targetProfileId = defaultProf.id;
+            } else {
+              const { data: anyProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).limit(1).maybeSingle();
+              if (anyProf) {
+                targetProfileId = anyProf.id;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[mascot-chat] Error resolving profile for inbox, using default uuid:", e);
+        }
+
+        const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, folder, has_attachments").eq("profile_id", targetProfileId).eq("folder", "inbox").eq("is_deleted", false).order("date", { ascending: false }).limit(limit);
         if (error) throw error;
-        if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada de Micro." });
+        if (!data?.length) return JSON.stringify({ message: "No hay correos en la bandeja de entrada." });
         const msgCount = data.length;
         return JSON.stringify({
-          message: msgCount + " correo(s) recientes en el buzon de Micro (ia@malagamicro.com)",
+          message: msgCount + " correo(s) recientes en la bandeja de entrada",
           emails: data.map((e: any) => ({ id: e.id, asunto: e.subject || "(Sin asunto)", de: e.from_name || e.from_address, fecha: e.date, leido: e.is_read, adjuntos: e.has_attachments })),
         });
       }
 
       case "sync_inbox_imap": {
         const limit = Number(args.limit) || 20;
-        // Sync Micro's dedicated IMAP profile
+        
+        let targetProfileId = MICRO_EMAIL_PROFILE_ID;
+        try {
+          const { data: microProfile } = await supabase.from("email_profiles").select("id").eq("id", MICRO_EMAIL_PROFILE_ID).maybeSingle();
+          if (!microProfile) {
+            const { data: defaultProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
+            if (defaultProf) {
+              targetProfileId = defaultProf.id;
+            } else {
+              const { data: anyProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).limit(1).maybeSingle();
+              if (anyProf) {
+                targetProfileId = anyProf.id;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[mascot-chat] Error resolving profile for sync, using default uuid:", e);
+        }
+
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
-          body: JSON.stringify({ profile_id: MICRO_EMAIL_PROFILE_ID, action: "sync", limit }),
+          body: JSON.stringify({ profile_id: targetProfileId, action: "sync", limit }),
         });
         const result = await res.json();
         if (!res.ok) return JSON.stringify({ success: false, error: result.error || "Error al sincronizar" });
-        return JSON.stringify({ success: true, message: "Sincronizacion del buzon de Micro completada. " + (result.new_messages ?? 0) + " correo(s) nuevo(s).", total: result.total_messages ?? 0 });
+        return JSON.stringify({ success: true, message: "Sincronización del buzón completada. " + (result.new_messages ?? 0) + " correo(s) nuevo(s).", total: result.total_messages ?? 0 });
       }
 
       case "read_email": {
@@ -710,22 +787,40 @@ async function executeToolCall(
         const search = String(args.search || "");
         let msg: any = null;
 
+        let targetProfileId = MICRO_EMAIL_PROFILE_ID;
+        try {
+          const { data: microProfile } = await supabase.from("email_profiles").select("id").eq("id", MICRO_EMAIL_PROFILE_ID).maybeSingle();
+          if (!microProfile) {
+            const { data: defaultProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
+            if (defaultProf) {
+              targetProfileId = defaultProf.id;
+            } else {
+              const { data: anyProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).limit(1).maybeSingle();
+              if (anyProf) {
+                targetProfileId = anyProf.id;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[mascot-chat] Error resolving profile for read_email, using default uuid:", e);
+        }
+
         if (messageId) {
-          const { data } = await supabase.from("email_messages").select("*").eq("id", messageId).eq("profile_id", MICRO_EMAIL_PROFILE_ID).single();
+          const { data } = await supabase.from("email_messages").select("*").eq("id", messageId).eq("profile_id", targetProfileId).single();
           msg = data;
         } else if (search) {
-          const { data } = await supabase.from("email_messages").select("*").eq("profile_id", MICRO_EMAIL_PROFILE_ID).eq("is_deleted", false).or(`subject.ilike.%${search}%,from_address.ilike.%${search}%,from_name.ilike.%${search}%`).order("date", { ascending: false }).limit(1);
+          const { data } = await supabase.from("email_messages").select("*").eq("profile_id", targetProfileId).eq("is_deleted", false).or(`subject.ilike.%${search}%,from_address.ilike.%${search}%,from_name.ilike.%${search}%`).order("date", { ascending: false }).limit(1);
           msg = data?.[0];
         }
         if (!msg) return JSON.stringify({ error: "No se encontró el correo." });
 
-        // If no body, try to fetch from IMAP using Micro's profile
+        // If no body, try to fetch from IMAP using the selected profile
         if (!msg.body_html && !msg.body_text && msg.message_uid) {
           const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
           const res = await fetch(`${supabaseUrl}/functions/v1/imap-check`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
-            body: JSON.stringify({ profile_id: MICRO_EMAIL_PROFILE_ID, action: "fetch-body", message_uid: msg.message_uid, message_id: msg.id }),
+            body: JSON.stringify({ profile_id: targetProfileId, action: "fetch-body", message_uid: msg.message_uid, message_id: msg.id }),
           });
           const result = await res.json();
           if (result.body_html || result.body_text) {
@@ -761,8 +856,26 @@ async function executeToolCall(
         const limit = Number(args.limit) || 10;
         if (!query) return JSON.stringify({ error: "Necesito un término de búsqueda." });
 
+        let targetProfileId = MICRO_EMAIL_PROFILE_ID;
+        try {
+          const { data: microProfile } = await supabase.from("email_profiles").select("id").eq("id", MICRO_EMAIL_PROFILE_ID).maybeSingle();
+          if (!microProfile) {
+            const { data: defaultProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).eq("is_default", true).maybeSingle();
+            if (defaultProf) {
+              targetProfileId = defaultProf.id;
+            } else {
+              const { data: anyProf } = await supabase.from("email_profiles").select("id").eq("user_id", userId).limit(1).maybeSingle();
+              if (anyProf) {
+                targetProfileId = anyProf.id;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[mascot-chat] Error resolving profile for search, using default uuid:", e);
+        }
+
         const { data, error } = await supabase.from("email_messages").select("id, subject, from_address, from_name, date, is_read, has_attachments, folder")
-          .eq("profile_id", MICRO_EMAIL_PROFILE_ID).eq("is_deleted", false).eq("folder", folder)
+          .eq("profile_id", targetProfileId).eq("is_deleted", false).eq("folder", folder)
           .or(`subject.ilike.%${query}%,from_address.ilike.%${query}%,from_name.ilike.%${query}%,body_text.ilike.%${query}%`)
           .order("date", { ascending: false }).limit(limit);
         if (error) throw error;
@@ -1390,6 +1503,49 @@ async function executeToolCall(
         });
       }
 
+      case "edit_file": {
+        const fileName = String(args.file_name || "");
+        const fileId = String(args.file_id || "");
+        const content = String(args.content || "");
+        if (!content) return JSON.stringify({ error: "El parámetro content es obligatorio." });
+        if (!fileName && !fileId) return JSON.stringify({ error: "Debe proporcionar file_name o file_id." });
+
+        let query = supabase.from("shared_files").select("id, file_name, file_path, file_type");
+        if (fileId) {
+          query = query.eq("id", fileId);
+        } else {
+          query = query.ilike("file_name", `%${fileName}%`);
+        }
+
+        const { data: fileRecord, error: findErr } = await query.limit(1).maybeSingle();
+        if (findErr || !fileRecord) return JSON.stringify({ error: `No se encontró ningún archivo con el identificador "${fileName || fileId}"` });
+
+        const filePath = fileRecord.file_path;
+        const encoder = new TextEncoder();
+        const fileBytes = encoder.encode(content);
+
+        // Upload new content (overwrite via upsert)
+        const { error: uploadErr } = await supabase.storage
+          .from("shared-files")
+          .upload(filePath, fileBytes, { contentType: fileRecord.file_type || "text/plain", upsert: true });
+        
+        if (uploadErr) return JSON.stringify({ error: `Error al sobrescribir archivo en almacenamiento: ${uploadErr.message}` });
+
+        // Update metadata
+        const { error: updateErr } = await supabase
+          .from("shared_files")
+          .update({ file_size: fileBytes.length, updated_at: new Date().toISOString() })
+          .eq("id", fileRecord.id);
+
+        if (updateErr) return JSON.stringify({ error: `Error al actualizar metadatos del archivo en base de datos: ${updateErr.message}` });
+
+        return JSON.stringify({
+          success: true,
+          message: `El archivo "${fileRecord.file_name}" ha sido actualizado/editado con éxito.`,
+          file_name: fileRecord.file_name,
+        });
+      }
+
       case "send_notification": {
         const title = String(args.title || "");
         const message = String(args.message || "");
@@ -1809,9 +1965,10 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
 
     const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
     const MODEL_CHAIN = [
-      "anthropic/claude-sonnet-4.5",
+      "anthropic/claude-3.5-sonnet",
       "google/gemini-2.5-flash",
-      "openai/gpt-5-mini",
+      "google/gemini-2.0-flash",
+      "openai/gpt-4o-mini",
     ];
 
     const openRouterHeaders = {
@@ -1821,9 +1978,21 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
       "X-Title": "MalagaMicro CRM",
     };
 
+    // Index of the model that last succeeded in this request
+    let currentModelIndex = 0;
+
     // Helper: try models in fallback order
-    async function callWithFallback(msgs: any[], useTools = true) {
-      for (const model of MODEL_CHAIN) {
+    async function callWithFallback(msgs: any[], useTools = true): Promise<any> {
+      const errors: string[] = [];
+
+      for (let i = currentModelIndex; i < MODEL_CHAIN.length; i++) {
+        const model = MODEL_CHAIN[i];
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          console.warn(`[mascot-chat] Timeout of 15s reached for model: ${model}. Aborting...`);
+          controller.abort();
+        }, 15000);
+
         try {
           console.log(`[mascot-chat] Trying model: ${model}`);
           const body: Record<string, unknown> = { model, messages: msgs };
@@ -1833,29 +2002,51 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
             method: "POST",
             headers: openRouterHeaders,
             body: JSON.stringify(body),
+            signal: controller.signal,
           });
 
+          clearTimeout(timeoutId);
+
           if (resp.status === 429) {
-            return { error: true, status: 429, message: "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo." };
+            console.warn(`[mascot-chat] Model ${model} returned 429 (Rate Limit)`);
+            errors.push(`${model} (429 Rate Limit)`);
+            continue; // Fallback to next model
           }
           if (resp.status === 402) {
-            return { error: true, status: 402, message: "Créditos de IA agotados en OpenRouter." };
+            console.warn(`[mascot-chat] Model ${model} returned 402 (Payment Required)`);
+            errors.push(`${model} (402 Out of Credits)`);
+            continue; // Fallback to next model
           }
           if (!resp.ok) {
             const errText = await resp.text();
             console.warn(`[mascot-chat] Model ${model} failed: ${resp.status} ${errText}`);
+            errors.push(`${model} (${resp.status}: ${errText.slice(0, 100)})`);
             continue;
           }
 
           const data = await resp.json();
           console.log(`[mascot-chat] Success with model: ${model}`);
+          
+          // Remember this index for next steps in this conversation turn
+          currentModelIndex = i;
           return { error: false, data, model };
         } catch (err) {
-          console.warn(`[mascot-chat] Model ${model} threw:`, err);
+          clearTimeout(timeoutId);
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.warn(`[mascot-chat] Model ${model} threw error:`, errMsg);
+          errors.push(`${model} (Error: ${errMsg})`);
           continue;
         }
       }
-      return { error: true, status: 502, message: "Todos los modelos de IA fallaron." };
+
+      // If we were starting from a fallback model index and everything failed, restart from the beginning to recover
+      if (currentModelIndex > 0) {
+        console.log(`[mascot-chat] Resetting fallback index from ${currentModelIndex} to 0 to try all models again.`);
+        currentModelIndex = 0;
+        return await callWithFallback(msgs, useTools);
+      }
+
+      return { error: true, status: 502, message: `Todos los modelos de IA fallaron. Detalle: ${errors.join(" | ")}` };
     }
 
     const chatMessages = [{ role: "system", content: systemPrompt }, ...(messages ?? [])];
@@ -1869,7 +2060,7 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
 
     let assistantMessage = result.data.choices?.[0]?.message;
 
-    const MAX_TOOL_ITERATIONS = 8;
+    const MAX_TOOL_ITERATIONS = 5;
     let iterations = 0;
     let accumulatedContent = assistantMessage?.content || "";
 
@@ -1879,7 +2070,15 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
       if (assistantMessage.content && !accumulatedContent) {
         accumulatedContent = assistantMessage.content;
       }
-      chatMessages.push(assistantMessage);
+      
+      const sanitizedMsg: Record<string, any> = {
+        role: "assistant",
+        content: assistantMessage.content || null
+      };
+      if (assistantMessage.tool_calls) {
+        sanitizedMsg.tool_calls = assistantMessage.tool_calls;
+      }
+      chatMessages.push(sanitizedMsg);
 
       for (const toolCall of assistantMessage.tool_calls) {
         const toolName = toolCall.function.name;
@@ -1889,7 +2088,7 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
         console.log(`[mascot-chat] Tool call: ${toolName}, args: ${JSON.stringify(toolArgs)}`);
         const toolResult = await executeToolCall(supabase, userId, toolName, toolArgs);
         console.log(`[mascot-chat] Tool result (${toolName}): ${toolResult.slice(0, 200)}`);
-        chatMessages.push({ role: "tool", tool_call_id: toolCall.id, content: toolResult });
+        chatMessages.push({ role: "tool", tool_call_id: toolCall.id || "call_unknown", content: toolResult });
       }
 
       result = await callWithFallback(chatMessages);
@@ -1923,7 +2122,16 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
         let retryIterations = 0;
         while (assistantMessage?.tool_calls && retryIterations < 3) {
           retryIterations++;
-          chatMessages.push(assistantMessage);
+          
+          const sanitizedMsg: Record<string, any> = {
+            role: "assistant",
+            content: assistantMessage.content || null
+          };
+          if (assistantMessage.tool_calls) {
+            sanitizedMsg.tool_calls = assistantMessage.tool_calls;
+          }
+          chatMessages.push(sanitizedMsg);
+          
           for (const toolCall of assistantMessage.tool_calls) {
             const toolName = toolCall.function.name;
             let toolArgs: Record<string, unknown> = {};
@@ -1931,7 +2139,7 @@ Si te piden algo fuera de tu alcance, sugiere usar el Chat IA principal (Perplex
             console.log(`[mascot-chat] RETRY Tool call: ${toolName}, args: ${JSON.stringify(toolArgs)}`);
             const toolResult = await executeToolCall(supabase, userId, toolName, toolArgs);
             console.log(`[mascot-chat] RETRY Tool result (${toolName}): ${toolResult.slice(0, 200)}`);
-            chatMessages.push({ role: "tool", tool_call_id: toolCall.id, content: toolResult });
+            chatMessages.push({ role: "tool", tool_call_id: toolCall.id || "call_unknown", content: toolResult });
           }
           result = await callWithFallback(chatMessages);
           if (result.error) break;

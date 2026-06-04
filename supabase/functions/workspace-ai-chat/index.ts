@@ -35,7 +35,7 @@ serve(async (req) => {
         "HTTP-Referer": Deno.env.get("SUPABASE_URL") || "",
       },
       body: JSON.stringify({
-        model: model || "openrouter/hunter-alpha",
+        model: model || "openai/gpt-4o-mini",
         messages: apiMessages,
         max_tokens: 2048,
       }),

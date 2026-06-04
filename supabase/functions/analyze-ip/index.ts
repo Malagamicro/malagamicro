@@ -149,7 +149,7 @@ Proporciona un análisis detallado de seguridad clasificando cada IP.`;
         "X-Title": "MalagaMicro CRM Security",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.0-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -183,7 +183,7 @@ Proporciona un análisis detallado de seguridad clasificando cada IP.`;
 
     console.log("[analyze-ip] Analysis complete. Risk level:", analysis.risk_level);
 
-    return new Response(JSON.stringify({ analysis, model_used: aiData._model_used || "gemini-2.5-flash" }), {
+    return new Response(JSON.stringify({ analysis, model_used: aiData._model_used || "gemini-2.0-flash" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 

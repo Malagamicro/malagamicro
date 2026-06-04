@@ -13,7 +13,8 @@ import {
   ImageIcon,
   BarChart3,
   Copy,
-  FolderUp
+  FolderUp,
+  Video
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -197,7 +198,7 @@ export const SeoArticleCard = ({ article, onDelete, onView, compact = false }: S
 
         {article.status === 'completed' && (
           <>
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className={`grid ${article.video_status && article.video_status !== 'none' ? 'grid-cols-4' : 'grid-cols-3'} gap-2 text-center`}>
               <div className="bg-muted/50 rounded-lg p-2">
                 <p className="text-lg font-bold text-primary">{article.seo_score || '-'}</p>
                 <p className="text-[10px] text-muted-foreground font-medium">SEO</p>
@@ -210,6 +211,23 @@ export const SeoArticleCard = ({ article, onDelete, onView, compact = false }: S
                 <p className="text-lg font-bold text-primary">{article.images_success_count || 0}</p>
                 <p className="text-[10px] text-muted-foreground font-medium">Imágenes</p>
               </div>
+              {article.video_status && article.video_status !== 'none' && (
+                <div className="bg-muted/50 rounded-lg p-2 flex flex-col justify-center items-center">
+                  <p className="text-sm font-bold text-primary truncate capitalize flex items-center justify-center gap-0.5">
+                    {article.video_status === 'completed' ? (
+                      <>
+                        <Video className="h-3.5 w-3.5 inline text-green-500" />
+                        {article.video_duration || 5}s
+                      </>
+                    ) : article.video_status === 'processing' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary inline" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-destructive inline" />
+                    )}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-medium">Video</p>
+                </div>
+              )}
             </div>
 
             {article.meta_description && (

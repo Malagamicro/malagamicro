@@ -504,7 +504,7 @@ export const TOOLS: N8nTool[] = [
     method: 'POST', path: '/ai-completion', icon: <Sparkles className="w-4 h-4" />, category: 'IA',
     bodyFields: [
       { name: 'prompt', type: 'string', required: true, description: 'El prompt o pregunta para la IA' },
-      { name: 'model', type: 'string', required: false, description: 'Modelo: google/gemini-2.5-flash (default), openai/gpt-5-mini, etc.' },
+      { name: 'model', type: 'string', required: false, description: 'Modelo: google/gemini-2.0-flash (default), openai/gpt-4o-mini, etc.' },
       { name: 'system_prompt', type: 'string', required: false, description: 'Instrucciones del sistema para la IA' },
     ],
   },

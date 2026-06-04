@@ -38,7 +38,7 @@ export function PerplexityChatbot() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('openai/gpt-5-nano');
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-4o-mini');
   const [customModelId, setCustomModelId] = useState('');
   const [activeSubagent, setActiveSubagent] = useState<string | null>(null);
   const [showSubagentPanel, setShowSubagentPanel] = useState(false);

@@ -22,14 +22,12 @@ const EMOJI_OPTIONS = ['🤖', '🎨', '🎵', '📊', '🧠', '✍️', '🔍',
 const COLOR_OPTIONS = ['#6C63FF', '#FF6B6B', '#48DBFB', '#FF9FF3', '#1DD1A1', '#FFA502', '#EE5A24', '#7158E2'];
 
 const POPULAR_MODELS = [
-  { id: 'openai/gpt-5-nano', name: 'GPT-5 Nano' },
-  { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini' },
-  { id: 'openai/gpt-5', name: 'GPT-5' },
-  { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-  { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
-  { id: 'meta-llama/llama-4-maverick', name: 'Llama 4 Maverick' },
-  { id: 'openai/gpt-5.2', name: 'GPT-5.2' },
+  { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
+  { id: 'openai/gpt-4o', name: 'GPT-4o' },
+  { id: 'google/gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+  { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
+  { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
 ];
 
 interface SubagentFormData {
@@ -48,7 +46,7 @@ interface SubagentFormData {
 const defaultForm: SubagentFormData = {
   name: '',
   description: '',
-  model: 'openai/gpt-5-nano',
+  model: 'openai/gpt-4o-mini',
   role_prompt: 'Eres un asistente útil y conciso. Responde siempre en español.',
   agent_type: 'text',
   avatar_emoji: '🤖',
@@ -67,7 +65,7 @@ export function SubagentManager() {
   const [customModel, setCustomModel] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamDescription, setTeamDescription] = useState('');
-  const [teamModel, setTeamModel] = useState('openai/gpt-5-nano');
+  const [teamModel, setTeamModel] = useState('openai/gpt-4o-mini');
   const [teamCustomModel, setTeamCustomModel] = useState('');
   const [editingTeam, setEditingTeam] = useState<AISubagentTeam | null>(null);
   const [activeTab, setActiveTab] = useState('agents');
@@ -124,7 +122,7 @@ export function SubagentManager() {
     }
     setTeamName('');
     setTeamDescription('');
-    setTeamModel('openai/gpt-5-nano');
+    setTeamModel('openai/gpt-4o-mini');
     setTeamCustomModel('');
     setEditingTeam(null);
     setIsTeamOpen(false);
@@ -467,7 +465,7 @@ export function SubagentManager() {
           <div className="flex justify-end">
             <Dialog open={isTeamOpen} onOpenChange={setIsTeamOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditingTeam(null); setTeamName(''); setTeamDescription(''); setTeamModel('openai/gpt-5-nano'); setTeamCustomModel(''); }}>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditingTeam(null); setTeamName(''); setTeamDescription(''); setTeamModel('openai/gpt-4o-mini'); setTeamCustomModel(''); }}>
                   <FolderPlus className="h-3 w-3 mr-1" /> Nuevo equipo
                 </Button>
               </DialogTrigger>
