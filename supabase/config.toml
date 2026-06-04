@@ -134,3 +134,7 @@ verify_jwt = false
 
 [functions.botqueron-rag]
 verify_jwt = false
+
+[functions.search-leads-ai]
+verify_jwt = false
+

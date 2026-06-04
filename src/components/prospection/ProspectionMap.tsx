@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   Search, Loader2, AlertCircle, Phone, Globe, Star,
   Building2, Plus, ChevronRight, Download,
-  Smartphone, PhoneCall, Zap, CheckCircle2,
+  Smartphone, PhoneCall, Zap, CheckCircle2, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLeads } from '@/hooks/useLeads';
@@ -30,6 +30,8 @@ export interface PlaceResult {
   userRatingsTotal?: number;
   placeId: string;
   location?: { lat: number; lng: number };
+  email?: string;
+  notes?: string;
 }
 
 export const SECTORS = [
@@ -97,6 +99,12 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
   const [totalFetched, setTotalFetched] = useState(0);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
 
+  const [searchMode, setSearchMode] = useState<'standard' | 'ai'>('standard');
+  const [aiFilters, setAiFilters] = useState('');
+  const [onlyWithEmail, setOnlyWithEmail] = useState(false);
+  const [onlyWithWhatsapp, setOnlyWithWhatsapp] = useState(false);
+  const [textFilter, setTextFilter] = useState('');
+
   const { addLead, leads } = useLeads();
 
   const existingPlaceIds = new Set(
@@ -149,53 +157,81 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
 
   const handleSearch = async (pageToken?: string) => {
     setIsSearching(true);
+    setSelectedPlace(null);
     if (!pageToken && location.trim()) {
       await geocodeLocation(location);
     }
     try {
-      const body: any = {
-        query: query || undefined,
-        location: location.trim() || undefined,
-        category: sector,
-        pageToken,
-        recursive: recursiveMode && !pageToken,
-      };
-      if (sector && sector !== 'all') body.googleType = sector;
-      if (!location.trim() && radiusEnabled) {
-        body.lat = mapCenter.lat;
-        body.lng = mapCenter.lng;
-        body.radiusKm = radius[0];
-      }
-      const { data, error } = await supabase.functions.invoke('search-places', { body });
-      if (error) throw error;
+      if (searchMode === 'ai') {
+        const body = {
+          query,
+          location: location.trim(),
+          filters: aiFilters || undefined,
+        };
+        const { data, error } = await supabase.functions.invoke('search-leads-ai', { body });
+        if (error) throw error;
 
-      const newPlaces = data?.places || [];
-      if (pageToken) {
-        setPlaces(prev => {
-          const existingIds = new Set(prev.map(p => p.placeId));
-          const unique = newPlaces.filter((p: PlaceResult) => !existingIds.has(p.placeId));
-          return [...prev, ...unique];
-        });
-      } else {
+        const newPlaces = data?.places || [];
         setPlaces(newPlaces);
-      }
-      setNextPageToken(data?.nextPageToken || null);
-      setTotalFetched(data?.totalFetched || newPlaces.length);
+        setNextPageToken(null);
+        setTotalFetched(newPlaces.length);
 
-      if (newPlaces.length > 0 && map && !pageToken) {
-        const bounds = new google.maps.LatLngBounds();
-        newPlaces.forEach((p: PlaceResult) => { if (p.location) bounds.extend(p.location); });
-        if (!radiusEnabled) map.fitBounds(bounds);
-      }
+        if (newPlaces.length > 0 && map) {
+          const bounds = new google.maps.LatLngBounds();
+          newPlaces.forEach((p: PlaceResult) => { if (p.location) bounds.extend(p.location); });
+          if (!radiusEnabled) map.fitBounds(bounds);
+        }
 
-      if (newPlaces.length === 0 && !pageToken) {
-        toast.info('No se encontraron resultados para esta búsqueda');
-      } else if (recursiveMode && !pageToken) {
-        toast.success(`${newPlaces.length} resultados obtenidos (paginación completa)`);
+        if (newPlaces.length === 0) {
+          toast.info('No se encontraron resultados con la IA');
+        } else {
+          toast.success(`Búsqueda IA completada. Se encontraron ${newPlaces.length} resultados.`);
+        }
+      } else {
+        const body: any = {
+          query: query || undefined,
+          location: location.trim() || undefined,
+          category: sector,
+          pageToken,
+          recursive: recursiveMode && !pageToken,
+        };
+        if (sector && sector !== 'all') body.googleType = sector;
+        if (!location.trim() && radiusEnabled) {
+          body.lat = mapCenter.lat;
+          body.lng = mapCenter.lng;
+          body.radiusKm = radius[0];
+        }
+        const { data, error } = await supabase.functions.invoke('search-places', { body });
+        if (error) throw error;
+
+        const newPlaces = data?.places || [];
+        if (pageToken) {
+          setPlaces(prev => {
+            const existingIds = new Set(prev.map(p => p.placeId));
+            const unique = newPlaces.filter((p: PlaceResult) => !existingIds.has(p.placeId));
+            return [...prev, ...unique];
+          });
+        } else {
+          setPlaces(newPlaces);
+        }
+        setNextPageToken(data?.nextPageToken || null);
+        setTotalFetched(data?.totalFetched || newPlaces.length);
+
+        if (newPlaces.length > 0 && map && !pageToken) {
+          const bounds = new google.maps.LatLngBounds();
+          newPlaces.forEach((p: PlaceResult) => { if (p.location) bounds.extend(p.location); });
+          if (!radiusEnabled) map.fitBounds(bounds);
+        }
+
+        if (newPlaces.length === 0 && !pageToken) {
+          toast.info('No se encontraron resultados para esta búsqueda');
+        } else if (recursiveMode && !pageToken) {
+          toast.success(`${newPlaces.length} resultados obtenidos (paginación completa)`);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Error al buscar empresas');
+      toast.error(err.message || 'Error al buscar empresas');
     } finally {
       setIsSearching(false);
     }
@@ -212,13 +248,15 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
       address: place.address,
       city: location || 'Málaga',
       phone: place.phone || '',
+      email: place.email || '',
       website: place.website || '',
-      source: 'google_maps',
+      source: place.email ? 'ai_agent' : 'google_maps',
       status: 'nuevo',
       segment: 'pyme',
       latitude: place.location?.lat,
       longitude: place.location?.lng,
-      googlePlaceId: place.placeId,
+      googlePlaceId: place.placeId?.startsWith('ai-') ? undefined : place.placeId,
+      notes: place.notes || undefined,
     } as any);
     toast.success(`${place.name} añadido como lead`);
     setTimeout(() => setAddingId(null), 500);
@@ -235,6 +273,7 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
         { header: 'Dirección', key: 'address', width: 40 },
         { header: 'Teléfono', key: 'phone', width: 18 },
         { header: 'Tipo Tel.', key: 'phoneType', width: 10 },
+        { header: 'Email', key: 'email', width: 25 },
         { header: 'Web', key: 'website', width: 30 },
         { header: 'Valoración', key: 'rating', width: 12 },
         { header: 'Reseñas', key: 'reviews', width: 12 },
@@ -251,6 +290,7 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
         sheet.addRow({
           name: p.name, address: p.address, phone: p.phone || '',
           phoneType: p.phoneType === 'mobile' ? 'Móvil' : p.phoneType === 'landline' ? 'Fijo' : '',
+          email: p.email || '',
           website: p.website || '', rating: p.rating || '', reviews: p.userRatingsTotal || '',
           category: p.category, placeId: p.placeId,
           lat: p.location?.lat || '', lng: p.location?.lng || '',
@@ -271,10 +311,11 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
   const handleExportCSV = () => {
     const toExport = radiusEnabled ? filteredPlaces : places;
     if (toExport.length === 0) { toast.error('No hay resultados para exportar'); return; }
-    const headers = ['Nombre', 'Dirección', 'Teléfono', 'Tipo Tel.', 'Web', 'Valoración', 'Reseñas', 'Categoría', 'Google Place ID', 'Latitud', 'Longitud'];
+    const headers = ['Nombre', 'Dirección', 'Teléfono', 'Tipo Tel.', 'Email', 'Web', 'Valoración', 'Reseñas', 'Categoría', 'Google Place ID', 'Latitud', 'Longitud'];
     const rows = toExport.map(p => [
       p.name, p.address, p.phone || '',
       p.phoneType === 'mobile' ? 'Móvil' : p.phoneType === 'landline' ? 'Fijo' : '',
+      p.email || '',
       p.website || '', p.rating?.toString() || '', p.userRatingsTotal?.toString() || '',
       p.category, p.placeId, p.location?.lat?.toString() || '', p.location?.lng?.toString() || '',
     ]);
@@ -289,16 +330,37 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
     toast.success(`${toExport.length} empresas exportadas`);
   };
 
-  const filteredPlaces = !radiusEnabled ? places : places.filter(p => {
-    if (!p.location) return true;
-    const R = 6371;
-    const dLat = (p.location.lat - mapCenter.lat) * Math.PI / 180;
-    const dLng = (p.location.lng - mapCenter.lng) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 +
-      Math.cos(mapCenter.lat * Math.PI / 180) * Math.cos(p.location.lat * Math.PI / 180) *
-      Math.sin(dLng / 2) ** 2;
-    const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return d <= radius[0];
+  const filteredPlaces = places.filter(p => {
+    // 1. Radio (si está habilitado y el lugar tiene coordenadas)
+    if (radiusEnabled && p.location) {
+      const R = 6371;
+      const dLat = (p.location.lat - mapCenter.lat) * Math.PI / 180;
+      const dLng = (p.location.lng - mapCenter.lng) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(mapCenter.lat * Math.PI / 180) * Math.cos(p.location.lat * Math.PI / 180) *
+        Math.sin(dLng / 2) ** 2;
+      const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      if (d > radius[0]) return false;
+    }
+
+    // 2. Filtro de Email
+    if (onlyWithEmail && !p.email) return false;
+
+    // 3. Filtro de WhatsApp/Móvil
+    if (onlyWithWhatsapp && p.phoneType !== 'mobile') return false;
+
+    // 4. Filtro de texto local en vivo
+    if (textFilter.trim()) {
+      const search = textFilter.toLowerCase();
+      const nameMatch = p.name?.toLowerCase().includes(search);
+      const addressMatch = p.address?.toLowerCase().includes(search);
+      const notesMatch = p.notes?.toLowerCase().includes(search);
+      const emailMatch = p.email?.toLowerCase().includes(search);
+      const websiteMatch = p.website?.toLowerCase().includes(search);
+      if (!nameMatch && !addressMatch && !notesMatch && !emailMatch && !websiteMatch) return false;
+    }
+
+    return true;
   });
 
   const handleCircleDragEnd = (e: google.maps.MapMouseEvent) => {
@@ -333,51 +395,115 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
       {/* Search controls */}
       <Card className="border-border">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Buscar</label>
-              <Input placeholder="Ej: clínicas, bares..." value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Ubicación</label>
-              <div className="relative">
-                <Input placeholder="Ciudad o zona" value={location} onChange={e => setLocation(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9" />
-                {isGeocodingLocation && <Loader2 className="w-3.5 h-3.5 animate-spin absolute right-2.5 top-2.5 text-muted-foreground" />}
+          <div className="space-y-4">
+            {/* Modo de búsqueda */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 border-border gap-2">
+              <div>
+                <h3 className="text-sm font-semibold">Motor de Búsqueda</h3>
+                <p className="text-xs text-muted-foreground">Elige cómo quieres recopilar la información de los leads</p>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant={searchMode === 'standard' ? 'default' : 'outline'}
+                  onClick={() => { setSearchMode('standard'); setPlaces([]); setSelectedPlace(null); }}
+                  className="text-xs h-8"
+                >
+                  Google Places (Rápido)
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant={searchMode === 'ai' ? 'default' : 'outline'}
+                  onClick={() => { setSearchMode('ai'); setPlaces([]); setSelectedPlace(null); }}
+                  className="text-xs h-8 gap-1"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+                  Claude 3.5 Sonnet IA (Completo)
+                </Button>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Sector (Google Type)</label>
-              <Select value={sector} onValueChange={setSector}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {SECTORS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Radio: {radiusEnabled ? `${radius[0]} km` : 'Sin límite'}</label>
-                <Switch checked={radiusEnabled} onCheckedChange={setRadiusEnabled} className="scale-75" />
+
+            {/* Inputs grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Tipo de Negocio</label>
+                <Input placeholder="Ej: clínicas, bares, fontaneros..." value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9" />
               </div>
-              <Slider value={radius} onValueChange={setRadius} min={1} max={100} step={1} className="py-2" disabled={!radiusEnabled} />
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Switch checked={recursiveMode} onCheckedChange={setRecursiveMode} className="scale-75" />
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Zap className="w-3 h-3" />Máx. resultados</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Ubicación</label>
+                <div className="relative">
+                  <Input placeholder="Ciudad o zona (ej: Málaga)" value={location} onChange={e => setLocation(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9" />
+                  {isGeocodingLocation && <Loader2 className="w-3.5 h-3.5 animate-spin absolute right-2.5 top-2.5 text-muted-foreground" />}
+                </div>
               </div>
-              <Button onClick={() => handleSearch()} disabled={isSearching} className="h-9 w-full">
-                {isSearching ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
-                {recursiveMode ? 'Buscar todo' : 'Buscar'}
-              </Button>
+
+              {searchMode === 'standard' ? (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Sector (Google Type)</label>
+                    <Select value={sector} onValueChange={setSector}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SECTORS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-muted-foreground">Radio: {radiusEnabled ? `${radius[0]} km` : 'Sin límite'}</label>
+                      <Switch checked={radiusEnabled} onCheckedChange={setRadiusEnabled} className="scale-75" />
+                    </div>
+                    <Slider value={radius} onValueChange={setRadius} min={1} max={100} step={1} className="py-2" disabled={!radiusEnabled} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-primary" /> Filtros e instrucciones extra para la IA
+                    </label>
+                    <Input placeholder="Ej: con email visible, autónomos, tiendas con redes sociales..." value={aiFilters} onChange={e => setAiFilters(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9" />
+                  </div>
+                </>
+              )}
             </div>
-            <div className="flex gap-1.5">
-              <Button variant="outline" size="sm" className="h-9 flex-1" onClick={handleExport} disabled={filteredPlaces.length === 0}>
-                <Download className="w-3.5 h-3.5 mr-1.5" />Excel
-              </Button>
-              <Button variant="outline" size="sm" className="h-9 flex-1" onClick={handleExportCSV} disabled={filteredPlaces.length === 0}>
-                <Download className="w-3.5 h-3.5 mr-1.5" />CSV
-              </Button>
+
+            {/* Bottom filters and actions row */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2 border-t border-border/60">
+              {/* Filtros cliente */}
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Switch checked={onlyWithEmail} onCheckedChange={setOnlyWithEmail} className="scale-75" />
+                  <label className="text-xs font-medium text-muted-foreground">Sólo con Email</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={onlyWithWhatsapp} onCheckedChange={setOnlyWithWhatsapp} className="scale-75" />
+                  <label className="text-xs font-medium text-muted-foreground">Sólo con Móvil/WhatsApp</label>
+                </div>
+                <div className="w-48">
+                  <Input placeholder="Filtrar por texto..." value={textFilter} onChange={e => setTextFilter(e.target.value)} className="h-8 text-xs" />
+                </div>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex gap-2 self-end md:self-auto items-center">
+                {searchMode === 'standard' && (
+                  <div className="flex items-center gap-2 mr-2 border-r pr-2 border-border h-8">
+                    <Switch checked={recursiveMode} onCheckedChange={setRecursiveMode} className="scale-75" />
+                    <label className="text-xs font-medium text-muted-foreground">Paginación completa</label>
+                  </div>
+                )}
+                <Button onClick={() => handleSearch()} disabled={isSearching} size="sm" className="h-8">
+                  {isSearching ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Search className="w-4 h-4 mr-1.5" />}
+                  Buscar
+                </Button>
+                <Button variant="outline" size="sm" className="h-8" onClick={handleExport} disabled={filteredPlaces.length === 0}>
+                  <Download className="w-3.5 h-3.5 mr-1.5" />Excel
+                </Button>
+                <Button variant="outline" size="sm" className="h-8" onClick={handleExportCSV} disabled={filteredPlaces.length === 0}>
+                  CSV
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -454,45 +580,66 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
                 onClick={() => setSelectedPlace(place)}
                 icon={{
                   path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-                  fillColor: place.phoneType === 'mobile' ? '#22c55e' : '#ef4444',
+                  fillColor: place.email ? '#8b5cf6' : (place.phoneType === 'mobile' ? '#22c55e' : '#ef4444'),
                   fillOpacity: 0.9,
                   strokeColor: '#fff',
                   strokeWeight: 1.5,
-                  scale: 5,
+                  scale: place.email ? 6 : 5,
                 }}
               />
             ))}
             {selectedPlace?.location && (
               <InfoWindow position={selectedPlace.location} onCloseClick={() => setSelectedPlace(null)}>
-                <div className="min-w-[220px] p-1 space-y-2">
-                  <p className="font-semibold text-sm">{selectedPlace.name}</p>
-                  <p className="text-xs" style={{ color: '#666' }}>{selectedPlace.address}</p>
+                <div className="min-w-[240px] p-2 space-y-2.5">
+                  <div className="flex items-center gap-1.5 justify-between">
+                    <p className="font-semibold text-sm line-clamp-1">{selectedPlace.name}</p>
+                    {selectedPlace.email && (
+                      <Badge className="bg-purple-600 text-white text-[9px] px-1 py-0 shrink-0">
+                        IA
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{selectedPlace.address}</p>
+                  
+                  {selectedPlace.email && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="font-medium text-muted-foreground">Email:</span>
+                      <a href={`mailto:${selectedPlace.email}`} className="text-primary hover:underline font-medium break-all">{selectedPlace.email}</a>
+                    </div>
+                  )}
+
                   {selectedPlace.rating && (
-                    <div className="flex items-center gap-1 text-xs">
-                      <Star className="w-3 h-3" style={{ color: '#f59e0b', fill: '#f59e0b' }} />
-                      <span>{selectedPlace.rating}</span>
-                      <span style={{ color: '#999' }}>({selectedPlace.userRatingsTotal})</span>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Star className="w-3.5 h-3.5 text-warning fill-warning" />
+                      <span className="font-medium text-foreground">{selectedPlace.rating}</span>
+                      <span>({selectedPlace.userRatingsTotal})</span>
                     </div>
                   )}
+                  
                   {selectedPlace.phone && (
-                    <div className="flex items-center gap-1 text-xs">
-                      <span>{selectedPlace.phone}</span>
-                      <span style={{ color: selectedPlace.phoneType === 'mobile' ? '#16a34a' : '#666', fontWeight: 500 }}>
-                        ({selectedPlace.phoneType === 'mobile' ? '📱 Móvil' : selectedPlace.phoneType === 'landline' ? '☎️ Fijo' : ''})
-                      </span>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{selectedPlace.phone}</span>
+                      <PhoneTypeBadge phoneType={selectedPlace.phoneType} phone={selectedPlace.phone} />
                     </div>
                   )}
+
+                  {selectedPlace.notes && (
+                    <div className="text-[11px] bg-muted/60 p-1.5 rounded leading-relaxed text-muted-foreground border-l-2 border-primary/30">
+                      {selectedPlace.notes}
+                    </div>
+                  )}
+
                   {isLeadSaved(selectedPlace) ? (
-                    <div className="flex items-center gap-1.5 mt-1 px-3 py-1.5 text-xs rounded" style={{ background: '#16a34a22', color: '#16a34a' }}>
+                    <div className="flex items-center justify-center gap-1.5 mt-1 px-3 py-1.5 text-xs rounded font-medium bg-green-500/10 text-green-600 border border-green-500/20">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Ya guardado como lead
                     </div>
                   ) : (
                     <button
                       onClick={() => handleAddAsLead(selectedPlace)}
                       style={{ background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
-                      className="w-full mt-1 px-3 py-1.5 text-xs rounded transition-opacity hover:opacity-90"
+                      className="w-full mt-1.5 px-3 py-1.5 text-xs rounded font-medium transition-opacity hover:opacity-90 flex items-center justify-center gap-1"
                     >
-                      + Añadir como lead
+                      <Plus className="w-3.5 h-3.5" /> Añadir como lead
                     </button>
                   )}
                 </div>
@@ -551,8 +698,16 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
                           <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" /> Guardado
                         </Badge>
                       )}
+                      {place.email && !isLeadSaved(place) && (
+                        <Badge className="text-[9px] px-1 py-0 h-4 bg-purple-600 text-white shrink-0">
+                          IA
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{place.address}</p>
+                    {place.notes && (
+                      <p className="text-[10px] text-muted-foreground mt-1 line-clamp-1 italic">{place.notes}</p>
+                    )}
                     <div className="flex flex-wrap items-center gap-2 mt-1.5">
                       {place.rating && (
                         <div className="flex items-center gap-0.5 text-xs">
@@ -567,6 +722,11 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
                         </div>
                       )}
                       <PhoneTypeBadge phoneType={place.phoneType} phone={place.phone} />
+                      {place.email && (
+                        <span className="text-[11px] text-muted-foreground truncate max-w-[150px] flex items-center gap-0.5">
+                          ✉️ {place.email}
+                        </span>
+                      )}
                       {place.website && (
                         <a href={`https://${place.website}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="flex items-center gap-0.5 text-xs text-primary hover:underline">
                           <Globe className="w-3 h-3" />
@@ -593,7 +753,7 @@ export function ProspectionMap({ apiKey }: { apiKey: string }) {
               </div>
             ))}
           </div>
-          {nextPageToken && !recursiveMode && (
+          {nextPageToken && !recursiveMode && searchMode === 'standard' && (
             <div className="p-2 border-t border-border">
               <Button variant="outline" size="sm" className="w-full" onClick={() => handleSearch(nextPageToken)} disabled={isSearching}>
                 {isSearching ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ChevronRight className="w-4 h-4 mr-2" />}
