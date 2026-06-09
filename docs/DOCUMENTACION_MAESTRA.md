@@ -1,134 +1,166 @@
-# Documentación Maestra del Proyecto: MalagaMicro CRM
+# 📋 Documentación Técnica Maestra: MalagaMicro CRM
 
 ## 1. Resumen Ejecutivo (High-Level Overview)
 
-**MalagaMicro CRM** es un sistema integral de gestión de clientes y prospectos (CRM) diseñado para administrar leads, campañas, presupuestos y comunicaciones a través de múltiples canales. Este sistema unifica la atención al cliente con módulos de inteligencia artificial (chatbots, generación SEO), automatización (n8n), y facturación o tickets (osTicket, StelOrder).
+**MalagaMicro CRM** es un sistema integral avanzado de gestión de relaciones con clientes, leads, prospectos y operaciones comerciales. Diseñado para centralizar y optimizar todos los procesos del equipo de ventas y operaciones, este ecosistema unifica atención al cliente, campañas de marketing, embudos de ventas, cotizaciones/presupuestos, y comunicaciones de múltiples canales (Email, WhatsApp).
 
-**Valor de Negocio:**
-El sistema actúa como el núcleo operativo de la empresa, permitiendo a los comerciales y gestores llevar un seguimiento preciso de oportunidades y soporte, con la ayuda de agentes IA para aligerar la carga operativa.
+El valor de negocio de la plataforma recae en su profunda automatización y escalabilidad, apoyada mediante agentes de Inteligencia Artificial (IA) para la prospección, asistencia (chatbots), generación SEO de contenido y unificación operativa con servicios de contabilidad e infraestructura externa (osTicket, StelOrder y automatizaciones vía n8n).
 
 ---
 
 ## 2. Arquitectura del Sistema
 
-El proyecto sigue una arquitectura moderna, orientada a servicios serverless y un frontend "Single Page Application" robusto.
+El sistema obedece un patrón de **Single Page Application (SPA)** enriquecida y fuertemente desacoplada de la capa de datos gracias a los principios BaaS (Backend as a Service) y arquitectura **Serverless**.
 
-*   **Frontend (Cliente):**
-    *   **Framework principal:** React 18 con Vite (modo SWC).
-    *   **Lenguaje:** TypeScript estricto.
-    *   **Enrutamiento:** `react-router-dom` para el manejo de rutas internas y Vistas Protegidas (`ProtectedRoute`).
-    *   **Diseño/Estilado:** Tailwind CSS integrado con `shadcn-ui` (Radix UI) para componentes prefabricados accesibles. Soporta temas (claro/oscuro).
-    *   **Estado y Peticiones:** `@tanstack/react-query` para caché y fetching asíncrono, reduciendo las recargas de la UI. PWA habilitado con `vite-plugin-pwa` (Workbox).
-*   **Backend & Base de Datos:**
-    *   **BaaS (Backend as a Service):** Supabase.
-    *   **Autenticación:** Supabase Auth (Email, Redirección local/remota, JWT).
-    *   **Base de Datos:** PostgreSQL alojada en Supabase (acceso via cliente `@supabase/supabase-js`).
-    *   **Serverless Edge Functions:** Funciones escritas en Deno alojadas en Supabase (`supabase/functions/`), utilizadas para integraciones complejas, IA, webhooks y envíos de notificaciones.
-*   **Integraciones Clave / Servicios Externos:**
-    *   **APIs Genéricas:** Perplexity/Gemini/OpenAI (Inteligencia artificial).
-    *   **n8n / Waha:** Para flujos de automatización de correos electrónicos, peticiones y WhatsApp.
-    *   **osTicket & StelOrder:** Módulos de facturación, ERP y sistema de tickets gestionados vía webhooks en las edge functions.
+*   **Frontend (UI/UX):**
+    *   **Core:** React 18 con TypeScript y empaquetador Vite (SWC plugin).
+    *   **Enrutamiento:** `react-router-dom` v6, con vistas separadas y *protected routes*.
+    *   **Estado y Peticiones Asíncronas:** `@tanstack/react-query` v5, asegurando caché en el cliente, revalidación condicional (stale-while-revalidate) y minimización de peticiones HTTP.
+    *   **Diseño Visual:** Sistema de componentes `shadcn/ui` montados sobre Tailwind CSS. Integración robusta de accesibilidad (Radix UI).
+*   **Backend, Base de Datos y Autenticación:**
+    *   **Plataforma Cloud:** Lovable Cloud / Supabase.
+    *   **Motor de BD:** PostgreSQL optimizado mediante Row Level Security (RLS) para segregación de perfiles (Admin, User).
+    *   **Autenticación:** Supabase Auth (JWT, email verification, MFA integrado).
+    *   **Suscripciones en Tiempo Real:** Realtime API de Supabase para actualización reactiva en chats y notificaciones del Kanban.
+*   **Microservicios y Automatización (Edge Computing):**
+    *   **Deno Edge Functions:** 49 funciones desplegadas en el borde (`supabase/functions/`) responsables de ejecutar lógica comercial compleja (Webhooks, Waha API para WhatsApp, SMTP para correos, llamadas a LLMs tipo Perplexity/OpenAI).
+    *   **n8n Orchestration:** Para la generación de reportes y cruce de datos masivos entre StelOrder, osTicket y la capa de BD.
 
 ---
 
 ## 3. Guía de Instalación y Configuración
 
+El proyecto debe ser clonado y ejecutado en un entorno de desarrollo compatible.
+
 ### Prerrequisitos
-*   Node.js v18+ y `npm` (o `bun`/`yarn`).
-*   Una instancia de Supabase (local o en la nube) con sus credenciales de API.
+*   Node.js v18.x o superior.
+*   NPM, PNPM o Bun como manejador de dependencias.
+*   Acceso al panel de Supabase y credenciales API del proyecto.
 
-### Configuración del Entorno Local
+### Instalación de Dependencias
+```bash
+# Clonar el repositorio
+git clone <URL_DEL_REPOSITORIO>
+cd malagamicro-crm
 
-1.  **Clonar y Dependencias:**
-    ```bash
-    git clone <REPOSITORIO>
-    cd <NOMBRE_PROYECTO>
-    npm install
-    ```
-2.  **Variables de Entorno (`.env`):**
-    Crea un archivo `.env` en la raíz basado en un `.env.example` y añade:
-    ```env
-    VITE_SUPABASE_URL=tu_supabase_url
-    VITE_SUPABASE_PUBLISHABLE_KEY=tu_supabase_anon_key
-    ```
-3.  **Desarrollo:**
-    ```bash
-    npm run dev &
-    ```
-    El servidor se levantará por defecto en `http://localhost:8080`.
-4.  **Generación PWA (opcional):**
-    El proyecto tiene un manifiesto de PWA que se inyecta en el build. Al hacer `npm run build`, Workbox empaquetará el Service Worker.
+# Instalar los paquetes npm
+npm install
+```
+
+### Variables de Entorno
+Crea un archivo `.env` en el directorio raíz. Contiene las variables necesarias para inyectar los contextos de Supabase y de los demás servicios:
+
+```env
+VITE_SUPABASE_URL="https://[TU_PROYECTO].supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY="[TU_ANON_KEY]"
+VITE_SUPABASE_PROJECT_ID="[TU_PROJECT_ID]"
+
+# WhatsApp API
+VITE_WAHA_API_URL="[WAHA_URL]"
+VITE_WAHA_API_KEY="[WAHA_KEY]"
+```
+
+### Ejecución Local
+```bash
+# Iniciar servidor de desarrollo con HMR
+npm run dev
+
+# Generar bundle de producción
+npm run build
+
+# Validaciones estáticas y linting
+npm run lint
+
+# Ejecutar suite de testing (Vitest)
+npm run test
+```
 
 ---
 
 ## 4. Diccionario de Funciones y Módulos (Deep Dive)
 
-### Módulo Core: Autenticación (`src/hooks/useAuth.tsx`)
-**Propósito:** Gestionar el ciclo de vida de la sesión de los usuarios mediante Supabase Auth.
-**Funciones principales:**
-*   `signUp(email, password)`: Crea un usuario y lanza evento de verificación.
-*   `signIn(email, password)`: Realiza el login usando contraseña y devuelve la sesión actual.
-*   `signOut()`: Elimina la sesión del almacenamiento local e invalida el JWT.
-*   `resetPassword(email)`: Envía link de recuperación para cambio de password seguro.
-**Dependencias:** `@supabase/supabase-js`, `src/integrations/supabase/client.ts`
+A continuación, se auditan y documentan los archivos cardinales y los flujos dominantes de la arquitectura React del proyecto:
 
-### Módulo Core: Enrutamiento (`src/App.tsx` y `src/components/ProtectedRoute.tsx`)
-**Propósito:** Punto de entrada de la SPA, definiendo rutas públicas y privadas.
-**Lógica principal:**
-*   Configura `QueryClientProvider` para caché general de datos.
-*   Aplica `AuthProvider` para proteger las rutas anidadas con el HOC `ProtectedRoute` (que redirige al login si `!session`).
+### 4.1. `src/App.tsx`
+**Propósito:** Punto de entrada de la aplicación y proveedor raíz. Configura la persistencia de datos globales (`QueryClient`), define el *routing map*, e inicializa la cascada de los principales Context Providers que encapsulan a toda la SPA (Autenticación, Notificaciones, Temas).
 
-### Módulo: Gestión de Leads (`src/components/leads/LeadsList.tsx` y análogos)
-**Propósito:** Proveer un CRUD robusto de clientes (Leads), su estado de conversión y embudo (Kanban).
-**Funciones y Flujo Principal:**
-*   Presenta interfaces ricas (Listas, Kanban, Mapa).
-*   Emplea filtros complejos y búsqueda en tiempo real usando React hooks y llamadas a Supabase.
-*   Componentes hijos relevantes: `LeadFormModal` (creación/edición), `LeadImportModal` (ingesta en masa).
-**Dependencias:** `lucide-react` (iconografía), componentes propios en `src/components/ui`.
+**Dependencias principales:** `react-router-dom`, `@tanstack/react-query`, Contextos y componentes anidados de `src/components/app/`.
 
-### Backend: API de CRM (`supabase/functions/crm-api/index.ts`)
-**Propósito:** Punto de entrada seguro a modo de API REST externa (o uso de la SPA en capas específicas) con Deno.
-**Lógica principal:**
-*   Valida CORS y headers requeridos.
-*   Posee utilidades Anti-Inyección (`SQL_INJECTION_PATTERNS`, `containsSqlInjection()`).
-*   Realiza saneo de parámetros (sanitization) contra exploits maliciosos.
+| Función / Constante | Parámetros | Retorno | Descripción |
+| :--- | :--- | :--- | :--- |
+| `queryClient` (instancia) | `{ defaultOptions: ... }` | `QueryClient` | Establece el cliente global para React Query con políticas `staleTime` de 60 segundos y exclusión de re-tries en errores `4xx`. |
+| `App()` | *Ninguno* | `JSX.Element` | Renderiza el árbol completo. Inyecta `ThemeProvider`, `AuthProvider`, y el `BrowserRouter` listando rutas como `/login` o el *dashboard* `/`. |
 
-### Módulos Complementarios de Integración (Edge Functions)
-*   `send-whatsapp`: Despacha plantillas o mensajes a un proveedor o API (ej. Waha).
-*   `mascot-chat` / `workspace-ai-chat`: Implementación de agentes LLM (asistente virtual del CRM).
-*   `n8n-configuracion` / `osticket-webhook`: Manejo de endpoints receptores para integraciones de flujos y generación de tickets.
+### 4.2. `src/hooks/useAuth.tsx`
+**Propósito:** Centralizar e interconectar el SDK de Supabase Auth con el contexto React, exponiendo métodos de validación, registro y ciclo de vida de sesión a cualquier componente del árbol.
+
+**Dependencias principales:** `@supabase/supabase-js`, `src/integrations/supabase/client.ts`.
+
+| Función | Parámetros | Retorno | Descripción |
+| :--- | :--- | :--- | :--- |
+| `signUp` | `email` (string), `password` (string) | `Promise<{ error: Error \| null }>` | Emite una petición de registro. Dispara un evento `onAuthStateChange` tras recibir el hash de confirmación localmente o vía email. |
+| `signIn` | `email` (string), `password` (string) | `Promise<{ error: Error \| null }>` | Autentica un usuario. Devuelve y propaga un JSON Web Token (JWT) asincrónicamente y actualiza el Provider. |
+| `signOut` | *Ninguno* | `Promise<void>` | Invalida y destruye la sesión existente a nivel servidor y elimina los cachés locales. |
+| `resetPassword` | `email` (string) | `Promise<{ error: Error \| null }>` | Orquesta un flujo de recuperación de contraseña mandando un correo seguro con el callback `/reset-password`. |
+
+### 4.3. `src/hooks/useLeads.tsx`
+**Propósito:** Consolidar toda la lógica de obtención y mutación para el módulo principal del CRM (el registro e interacciones con *Leads*). Utiliza paginación infinita, peticiones optimistas y loguea la auditoría.
+
+**Dependencias principales:** `@tanstack/react-query`, `src/lib/phoneEnrichment`, Edge function de Geocoding.
+
+| Función | Parámetros | Retorno | Descripción |
+| :--- | :--- | :--- | :--- |
+| `useLeads` | *Ninguno* | `Object (Estado, mutaciones)` | Hook compuesto que ejecuta `useInfiniteQuery`. Retorna los `leads` paginados, banderas de `isLoading` y funciones expuestas (CRUD). |
+| `addLead` | `Omit<Lead, 'id' \| 'createdAt' \| 'updatedAt'>` | `Promise<Lead>` | Inserta un cliente, ejecuta el geocoding automático (`geocodeAddress`) para obtener lat/lng y manda un trigger a la auditoría. |
+| `updateLeadStatus` | `{ id: string, status: LeadStatus, previousStatus?: LeadStatus }` | `Promise<void>` | Muta el estado de un lead en la Base de Datos. Implementa un **optimistic update** en el caché de `react-query` para visualización instantánea. |
+| `importLeads` | `Array<Omit<Lead...>>` | `Promise<{count, insertedLeads}>` | Interfaz Bulk que inserta múltiples leads de CSV. Paraleliza en segundo plano análisis telefónico e invoca edge functions (`enrich-lead-phone`). |
+
+### 4.4. `src/pages/Index.tsx`
+**Propósito:** Es la Vista Maestra (Layout principal) tras pasar el *Gate* de autenticación. Este gran componente orquesta un enrutamiento en formato de Pestañas (Tabs) o Sidebars y renderiza sub-módulos condicionales basados en el rol (Admin vs User).
+
+**Dependencias principales:** Decenas de componentes funcionales (`Dashboard`, `LeadsList`, `LeadKanban`, `EmailModule`, `InternalChatPage`), `src/hooks/useSidebarConfig.tsx`.
+
+| Función / Bloque | Parámetros | Retorno | Descripción |
+| :--- | :--- | :--- | :--- |
+| `renderContent` | *Ninguno* | `JSX.Element` | Gran condicional (`switch(activeTab)`) que evalúa el estado actual (`activeTab`) para montar el árbol correspondiente (Ej: "leads" -> `<LeadsList>`, "pipeline" -> `<LeadKanban>`). Implementa además control de acceso para `ADMIN_ONLY_TABS`. |
+| `handleFormSubmit` | `data` (any) | `void` | Delega las operaciones formales de inserción/edición de leads al hook `useLeads`, ejecutando llamadas HTTP en segundo plano. |
 
 ---
 
 ## 5. Flujos de Datos Clave
 
-### Flujo 1: Ingreso e Ingesta de Leads
-1.  **Usuario (Comercial)** sube un CSV en `LeadImportModal` o usa una sincronización (n8n/Google Sheets).
-2.  **Frontend** formatea los datos y usa el cliente de Supabase (o llama a una función) para realizar un bulk insert en la tabla `leads`.
-3.  **Supabase** dispara triggers asíncronos (si existen) o notifica vía Realtime al frontend.
-4.  **UI de LeadsList/LeadKanban** se invalida (via `react-query`) y se re-dibuja con los leads nuevos.
+### A. Flujo de Autenticación Reactiva
+1.  **Interacción:** El usuario somete el formulario en `/login`.
+2.  **Mutación API:** El método `signIn` despacha la credencial a Supabase Auth.
+3.  **Suscripción a Eventos:** En el useEffect principal de `useAuth`, el listener `onAuthStateChange` captura el token exitoso entrante.
+4.  **Propagación de Estado:** El componente actualiza el estado `session` a nivel global.
+5.  **Renderizado Seguro:** El guard de ruta `<ProtectedRoute>` avala el JWT y transiciona automáticamente la UI principal (`<Index />`), activando la hidratación asíncrona de datos del usuario actual y preferencias.
 
-### Flujo 2: Autenticación y Verificación
-1.  **Usuario** se registra con `signUp` en `Auth.tsx`.
-2.  **Supabase Auth** almacena el registro en estado *unverified* y manda un correo de validación configurado en el Dashboard de Supabase.
-3.  **Usuario** hace click en el correo, navega a la URL con hash (accesible por Supabase client).
-4.  `useAuth` capta el evento de cambio de sesión (`onAuthStateChange`), actualiza el contexto y `ProtectedRoute` permite el acceso a `/`.
+### B. Flujo CRUD Optimista (Actualización de Estado en Pipeline de Ventas)
+1.  **Interacción:** En la vista `<LeadKanban />`, el usuario arrastra la tarjeta de un prospecto de "Nuevo" a "Contactado".
+2.  **Ejecución de Hook:** Se invoca a `updateLeadStatus` desde `useLeads`.
+3.  **Actualización Optimista (Caché local):** React Query intercepta el evento `onMutate`, congela re-peticiones y modifica inmediatamente el arreglo cacheado en memoria; la UI se re-pinta instantáneamente dando un "UX" fluido.
+4.  **Confirmación API:** Paralelamente, se ejecuta la petición SQL asincrónica real hacia Supabase.
+5.  **Liquidación:** Si ocurre fallo de red (`onError`), se restaura la variable original (Rollback). Si tiene éxito, se despacha en el `onSuccess` el logging de auditoría en la tabla `lead_activities` y se marca la llave como `stale` para refrescos subyacentes.
 
 ---
 
-## 6. Puntos de Mejora (Auditoría)
+## 6. Puntos de Mejora (Auditoría Arquitectónica y Código Limpio)
 
-Basado en la revisión arquitectónica del repositorio, se identifican las siguientes áreas de optimización:
+Una revisión profunda basada en principios S.O.L.I.D. y diseño de SPA, detecta importantes oportunidades de refactorización para garantizar una escalabilidad a largo plazo:
 
-1.  **Manejo de Errores Global (Error Boundaries):**
-    *   *Hallazgo:* La aplicación React carece de un *Error Boundary* explícito a nivel de enrutador en caso de fallos catastróficos de JS.
-    *   *Sugerencia:* Implementar un `<ErrorBoundary>` rodeando el `<Routes>` en `App.tsx` para mostrar fallos gráciles y evitar pantallas en blanco.
-2.  **Modularización del Routing:**
-    *   *Hallazgo:* `src/App.tsx` comienza a sobrecargarse de rutas y proveedore de contexto anidados (Provider Hell).
-    *   *Sugerencia:* Extraer las rutas a un archivo `routes.tsx` dedicado usando la nueva API de `createBrowserRouter` de React Router v6.
-3.  **Refactor de Componentes Monolíticos (SRP / Clean Architecture):**
-    *   *Hallazgo:* Vistas como `LeadsList.tsx` manejan estado visual, lógica de filtros y llamadas a red implícitas (o combinaciones pesadas de hooks).
-    *   *Sugerencia:* Aplicar el patrón Container/Presentational. Separar los *hooks custom* de obtención de leads de las puras tablas de renderizado.
-4.  **Seguridad Backend (Edge Functions):**
-    *   *Hallazgo:* En `crm-api`, el control de inyección SQL basado en Regex es frágil (`containsSqlInjection`).
-    *   *Sugerencia:* No construir queries crudas jamás en Deno/Supabase. Utilizar exclusivamente el Query Builder tipado de Supabase (`supabase.from().select()`), el cual automáticamente prepara los "statements" e imposibilita SQL Injections de primer orden, haciendo redundante el Regex ineficiente.
+1.  **Sobrecarga del Componente `src/pages/Index.tsx` (Monolito de Routing):**
+    *   **Diagnóstico:** El archivo `Index.tsx` actualmente opera como un enorme router local manejando múltiples pestañas con un `switch(activeTab)`. Esto obliga a empaquetar todos los módulos grandes (`Dashboard`, `Leads`, `Reports`, `Editors`, `Mail`) en un solo bulto sincrónico, perjudicando el tiempo de carga (Time To Interactive).
+    *   **Refactorización sugerida:** Transicionar este componente a un sistema de rutas de primer nivel mediante `<Outlet />` de `react-router-dom`. Cada sub-módulo debería estar apoyado por **Code Splitting (Lazy Loading)** usando `React.lazy()` y `Suspense`, delegando eficientemente fragmentos de código.
+
+2.  **Carencia de *Error Boundaries* en Enrutador Principal:**
+    *   **Diagnóstico:** Actualmente, una excepción no capturada de JavaScript en cualquier submódulo montado crashearía el ciclo de vida entero de `App.tsx` dejando la pantalla en blanco.
+    *   **Refactorización sugerida:** Implementar un HOC (Higher-Order Component) `<ErrorBoundary>` cubriendo las capas de rutas y el interior de los módulos pesados. Esto permitiría a la interfaz fallar elegantemente y ofrecer botones de "Forzar Recarga".
+
+3.  **Alto Acoplamiento en Componentes Complejos (ej: `LeadsList`):**
+    *   **Diagnóstico:** Archivos que manejan listas suelen combinar filtros de UI, hooks asincrónicos, exportación a CSV/Excel y maquetación JSX dentro de las mismas cientos de líneas de código.
+    *   **Refactorización sugerida (SRP - Single Responsibility):** Mover toda la capa de filtrado, la capa de exportación y los constructores de tablas hacia hooks o componentes abstractos puros. Usar Patrón *Smart/Dumb components*, delegando a vistas de UI (Presentational) el JSX puro e invadiendo lógicas complejas un nivel más arriba (Container).
+
+4.  **Estandarización de Endpoints con Cliente Backend (Edge Functions):**
+    *   **Diagnóstico:** Muchos de los hooks (ej: `useLeads`, `useBudgetRequests`) usan métodos directos con `supabase.from()` o inyectan llamadas HTTP directamente a Edge Functions repitiendo lógicas y headers.
+    *   **Refactorización sugerida:** Envolver las operaciones a través del concepto de factorías y servicios (`src/services/api/`) para un control robusto de errores o retries; definiendo explícitamente las interfaces de Input/Output antes de que estas pasen a la mutación de TanStack Query.
