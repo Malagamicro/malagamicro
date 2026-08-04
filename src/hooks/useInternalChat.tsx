@@ -91,36 +91,47 @@ export function useInternalChat() {
 
       const profileMap = new Map(profiles?.map(p => [p.user_id, p]) || []);
 
-      const conversationsWithDetails = await Promise.all(
-        (convs || []).map(async (conv) => {
-          const participants = allParticipants
-            ?.filter(p => p.conversation_id === conv.id)
-            .map(p => ({ ...p, profile: profileMap.get(p.user_id) })) || [];
+      // Batch fetch all messages for these conversations in a single query (eliminates N+1 loop)
+      const { data: allMessages } = await supabase
+        .from('internal_messages')
+        .select('*')
+        .in('conversation_id', convIds)
+        .order('created_at', { ascending: false });
 
-          const { data: lastMessages } = await supabase
-            .from('internal_messages')
-            .select('*')
-            .eq('conversation_id', conv.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          const myParticipation = participants.find(p => p.user_id === user.id);
-          const lastReadAt = myParticipation?.last_read_at;
-
-          let unreadCount = 0;
-          if (lastReadAt) {
-            const { count } = await supabase
-              .from('internal_messages')
-              .select('*', { count: 'exact', head: true })
-              .eq('conversation_id', conv.id)
-              .gt('created_at', lastReadAt)
-              .neq('sender_id', user.id);
-            unreadCount = count || 0;
+      const lastMessageMap = new Map<string, any>();
+      if (allMessages) {
+        for (const msg of allMessages) {
+          if (!lastMessageMap.has(msg.conversation_id)) {
+            lastMessageMap.set(msg.conversation_id, msg);
           }
+        }
+      }
 
-          return { ...conv, participants, last_message: lastMessages?.[0], unread_count: unreadCount };
-        })
-      );
+      const conversationsWithDetails = (convs || []).map((conv) => {
+        const participants = allParticipants
+          ?.filter(p => p.conversation_id === conv.id)
+          .map(p => ({ ...p, profile: profileMap.get(p.user_id) })) || [];
+
+        const myParticipation = participants.find(p => p.user_id === user.id);
+        const lastReadAt = myParticipation?.last_read_at;
+
+        let unreadCount = 0;
+        if (lastReadAt && allMessages) {
+          const lastReadTime = new Date(lastReadAt).getTime();
+          unreadCount = allMessages.filter(
+            m => m.conversation_id === conv.id &&
+                 new Date(m.created_at).getTime() > lastReadTime &&
+                 m.sender_id !== user.id
+          ).length;
+        }
+
+        return {
+          ...conv,
+          participants,
+          last_message: lastMessageMap.get(conv.id),
+          unread_count: unreadCount,
+        };
+      });
 
       return conversationsWithDetails as Conversation[];
     },
