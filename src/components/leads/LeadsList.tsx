@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Lead, LeadStatus, LeadSegment } from '@/types/lead';
 import { LeadCard } from './LeadCard';
 import { Input } from '@/components/ui/input';
@@ -70,7 +70,6 @@ export function LeadsList({
   onLoadMore,
 }: LeadsListProps) {
   const { folders } = useLeadFolders();
-  const { bulkDeleteLeads, isBulkDeleting } = useLeads();
   const { configs } = useGoogleSheetsConfigs();
   const mainConfig = configs[0];
   const { sync, isSyncing } = useGoogleSheetsSync(mainConfig?.id);
@@ -84,6 +83,15 @@ export function LeadsList({
   };
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
   const [segmentFilter, setSegmentFilter] = useState<LeadSegment | 'all'>('all');
   const [folderFilter, setFolderFilter] = useState<string>('all');
@@ -93,23 +101,19 @@ export function LeadsList({
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const filteredAndSortedLeads = useMemo(() => {
-    const filtered = leads.filter((lead) => {
-      const matchesSearch = 
-        lead.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.contactName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lead.city.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
-      const matchesSegment = segmentFilter === 'all' || lead.segment === segmentFilter;
-      const matchesFolder = folderFilter === 'all' || 
-        (folderFilter === 'none' ? !lead.folderId : lead.folderId === folderFilter);
-      
-      return matchesSearch && matchesStatus && matchesSegment && matchesFolder;
-    });
+  const { leads: serverLeads, totalCount: serverTotalCount, bulkDeleteLeads, isBulkDeleting } = useLeads({
+    search: debouncedSearchTerm,
+    status: statusFilter,
+    segment: segmentFilter,
+    folderId: folderFilter,
+  });
 
-    // Sort the filtered leads
-    return [...filtered].sort((a, b) => {
+  const isFiltering = debouncedSearchTerm.trim() !== '' || statusFilter !== 'all' || segmentFilter !== 'all' || folderFilter !== 'all';
+  const activeLeads = isFiltering ? serverLeads : leads;
+  const activeTotalCount = isFiltering ? serverTotalCount : (totalCount ?? leads.length);
+
+  const filteredAndSortedLeads = useMemo(() => {
+    return [...activeLeads].sort((a, b) => {
       switch (sortBy) {
         case 'score':
           return (b.score ?? 0) - (a.score ?? 0);
@@ -120,7 +124,7 @@ export function LeadsList({
           return b.createdAt.getTime() - a.createdAt.getTime();
       }
     });
-  }, [leads, searchTerm, statusFilter, segmentFilter, folderFilter, sortBy]);
+  }, [activeLeads, sortBy]);
 
   const toggleLeadSelection = (leadId: string) => {
     setSelectedLeadIds(prev => 
@@ -167,7 +171,7 @@ export function LeadsList({
           <div className="min-w-0">
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Leads</h1>
             <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-              {filteredAndSortedLeads.length} de {leads.length} leads
+              {filteredAndSortedLeads.length} de {activeTotalCount} leads
               {selectedLeadIds.length > 0 && (
                 <span className="text-primary ml-2">
                   ({selectedLeadIds.length} selec.)

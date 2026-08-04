@@ -56,11 +56,16 @@ interface LeadsPage {
   totalCount: number;
 }
 
-export function useLeads() {
+export function useLeads(options?: { search?: string; status?: string; segment?: string; folderId?: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { logLeadCreated, logLeadUpdated, logLeadDeleted, logLeadStatusChanged, logLeadsImported } = useAuditLog();
+
+  const searchKey = options?.search?.trim() || '';
+  const statusKey = options?.status || 'all';
+  const segmentKey = options?.segment || 'all';
+  const folderKey = options?.folderId || 'all';
 
   // Paginated query with useInfiniteQuery
   const {
@@ -71,14 +76,33 @@ export function useLeads() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['leads'],
+    queryKey: ['leads', searchKey, statusKey, segmentKey, folderKey],
     queryFn: async ({ pageParam = 0 }): Promise<LeadsPage> => {
       const from = pageParam;
       const to = from + PAGE_SIZE - 1;
 
-      const { data, error, count } = await supabase
+      let query = supabase
         .from('leads')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'exact' });
+
+      if (searchKey) {
+        query = query.or(`company_name.ilike.%${searchKey}%,contact_name.ilike.%${searchKey}%,city.ilike.%${searchKey}%,email.ilike.%${searchKey}%`);
+      }
+      if (statusKey !== 'all') {
+        query = query.eq('status', statusKey);
+      }
+      if (segmentKey !== 'all') {
+        query = query.eq('segment', segmentKey);
+      }
+      if (folderKey !== 'all') {
+        if (folderKey === 'none') {
+          query = query.is('folder_id', null);
+        } else {
+          query = query.eq('folder_id', folderKey);
+        }
+      }
+
+      const { data, error, count } = await query
         .order('created_at', { ascending: false })
         .range(from, to);
       
