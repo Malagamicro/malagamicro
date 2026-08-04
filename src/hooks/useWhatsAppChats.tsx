@@ -310,6 +310,8 @@ export function useWhatsAppChats() {
       let syncedChats = 0;
       let syncedMessages = 0;
 
+      const allMessagesToUpsert: any[] = [];
+
       for (const chat of evolutionChats) {
         const phone = chat.remoteJid.replace(/@s\.whatsapp\.net$/, '');
         const chatId = chat.remoteJid;
@@ -359,7 +361,7 @@ export function useWhatsAppChats() {
           }
         }
 
-        // Fetch and sync last messages for this chat
+        // Fetch and queue last messages for this chat
         const messages = await fetchChatMessages(chatId, 30);
         
         for (const msg of messages) {
@@ -375,8 +377,7 @@ export function useWhatsAppChats() {
             ? new Date(msg.messageTimestamp * 1000).toISOString()
             : new Date().toISOString();
 
-          // Use upsert with message_id to prevent duplicates (unique index)
-          const { error: insertError } = await supabase.from('waha_messages').upsert({
+          allMessagesToUpsert.push({
             chat_id: chatId,
             content: content || (msgType !== 'text' ? `[${msgType}]` : ''),
             from_me: msg.key.fromMe ?? false,
@@ -385,9 +386,21 @@ export function useWhatsAppChats() {
             message_id: msg.key.id,
             media_url: msg.mediaUrl || null,
             message_type: msgType,
-          }, { onConflict: 'message_id', ignoreDuplicates: true });
+          });
+        }
+      }
 
-          if (!insertError) syncedMessages++;
+      // Bulk upsert messages in batches of 200 to prevent HTTP overhead and browser freezing
+      const BATCH_SIZE = 200;
+      for (let i = 0; i < allMessagesToUpsert.length; i += BATCH_SIZE) {
+        const chunk = allMessagesToUpsert.slice(i, i + BATCH_SIZE);
+        const { error: insertError } = await supabase.from('waha_messages').upsert(chunk, {
+          onConflict: 'message_id',
+          ignoreDuplicates: true,
+        });
+
+        if (!insertError) {
+          syncedMessages += chunk.length;
         }
       }
 
