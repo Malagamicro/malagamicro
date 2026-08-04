@@ -111,39 +111,9 @@ export function useEmailMessages(profileId?: string) {
     return () => { supabase.removeChannel(channel); };
   }, [user, fetchMessages]);
 
-  // Auto-sync every 2 minutes
-  useEffect(() => {
-    if (!user) return;
-
-    const doAutoSync = async () => {
-      try {
-        const { data: allProfiles } = await supabase
-          .from('email_profiles')
-          .select('id, imap_host, imap_user, imap_password')
-          .not('imap_host', 'is', null)
-          .not('imap_user', 'is', null)
-          .not('imap_password', 'is', null);
-        
-        const validProfiles = (allProfiles || []).filter(
-          p => p.imap_host?.trim() && p.imap_user?.trim() && p.imap_password?.trim()
-        );
-
-        if (validProfiles.length === 0) return;
-
-        for (const p of validProfiles) {
-          try {
-            await supabase.functions.invoke('imap-check', {
-              body: { profile_id: p.id, action: 'sync' }
-            });
-          } catch { /* silent */ }
-        }
-        await fetchMessages();
-      } catch { /* silent */ }
-    };
-
-    const interval = setInterval(doAutoSync, AUTO_SYNC_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [user, fetchMessages]);
+  // NOTE: Periodic client-side auto-sync interval removed to prevent multi-user concurrency storms.
+  // Updates are received in realtime via the postgres_changes subscription above,
+  // or on-demand when user clicks manual sync (syncInbox).
 
   const syncProfilePaginated = async (pId: string): Promise<number> => {
     let totalInserted = 0;

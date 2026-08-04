@@ -403,44 +403,8 @@ export function useWhatsAppChats() {
     },
   });
 
-  // Auto-sync every 5 minutes in the background
-  const autoSyncRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  
-  useEffect(() => {
-    if (!user?.id) return;
-    
-    // Initial silent sync after 10 seconds
-    const initialTimeout = setTimeout(() => {
-      syncFromEvolution.mutate(undefined, {
-        onSuccess: (result) => {
-          // Silent - no toast for auto-sync, only log
-          console.log(`🔄 Auto-sync: ${result.synced} chats, ${result.messages} messages`);
-          queryClient.invalidateQueries({ queryKey: ['whatsapp-chats'] });
-          queryClient.invalidateQueries({ queryKey: ['whatsapp-messages'] });
-        },
-        onError: () => { /* silent */ },
-      });
-    }, 10000);
-
-    // Then every 5 minutes
-    autoSyncRef.current = setInterval(() => {
-      if (!syncFromEvolution.isPending) {
-        syncFromEvolution.mutate(undefined, {
-          onSuccess: (result) => {
-            console.log(`🔄 Auto-sync: ${result.synced} chats, ${result.messages} messages`);
-            queryClient.invalidateQueries({ queryKey: ['whatsapp-chats'] });
-            queryClient.invalidateQueries({ queryKey: ['whatsapp-messages'] });
-          },
-          onError: () => { /* silent */ },
-        });
-      }
-    }, 5 * 60 * 1000);
-
-    return () => {
-      clearTimeout(initialTimeout);
-      if (autoSyncRef.current) clearInterval(autoSyncRef.current);
-    };
-  }, [user?.id]);
+  // NOTE: Client-side periodic auto-sync interval removed to prevent multi-client concurrency storms.
+  // Updates are received in realtime via WebSockets or on-demand when user clicks manual sync.
 
   // NOTE: Realtime subscriptions are now handled by useRealtimeConnection hook
   // This prevents duplicate subscriptions and provides centralized connection management
