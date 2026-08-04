@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 type Message = { role: 'system' | 'user' | 'assistant'; content: string };
@@ -41,11 +42,12 @@ export function useAICompletion(options: UseAICompletionOptions = {}) {
         : messages;
 
       try {
+        const { data: { session } } = await supabase.auth.getSession();
         const resp = await fetch(AI_COMPLETION_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${session?.access_token || ''}`,
           },
           body: JSON.stringify({
             messages: allMessages,

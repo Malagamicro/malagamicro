@@ -172,11 +172,12 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
       const sampleRows = data.slice(1, 4).map(row => 
         row.map((c, ci) => getCellDisplay(data, data.indexOf(row), ci))
       );
+      const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spreadsheet-nlp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${session?.access_token || ''}`,
         },
         body: JSON.stringify({
           query: nlpQuery,
@@ -238,11 +239,12 @@ function SpreadsheetEditor({ data, onChange }: { data: SpreadsheetCell[][]; onCh
       if (Object.values(rowValues).every(v => !v.trim())) continue;
 
       try {
+        const { data: { session } } = await supabase.auth.getSession();
         const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/spreadsheet-nlp`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${session?.access_token || ''}`,
           },
           body: JSON.stringify({
             query: col.prompt,
@@ -924,11 +926,12 @@ export function DocumentEditor({ initialContent = '', initialTitle = '', onSaveT
     setIsStreaming(true);
     let assistantContent = '';
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/document-ai`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${session?.access_token || ''}`,
         },
         body: JSON.stringify({ messages, action, fileType: docType || 'markdown' }),
       });

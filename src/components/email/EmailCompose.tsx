@@ -155,9 +155,13 @@ export function EmailCompose({ initialData }: EmailComposeProps) {
     const COMPOSE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compose-email-ai`;
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch(COMPOSE_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`
+        },
         body: JSON.stringify({ messages: newMessages, context: `Perfil de envío: ${selectedProfile?.from_name || ''} <${selectedProfile?.from_email || ''}>` }),
       });
       if (!resp.ok) { const errData = await resp.json().catch(() => ({})); throw new Error(errData.error || 'Error de IA'); }

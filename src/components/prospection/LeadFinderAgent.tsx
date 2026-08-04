@@ -51,7 +51,7 @@ export function LeadFinderAgent() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'Authorization': `Bearer ${session?.access_token || ''}`,
           },
           body: JSON.stringify({
             messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),

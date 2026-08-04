@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useMessageTemplates, MessageTemplate } from '@/hooks/useMessageTemplates';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
@@ -145,11 +146,12 @@ export default function Templates() {
     if (!aiPrompt.trim()) return;
     setIsGeneratingAi(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/document-ai`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${session?.access_token || ''}`,
         },
         body: JSON.stringify({
           action: 'write',

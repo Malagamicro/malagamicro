@@ -143,7 +143,7 @@ export function PerplexityChatbot() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        'Authorization': `Bearer ${token || ''}`,
       },
       body: JSON.stringify({ 
         messages: userMessages,
@@ -331,7 +331,7 @@ export function PerplexityChatbot() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          'Authorization': `Bearer ${token || ''}`,
         },
         body: JSON.stringify({
           messages: contextMessages,
