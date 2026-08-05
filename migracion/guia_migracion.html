@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guía Técnica de Migración y Despliegue en VPS - MalagaMicro CRM</title>
+  <style>
+    /* CSS Reset & Styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1e293b;
+      background-color: #ffffff;
+      line-height: 1.6;
+      font-size: 13.5px;
+      padding: 40px;
+      max-width: 850px;
+      margin: 0 auto;
+    }
+
+    /* Print & PDF Setup */
+    @page {
+      size: A4;
+      margin: 15mm;
+    }
+
+    @media print {
+      body {
+        padding: 0;
+        max-width: 100%;
+        font-size: 11.5px;
+        color: #000000;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      .section-block, .warning-box, pre, .repo-banner {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      a {
+        text-decoration: none;
+        color: #000000;
+      }
+    }
+
+    /* Header & Titles */
+    header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .important-notice {
+      background-color: #f8fafc;
+      border-left: 4px solid #0f172a;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #334155;
+    }
+
+    /* Repository Link Banner */
+    .repo-banner {
+      background-color: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 24px;
+    }
+
+    .repo-banner strong {
+      color: #0f172a;
+      font-size: 13px;
+    }
+
+    .repo-link {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #2563eb;
+      word-break: break-all;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    /* Sections & Cards */
+    .section-block {
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    p {
+      margin-bottom: 10px;
+      color: #334155;
+    }
+
+    ul, ol {
+      padding-left: 20px;
+      margin-bottom: 12px;
+    }
+
+    li {
+      margin-bottom: 6px;
+      color: #334155;
+    }
+
+    li strong {
+      color: #0f172a;
+    }
+
+    /* Warning Box for Refactoring Alert */
+    .warning-box {
+      background-color: #fef2f2;
+      border-left: 4px solid #dc2626;
+      border-right: 1px solid #fecaca;
+      border-top: 1px solid #fecaca;
+      border-bottom: 1px solid #fecaca;
+      border-radius: 4px;
+      padding: 14px 16px;
+      margin: 16px 0;
+    }
+
+    .warning-title {
+      font-weight: 700;
+      color: #991b1b;
+      font-size: 13px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .warning-content {
+      color: #7f1d1d;
+      font-size: 12.5px;
+    }
+
+    /* Task Sub-items */
+    .task-block {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+    }
+
+    .task-title {
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    /* Code Snippets */
+    pre {
+      background-color: #0f172a;
+      color: #f8fafc;
+      border-radius: 4px;
+      padding: 12px 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      overflow-x: auto;
+      margin: 10px 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background-color: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 12px;
+      border: 1px solid #cbd5e1;
+    }
+
+    /* Web Bar */
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .print-btn {
+      background-color: #0f172a;
+      color: #ffffff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .print-btn:hover {
+      background-color: #334155;
+    }
+
+    .doc-meta {
+      font-size: 12px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="action-bar no-print">
+    <span class="doc-meta">Documento Técnico — MálagaMicro CRM</span>
+    <button class="print-btn" onclick="window.print()">Guardar / Imprimir como PDF</button>
+  </div>
+
+  <header>
+    <h1>Guía Técnica de Migración y Despliegue en VPS: MalagaMicro CRM</h1>
+    <div class="subtitle">Documento técnico para migración a infraestructura propia y base de datos nueva</div>
+  </header>
+
+  <div class="important-notice">
+    <strong>Importante para el desarrollador a cargo:</strong> Este documento contiene la hoja de ruta para migrar el CRM desde Lovable Cloud hacia infraestructura propia (VPS) y base de datos limpia.
+  </div>
+
+  <section class="repo-banner">
+    <p><strong>Repositorio de Código Fuente:</strong></p>
+    <a href="https://github.com/Malagamicro/malagamicro.git" class="repo-link" target="_blank">https://github.com/Malagamicro/malagamicro.git</a>
+  </section>
+
+  <!-- SECCIÓN 1 -->
+  <section class="section-block">
+    <h2>1. Preparación de la Infraestructura (VPS Existente)</h2>
+    <p>Dado que el VPS ya está provisionado, el desarrollador deberá verificar que cuenta con el siguiente stack operativo antes de iniciar el despliegue:</p>
+    <ul>
+      <li><strong>Motor de Contenedores:</strong> Docker Engine y Docker Compose instalados.</li>
+      <li><strong>Gestión de Despliegue:</strong> Coolify (o alternativa como Portainer/Traefik) para gestión de variables de entorno y certificados SSL automáticos.</li>
+      <li><strong>Networking:</strong> Puertos 80 y 443 abiertos; dominio/subdominio apuntando a la IP del VPS.</li>
+    </ul>
+  </section>
+
+  <!-- SECCIÓN 2 -->
+  <section class="section-block">
+    <h2>2. Inicialización de la Nueva Base de Datos</h2>
+    <p>El proyecto requiere abandonar la base de datos de Lovable y levantar una instancia nueva y limpia (recomendado PostgreSQL 14+ / Supabase autohosteado o en Supabase Cloud).</p>
+    <ul>
+      <li>
+        <strong>Ejecución del Esquema Inicial:</strong> El archivo SQL preparado debe ejecutarse en el siguiente orden estricto para evitar errores de Foreign Keys:
+        <ol style="margin-top: 6px;">
+          <li>Tablas base (Leads, Tareas, Presupuestos).</li>
+          <li>Tablas de integración (WhatsApp, Emails).</li>
+          <li>Funciones RPC y Triggers.</li>
+        </ol>
+      </li>
+      <li style="margin-top: 8px;">
+        <strong>Configuración de Seguridad (RLS - Row Level Security):</strong><br>
+        <em>Crítico:</em> Las políticas RLS deben re-aplicarse a la nueva base de datos. Si el desarrollador omite este paso, el frontend devolverá errores <code>401 Unauthorized</code> al intentar leer/escribir datos, o peor aún, los usuarios tendrán acceso a datos cruzados.
+      </li>
+      <li style="margin-top: 8px;">
+        <strong>Migración de Storage:</strong> Los buckets para adjuntos (facturas, fotos de perfil) deben crearse manualmente en la nueva instancia con sus respectivas políticas de acceso público/privado.
+      </li>
+    </ul>
+  </section>
+
+  <!-- SECCIÓN 3 -->
+  <section class="section-block">
+    <h2>3. Configuración de Variables de Entorno (.env)</h2>
+    <p>El nuevo entorno de producción requiere un <code>.env</code> completo. El desarrollador deberá sustituir las variables de Lovable por las de la nueva infraestructura:</p>
+    <pre>VITE_SUPABASE_URL="[URL_NUEVA_BASE_DATOS]"
+VITE_SUPABASE_ANON_KEY="[NUEVA_ANON_KEY]"
+VITE_WAHA_API_URL="[NUEVO_ENDPONT_WAHA_CON_SSL]" # Eliminar el trycloudflare temporal
+VITE_N8N_WEBHOOK_URL="[URL_N8N_PRODUCCION]"</pre>
+  </section>
+
+  <!-- SECCIÓN 4 -->
+  <section class="section-block">
+    <h2>4. Despliegue de Backend (Edge Functions)</h2>
+    <p>El CRM depende de 52 Edge Functions en Deno para lógica de negocio pesada (envío de correos, comprobación IMAP, IA).</p>
+    <ul>
+      <li>El desarrollador debe desplegar el directorio <code>/supabase/functions</code> en el nuevo entorno usando la CLI de Supabase.</li>
+      <li>Deben configurarse los secretos (API Keys de OpenAI, Perplexity, SMTP) de forma independiente para el runtime de las funciones.</li>
+    </ul>
+  </section>
+
+  <!-- SECCIÓN 5 -->
+  <section class="section-block">
+    <h2>5. Configuración de Red Externa (WhatsApp & CORS)</h2>
+    <ul>
+      <li>
+        <strong>Problema de Mixed Content:</strong> Actualmente, el frontend hace llamadas directas a las APIs de WAHA/Evolution. Al subir la app web a HTTPS, los navegadores bloquearán estas llamadas si el servidor de WhatsApp no tiene un dominio con SSL válido y cabeceras CORS configuradas.
+      </li>
+      <li style="margin-top: 8px;">
+        <strong>Solución requerida:</strong> El desarrollador deberá levantar un proxy inverso en el VPS para canalizar el tráfico de WhatsApp por HTTPS, o refactorizar el frontend para que las llamadas pasen siempre por el backend en lugar de ir directas de cliente a servidor externo.
+      </li>
+    </ul>
+  </section>
+
+  <footer style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 12px; text-align: center; font-size: 11px; color: #94a3b8;">
+    Guía Técnica de Migración y Despliegue en VPS — MalagaMicro CRM
+  </footer>
+
+</body>
+</html>
