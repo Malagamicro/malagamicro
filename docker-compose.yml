@@ -1,0 +1,26 @@
+# ==============================================================================
+# MalagaMicro CRM — Despliegue del frontend
+#
+#   PC local:        docker compose up -d --build     -> http://localhost:8081
+#   Servidor cloud:  igual, poniendo un proxy inverso (Traefik/Caddy/Nginx) con
+#                    SSL delante del puerto 8081.
+#
+# Requiere un fichero .env en la raíz (copia .env.example y rellénalo).
+# El backend (PostgreSQL + Auth + Storage + Edge Functions) es Supabase:
+# puede ser Supabase Cloud o Supabase autohospedado (ver docs/DESPLIEGUE_LOCAL_Y_CLOUD.md).
+# ==============================================================================
+
+services:
+  crm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
+    image: malagamicro-crm:latest
+    container_name: malagamicro-crm
+    restart: unless-stopped
+    ports:
+      - "${CRM_PORT:-8081}:80"
