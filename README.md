@@ -10,6 +10,7 @@ Sistema integral de gestión de clientes, prospectos y operaciones comerciales. 
 |-----------|-------------|
 | [Documentación Maestra](./docs/DOCUMENTACION_MAESTRA.md) | Arquitectura, módulos core, flujos de datos y puntos de mejora |
 | [Integración N8N](./docs/INTEGRACION_N8N_DOCUMENTACION.md) | Webhooks, automatizaciones y conexión con StelOrder |
+| [Despliegue local y cloud](./docs/DESPLIEGUE_LOCAL_Y_CLOUD.md) | Ejecutar el CRM en un PC o servidor propio (Docker, Nginx, Supabase) |
 
 ---
 
