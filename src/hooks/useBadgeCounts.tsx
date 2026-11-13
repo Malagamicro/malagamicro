@@ -82,7 +82,6 @@ export function useBadgeCounts(): BadgeCounts {
         .from('osticket_tickets')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .neq('status', 'closed')
         .gte('created_at', oneDayAgo);
       return count || 0;
     },
